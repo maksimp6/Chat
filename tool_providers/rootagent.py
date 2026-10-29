@@ -3,9 +3,9 @@
 ``rootagent_run`` dispatches the ``rootagent_command`` action of the Redmi 9 app
 server workflow on ``develop`` and returns the run id at once. ``rootagent_result``
 reads that run's status and, once the run has finished, its JSON result artifact.
-The device work happens only inside that job, in the ``rootagent-command``
-environment on the existing runner, and only five bounded commands are allowed:
-no text, keys, unlock, PIN or retry of an uncertain input.
+Logos drives the owner's phone as a user: status, probe, capture, tap, swipe,
+text, key, and the legacy relative move/click. The device work happens only
+inside that job, on the existing runner and only for ``develop``.
 
 The token and the repository come from the server environment
 (``LOGOS_ROOTAGENT_DISPATCH_TOKEN``, ``LOGOS_ROOTAGENT_REPOSITORY``). The token is
@@ -34,21 +34,30 @@ WORKFLOW_FILE = "redmi9-app-server.yml"
 WORKFLOW_PATH = ".github/workflows/" + WORKFLOW_FILE
 ACTION = "rootagent_command"
 BRANCH = "develop"
-COMMANDS = ("status", "probe", "capture", "move", "click")
-# Commands that capture or move the device: each one needs the caller's approval.
-GATED_COMMANDS = frozenset({"capture", "move", "click"})
+COMMANDS = (
+    "status",
+    "probe",
+    "capture",
+    "move",
+    "click",
+    "tap",
+    "swipe",
+    "text",
+    "key",
+)
 DELTA_LIMIT = 500
+COORD_LIMIT = 99999
+DURATION_LIMIT = 60000
+TEXT_LIMIT = 4096
 PACKAGE_PATTERN = r"[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+"
 PACKAGE = re.compile(PACKAGE_PATTERN)
+KEYCODE_PATTERN = r"KEYCODE_[A-Z0-9_]+|[0-9]{1,4}"
+KEYCODE = re.compile(KEYCODE_PATTERN)
 REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 RESULT_ARTIFACT = "rootagent-command"
 CAPTURE_ARTIFACT = "rootagent-capture"
 RESULT_FILE = "rootagent-result.json"
 REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
-APPROVAL_MESSAGE = (
-    "Для команд capture, move и click нужно подтверждение владельца: "
-    "без него запуск на телефоне не отправлен"
-)
 
 
 class _Failure(Exception):
@@ -73,32 +82,65 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 _OPENER = urllib.request.build_opener(_NoRedirect)
 
 
-def _approved(cfg: Mapping[str, Any] | None) -> bool:
-    context = cfg.get("_universal_context") if isinstance(cfg, Mapping) else None
-    call = context.get("call") if isinstance(context, Mapping) else None
-    return bool(getattr(call, "approved", False)) if call is not None else False
+def _bounded_int(args: Mapping[str, Any], key: str, low: int, high: int) -> int:
+    value = args.get(key)
+    if type(value) is not int or not low <= value <= high:
+        raise ValueError(f"{key} должен быть целым числом от {low} до {high}")
+    return value
+
+
+def _coord(args: Mapping[str, Any], key: str) -> int:
+    return _bounded_int(args, key, 0, COORD_LIMIT)
 
 
 def _validated(args: Mapping[str, Any]) -> tuple[str, str]:
-    """The command and the workflow's rootagent_args text, under the job's own rules."""
+    """The command and the workflow's rootagent_args text, under the job's own rules.
+
+    The device drives the whole phone as a user; the coordinates and deltas are
+    re-checked against the real screen on the device. No command is gated here.
+    """
     command = args.get("command")
     if command not in COMMANDS:
-        raise ValueError("command должна быть одной из: status, probe, capture, move, click")
-    dx, dy, package = args.get("dx"), args.get("dy"), args.get("package")
+        raise ValueError("command должна быть одной из: " + ", ".join(COMMANDS))
+    package = args.get("package")
     if command in ("status", "probe"):
-        if dx is not None or dy is not None or package is not None:
-            raise ValueError(f"{command} не принимает dx, dy и package")
         return command, ""
-    if not isinstance(package, str) or PACKAGE.fullmatch(package) is None:
-        raise ValueError(f"{command} требует package вида com.example.app")
     if command == "capture":
-        if dx is not None or dy is not None:
-            raise ValueError("capture принимает только package")
+        if package is None:
+            return command, ""
+        if not isinstance(package, str) or PACKAGE.fullmatch(package) is None:
+            raise ValueError("capture принимает необязательный package вида com.example.app")
         return command, package
-    for label, value in (("dx", dx), ("dy", dy)):
-        if type(value) is not int or not -DELTA_LIMIT <= value <= DELTA_LIMIT:
-            raise ValueError(f"{label} должен быть целым числом от -500 до 500")
-    return command, f"{dx} {dy} {package}"
+    if command in ("move", "click"):
+        dx = _bounded_int(args, "dx", -DELTA_LIMIT, DELTA_LIMIT)
+        dy = _bounded_int(args, "dy", -DELTA_LIMIT, DELTA_LIMIT)
+        if package is None:
+            return command, f"{dx} {dy}"
+        if not isinstance(package, str) or PACKAGE.fullmatch(package) is None:
+            raise ValueError("package должен быть вида com.example.app")
+        return command, f"{dx} {dy} {package}"
+    if command == "tap":
+        return command, f"{_coord(args, 'x')} {_coord(args, 'y')}"
+    if command == "swipe":
+        x, y, x2, y2 = (_coord(args, key) for key in ("x", "y", "x2", "y2"))
+        duration = args.get("duration_ms")
+        if duration is None:
+            return command, f"{x} {y} {x2} {y2}"
+        duration = _bounded_int(args, "duration_ms", 1, DURATION_LIMIT)
+        return command, f"{x} {y} {x2} {y2} {duration}"
+    if command == "text":
+        text = args.get("text")
+        if not isinstance(text, str) or not text or len(text) > TEXT_LIMIT:
+            raise ValueError(f"text должен быть непустой строкой не длиннее {TEXT_LIMIT} символов")
+        if any(ch in text for ch in ("\x00", "\n", "\r")):
+            raise ValueError("text должен быть одной строкой без переводов строки")
+        return command, text
+    keycode = args.get("keycode")
+    if isinstance(keycode, int) and 0 <= keycode <= 9999:
+        keycode = str(keycode)
+    if not isinstance(keycode, str) or KEYCODE.fullmatch(keycode) is None:
+        raise ValueError("keycode должен быть вида KEYCODE_HOME или числом, например 3")
+    return command, keycode
 
 
 def _configured() -> tuple[str, str, str]:
@@ -254,16 +296,6 @@ def rootagent_run(
     arguments: Mapping[str, Any] | None, cfg: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:
     command, argument_text = _validated(dict(arguments or {}))
-    if command in GATED_COMMANDS and not _approved(cfg):
-        return {
-            "success": False,
-            "error": APPROVAL_MESSAGE,
-            "metadata": {
-                "phase": "approval_required",
-                "tool": "rootagent_run",
-                "command": command,
-            },
-        }
     try:
         token, owner, name = _configured()
         body = {
@@ -313,8 +345,8 @@ def rootagent_run(
         "submitted": True,
         "verified": False,
         "note": (
-            "Запуск поставлен в очередь. Результат читается через rootagent_result "
-            "по run_id; задание может ждать одобрения в окружении rootagent-command."
+            "Запуск поставлен в очередь на ветке develop. Результат читается через "
+            "rootagent_result по run_id."
         ),
     }
 
@@ -377,10 +409,66 @@ _RUN_PROPERTIES = {
         "type": "string",
         "enum": list(COMMANDS),
         "description": (
-            "status и probe только читают состояние; capture снимает экран; move и click "
-            "посылают относительное движение мыши, click дополнительно нажимает левую кнопку"
+            "status и probe читают состояние; capture снимает экран; tap нажимает в точке "
+            "(x, y); swipe проводит от (x, y) к (x2, y2); text вводит строку; key шлёт клавишу "
+            "(keycode); move и click — относительное движение мыши (dx, dy)"
         ),
     },
+    "x": _optional(
+        {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": COORD_LIMIT,
+            "description": "Абсолютная координата X экрана для tap и swipe",
+        }
+    ),
+    "y": _optional(
+        {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": COORD_LIMIT,
+            "description": "Абсолютная координата Y экрана для tap и swipe",
+        }
+    ),
+    "x2": _optional(
+        {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": COORD_LIMIT,
+            "description": "Конечная координата X для swipe",
+        }
+    ),
+    "y2": _optional(
+        {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": COORD_LIMIT,
+            "description": "Конечная координата Y для swipe",
+        }
+    ),
+    "duration_ms": _optional(
+        {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": DURATION_LIMIT,
+            "description": "Длительность swipe в миллисекундах; необязательно",
+        }
+    ),
+    "text": _optional(
+        {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": TEXT_LIMIT,
+            "description": "Строка для ввода командой text (одна строка, без переводов строки)",
+        }
+    ),
+    "keycode": _optional(
+        {
+            "type": "string",
+            "pattern": "^(?:" + KEYCODE_PATTERN + ")$",
+            "description": "Клавиша для key: имя вида KEYCODE_HOME, KEYCODE_BACK или число",
+        }
+    ),
     "dx": _optional(
         {
             "type": "integer",
@@ -401,7 +489,7 @@ _RUN_PROPERTIES = {
         {
             "type": "string",
             "pattern": "^" + PACKAGE_PATTERN + "$",
-            "description": "Имя пакета Android на переднем плане, например com.example.app; нужно для capture, move и click",
+            "description": "Необязательное имя пакета Android на переднем плане, например com.example.app",
         }
     ),
 }
@@ -412,12 +500,12 @@ ROOTAGENT_TOOLS: dict[str, dict[str, Any]] = {
     "rootagent_run": {
         "title": "Redmi 9 RootAgent: запуск команды",
         "description": (
-            "Запустить одну команду RootAgent на Redmi 9 через GitHub Actions. Разрешены только "
-            "status, probe, capture, move и click: текст, клавиши, разблокировка, PIN и повтор "
-            "неясного ввода не поддерживаются. Задание идёт только на ветке develop и может ждать "
-            "одобрения в окружении rootagent-command. Инструмент сразу возвращает run_id; результат "
-            "читайте через rootagent_result. Успешный ответ означает, что запуск принят, а не что "
-            "действие выполнено на телефоне. capture, move и click требуют подтверждения владельца."
+            "Управлять телефоном Redmi 9 как пользователь через GitHub Actions: status, probe, "
+            "capture (снимок экрана), tap (нажатие в точке), swipe (свайп), text (ввод строки), "
+            "key (клавиша, в т.ч. системная), move и click (относительная мышь). Задание идёт "
+            "на ветке develop. Инструмент сразу возвращает run_id; результат читайте через "
+            "rootagent_result. Успешный ответ означает, что запуск принят, а не что действие "
+            "уже выполнено на телефоне."
         ),
         "parameters": object_schema(_RUN_PROPERTIES, ["command"]),
         "capabilities": ["device", "rootagent", "github_actions"],

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Runner-only native RootAgent CLI; reuse the existing root mouse daemon.
+"""Runner-only native RootAgent CLI for the owner's rooted Redmi 9.
 
-Mouse coordinates are relative deltas, not absolute screen coordinates.
-An ACK means submitted, never that Android visibly applied the action.
+Drives the whole phone as a user: absolute tap, swipe, text and key input go
+through root /system/bin/input; capture reads the screen; move/click keep the
+legacy relative input through the existing root mouse daemon. submitted means
+the command was sent, never that Android visibly applied the action.
 """
 
 import argparse
@@ -144,6 +146,24 @@ def require_screen(expected=None):
     if expected is not None and state["package"] != expected:
         raise AgentError("foreground_package_mismatch")
     return state
+
+
+def screen_size():
+    """Current display size in pixels, for bounding absolute coordinates."""
+    out = bounded_command(["/system/bin/wm", "size"], 256).decode("utf-8", "replace")
+    match = re.search(r"Override size:\s*(\d+)x(\d+)", out) or re.search(
+        r"Physical size:\s*(\d+)x(\d+)", out
+    )
+    if match is None:
+        raise AgentError("screen_size_unknown")
+    return int(match.group(1)), int(match.group(2))
+
+
+def _bounded_int(value, low, high):
+    return type(value) is int and low <= value <= high
+
+
+KEYCODE = re.compile(r"KEYCODE_[A-Z0-9_]+|[0-9]{1,4}")
 
 
 def validate_png(png):
@@ -290,21 +310,32 @@ def submit_mouse(connection, command, dx, dy):
 
 def worker(request):
     command = request.get("command")
-    keys = (
-        {"command", "dx", "dy", "expected_package"}
-        if command in ("move", "click")
-        else {"command"}
-    )
-    if command == "capture" and "expected_package" in request:
-        keys.add("expected_package")
-    if set(request) != keys or command not in (
-        "status",
-        "probe",
-        "capture",
-        "move",
-        "click",
-        "wake",
-    ):
+    # Required and optional request keys per command. The owner drives the whole
+    # phone as a user: absolute tap/swipe, text and key input go through root
+    # /system/bin/input, which injects trusted events across the whole device.
+    required = {
+        "status": set(),
+        "probe": set(),
+        "wake": set(),
+        "capture": set(),
+        "move": {"dx", "dy"},
+        "click": {"dx", "dy"},
+        "tap": {"x", "y"},
+        "swipe": {"x", "y", "x2", "y2"},
+        "text": {"text"},
+        "key": {"keycode"},
+    }
+    optional = {
+        "capture": {"expected_package"},
+        "move": {"expected_package"},
+        "click": {"expected_package"},
+        "swipe": {"duration_ms"},
+    }
+    if command not in required:
+        raise AgentError("invalid_worker_request")
+    allowed = {"command"} | required[command] | optional.get(command, set())
+    present = set(request)
+    if not ({"command"} | required[command]) <= present <= allowed:
         raise AgentError("invalid_worker_request")
     device_guard()
     if command == "status":
@@ -314,6 +345,10 @@ def worker(request):
             mouse_ready = True
         except (OSError, AgentError):
             mouse_ready = False
+        try:
+            width, height = screen_size()
+        except AgentError:
+            width = height = None
         return {
             "model": "Redmi 9",
             "device": "galahad",
@@ -321,6 +356,9 @@ def worker(request):
             "keyguard_locked_or_unknown": not state["unlocked"],
             "display_on": state["display_on"],
             "focus_present": bool(state["package"]),
+            "focus_package": state["package"],
+            "screen_width": width,
+            "screen_height": height,
             "mouse_metadata_valid": mouse_ready,
         }
     if command == "probe":
@@ -353,30 +391,102 @@ def worker(request):
             "verified": False,
             "coordinates": "relative",
         }
+    if command == "tap":
+        width, height = screen_size()
+        x, y = request["x"], request["y"]
+        if not _bounded_int(x, 0, width) or not _bounded_int(y, 0, height):
+            raise AgentError("coordinates_out_of_bounds")
+        bounded_command(["/system/bin/input", "tap", str(x), str(y)])
+        return {
+            "command": "tap",
+            "x": x,
+            "y": y,
+            "submitted": True,
+            "verified": False,
+            "coordinates": "absolute",
+        }
+    if command == "swipe":
+        width, height = screen_size()
+        x, y, x2, y2 = (request[key] for key in ("x", "y", "x2", "y2"))
+        if any(
+            not _bounded_int(value, 0, limit)
+            for value, limit in ((x, width), (y, height), (x2, width), (y2, height))
+        ):
+            raise AgentError("coordinates_out_of_bounds")
+        duration = request.get("duration_ms")
+        argv = ["/system/bin/input", "swipe", str(x), str(y), str(x2), str(y2)]
+        if duration is not None:
+            if not _bounded_int(duration, 1, 60000):
+                raise AgentError("invalid_swipe_duration")
+            argv.append(str(duration))
+        bounded_command(argv)
+        return {
+            "command": "swipe",
+            "from": [x, y],
+            "to": [x2, y2],
+            "duration_ms": duration,
+            "submitted": True,
+            "verified": False,
+            "coordinates": "absolute",
+        }
+    if command == "text":
+        value = request["text"]
+        if not isinstance(value, str) or not value or len(value) > 4096:
+            raise AgentError("invalid_text")
+        # argv, never a shell; Android input text reads a space as %s.
+        bounded_command(["/system/bin/input", "text", value.replace(" ", "%s")])
+        # The text itself is the owner's input and is never echoed into the result.
+        return {
+            "command": "text",
+            "length": len(value),
+            "submitted": True,
+            "verified": False,
+        }
+    if command == "key":
+        code = request["keycode"]
+        if type(code) is int and 0 <= code <= 9999:
+            token = str(code)
+        elif isinstance(code, str) and KEYCODE.fullmatch(code) is not None:
+            token = code
+        else:
+            raise AgentError("invalid_keycode")
+        bounded_command(["/system/bin/input", "keyevent", token])
+        return {
+            "command": "key",
+            "keycode": token,
+            "submitted": True,
+            "verified": False,
+        }
     if command == "capture":
         expected = request.get("expected_package")
         if "expected_package" in request and (
             not isinstance(expected, str) or PACKAGE.fullmatch(expected) is None
         ):
             raise AgentError("invalid_capture_request")
-        before = require_screen(expected)
+        # A capture is never blocked by screen state: it returns whatever the
+        # display shows. Any expected package is reported, not enforced.
         png = bounded_command(["/system/bin/screencap", "-p"], PNG_LIMIT, 15)
         metadata = validate_png(png)
-        after = require_screen(before["package"])
-        if after["focus_window"] != before["focus_window"]:
-            raise AgentError("foreground_window_changed")
-        return {**metadata, "png_base64": base64.b64encode(png).decode("ascii")}
-    if (
-        any(
-            type(request[key]) is not int or not -500 <= request[key] <= 500
-            for key in ("dx", "dy")
-        )
-        or not isinstance(request["expected_package"], str)
-        or PACKAGE.fullmatch(request["expected_package"]) is None
+        state = screen_state()
+        if expected is not None:
+            metadata["expected_package_matches"] = state["package"] == expected
+        return {
+            **metadata,
+            "focus_package": state["package"],
+            "png_base64": base64.b64encode(png).decode("ascii"),
+        }
+    # move / click: legacy relative-delta input through the existing C daemon.
+    if any(
+        type(request[key]) is not int or not -500 <= request[key] <= 500
+        for key in ("dx", "dy")
+    ):
+        raise AgentError("invalid_mouse_request")
+    expected = request.get("expected_package")
+    if expected is not None and (
+        not isinstance(expected, str) or PACKAGE.fullmatch(expected) is None
     ):
         raise AgentError("invalid_mouse_request")
     with mouse_connection() as connection:
-        require_screen(request["expected_package"])
         submit_mouse(connection, command, request["dx"], request["dy"])
     return {
         "command": command,
@@ -404,17 +514,48 @@ def save_capture(path, png):
 def main():
     runner_values = runner_guard()
     if sys.argv[1:] == ["_worker"]:
-        raw = sys.stdin.buffer.read(2049)
-        if len(raw) > 2048:
+        raw = sys.stdin.buffer.read(16385)
+        if len(raw) > 16384:
             raise AgentError("worker_request_limit")
         request = json.loads(raw)
         if not isinstance(request, dict):
             raise AgentError("invalid_worker_request")
         print(json.dumps({"ok": True, "result": worker(request)}))
         return 0
+    # Request-file mode: the whole validated request lives in a JSON file, so no
+    # argument (least of all free text) is ever passed through a shell or an
+    # environment variable. Capture adds its RAM-disk output path here.
+    if sys.argv[1:2] == ["--request"]:
+        rest = sys.argv[2:]
+        if not rest:
+            raise AgentError("request_file_required")
+        output = None
+        if len(rest) == 3 and rest[1] == "--output":
+            output = rest[2]
+        elif len(rest) != 1:
+            raise AgentError("invalid_request_invocation")
+        with open(rest[0], "rb") as handle:
+            blob = handle.read(16385)
+        if len(blob) > 16384:
+            raise AgentError("request_file_limit")
+        args = json.loads(blob)
+        if not isinstance(args, dict) or not isinstance(args.get("command"), str):
+            raise AgentError("invalid_request_file")
+        return run_client(args, output, runner_values)
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for command in ("status", "probe", "capture", "move", "click", "wake"):
+    for command in (
+        "status",
+        "probe",
+        "capture",
+        "move",
+        "click",
+        "wake",
+        "tap",
+        "swipe",
+        "text",
+        "key",
+    ):
         sub = commands.add_parser(command)
         if command == "capture":
             sub.add_argument("--output", required=True)
@@ -422,11 +563,29 @@ def main():
         if command in ("move", "click"):
             sub.add_argument("dx", type=int)
             sub.add_argument("dy", type=int)
-            sub.add_argument("--expected-package", required=True)
+            sub.add_argument("--expected-package")
+        if command == "tap":
+            sub.add_argument("x", type=int)
+            sub.add_argument("y", type=int)
+        if command == "swipe":
+            sub.add_argument("x", type=int)
+            sub.add_argument("y", type=int)
+            sub.add_argument("x2", type=int)
+            sub.add_argument("y2", type=int)
+            sub.add_argument("--duration-ms", dest="duration_ms", type=int)
+        if command == "text":
+            sub.add_argument("text")
+        if command == "key":
+            sub.add_argument("keycode")
     args = vars(parser.parse_args())
     output = args.pop("output", None)
-    if args["command"] == "capture" and args.get("expected_package") is None:
-        args.pop("expected_package", None)
+    # Optional arguments left unset carry None; the worker contract omits them.
+    args = {key: value for key, value in args.items() if value is not None}
+    return run_client(args, output, runner_values)
+
+
+def run_client(args, output, runner_values):
+    """Hand one validated request to the bounded root worker and print its result."""
     if output is not None and os.geteuid() == 0:
         raise AgentError("capture_requires_unprivileged_client")
     script = str(Path(__file__).resolve())

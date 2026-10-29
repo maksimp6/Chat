@@ -430,13 +430,12 @@ jobs:
             echo "picture bytes: $(wc -c < "$MEDIA_DIR/art.jpg")"
           fi
 
-  # Dispatched by the Logos tool rootagent_run. Only the five bounded commands below run here:
-  # no text, keys, unlock, PIN or retry. Runs only for develop, after the environment approves it.
+  # Dispatched by the Logos tool rootagent_run. Logos drives the whole phone as a
+  # user: status, probe, capture, move, click, tap, swipe, text, key. Runs only for develop.
   rootagent_command:
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'rootagent_command' && github.ref == 'refs/heads/develop'
     runs-on: redmi9
     timeout-minutes: 8
-    environment: rootagent-command
     permissions:
       contents: read
     steps:
@@ -450,45 +449,75 @@ jobs:
         run: |
           set -euo pipefail
           python -I - <<'PY'
+          import json
           import os
           import re
 
-          COMMANDS = ("status", "probe", "capture", "move", "click")
-          ALLOWED = re.compile(r"[A-Za-z0-9_. -]*")
+          COMMANDS = (
+              "status", "probe", "capture", "move", "click",
+              "tap", "swipe", "text", "key",
+          )
+          STRICT = re.compile(r"[A-Za-z0-9_. -]*")
           PACKAGE = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+")
-          INTEGER = re.compile(r"-?(?:0|[1-9][0-9]{0,2})")
+          DELTA = re.compile(r"-?(?:0|[1-9][0-9]{0,2})")
+          COORD = re.compile(r"0|[1-9][0-9]{0,4}")
+          KEYCODE = re.compile(r"KEYCODE_[A-Z0-9_]+|[0-9]{1,4}")
           command = os.environ.get("ROOTAGENT_COMMAND", "")
           raw = os.environ.get("ROOTAGENT_ARGS", "")
           if command not in COMMANDS:
-              raise SystemExit("rootagent_command must be one of status, probe, capture, move, click")
-          if ALLOWED.fullmatch(raw) is None:
-              raise SystemExit("rootagent_args may contain only letters, digits, underscore, dot, minus and spaces")
-          tokens = raw.split(" ") if raw else []
-          dx = dy = package = ""
-          if command in ("status", "probe"):
-              if tokens:
-                  raise SystemExit(f"{command} takes no arguments")
-          elif command == "capture":
-              if len(tokens) != 1 or PACKAGE.fullmatch(tokens[0]) is None:
-                  raise SystemExit("capture takes one package name, such as com.example.app")
-              package = tokens[0]
+              raise SystemExit("rootagent_command must be one of " + ", ".join(COMMANDS))
+          request = {"command": command}
+          # The whole validated request is written to a JSON file and handed to the
+          # CLI with --request. No argument, least of all free text, is ever passed
+          # through a shell command line or an environment variable.
+          if command == "text":
+              if not raw:
+                  raise SystemExit("text requires a non-empty string")
+              if len(raw) > 4096 or "\x00" in raw or "\n" in raw or "\r" in raw:
+                  raise SystemExit("text must be at most 4096 characters on a single line")
+              request["text"] = raw
           else:
-              if (
-                  len(tokens) != 3
-                  or INTEGER.fullmatch(tokens[0]) is None
-                  or INTEGER.fullmatch(tokens[1]) is None
-                  or PACKAGE.fullmatch(tokens[2]) is None
-              ):
-                  raise SystemExit(f"{command} takes DX DY PACKAGE: two integers and a package name")
-              dx, dy, package = int(tokens[0]), int(tokens[1]), tokens[2]
-              if not (-500 <= dx <= 500 and -500 <= dy <= 500):
-                  raise SystemExit("move and click deltas must be integers from -500 through 500")
-              dx, dy = str(dx), str(dy)
+              if STRICT.fullmatch(raw) is None:
+                  raise SystemExit("rootagent_args may contain only letters, digits, underscore, dot, minus and spaces")
+              tokens = raw.split(" ") if raw else []
+              if command in ("status", "probe"):
+                  if tokens:
+                      raise SystemExit(f"{command} takes no arguments")
+              elif command == "capture":
+                  if len(tokens) > 1 or (tokens and PACKAGE.fullmatch(tokens[0]) is None):
+                      raise SystemExit("capture takes an optional package name, such as com.example.app")
+                  if tokens:
+                      request["expected_package"] = tokens[0]
+              elif command in ("move", "click"):
+                  if len(tokens) not in (2, 3) or any(DELTA.fullmatch(t) is None for t in tokens[:2]):
+                      raise SystemExit(f"{command} takes DX DY [PACKAGE]: two deltas and an optional package")
+                  if len(tokens) == 3 and PACKAGE.fullmatch(tokens[2]) is None:
+                      raise SystemExit("the third argument must be a package name")
+                  dx, dy = int(tokens[0]), int(tokens[1])
+                  if not (-500 <= dx <= 500 and -500 <= dy <= 500):
+                      raise SystemExit("move and click deltas must be integers from -500 through 500")
+                  request["dx"], request["dy"] = dx, dy
+                  if len(tokens) == 3:
+                      request["expected_package"] = tokens[2]
+              elif command == "tap":
+                  if len(tokens) != 2 or any(COORD.fullmatch(t) is None for t in tokens):
+                      raise SystemExit("tap takes X Y: two screen coordinates")
+                  request["x"], request["y"] = int(tokens[0]), int(tokens[1])
+              elif command == "swipe":
+                  if len(tokens) not in (4, 5) or any(COORD.fullmatch(t) is None for t in tokens):
+                      raise SystemExit("swipe takes X Y X2 Y2 [DURATION_MS]")
+                  request["x"], request["y"], request["x2"], request["y2"] = (int(t) for t in tokens[:4])
+                  if len(tokens) == 5:
+                      request["duration_ms"] = int(tokens[4])
+              elif command == "key":
+                  if len(tokens) != 1 or KEYCODE.fullmatch(tokens[0]) is None:
+                      raise SystemExit("key takes one keycode, such as KEYCODE_HOME or 3")
+                  request["keycode"] = tokens[0]
+          path = os.path.join(os.environ["RUNNER_TEMP"], "rootagent-request.json")
+          with open(path, "w", encoding="utf-8") as handle:
+              json.dump(request, handle)
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"command={command}\n")
-              output.write(f"dx={dx}\n")
-              output.write(f"dy={dy}\n")
-              output.write(f"package={package}\n")
           print(f"rootagent_command {command} accepted")
           PY
 
@@ -511,29 +540,18 @@ jobs:
         id: run
         shell: bash
         timeout-minutes: 3
-        env:
-          ROOTAGENT_COMMAND: ${{ steps.request.outputs.command }}
-          ROOTAGENT_DX: ${{ steps.request.outputs.dx }}
-          ROOTAGENT_DY: ${{ steps.request.outputs.dy }}
-          ROOTAGENT_PACKAGE: ${{ steps.request.outputs.package }}
-          ROOTAGENT_MEDIA: ${{ steps.media.outputs.media }}
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
           mkdir -p -m 700 "$RUNNER_TEMP/scripts"
           curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
             "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_root_agent.py" -o "$RUNNER_TEMP/scripts/redmi_root_agent.py"
-          case "$ROOTAGENT_COMMAND" in
-            status|probe)
-              argv=("$ROOTAGENT_COMMAND") ;;
-            capture)
-              argv=(capture --output "$ROOTAGENT_MEDIA/rootagent-capture.png" --expected-package "$ROOTAGENT_PACKAGE") ;;
-            move|click)
-              argv=("$ROOTAGENT_COMMAND" "$ROOTAGENT_DX" "$ROOTAGENT_DY" --expected-package "$ROOTAGENT_PACKAGE") ;;
-            *)
-              echo "unexpected command" >&2
-              exit 1 ;;
-          esac
+          # The validator wrote the whole request to this JSON file; the CLI reads it
+          # with --request, so no argument passes through a shell line or environment.
+          argv=(--request "$RUNNER_TEMP/rootagent-request.json")
+          if [ "${{ steps.request.outputs.command }}" = "capture" ]; then
+            argv+=(--output "${{ steps.media.outputs.media }}/rootagent-capture.png")
+          fi
           # The CLI's JSON is the result. Its exit status is kept until the artifacts are uploaded.
           set +e
           python "$RUNNER_TEMP/scripts/redmi_root_agent.py" "${argv[@]}" > "$RUNNER_TEMP/rootagent-result.json"

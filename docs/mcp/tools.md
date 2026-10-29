@@ -27,7 +27,7 @@
 | cloud | cloud/tools.py | 14 | cloud.resources.list/get, cloud.compute.list/status/start/stop/reboot, cloud.costs.summary, cloud.budget.status, cloud.metrics.query, cloud.logs.query, cloud.backup.create, cloud.ssh.exec, cloud.capabilities |
 | forge | forge/tools.py | 6 | printing3d.quote, printing3d.finance.assess/status/plan.set, printing3d.order.create, printing3d.orders.list, printing3d.treasury.summary |
 | browser | browser/tools.py (composition/tool_sources.py) | 17 | browser_open, browser_read, browser_find, browser_extract, browser_click, browser_fill_form, browser_act, browser_wait, browser_evaluate, browser_screenshot, browser_history, browser_tabs, browser_session, browser_cookies, browser_search, browser_request, browser_download |
-| rootagent | tool_providers/rootagent.py (composition/tool_sources.py) | 2 | rootagent_run (запуск status, probe, capture, move, click как задания GitHub Actions на develop; capture, move, click требуют подтверждения), rootagent_result (статус запуска и JSON-результат по run_id). Настройка и границы — [docs/redmi-root-agent.md](../redmi-root-agent.md#logos-tool) |
+| rootagent | tool_providers/rootagent.py (composition/tool_sources.py) | 2 | rootagent_run (управление телефоном как юзер: status, probe, capture, tap, swipe, text, key, move, click как задания GitHub Actions на develop), rootagent_result (статус запуска и JSON-результат по run_id). Настройка и границы — [docs/redmi-root-agent.md](../redmi-root-agent.md#logos-tool) |
 | tty | tool_providers/tty.py (composition/tool_sources.py) | 6 | tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list |
 
 ## Браузер (категория browser)

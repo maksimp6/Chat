@@ -1,8 +1,9 @@
 # Redmi 9 native RootAgent CLI
 
-The native CLI lets a genuine GitHub Actions job on the rooted Redmi 9 inspect
-root access, capture an approved screen, and submit relative mouse input through
-the existing production C daemon. It uses the runner's Python and `su`.
+The native CLI lets a genuine GitHub Actions job on the owner's rooted Redmi 9
+drive the phone as a user: inspect root access, capture the screen, tap, swipe,
+type text and send keys through root `input`, and submit relative mouse input
+through the existing production C daemon. It uses the runner's Python and `su`.
 
 The legacy Android RootAgent APK and its matching instrumentation package remain
 absent. This CLI does not restore that Android service. It requires no APK build,
@@ -17,11 +18,10 @@ context to run locally. `RUNNER_TEMP` must identify a real job temporary directo
 The private `_worker` entry point is internal to the CLI's `su` invocation.
 
 The device guard requires model `Redmi 9`, device `galahad`, and a root worker.
-Capture and input fail closed when Keyguard or foreground state is unknown.
-They also require Android's early/fully-on display flags; an unlocked Keyguard
-alone does not establish that the display is awake.
-The CLI does not unlock the phone, enter a PIN, restart RDC, install software,
-restart the mouse daemon, or change its boot service.
+Absolute `tap`/`swipe` coordinates are bounded against the real screen size read
+on the device. Input is no longer gated on Keyguard or foreground state: this is
+the owner's own phone, driven as a user. The legacy relative `move`/`click` keep
+using the existing pinned C daemon.
 
 ## Existing input backend
 
@@ -53,18 +53,28 @@ Invoke `scripts/redmi_root_agent.py` with the runner's Python from an actual
 Actions step. The public client remains unprivileged and invokes its bounded root
 worker internally.
 
+Logos drives the owner's own phone as a user. Absolute `tap`, `swipe`, `text`
+and `key` go through root `/system/bin/input`, which injects trusted events
+across the whole device; `capture` reads the screen; `move`/`click` keep the
+legacy relative input through the existing root mouse daemon.
+
 | Command | Meaning |
 | --- | --- |
-| `status` | Sanitized device, root, Keyguard, focus-presence, and socket metadata; no input |
+| `status` | Sanitized device, root, Keyguard, focus, screen size, and socket metadata; no input |
 | `probe` | Connect to the existing socket and verify root peer/executable hash; send no input command |
 | `wake` | If display-on is unconfirmed, submit one fixed relative `move 1 1`, without clicking; verify actual wake separately |
-| `capture --output PATH [--expected-package PACKAGE]` | Capture and validate PNG; require stable native focus/window identity before and after capture |
-| `move DX DY --expected-package PACKAGE` | Submit bounded relative movement after unlocked/foreground checks |
-| `click DX DY --expected-package PACKAGE` | Submit one bounded relative movement and left click after unlocked/foreground checks |
+| `capture --output PATH [--expected-package PACKAGE]` | Capture and validate the PNG; any expected package is reported, not enforced |
+| `tap X Y` | Tap absolute screen coordinates through root `input tap` |
+| `swipe X Y X2 Y2 [--duration-ms MS]` | Swipe/scroll from (X, Y) to (X2, Y2) through root `input swipe` |
+| `text STR` | Type a string through root `input text` |
+| `key KEYCODE` | Send a key (e.g. `KEYCODE_HOME`, `KEYCODE_BACK`, `KEYCODE_ENTER`, or a number) through root `input keyevent` |
+| `move DX DY [--expected-package PACKAGE]` | Submit bounded relative mouse movement through the C daemon |
+| `click DX DY [--expected-package PACKAGE]` | Submit one bounded relative movement and left click through the C daemon |
 
-The E2E always supplies `--expected-package` for capture and input. A package
-check alone does not establish that the browser is displaying the owned test
-page; the acceptance checks below provide that additional evidence.
+Absolute coordinates are bounded against the real screen size read on the
+device. `text` is passed to the CLI only through a validated request file
+(`--request`), never through a shell command line or an environment variable,
+and the string itself is never echoed into the result or the logs.
 
 PNG validation checks the signature, bounded dimensions and length, chunk
 ordering and CRCs, supported pixel profile, and exact decompressed scanline
@@ -178,7 +188,6 @@ that GitHub Actions job, on the existing `redmi9` runner.
 
 | Setting | Where it lives | Set by | Required value |
 | --- | --- | --- | --- |
-| Environment `rootagent-command` | GitHub repository settings, Environments | Repository owner | Required reviewers. GitHub creates the environment on first use with no reviewers, so configure them before the first dispatch. The job declares `environment: rootagent-command`. |
 | Token | Logos server environment variable `LOGOS_ROOTAGENT_DISPATCH_TOKEN` | Server operator | Fine-grained token with Actions read and write on this repository only |
 | Repository | Logos server environment variable `LOGOS_ROOTAGENT_REPOSITORY` | Server operator | `owner/name` of this repository |
 
@@ -188,16 +197,23 @@ and does not call GitHub.
 
 ### What the job allows
 
+This is the owner's own rooted phone, driven as a user. The job adds no approval
+prompt of its own; its boundary is the branch and the real runner.
+
 - The job runs only for `refs/heads/develop`. Other branches never start it.
-- Commands are `status`, `probe`, `capture`, `move` and `click`. There is no
-  `wake`, no text or key input, no unlock, no PIN, and no retry of an uncertain
+- Commands are `status`, `probe`, `capture`, `tap`, `swipe`, `text`, `key`,
+  `move` and `click`. `tap`/`swipe` use absolute coordinates, `text` types a
+  string, `key` sends a keycode, and `move`/`click` keep the relative C-daemon
   input.
-- `status` and `probe` take no arguments. `capture` takes a package name.
-  `move` and `click` take `DX DY PACKAGE`, with `DX` and `DY` integers from
-  `-500` through `500`. The job validates the arguments before anything runs,
-  and the tool applies the same rules.
-- `capture`, `move` and `click` need the caller's approval, checked inside
-  `rootagent_run`. `status`, `probe` and `rootagent_result` need none.
+- `status` and `probe` take no arguments. `capture` takes an optional package.
+  `tap` takes `X Y`; `swipe` takes `X Y X2 Y2 [DURATION_MS]`; `text` takes a
+  one-line string (≤ 4096 chars); `key` takes a keycode. `move`/`click` take
+  `DX DY [PACKAGE]` with deltas from `-500` through `500`. The job validates the
+  arguments before anything runs, and the tool applies the same rules.
+- The validator writes the whole request to a JSON file, and the CLI reads it
+  with `--request`; no argument, least of all free text, passes through a shell
+  command line or an environment variable.
+- No command needs an in-tool approval: Logos dispatches directly.
 - The JSON result is uploaded as a workflow artifact, and for `capture` only,
   the PNG too. Both have a retention of 1 day and nothing is committed. The PNG
   is written to the RAM disk, never to flash.
