@@ -493,13 +493,13 @@ def run_step(step, injector, width, height, diagnostics=None):
         if (
             not isinstance(value, list)
             or len(value) != 2
-            or not _bounded_int(value[0], 0, width)
-            or not _bounded_int(value[1], 0, height)
+            or not _bounded_int(value[0], 0, width - 1)
+            or not _bounded_int(value[1], 0, height - 1)
         ):
             raise AgentError("invalid_batch_tap")
         injector.tap(value[0], value[1])
     elif kind == "swipe":
-        limits = (width, height, width, height, 60000)
+        limits = (width - 1, height - 1, width - 1, height - 1, 60000)
         if (
             not isinstance(value, list)
             or len(value) not in (4, 5)
@@ -794,7 +794,8 @@ def worker(request):
     if command == "tap":
         width, height = screen_size()
         x, y = request["x"], request["y"]
-        if not _bounded_int(x, 0, width) or not _bounded_int(y, 0, height):
+        # The virtual touchscreen spans 0..width-1 and 0..height-1.
+        if not _bounded_int(x, 0, width - 1) or not _bounded_int(y, 0, height - 1):
             raise AgentError("coordinates_out_of_bounds")
         injector = Injector(width, height)
         try:
@@ -814,7 +815,9 @@ def worker(request):
         x, y, x2, y2 = (request[key] for key in ("x", "y", "x2", "y2"))
         if any(
             not _bounded_int(value, 0, limit)
-            for value, limit in ((x, width), (y, height), (x2, width), (y2, height))
+            for value, limit in (
+                (x, width - 1), (y, height - 1), (x2, width - 1), (y2, height - 1)
+            )
         ):
             raise AgentError("coordinates_out_of_bounds")
         duration = request.get("duration_ms")
