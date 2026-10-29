@@ -101,11 +101,29 @@ stop_app() {
 }
 
 outcome=already_running
+provision_rootagent() {
+  # Bridge the RootAgent dispatch credential and repository from the deploy context
+  # into private state files the launcher reads, so Logos can drive the phone without
+  # any manual server setup. The token is never echoed; umask 077 keeps the files 0600.
+  # A deploy names the repository; a manual start/restart leaves the stored values be.
+  local repository=${GITHUB_REPOSITORY:-} token=${ROOTAGENT_DISPATCH_TOKEN:-} tmp
+  if [[ $repository =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+    tmp=$(mktemp "$state/rootagent-repository.XXXXXX") || return 1
+    printf '%s' "$repository" >"$tmp" && mv -fT -- "$tmp" "$state/rootagent-repository" || { rm -f -- "$tmp"; return 1; }
+  fi
+  if [[ -n $token ]]; then
+    tmp=$(mktemp "$state/rootagent-dispatch.token.XXXXXX") || return 1
+    printf '%s' "$token" >"$tmp" && mv -fT -- "$tmp" "$state/rootagent-dispatch.token" || { rm -f -- "$tmp"; return 1; }
+  fi
+  return 0
+}
+
 start_app() {
   [[ -z $pid ]] || return 0
   if timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/"$1"' _ "$port" 2>/dev/null; then
     echo 'Port belongs to an untracked listener; refusing duplicate startup' >&2; return 1
   fi
+  provision_rootagent
   local revision launcher launcher_tmp launcher_backup
   revision=$(git -C "$app" rev-parse HEAD 2>/dev/null || printf unknown)
   # The app checkout changes on both deploy and rollback. A workflow-local
