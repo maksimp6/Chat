@@ -63,6 +63,13 @@ DELTA_LIMIT = 500
 COORD_LIMIT = 99999
 DURATION_LIMIT = 60000
 TEXT_LIMIT = 4096
+# The phone types through a virtual US keyboard: printable ASCII and tab, nothing else
+# (scripts/redmi_root_agent.py ASCII_KEYS). Cyrillic and emoji cannot be typed.
+KEYBOARD_CHARS = frozenset(chr(code) for code in range(32, 127)) | {"\t"}
+KEYBOARD_TEXT_ERROR = (
+    "text набирается виртуальной клавиатурой US: только латиница, цифры, пробел, "
+    "табуляция и ASCII-знаки; кириллица и эмодзи не набираются"
+)
 PACKAGE_PATTERN = r"[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+"
 PACKAGE = re.compile(PACKAGE_PATTERN)
 KEYCODE_PATTERN = r"KEYCODE_[A-Z0-9_]+|[0-9]{1,4}"
@@ -128,6 +135,12 @@ def _validated(args: Mapping[str, Any]) -> tuple[str, str]:
                 '{"tap": [x, y]}, {"text": "..."}, {"key": "KEYCODE_ENTER"}, '
                 '{"swipe": [x, y, x2, y2]}, {"wait": мс}, {"browse": "https://..."}'
             )
+        if any(
+            isinstance(step.get("text"), str)
+            and any(ch not in KEYBOARD_CHARS for ch in step["text"])
+            for step in steps
+        ):
+            raise ValueError(KEYBOARD_TEXT_ERROR)
         return command, json.dumps(steps, ensure_ascii=False)
     if command == "browse":
         url = args.get("url")
@@ -163,6 +176,8 @@ def _validated(args: Mapping[str, Any]) -> tuple[str, str]:
             raise ValueError(f"text должен быть непустой строкой не длиннее {TEXT_LIMIT} символов")
         if any(ch in text for ch in ("\x00", "\n", "\r")):
             raise ValueError("text должен быть одной строкой без переводов строки")
+        if any(ch not in KEYBOARD_CHARS for ch in text):
+            raise ValueError(KEYBOARD_TEXT_ERROR)
         return command, text
     keycode = args.get("keycode")
     if isinstance(keycode, int) and 0 <= keycode <= 9999:
@@ -423,14 +438,18 @@ def _run_local(cli: str, command: str, args: Mapping[str, Any]) -> dict[str, Any
     try:
         payload = json.loads(line)
     except ValueError:
-        return _Failure("Устройство вернуло не JSON", "execution", local=True, command=command).result
+        payload = None
+    if not isinstance(payload, dict):
+        return _Failure(
+            "Устройство вернуло не JSON-объект", "execution", local=True, command=command
+        ).result
     if completed.returncode or payload.get("ok") is False:
         return _Failure(
             f"Устройство отклонило команду: {payload.get('error', 'root_worker_failed')}",
             "execution", local=True, command=command,
         ).result
     # run_client prints the worker metadata directly; a screenshot rides as png_base64.
-    result = payload if isinstance(payload, dict) else {}
+    result = payload
     capture = None
     encoded = result.pop("png_base64", None)
     if isinstance(encoded, str) and encoded:
@@ -589,8 +608,10 @@ _RUN_PROPERTIES = {
         "enum": list(COMMANDS),
         "description": (
             "status и probe читают состояние; capture снимает экран; tap нажимает в точке "
-            "(x, y); swipe проводит от (x, y) к (x2, y2); text вводит строку; key шлёт клавишу "
-            "(keycode); move и click — относительное движение мыши (dx, dy)"
+            "(x, y); swipe проводит от (x, y) к (x2, y2); text вводит строку латиницей "
+            "(ASCII); key шлёт клавишу (keycode); browse открывает url и снимает экран; "
+            "batch выполняет steps подряд и снимает экран; move и click — относительное "
+            "движение мыши (dx, dy)"
         ),
     },
     "x": _optional(
@@ -638,7 +659,11 @@ _RUN_PROPERTIES = {
             "type": "string",
             "minLength": 1,
             "maxLength": TEXT_LIMIT,
-            "description": "Строка для ввода командой text (одна строка, без переводов строки)",
+            "pattern": "^[\\t -~]+$",
+            "description": (
+                "Строка для ввода командой text: одна строка, только латиница, цифры, "
+                "пробел и ASCII-знаки (виртуальная клавиатура US, кириллица не набирается)"
+            ),
         }
     ),
     "steps": _optional(
@@ -704,9 +729,9 @@ ROOTAGENT_TOOLS: dict[str, dict[str, Any]] = {
             "экрана), tap (нажатие в точке), swipe (свайп), text (ввод строки), key (клавиша, "
             "в т.ч. системная), browse (разбудить экран, открыть url в браузере и сразу снять "
             "экран), move и click (относительная мышь). Когда Логос работает на самом телефоне, "
-            "команда выполняется на устройстве напрямую и результат (для capture/browse/batch — "
-            "снимок в base64) возвращается сразу в поле result/capture — rootagent_result не "
-            "нужен. Если Логос не на телефоне, команда ставится как задание GitHub Actions на "
+            "команда выполняется на устройстве напрямую и результат возвращается сразу в поле "
+            "result/capture — rootagent_result не нужен; снимок экрана (capture/browse/batch) "
+            "модель с поддержкой изображений получает картинкой в следующем запросе. Если Логос не на телефоне, команда ставится как задание GitHub Actions на "
             "develop: тогда возвращается run_id, а результат читается через rootagent_result."
         ),
         "parameters": object_schema(_RUN_PROPERTIES, ["command"]),
@@ -722,8 +747,9 @@ ROOTAGENT_TOOLS: dict[str, dict[str, Any]] = {
         "title": "Redmi 9 RootAgent: результат запуска",
         "description": (
             "Прочитать запуск rootagent_run по run_id: статус, итог и JSON-результат команды, "
-            "когда запуск завершён. Результат и снимок (для capture — PNG в base64) читаются с "
-            "ветки rootagent-results, куда задание публикует их через GitHub API."
+            "когда запуск завершён. Результат и снимок читаются с ветки rootagent-results, "
+            "куда задание публикует их через GitHub API; снимок модель с поддержкой "
+            "изображений получает картинкой в следующем запросе."
         ),
         "parameters": object_schema(
             {

@@ -184,8 +184,19 @@ Logos reaches the RootAgent through two tools, `rootagent_run` and
 on the device and returns the result at once — no GitHub, no token.** It invokes
 `scripts/redmi_root_agent.py --local-request <file>`, which hands the request to
 the root worker; the worker's `device_guard` pins the Redmi 9 identity as root on
-every command. For `capture`/`browse`/`batch` the screenshot comes back inline as
-base64 in the `capture` field, so `rootagent_result` is not needed.
+every command. For `capture`/`browse`/`batch` the screenshot comes back in the
+`capture` field, so `rootagent_result` is not needed.
+
+The model never receives the screenshot as text: a function output is a string, and
+megabytes of base64 there could not be seen and would fill the context (#1708). The
+chat tool loop (`chat/mcp_routes.py::_take_screenshots`) replaces every `png_base64`
+with a note and, for a model that reads images, attaches the PNG to the next request
+as an `input_image`; for any other model the note says it was not shown (size and
+sha256 stay in the result).
+
+`text` (and a batch `text` step) types through a virtual US keyboard: printable ASCII
+and tab only. Cyrillic and emoji are refused by the tool before the phone is called.
+Tap and swipe coordinates run from 0 to width−1 and height−1 of the real screen.
 
 The GitHub Actions path is a fallback for when Logos is **not** on the phone:
 there `rootagent_run` dispatches the `rootagent_command` action of

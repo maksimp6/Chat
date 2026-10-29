@@ -279,6 +279,41 @@ def image_input_model_keys() -> frozenset[str]:
     )
 
 
+def _take_screenshots(value: Any, note: str) -> tuple[Any, list[str]]:
+    """A tool output without its png_base64 fields, and the PNGs as data URLs.
+
+    A function_call_output is a string, so a screenshot inside it reaches the model as
+    megabytes of base64 text it cannot see (#1708). Each one is replaced by ``note``
+    and handed over as an image of the next request instead.
+    """
+    images: list[str] = []
+
+    def strip(node: Any) -> Any:
+        if isinstance(node, dict):
+            stripped = {}
+            for key, item in node.items():
+                if key == "png_base64" and isinstance(item, str) and item:
+                    images.append("data:image/png;base64," + item)
+                    stripped[key] = note
+                else:
+                    stripped[key] = strip(item)
+            return stripped
+        if isinstance(node, list):
+            return [strip(item) for item in node]
+        return node
+
+    return strip(value), images
+
+
+SCREENSHOT_ATTACHED = (
+    "снимок экрана приложен к следующему запросу как изображение (input_image)"
+)
+SCREENSHOT_NOT_SHOWN = (
+    "снимок экрана не передан модели: выбранная модель не принимает изображения; "
+    "размер и sha256 снимка указаны рядом"
+)
+
+
 IMAGE_HISTORY_TURNS = 20
 IMAGE_HISTORY_TEXT_CHARS = 4000
 _MARKDOWN_PICTURE = re.compile(r"!\[[^\]]*\]\(data:image/[^)]*\)")
@@ -502,7 +537,37 @@ def _define_logos_client(base: type) -> type:
                 )
                 if failed:
                     return {"error": result["error"], "tool": result.get("name")}
-                return result.get("result")
+                sees_images = model_key in image_input_model_keys()
+                output, images = _take_screenshots(
+                    result.get("result"),
+                    SCREENSHOT_ATTACHED if sees_images else SCREENSHOT_NOT_SHOWN,
+                )
+                if sees_images:
+                    screenshots.extend(images)
+                return output
+
+            # Screenshots taken from this round's tool outputs, for the next request.
+            screenshots = []
+
+            def with_screenshots(items):
+                """The continuation input plus one user message carrying the screenshots."""
+                if not screenshots:
+                    return items
+                message_item = {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": "Снимки экрана из результатов инструментов, по порядку вызовов.",
+                        }
+                    ]
+                    + [
+                        {"type": "input_image", "image_url": url, "detail": "auto"}
+                        for url in screenshots
+                    ],
+                }
+                screenshots.clear()
+                return [*items, message_item]
 
             # Retain the original request and all tool rounds without a provider conversation.
             initial_input = bound._response_input(base_params, message)
@@ -549,15 +614,17 @@ def _define_logos_client(base: type) -> type:
                 # The provider conversation already contains the answered calls.
                 if conversation_id:
                     return follow_up(
-                        [
-                            item
-                            for item in input_items
-                            if isinstance(item, dict)
-                            and item.get("type") == "function_call_output"
-                        ],
+                        with_screenshots(
+                            [
+                                item
+                                for item in input_items
+                                if isinstance(item, dict)
+                                and item.get("type") == "function_call_output"
+                            ]
+                        ),
                         "tool",
                     )
-                continuation_history.extend(input_items)
+                continuation_history.extend(with_screenshots(input_items))
                 return follow_up(list(continuation_history), "tool")
 
             def continue_after_output_limit(previous_response, part):
