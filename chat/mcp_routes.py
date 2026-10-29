@@ -512,13 +512,7 @@ def _define_logos_client(base: type) -> type:
             # A live turn's receiver of progress events; base_params carries it into
             # every tool round and continuation part.
             sink = (params or {}).get("on_stream_event")
-            should_stop = (params or {}).get("should_stop")
             rounds = 0
-
-            def stop_check():
-                """«Стоп»: no new provider request or tool call starts after it."""
-                if callable(should_stop) and should_stop():
-                    raise _TurnStopped(TURN_STOPPED_TEXT)
 
             def emit(event):
                 if sink is None:
@@ -565,7 +559,6 @@ def _define_logos_client(base: type) -> type:
             )
             round_result(response)
             _record_provider_output(trace, response)
-            stop_check()
 
             base_params = dict(params or {})
             tool_servers = None
@@ -581,7 +574,6 @@ def _define_logos_client(base: type) -> type:
                         inner = call.get("arguments")
                     if isinstance(inner, dict) and isinstance(inner.get("tool"), str):
                         name = inner["tool"]
-                stop_check()
                 emit({"kind": "tool_call", "phase": "start", "name": name})
                 try:
                     if tool_servers is None:
@@ -634,7 +626,6 @@ def _define_logos_client(base: type) -> type:
                             "instructions": SCREEN_DESCRIBER_ROLE,
                             "input_images": images,
                             "reasoning_effort": "high",
-                            "should_stop": should_stop,
                         },
                         execution_trace=trace,
                     )
@@ -699,7 +690,6 @@ def _define_logos_client(base: type) -> type:
                 continuation_params["background"] = base_params.get(
                     "background", True
                 )
-                stop_check()
                 start_round(round_kind, part)
                 response = self._ask_provider(
                     message="",
@@ -1124,16 +1114,6 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
             )
 
     return _build_chat_reply(client, response, trace)
-
-
-TURN_STOPPED_TEXT = (
-    "Ход остановлен кнопкой «Стоп»: ответ провайдера отменён, новые запросы к модели "
-    "и вызовы инструментов не запускались."
-)
-
-
-class _TurnStopped(RuntimeError):
-    """The owner pressed «Стоп»; the message is for the user."""
 
 
 class _EmptyModelReply(RuntimeError):
@@ -1565,7 +1545,7 @@ def _finalize_chat_turn(
 
 def _turn_error_text(error):
     """Russian text for a failure the user can fix, or None; the exception is logged."""
-    if isinstance(error, (_EmptyModelReply, _TurnStopped)):
+    if isinstance(error, _EmptyModelReply):
         return str(error)
     if isinstance(error, bound.NoActiveCredentialError):
         return PROVIDER_KEY_MISSING
@@ -1728,21 +1708,10 @@ def chat():
     if wants_live:
         return _start_live_turn(t_start, admission)
     status, body = 500, {}
-    # A turn answered as JSON can still be stopped («Стоп»): it has a stop token while it runs.
-    token = None
-    if admission is not None and isinstance(data, dict):
-        conv_id = data.get("conversation_id")
-        if isinstance(conv_id, str) and isinstance(data.get("request_id"), str):
-            token = live_turns.StopToken(
-                conv_id, data["request_id"], get_current_owner_id(required=False)
-            )
-            live_turns.register_stop(token)
     try:
-        rv = _chat_turn(t_start=t_start, admission=admission, stop=token)
+        rv = _chat_turn(t_start=t_start, admission=admission)
         status, body = _response_parts(rv)
     finally:
-        if token is not None:
-            live_turns.unregister_stop(token)
         # Recorded even when the turn raised, so a re-sent request never runs twice.
         if admission is not None:
             admission.settle(status, body)
@@ -1830,44 +1799,6 @@ def _start_live_turn(t_start, admission):
     return live_turns.sse_response(live, 0)
 
 
-@mcp_bp.route("/api/chat/turns/<request_id>/stop", methods=["POST"])
-def chat_turn_stop(request_id):
-    """«Стоп»: stop the running turn on the server and cancel its provider request."""
-    if not live_turns.REQUEST_ID_PATTERN.fullmatch(request_id or ""):
-        return jsonify(
-            error_body("invalid_params", message=live_turns.REQUEST_ID_MESSAGE)
-        ), 400
-    conv_id = request.args.get("conversation_id")
-    owner_id = get_current_owner_id(required=False)
-    if (
-        not isinstance(conv_id, str)
-        or not conv_id.strip()
-        or not check_access(conv_id, owner_id)
-    ):
-        return jsonify(error_body("conversation_not_found")), 404
-    live = live_turns.find(conv_id, request_id) or live_turns.find_stop(conv_id, request_id)
-    if live is None or live.owner_id != owner_id or live.finished:
-        return jsonify({"status": "not_running"})
-    response_id = live.request_stop()
-    cancelled, cancel_error = False, None
-    if response_id:
-        try:
-            logos_client_type()(bound.Config).cancel_response(response_id)
-            cancelled = True
-        except Exception as exc:
-            # The turn still stops at its next step; the provider may finish this request.
-            logger.warning("[CHAT] Ответ %s не отменён у провайдера: %s", response_id, exc)
-            cancel_error = f"{type(exc).__name__}: {exc}"
-    return jsonify(
-        {
-            "status": "stopping",
-            "response_id": response_id,
-            "provider_cancelled": cancelled,
-            "provider_cancel_error": cancel_error,
-        }
-    )
-
-
 def _event_position():
     """The last event a reader has: Last-Event-ID, else ?after=, else 0."""
     for raw in (request.headers.get("Last-Event-ID"), request.args.get("after")):
@@ -1902,7 +1833,7 @@ def chat_turn_events(request_id):
     return live_turns.receipt_response(conv_id, request_id)
 
 
-def _chat_turn(*, t_start, admission=None, live=None, stop=None):
+def _chat_turn(*, t_start, admission=None, live=None):
     """One chat turn, from the request body to the stored reply (the former body of chat())."""
     import time as _time
 
@@ -2094,10 +2025,6 @@ def _chat_turn(*, t_start, admission=None, live=None, stop=None):
             # Set after set_request, so the callable never enters the trace; every
             # tool round and continuation part copies it from these params.
             params["on_stream_event"] = live.provider_event
-            params["should_stop"] = live.stop_requested.is_set
-        elif stop is not None:
-            params["on_stream_event"] = stop.provider_event
-            params["should_stop"] = stop.stop_requested.is_set
         result = _execute_chat_model(message, model_key, invocation, params, trace)
         if live is not None:
             live.provider_event({"kind": "finalizing"})
@@ -2114,12 +2041,6 @@ def _chat_turn(*, t_start, admission=None, live=None, stop=None):
             request_id=request_id,
         )
     except Exception as e:
-        stopper = live if live is not None else stop
-        if stopper is not None and stopper.stop_requested.is_set() and not isinstance(
-            e, _TurnStopped
-        ):
-            # Whatever the cancelled provider request raised, the cause is «Стоп».
-            e = _TurnStopped(TURN_STOPPED_TEXT)
         logger.exception("[CHAT] Ошибка")
         internal_error_message = str(e)
         is_temperature_error = (

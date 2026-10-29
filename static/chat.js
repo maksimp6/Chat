@@ -750,12 +750,11 @@ document.addEventListener("DOMContentLoaded", function () {
     return chatErrorReason(data, status);
   }
 
-  // «Стоп» stops the turn on the server too (POST /api/chat/turns/<id>/stop): the provider request is cancelled and no
-  // new request or tool call starts. Before the 'turn' event the server may not have the question at all, so the text
-  // goes back to the field (see sendTurn).
+  // «Стоп» ends only this tab's stream. Once the server has the question ('turn' event) it goes on with the answer; before
+  // that the server may not have the question at all, so the text goes back to the field (see sendTurn).
   function stopNotice(accepted) {
     return accepted
-      ? "Ход остановлен: сервер отменил ответ модели и не запускает новые запросы и инструменты. То, что модель успела написать, появится в этом диалоге."
+      ? "Показ ответа остановлен. Сервер продолжает ответ: он появится в этом диалоге, когда сохранится."
       : "Показ ответа остановлен до подтверждения сервером. Если вопрос дошёл до сервера, ответ появится в этом диалоге.";
   }
 
@@ -1025,31 +1024,9 @@ document.addEventListener("DOMContentLoaded", function () {
     return Boolean(modelsData && modelsData.voice && modelsData.voice[modelKey]);
   }
 
-  // The request id of the live turn of each conversation, for «Стоп».
-  const liveRequestIds = new Map();
-
-  function stopServerTurn(convId) {
-    let requestId = liveRequestIds.get(convId);
-    if (!requestId) {
-      try {
-        requestId = savedLiveTurns()[convId];
-      } catch (error) {
-        requestId = null;
-      }
-    }
-    if (!requestId) return;
-    window.LogosDispatcher.request(
-      "/api/chat/turns/" + encodeURIComponent(requestId) + "/stop?conversation_id=" + encodeURIComponent(convId),
-      { method: "POST" },
-    ).catch(function (error) {
-      console.warn("[CHAT] Stop request failed:", error);
-    });
-  }
-
   function sendMessage() {
     const running = currentConvId ? activeChatRequests.get(currentConvId) : null;
     if (running) {
-      stopServerTurn(currentConvId);
       running.abort();
       return;
     }
@@ -2422,7 +2399,6 @@ document.addEventListener("DOMContentLoaded", function () {
         // «Повторить» is a new send with a new id.
         turn.chatRequestId = imageRequestId();
         rememberLiveTurn(turn.conversationId, turn.chatRequestId);
-        liveRequestIds.set(turn.conversationId, turn.chatRequestId);
         const chatController = new AbortController();
         activeChatRequests.set(turn.conversationId, chatController);
         // A live answer keeps streaming after its headers: the page stays busy (no automatic reload) until the turn ends.
