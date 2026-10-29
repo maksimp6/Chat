@@ -1656,6 +1656,8 @@ document.addEventListener("DOMContentLoaded", function () {
   async function readLiveStream(response, options) {
     const signal = options.signal;
     const idleMs = Number(options.idleMs) > 0 ? Number(options.idleMs) : 0;
+    // The reading of this response can be ended from outside (the tab came back): then it reports a broken stream.
+    const onRelease = typeof options.onRelease === "function" ? options.onRelease : null;
     const parser = createSseParser(options.onEvent);
     let lastActivity = Date.now();
     if (signal && signal.aborted) throw stoppedError();
@@ -1674,6 +1676,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
     let idleTimer = null;
+    let released = false;
     const cancel = function () {
       try {
         reader.cancel().catch(function () {});
@@ -1687,6 +1690,10 @@ document.addEventListener("DOMContentLoaded", function () {
       idleTimer = setTimeout(cancel, idleMs);
     };
     if (signal) signal.addEventListener("abort", cancel, { once: true });
+    if (onRelease) onRelease(function () {
+      released = true;
+      cancel();
+    });
     armIdle();
     try {
       for (;;) {
@@ -1698,6 +1705,7 @@ document.addEventListener("DOMContentLoaded", function () {
           return { done: null, lastActivity: lastActivity };
         }
         if (signal && signal.aborted) throw stoppedError();
+        if (released) return { done: null, lastActivity: lastActivity };
         // A partial event at the end is dropped: without `done` the stream was interrupted.
         if (chunk.done) return { done: parser.push(decoder.decode()), lastActivity: lastActivity };
         lastActivity = Date.now();
@@ -1804,10 +1812,20 @@ document.addEventListener("DOMContentLoaded", function () {
       const pinned = Boolean(chatbox) && isPinned(chatbox);
       const text = fullText();
       if (text !== shownText) {
-        textEl.innerHTML = parseMarkdown(text);
+        try {
+          textEl.innerHTML = parseMarkdown(text);
+        } catch (error) {
+          // A redraw that fails shows the text as it is; the stored reply still replaces it at the end.
+          console.error("[CHAT] Live text redraw failed:", error && error.name);
+          textEl.textContent = text;
+        }
         shownText = text;
       }
-      renderReasoning();
+      try {
+        renderReasoning();
+      } catch (error) {
+        console.error("[CHAT] Live reasoning redraw failed:", error && error.name);
+      }
       el.hidden = !text && !fullReasoning();
       if (pinned) chatbox.scrollTop = chatbox.scrollHeight;
       lastRenderMs = performance.now() - started;
@@ -1834,6 +1852,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function apply(event) {
       if (closed) return;
+      if (!event || typeof event !== "object") return;
       if (event.type === "round") {
         if (event.kind === "initial") {
           committedText = "";
@@ -1995,6 +2014,14 @@ document.addEventListener("DOMContentLoaded", function () {
   async function followLiveTurn(turn, firstResponse, stopSignal, outcome) {
     const live = createLiveReply(turn);
     turn.live = live;
+    // The tab was hidden for a while: the stream may be dead without the browser saying so. On return the stream is
+    // ended and read again from the last event applied, at once instead of after the idle timeout.
+    const onVisible = function () {
+      if (document.hidden || !live.release) return;
+      live.ensureAttached();
+      live.release();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     const onEvent = function (event, id) {
       applyLiveEvent(turn, live, event);
       const index = Number(id);
@@ -2002,8 +2029,15 @@ document.addEventListener("DOMContentLoaded", function () {
     };
     let response = firstResponse;
     while (response) {
-      const result = await readLiveStream(response, { signal: stopSignal, idleMs: LIVE_IDLE_MS, onEvent: onEvent });
+      const result = await readLiveStream(response, {
+        signal: stopSignal,
+        idleMs: LIVE_IDLE_MS,
+        onEvent: onEvent,
+        onRelease: function (release) { live.release = release; },
+      });
+      live.release = null;
       if (result.done) {
+        document.removeEventListener("visibilitychange", onVisible);
         const body = result.done.body && typeof result.done.body === "object" ? result.done.body : {};
         // addMessage scrolls to the end; a reader who scrolled up keeps the same text in view, since the stored reply
         // takes the bubble's place. The chat follows to the end only when it was there.
@@ -2015,6 +2049,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       response = await reattachLiveTurn(turn, live, stopSignal, result.lastActivity, outcome);
     }
+    document.removeEventListener("visibilitychange", onVisible);
   }
 
   // The server lost the turn in a restart. The question can be sent again with «Повторить» unless it had photos, which a
