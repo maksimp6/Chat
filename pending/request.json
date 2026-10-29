@@ -1,1 +1,0 @@
-{"command": "batch", "args": "[{\"tap\": [468, 1945]}, {\"wait\": 1200}, {\"text\": \"hello\"}, {\"wait\": 1500}]"}
