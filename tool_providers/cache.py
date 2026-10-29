@@ -62,6 +62,9 @@ INDEX_STATE_FILE_NAME = "logos.cache.index.json"
 INDEX_FILE_NAME = "logos-cache.md"
 # The search model: the text model with the largest context window (1M tokens).
 SEARCH_MODEL = "deepseek-v4.1-flash"
+# Reading the whole cache at high effort can run for minutes; the client's 180 s default
+# failed real searches (#1710), so the wait is the transport's own maximum, no app cap.
+SEARCH_POLL_TIMEOUT_SECONDS = 7200
 SEARCH_ROLE = (
     "Ты — модель-помощник Логоса для поиска в кэше. Кэш — один длинный текст, который "
     "только растёт: в него дописывают модель и инструменты всех диалогов; каждый кусок "
@@ -382,7 +385,11 @@ def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
         f"Запрос основной модели:\n{query.strip()}\n\n"
         f"Весь текст кэша ({len(text)} символов):\n\n{text}",
         SEARCH_MODEL,
-        params={"instructions": SEARCH_ROLE, "reasoning_effort": "high"},
+        params={
+            "instructions": SEARCH_ROLE,
+            "reasoning_effort": "high",
+            "poll_timeout": SEARCH_POLL_TIMEOUT_SECONDS,
+        },
         execution_trace=_trace_of(cfg),
     )
     reasoning, answer = client.extract_reasoning_and_text(response)

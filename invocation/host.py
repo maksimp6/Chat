@@ -19,6 +19,7 @@ class Host:
     KristallError: Any  # kristall.KristallError
     KristallLimitError: Any  # kristall.KristallLimitError
     MAX_JOURNAL_FRAME_BYTES: Any  # kristall.store.MAX_JOURNAL_FRAME_BYTES
+    add_message: Any  # storage.records.add_message
     create_session: Any  # sessions.manager.create_session
     file_court_case: Any  # court.filing.file_case
     get_memory_client: Any  # agent_memory.client.get_memory_client
@@ -36,6 +37,7 @@ bound = _binding.names()
 __all__ = [
     "Host",
     "HostNotBound",
+    "add_message",
     "bind",
     "bound",
     "create_session",
@@ -47,6 +49,10 @@ __all__ = [
     "provide",
     "restore_session",
 ]
+
+
+def add_message(*args: Any, **kwargs: Any) -> Any:
+    return current().add_message(*args, **kwargs)
 
 
 def create_session(*args: Any, **kwargs: Any) -> Any:

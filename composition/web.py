@@ -9,6 +9,9 @@ memory path is configured, otherwise on the first data request.
 
 from __future__ import annotations
 
+import time
+from functools import partial
+
 from flask import Flask
 
 from agent_memory.routes import install as install_memory_routes
@@ -18,6 +21,7 @@ from chat.completion_routes import completion_bp
 from chat.embedding_routes import embedding_bp
 from chat.image_routes import image_bp
 from chat.mcp_routes import mcp_bp
+from invocation.manager import fail_interrupted_invocations
 from chat.voice_routes import voice_bp
 from cloud.cloudru.iam_routes import cloudru_iam_bp
 from conversations.ownership import prepare_conversation_ownership_records
@@ -79,6 +83,9 @@ BLUEPRINTS = (
     printing3d_bp,
 )
 
+# Turns opened before this process booted were killed with the previous one (#1710).
+_BOOTED_AT = time.time()
+
 STORAGE_INITIALIZERS = (
     open_journal_store,
     prepare_local_agent_records,
@@ -93,6 +100,7 @@ STORAGE_INITIALIZERS = (
     ensure_government_department,
     prepare_environment_records,
     ensure_rdc_server,
+    partial(fail_interrupted_invocations, before=_BOOTED_AT),
 )
 
 

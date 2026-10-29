@@ -13,10 +13,12 @@ from typing import Any
 
 from invocation.context import InvocationContext
 from invocation.host import (
+    add_message,
     bound,
     create_session,
     file_court_case,
     get_memory_client,
+    get_messages,
     memory_file_path,
     restore_session,
 )
@@ -377,6 +379,55 @@ def _file_court_case(invocation_id: str, error: Any) -> None:
         )
     except Exception:
         logger.exception("court case for invocation %s was not filed", invocation_id)
+
+
+INTERRUPTED_REPLY = (
+    "⚠️ Ошибка: ход прерван перезапуском Logos (обновление или сбой сервера), "
+    "ответ не был получен. Повторите запрос."
+)
+
+
+def fail_interrupted_invocations(before: float) -> int:
+    """Fail every invocation a previous process left created or running (#1710).
+
+    Logos is one process, so a turn still open from before ``before`` (this
+    process's boot) can never finish: a deploy or crash killed it. Each one is
+    failed, which files its Court case, and a dialog whose last message is still
+    the question gets an answer saying so, instead of nothing."""
+    client = get_memory_client(memory_file_path())
+    failed = 0
+    for key, record in client.items(_INVOCATION_PREFIX).items():
+        if not isinstance(record, dict) or record.get("status") not in {"created", "running"}:
+            continue
+        if (record.get("created_at") or 0) >= before:
+            continue
+        invocation_id = str(record.get("id") or key[len(_INVOCATION_PREFIX):])
+        error = {
+            "code": "interrupted_by_restart",
+            "message": "the Logos process stopped before the turn finished",
+            "status_at_restart": record.get("status"),
+        }
+        if not fail_invocation(invocation_id, error):
+            continue
+        failed += 1
+        conversation_id = record.get("conversation_id")
+        try:
+            messages = get_messages(conversation_id) if conversation_id else []
+            if messages and messages[-1].get("role") == "user":
+                add_message(
+                    conversation_id,
+                    "assistant",
+                    INTERRUPTED_REPLY,
+                    cost=None,
+                    source="interrupted:" + invocation_id,
+                    deduplicate_source=True,
+                    trace={"invocation_id": invocation_id, "error": error},
+                )
+        except Exception:
+            logger.exception("interrupted turn %s was not reported in its dialog", invocation_id)
+    if failed:
+        logger.error("[BOOT] %d turn(s) were interrupted by the last restart", failed)
+    return failed
 
 
 def cancel_invocation(invocation_id: str, reason: Any = None) -> bool:

@@ -386,6 +386,7 @@ def _invocation():
     from kristall import KristallError
     from kristall import KristallLimitError
     from kristall.store import MAX_JOURNAL_FRAME_BYTES
+    from storage.records import add_message
     from sessions.manager import create_session
     from court.filing import file_case as file_court_case
     from agent_memory.client import get_memory_client
@@ -398,6 +399,7 @@ def _invocation():
         KristallError=KristallError,
         KristallLimitError=KristallLimitError,
         MAX_JOURNAL_FRAME_BYTES=MAX_JOURNAL_FRAME_BYTES,
+        add_message=add_message,
         create_session=create_session,
         file_court_case=file_court_case,
         get_memory_client=get_memory_client,
