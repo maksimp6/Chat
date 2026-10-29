@@ -53,7 +53,6 @@ from chat.host import (
     persist_invocation_trace,
     record_yandex_mcp_activity,
     reset_current_trace,
-    save_conv_settings,
     upgrade_dialog_settings,
     set_owner,
     set_yandex_conversation,
@@ -186,6 +185,18 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
 OUTPUT_LIMIT_CONTINUE_PROMPT = (
     "Твой предыдущий ответ оборвался из-за ограничения длины вывода. Продолжи его "
     "ровно с того места, где он прервался: без повторов, без вступления и без пояснений."
+)
+
+
+# Sent when the cut part held only reasoning (#1705). The provider did not return
+# that reasoning into the next request (input grew by the prompt alone), so the
+# model started thinking from scratch and hit the limit again, round after round.
+# Its own reasoning goes back to it, and it is asked to go on from there.
+REASONING_CUT_CONTINUE_PROMPT = (
+    "Твоё предыдущее рассуждение оборвалось из-за ограничения длины вывода, ещё до "
+    "ответа. Ниже — то, что ты уже успел продумать. Не начинай рассуждать заново: "
+    "продолжи с этого места и переходи к ответу пользователю или к вызову нужного "
+    "инструмента.\n\nТвоё рассуждение до обрыва:\n"
 )
 
 
@@ -545,7 +556,27 @@ def _define_logos_client(base: type) -> type:
 
             def continue_after_output_limit(previous_response, part):
                 # The provider conversation holds the cut answer; otherwise it joins the history.
-                request = {"role": "user", "content": OUTPUT_LIMIT_CONTINUE_PROMPT}
+                prompt = OUTPUT_LIMIT_CONTINUE_PROMPT
+                cut_reasoning, cut_text = self.extract_reasoning_and_text(
+                    previous_response
+                )
+                if not cut_text.strip() and not extract_function_calls(
+                    previous_response
+                ):
+                    # Only reasoning was cut: give it back instead of "go on" (#1705).
+                    prompt = REASONING_CUT_CONTINUE_PROMPT + (
+                        cut_reasoning.strip() or "(текст рассуждения провайдер не вернул)"
+                    )
+                    if trace is not None:
+                        trace.add_event(
+                            "provider_reasoning_cut_returned",
+                            {
+                                "part": part,
+                                "response_id": previous_response.get("id"),
+                                "reasoning_chars": len(cut_reasoning),
+                            },
+                        )
+                request = {"role": "user", "content": prompt}
                 if conversation_id:
                     return follow_up([request], "output_limit", part)
                 continuation_history.extend(
@@ -1898,34 +1929,12 @@ def list_tool_categories():
     return jsonify({"categories": bound.registry.get_available_categories()})
 
 
-def _tool_category_selection(value: Any) -> list[str] | None:
-    """Registered category names only, so a saved selection always maps to real tools."""
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        return None
-    known = bound.registry.get_available_categories()
-    if any(item not in known for item in value):
-        return None
-    return list(dict.fromkeys(value))
-
-
-@mcp_bp.route("/api/conversations/<conv_id>/tools", methods=["GET", "PUT"])
+# Settings are read-only: the tool selection is shown, never changed through the API.
+@mcp_bp.route("/api/conversations/<conv_id>/tools", methods=["GET"])
 def conv_tools(conv_id):
     owner_id = get_current_owner_id(required=False)
     if not check_access(conv_id, owner_id):
         return jsonify(error_body("conversation_not_found")), 404
-    if request.method == "PUT":
-        data = request.get_json(silent=True) or {}
-        if not isinstance(data, dict):
-            return jsonify(error_body("JSON object is required")), 400
-        categories = _tool_category_selection(data.get("active_tool_categories", []))
-        if categories is None:
-            return jsonify(error_body("invalid_tool_categories")), 400
-        # The record is stored as it is applied, so this explicit choice outlives the upgrade.
-        settings = upgrade_dialog_settings(get_conv_settings(conv_id) or {})
-        settings["active_tool_categories"] = categories
-        save_conv_settings(conv_id, settings)
-        return jsonify({"status": "ok", "active_tool_categories": categories})
-
     settings = upgrade_dialog_settings(get_conv_settings(conv_id) or {})
     cats = settings.get("active_tool_categories")
     if cats is None:
@@ -1934,7 +1943,6 @@ def conv_tools(conv_id):
 
 
 # Stored server credentials are not echoed back to the browser.
-# Stored credentials never go back to the browser: an empty value on update means "unchanged".
 _MCP_SECRET_FIELDS = ("authorization", "headers")
 
 
@@ -1945,51 +1953,20 @@ def _without_secrets(record):
     return public
 
 
-def _update_payload():
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return None
-    for field in _MCP_SECRET_FIELDS:
-        if not data.get(field):
-            data.pop(field, None)
-    return data
-
-
-@mcp_bp.route("/api/mcp-servers", methods=["GET", "POST"])
+# Settings are read-only: servers are listed, read and deleted here, never created or changed.
+@mcp_bp.route("/api/mcp-servers", methods=["GET"])
 def handle_mcp_servers():
     owner_id = get_current_owner_id()
-    if request.method == "POST":
-        data = _update_payload()
-        if data is None:
-            return jsonify(error_body("JSON object is required")), 400
-        try:
-            sid = bound.mcp_storage.create_server(owner_id, data)
-        except ValueError as exc:
-            return jsonify(error_body(str(exc), detail_of="invalid_mcp_server")), 400
-        return jsonify({"status": "ok", "id": sid}), 201
     servers = bound.mcp_storage.list_servers(owner_id=owner_id)
     return jsonify({"data": [_without_secrets(srv) for srv in servers]})
 
 
-@mcp_bp.route("/api/mcp-servers/<server_id>", methods=["GET", "PUT", "DELETE"])
+@mcp_bp.route("/api/mcp-servers/<server_id>", methods=["GET", "DELETE"])
 def handle_mcp_server_item(server_id):
     owner_id = get_current_owner_id()
     if request.method == "DELETE":
         bound.mcp_storage.delete_server(server_id, owner_id)
         return jsonify({"status": "deleted"})
-    if request.method == "PUT":
-        data = _update_payload()
-        if data is None:
-            return jsonify(error_body("JSON object is required")), 400
-        try:
-            updated = bound.mcp_storage.update_server(server_id, owner_id, data)
-        except ValueError as exc:
-            return jsonify(error_body(str(exc), detail_of="invalid_mcp_server")), 400
-        if not updated:
-            return jsonify(
-                error_body("Сервер не найден", detail_of="mcp_server_not_found")
-            ), 404
-        return jsonify({"status": "updated"})
 
     srv = bound.mcp_storage.get_server(server_id, owner_id=owner_id)
     if not srv:

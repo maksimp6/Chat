@@ -51,7 +51,7 @@
     var md = document.createElement("div");
     md.className = "settings-mcp-body";
     md.innerHTML =
-      '<button class="logos-btn settings-contract-btn" id="mcp-mgr-add">+ Добавить сервер</button>' +
+      '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:10px;">Настройки только для чтения: серверы нельзя добавить или изменить здесь, только удалить.</div>' +
       '<div id="mcp-mgr-list"></div>';
 
     var ov = CoreUI.modal.create({
@@ -77,7 +77,7 @@
       var list = document.getElementById("mcp-mgr-list");
       if (!servers || servers.length === 0) {
         list.innerHTML =
-          '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Нет MCP серверов. Добавьте первый.</div>';
+          '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Нет MCP серверов.</div>';
         return;
       }
       list.innerHTML = servers
@@ -92,9 +92,11 @@
             UI.escapeHtml(connInfo) +
             "</div></div>" +
             '<div style="display:flex;gap:6px;">' +
-            '<button class="logos-btn mcp-edit-btn settings-contract-btn" data-id="' +
-            UI.escapeHtml(srv.id) +
-            '">Изменить</button>' +
+            (srv.server_url
+              ? '<button class="logos-btn mcp-oauth-btn settings-contract-btn" data-id="' +
+                UI.escapeHtml(srv.id) +
+                '">⚡ OAuth</button>'
+              : "") +
             '<button class="logos-btn mcp-del-btn settings-contract-btn" data-id="' +
             UI.escapeHtml(srv.id) +
             '">Удалить</button>' +
@@ -103,13 +105,38 @@
         })
         .join("");
 
-      list.querySelectorAll(".mcp-edit-btn").forEach(function (btn) {
+      list.querySelectorAll(".mcp-oauth-btn").forEach(function (btn) {
         btn.addEventListener("click", function () {
           var sid = this.getAttribute("data-id");
-          var srv = servers.find(function (s) {
-            return s.id === sid;
-          });
-          if (srv) openMcpEditor(srv);
+          var self = this;
+          self.disabled = true;
+          // Open the popup synchronously so the browser does not block it.
+          var popup = window.open("", "mcp_oauth", "width=520,height=680");
+          var redirectUri = window.location.origin + "/api/mcp/oauth/callback";
+          window.LogosDispatcher.request("/api/mcp-servers/" + encodeURIComponent(sid) + "/oauth/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ redirect_uri: redirectUri }),
+          })
+            .then(function (r) {
+              return r.json().then(function (body) {
+                if (!r.ok || !body.authorize_url) {
+                  throw new Error((body && (body.message || body.error)) || "HTTP " + r.status);
+                }
+                return body.authorize_url;
+              });
+            })
+            .then(function (url) {
+              if (popup && !popup.closed) popup.location = url;
+              else window.location = url;
+            })
+            .catch(function (e) {
+              if (popup && !popup.closed) popup.close();
+              LogosToast.error("Не удалось начать OAuth: " + (e.message || e));
+            })
+            .then(function () {
+              self.disabled = false;
+            });
         });
       });
 
@@ -151,201 +178,6 @@
       window.fetchMcpServers().then(renderList, renderLoadError);
     }
 
-    var editorEl = null;
-
-    function openMcpEditor(srv) {
-      if (editorEl) editorEl.remove();
-      var isNew = !srv;
-      srv = srv || {};
-
-      // Stored secrets are not sent to the browser; the field only says that one is saved.
-      var SAVED_HINT = "сохранён — оставьте пустым, чтобы не менять";
-
-      var CONNECTOR_CHOICES = [
-        ["", "(нет — использовать server_url)"],
-        ["termux_api", "📱 Termux API (Android Hardware)"],
-        ["local_git", "📁 Local Git"],
-        ["connector_dropbox", "Dropbox"],
-        ["connector_gmail", "Gmail"],
-        ["connector_googlecalendar", "Google Calendar"],
-        ["connector_googledrive", "Google Drive"],
-        ["connector_microsoftteams", "Microsoft Teams"],
-        ["connector_outlookcalendar", "Outlook Calendar"],
-        ["connector_outlookemail", "Outlook Email"],
-        ["connector_sharepoint", "SharePoint"],
-      ];
-
-      function connSelected(val) {
-        return CONNECTOR_CHOICES.map(function (choice) {
-          var selected = choice[0] === val ? " selected" : "";
-          return (
-            '<option value="' + UI.escapeHtml(choice[0]) + '"' + selected + ">" +
-            UI.escapeHtml(choice[1]) + "</option>"
-          );
-        }).join("");
-      }
-
-      var e = document.createElement("div");
-      e.style.cssText =
-        "border:1px solid var(--m-accent,#4a90d9);border-radius:8px;padding:16px;margin-top:12px;background:var(--m-editor,#f8f9fa);";
-
-      e.innerHTML =
-        '<h3 style="margin:0 0 10px;font-size:15px;color:var(--m-text,#222);">' +
-        (isNew ? "Новый MCP сервер" : "Редактирование") +
-        "</h3>" +
-        '<div style="margin-bottom:8px;">' +
-        UI.lbl("Название") +
-        UI.inp("mcp-ed-name", "text", srv.name || "", {"style": "width:100%;"}) +
-        "</div>" +
-        '<div style="margin-bottom:8px;">' +
-        UI.lbl("Connector ID") +
-        UI.sel("mcp-ed-connector", connSelected(srv.connector_id || "")) +
-        "</div>" +
-        '<div style="margin-bottom:8px;">' +
-        UI.lbl("Server URL") +
-        UI.inp(
-          "mcp-ed-url",
-          "text",
-          srv.server_url || "",
-          {"style": "width:100%;", "placeholder": "https://mcp.example.com/sse"},
-        ) +
-        "</div>" +
-        UI.gap2(
-          "<div>" +
-            UI.lbl("Server Label") +
-            UI.inp("mcp-ed-label", "text", srv.server_label || "", {"style": "width:100%;"}) +
-            "</div>",
-          "<div>" +
-            UI.lbl("Authorization") +
-            UI.inp(
-              "mcp-ed-auth",
-              "password",
-              "",
-              { style: "width:100%;", placeholder: srv.has_authorization ? SAVED_HINT : "" },
-            ) +
-            "</div>",
-        ) +
-        '<div style="margin-bottom:8px;">' +
-        UI.lbl("Description") +
-        UI.inp("mcp-ed-desc", "text", srv.server_description || "", {"style": "width:100%;"}) +
-        "</div>" +
-        '<div style="margin-bottom:8px;">' +
-        UI.lbl("Headers (JSON)") +
-        '<textarea id="mcp-ed-headers" style="width:100%;min-height:40px;font-family:monospace;font-size:11px;padding:6px;border:1px solid var(--m-border,#ddd);border-radius:4px;background:var(--m-input-bg,#f5f5f5);color:var(--m-input-text,#222);box-sizing:border-box;" placeholder="' +
-        UI.escapeHtml(srv.has_headers ? SAVED_HINT : '{"X-Key":"val"}') +
-        '"></textarea></div>' +
-        '<div style="margin-bottom:8px;">' +
-        UI.lbl("Allowed Tools") +
-        UI.inp("mcp-ed-allowed", "text", srv.allowed_tools || "", {"style": "width:100%;"}) +
-        "</div>" +
-        '<div style="margin-bottom:4px;">' +
-        UI.chk("mcp-ed-allowed-ro", srv.allowed_tools_read_only || false, "Read-only filter") +
-        "</div>" +
-        '<div style="margin-bottom:8px;font-size:12px;color:var(--m-muted,#666);">⏳ Defer Loading — всегда включено для всех инструментов, включая MCP; отключить нельзя.</div>' +
-        '<div style="display:flex;gap:8px;margin-top:10px;">' +
-        UI.btn("mcp-ed-save", isNew ? "Создать" : "Сохранить", "accent") +
-        (isNew ? "" : UI.btn("mcp-ed-oauth", "⚡ Подключить (OAuth)")) +
-        UI.btn("mcp-ed-cancel", "Отмена") +
-        "</div>" +
-        '<div id="mcp-ed-oauth-status" role="status" style="margin-top:6px;font-size:12px;color:var(--m-muted,#666);min-height:14px;"></div>';
-
-      document.getElementById("mcp-mgr-list").insertAdjacentElement("beforebegin", e);
-      editorEl = e;
-
-      document.getElementById("mcp-ed-cancel").addEventListener("click", function () {
-        editorEl.remove();
-        editorEl = null;
-      });
-
-      var oauthBtn = document.getElementById("mcp-ed-oauth");
-      if (oauthBtn) {
-        oauthBtn.addEventListener("click", function () {
-          var status = document.getElementById("mcp-ed-oauth-status");
-          status.textContent = "Открываю окно авторизации…";
-          // Open the popup synchronously so the browser does not block it; fill it after.
-          var popup = window.open("", "mcp_oauth", "width=520,height=680");
-          var redirectUri = window.location.origin + "/api/mcp/oauth/callback";
-          window.LogosDispatcher.request(
-            "/api/mcp-servers/" + encodeURIComponent(srv.id) + "/oauth/start",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ redirect_uri: redirectUri }),
-            },
-          )
-            .then(function (r) {
-              return r.json().then(function (body) {
-                if (!r.ok || !body.authorize_url) {
-                  throw new Error((body && (body.message || body.error)) || "HTTP " + r.status);
-                }
-                return body.authorize_url;
-              });
-            })
-            .then(function (url) {
-              if (popup && !popup.closed) {
-                popup.location = url;
-              } else {
-                window.location = url;
-              }
-              status.textContent = "Подтвердите доступ в открывшемся окне, затем обновите список.";
-            })
-            .catch(function (error) {
-              if (popup && !popup.closed) popup.close();
-              status.textContent = "Не удалось начать авторизацию: " + (error.message || error);
-            });
-        });
-      }
-
-      document.getElementById("mcp-ed-save").addEventListener("click", function () {
-        var saveBtn = this;
-        var payload = {
-          name: document.getElementById("mcp-ed-name").value.trim(),
-          connector_id: document.getElementById("mcp-ed-connector").value,
-          server_url: document.getElementById("mcp-ed-url").value.trim(),
-          server_label: document.getElementById("mcp-ed-label").value.trim(),
-          authorization: document.getElementById("mcp-ed-auth").value.trim(),
-          server_description: document.getElementById("mcp-ed-desc").value.trim(),
-          headers: document.getElementById("mcp-ed-headers").value.trim(),
-          allowed_tools: document.getElementById("mcp-ed-allowed").value.trim(),
-          allowed_tools_read_only: document.getElementById("mcp-ed-allowed-ro").checked,
-          require_approval: "never",
-        };
-        // An empty secret field keeps the stored value, so it is not sent at all.
-        if (!payload.authorization) delete payload.authorization;
-        if (!payload.headers) delete payload.headers;
-        if (!payload.name || (!payload.server_url && !payload.connector_id)) {
-          LogosToast.error("Заполните название и URL/Connector");
-          return;
-        }
-        var method = isNew ? "POST" : "PUT";
-        var url = isNew ? "/api/mcp-servers" : "/api/mcp-servers/" + encodeURIComponent(srv.id);
-        saveBtn.disabled = true;
-        window.LogosDispatcher.request(url, {
-          method: method,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-          .then(function (r) {
-            if (!r.ok) throw new Error("HTTP " + r.status);
-            return r.json();
-          })
-          .then(function () {
-            if (editorEl === e) {
-              e.remove();
-              editorEl = null;
-            }
-            refreshList();
-          })
-          .catch(function (e) {
-            saveBtn.disabled = false;
-            LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
-          });
-      });
-    }
-
-    document.getElementById("mcp-mgr-add").addEventListener("click", function () {
-      openMcpEditor(null);
-    });
     refreshList();
   };
 

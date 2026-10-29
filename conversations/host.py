@@ -25,10 +25,6 @@ class Host:
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_memory_client: Any  # agent_memory.client.get_memory_client
     memory_file_path: Any  # storage.records.memory_file_path
-    normalize_tools_config: (
-        Any  # yandex_client_modules.tool_config.normalize_tools_config
-    )
-    save_conv_settings: Any  # storage.records.save_conv_settings
     update_conversation_model: Any  # storage.records.update_conversation_model
     update_conversation_title: Any  # storage.records.update_conversation_title
     upgrade_dialog_settings: (
@@ -36,9 +32,6 @@ class Host:
     )
     validate_dialog_model: (
         Any  # provider_accounts.model_discovery.validate_dialog_model
-    )
-    validate_generation_params: (
-        Any  # yandex_client_modules.request_builder.validate_generation_params
     )
 
 
@@ -61,13 +54,10 @@ __all__ = [
     "get_current_owner_id",
     "get_memory_client",
     "memory_file_path",
-    "normalize_tools_config",
-    "save_conv_settings",
     "update_conversation_model",
     "update_conversation_title",
     "upgrade_dialog_settings",
     "validate_dialog_model",
-    "validate_generation_params",
 ]
 
 
@@ -95,14 +85,6 @@ def memory_file_path(*args: Any, **kwargs: Any) -> Any:
     return current().memory_file_path(*args, **kwargs)
 
 
-def normalize_tools_config(*args: Any, **kwargs: Any) -> Any:
-    return current().normalize_tools_config(*args, **kwargs)
-
-
-def save_conv_settings(*args: Any, **kwargs: Any) -> Any:
-    return current().save_conv_settings(*args, **kwargs)
-
-
 def update_conversation_model(*args: Any, **kwargs: Any) -> Any:
     return current().update_conversation_model(*args, **kwargs)
 
@@ -117,7 +99,3 @@ def upgrade_dialog_settings(*args: Any, **kwargs: Any) -> Any:
 
 def validate_dialog_model(*args: Any, **kwargs: Any) -> Any:
     return current().validate_dialog_model(*args, **kwargs)
-
-
-def validate_generation_params(*args: Any, **kwargs: Any) -> Any:
-    return current().validate_generation_params(*args, **kwargs)

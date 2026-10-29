@@ -1,4 +1,4 @@
-"""HTTP API of the global memory panel: configuration, facts and clearing."""
+"""HTTP API of the global memory panel: configuration and facts (read-only settings), clearing."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from agent_memory.extractor import list_global_memory_facts
 from agent_memory.manager import (
     clear_global_memory,
     load_memory_config,
-    save_memory_config,
 )
 
 
@@ -16,15 +15,6 @@ def api_memory_panel_data():
     cfg = load_memory_config()
     facts = list_global_memory_facts()
     return jsonify({"config": cfg, "facts": facts})
-
-
-def api_update_memory_config():
-    data = request.get_json(silent=True) or {}
-    try:
-        save_memory_config(data)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    return jsonify({"status": "ok", "config": load_memory_config()})
 
 
 def api_clear_memory():
@@ -40,7 +30,5 @@ def install(app: Flask) -> None:
     app.add_url_rule(
         "/api/memory/manage", view_func=api_memory_panel_data, methods=["GET"]
     )
-    app.add_url_rule(
-        "/api/memory/config", view_func=api_update_memory_config, methods=["PUT"]
-    )
+    # Settings are read-only: the memory configuration is shown, never saved through the API.
     app.add_url_rule("/api/memory/clear", view_func=api_clear_memory, methods=["POST"])

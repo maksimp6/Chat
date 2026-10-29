@@ -6,8 +6,8 @@ The tool platform: provider-agnostic tool contracts and the execution pipeline, 
 
 Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
 
-- **Dialog settings and tools**: `GET /api/conversations/<conv_id>/settings`, `PUT /api/conversations/<conv_id>/settings`, `GET /api/tools/categories`, `PUT /api/conversations/<conv_id>/tools`
-- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`, `POST /api/mcp-servers`
+- **Dialog settings and tools**: `GET /api/conversations/<conv_id>/settings`, `GET /api/tools/categories`
+- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`
 - **Approve a tool action**: `POST /api/mcp/execute-approved`
 - **Read dialogs from outside (MCP)**: `POST {MCP_PATH}`
 

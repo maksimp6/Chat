@@ -13,15 +13,11 @@
 
   var CATEGORY_LABELS = { general: "общее" };
 
-  // Config controls take part in a save only after the stored settings were read. Otherwise a
-  // save would send values the server never confirmed and overwrite them.
-  var configLoaded = false;
-
-  function setConfigControlsReady(ready) {
-    configLoaded = ready;
+  // Settings are read-only: the memory configuration is shown, never saved.
+  function lockConfigControls() {
     ["memEnabled", "memLimit"].forEach(function (id) {
       var control = byId(id);
-      if (control) control.disabled = !ready;
+      if (control) control.disabled = true;
     });
   }
 
@@ -29,7 +25,7 @@
     // Old facts stay out of view while the request runs (пункт 51).
     var pending = byId("memoryFactsList");
     if (pending) pending.textContent = "Загрузка…";
-    setConfigControlsReady(false);
+    lockConfigControls();
     try {
       var response = await window.LogosDispatcher.request("/api/memory/manage");
       if (!response.ok) throw new Error("HTTP " + response.status);
@@ -48,7 +44,7 @@
           Number.isInteger(config.max_context_facts) ? config.max_context_facts : 100,
         );
       }
-      setConfigControlsReady(true);
+      lockConfigControls();
       if (count) count.textContent = facts.length;
       reportStatus("");
       if (!list) return;
@@ -75,44 +71,10 @@
       });
     } catch (error) {
       console.error("[Memory] Failed to load memory:", error);
-      setConfigControlsReady(false);
+      lockConfigControls();
       var failed = byId("memoryFactsList");
       if (failed) failed.replaceChildren();
       reportStatus("Не удалось загрузить память.");
-    }
-  };
-
-  window.updateMemoryConfig = async function (event) {
-    var control = event && event.target;
-    if (!configLoaded || !control) return;
-    // Send only the control the user changed; the other stored settings stay as they are.
-    var body = {};
-    if (control.id === "memEnabled") {
-      body.enabled = Boolean(control.checked);
-    } else if (control.id === "memLimit") {
-      var maxFacts = parseInt(control.value, 10);
-      if (Number.isNaN(maxFacts)) {
-        // An empty limit is not a value to save; show the stored one again.
-        await window.loadMemoryData();
-        return;
-      }
-      body.max_context_facts = maxFacts;
-    } else {
-      return;
-    }
-    try {
-      var response = await window.LogosDispatcher.request("/api/memory/config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!response.ok) throw new Error("HTTP " + response.status);
-      await window.loadMemoryData();
-    } catch (error) {
-      console.error("[Memory] Failed to update config:", error);
-      // Re-read the server state so the controls show what was actually saved.
-      await window.loadMemoryData();
-      reportStatus("Не удалось сохранить настройки памяти.");
     }
   };
 
@@ -161,17 +123,6 @@
       window.loadMemoryData();
     });
 
-    var configBindings = [
-      ["memEnabled", "change", window.updateMemoryConfig],
-      ["memLimit", "change", window.updateMemoryConfig],
-    ];
-
-    configBindings.forEach(function (binding) {
-      var element = byId(binding[0]);
-      if (!element || element.dataset.bound === "true") return;
-      element.addEventListener(binding[1], binding[2]);
-      element.dataset.bound = "true";
-    });
   }
 
   if (document.readyState === "loading") {

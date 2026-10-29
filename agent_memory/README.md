@@ -6,8 +6,8 @@ Shared memory for Logos agents on native Kristall: the Kristall client lifecycle
 
 Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
 
-- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`, `POST /api/mcp-servers`
-- **Global memory used by every dialog**: `GET /api/memory/manage`, `PUT /api/memory/config`, `POST /api/memory/clear`
+- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`
+- **Global memory used by every dialog**: `GET /api/memory/manage`, `POST /api/memory/clear`
 
 ## Public API
 

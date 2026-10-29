@@ -41,9 +41,11 @@ FILE_SEARCH_OFF_NOTE = (
 FILE_SEARCH_ON_NOTE = (
     "\n\nВ этом диалоге подключён поиск по векторному хранилищу (File Search, RAG; "
     "инструмент file_search, он же search_index): в нём архив диалогов с Логосом, "
-    "issues и документы репозитория владельца. Когда пользователь просит найти что-то "
-    "в памяти, в индексе, в RAG, в архиве, в диалогах или файлах, вызови file_search "
-    "и отвечай по найденным фрагментам, называя файлы-источники (filename). "
+    "issues и документы репозитория владельца, а также весь текст кэша. Используй "
+    "индекс всегда, в каждом ходе: до ответа вызови file_search по сути вопроса и "
+    "опирайся на найденные фрагменты, называя файлы-источники (filename); тем более "
+    "когда пользователь просит найти что-то в памяти, в индексе, в RAG, в архиве, в "
+    "диалогах или файлах. "
     "Не подменяй найденное общими сведениями и веб-поиском; если в индексе ничего "
     "подходящего нет, так и скажи. "
     # #1669: the model presented facts from the user's own message as index findings,
@@ -64,13 +66,15 @@ CACHE_NOTE = (
     "дописывают модель и инструменты всех диалогов, и ничего из него не удаляется. "
     "Каждый дописанный кусок получает векторы всех моделей эмбеддингов с их "
     "версиями, а весь текст целиком лежит в индексе — векторном хранилище знаний, "
-    "где его находит file_search. Используй кэш активно, в каждом ходе. Перед "
-    "финальным ответом вызови cache_append (source: model) и допиши в кэш свой ответ "
-    "пользователю целиком, а после него — как ты видишь этот ход: что пришло на вход, "
-    "какие инструкции и инструменты ты видишь, на что опирается ответ и в чём ты не "
-    "уверен. Затем дай пользователю тот же ответ. Если cache_append вернул ошибку или в "
-    "background.previous есть embedding_errors или index_errors, сообщи об этом в "
-    "ответе дословно. Чтобы найти "
+    "где его находит file_search. Используй кэш активно, в каждом ходе. Ход всегда "
+    "начинается с записи вопроса в кэш: первым вызовом cache_append (source: user) "
+    "допиши в кэш вопрос пользователя дословно и целиком — первый запрос хода "
+    "требует именно этот вызов. Перед финальным ответом снова вызови cache_append "
+    "(source: model) и допиши свой ответ пользователю целиком, а после него — как ты "
+    "видишь этот ход: что пришло на вход, какие инструкции и инструменты ты видишь, "
+    "на что опирается ответ и в чём ты не уверен. Затем дай пользователю тот же "
+    "ответ. Если cache_append вернул ошибку или в background.previous есть "
+    "embedding_errors или index_errors, сообщи об этом в ответе дословно. Чтобы найти "
     "в кэше прежний контекст или прежние твои ответы, вызови cache_search: поиск "
     "выполняет модель-помощник (DeepSeek V4.1 Flash) — она читает весь кэш и "
     "возвращает найденные места дословно с их заголовками; её ответ проверяй, её "
@@ -450,10 +454,28 @@ class YandexMcpMixin:
             ) + CACHE_NOTE
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
+        # The function that carries cache_append: itself, or its category's group
+        # function when the tools are grouped (#1703); None without the cache.
+        cache_function = grouped_into.get("cache_append") or (
+            "cache_append"
+            if any(tool.get("name") == "cache_append" for tool in tools)
+            else None
+        )
         if not tools and ask_params.get("tool_choice") == "required":
             # Nothing to call (every tool switched off): a required call cannot be met.
             ask_params["tool_choice"] = "auto"
             note("tool_choice", "tool_choice required released to auto: no tool in this turn")
+        elif ask_params.get("tool_choice") == "required" and cache_function:
+            # The owner's rule: every turn starts by writing the user's question to the cache.
+            # The forced tool is sent loaded, since a deferred one is hidden until a tool search.
+            ask_params["tools"] = tools = [
+                {key: value for key, value in tool.items() if key != "defer_loading"}
+                if tool.get("name") == cache_function
+                else tool
+                for tool in tools
+            ]
+            # A grouped cache_append is mapped to its group function below.
+            ask_params["tool_choice"] = {"type": "function", "name": "cache_append"}
         elif ask_params.get("tool_choice") == "required" and not any(
             tool.get("type") in ("function", "mcp") for tool in tools
         ):

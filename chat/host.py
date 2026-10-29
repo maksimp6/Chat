@@ -115,7 +115,6 @@ class Host:
     request_image: Any  # yandex_client_modules.image_generation.generate_image
     reserve_request: Any  # provider_accounts.quotas.reserve_request
     reset_current_trace: Any  # observability.trace_manager.reset_current_trace
-    save_conv_settings: Any  # storage.records.save_conv_settings
     save_global_memory_facts: Any  # agent_memory.extractor.save_global_memory_facts
     save_image_file: Any  # storage.generated_images.save_image_file
     set_owner: Any  # conversations.ownership.set_owner
@@ -190,7 +189,6 @@ __all__ = [
     "request_image",
     "reserve_request",
     "reset_current_trace",
-    "save_conv_settings",
     "save_global_memory_facts",
     "save_image_file",
     "set_owner",
@@ -378,10 +376,6 @@ def reset_current_trace(*args: Any, **kwargs: Any) -> Any:
 
 def save_global_memory_facts(*args: Any, **kwargs: Any) -> Any:
     return current().save_global_memory_facts(*args, **kwargs)
-
-
-def save_conv_settings(*args: Any, **kwargs: Any) -> Any:
-    return current().save_conv_settings(*args, **kwargs)
 
 
 def save_image_file(*args: Any, **kwargs: Any) -> Any:

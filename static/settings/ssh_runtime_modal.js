@@ -62,8 +62,8 @@
       "Приватный ключ и его содержимое никогда не передаются через этот интерфейс. В targets указывается только серверный путь к существующему ключу и known_hosts. ",
       "Проверка подключения выполняет только фиксированную команду true и проверяет сохранённую конфигурацию.",
       "</div>",
-      '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">',
-      '<button class="logos-btn settings-contract-btn" id="set-ssh-save-btn" type="button">Сохранить SSH</button>',
+      '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">',
+      "Настройки SSH Runtime только для чтения: изменить их здесь нельзя.",
       "</div>",
       "</div>",
     ].join("");
@@ -102,19 +102,6 @@
       sshStatusEl.style.color = error ? "var(--m-danger,#c33)" : "var(--m-muted,#666)";
     }
 
-    // Form values as they were last loaded or saved; a connection test is allowed only while they match.
-    var savedFormState = null;
-    function formState() {
-      return JSON.stringify(
-        Array.prototype.map.call(
-          content.querySelectorAll("input:not(#set-ssh-test-target), textarea"),
-          function (el) {
-            return el.type === "checkbox" ? el.checked : el.value;
-          },
-        ),
-      );
-    }
-
     function showLastTest(last) {
       if (last) {
         setSshStatus(
@@ -147,13 +134,10 @@
       document.getElementById("set-ssh-approval-privileged").checked =
         ssh.approval_required_for_privileged !== false;
       document.getElementById("set-ssh-targets").value = JSON.stringify(ssh.targets || {}, null, 2);
-      document.getElementById("set-ssh-allow-exec").disabled = ssh.read_only === true;
-      document.getElementById("set-ssh-allow-write").disabled = ssh.read_only === true;
       var targetNames = Object.keys(ssh.targets || {});
       if (sshTestTargetEl && targetNames.length && !sshTestTargetEl.value)
         sshTestTargetEl.value = targetNames[0];
       showLastTest(ssh.last_test);
-      savedFormState = formState();
     }
 
     window.LogosDispatcher.request("/api/ssh-runtime/settings")
@@ -166,90 +150,18 @@
       .then(function (data) {
         // Unlock only after a successful populate, so a failure leaves the form closed.
         populateSshSettings(data);
-        setSshFormLocked(false);
-        var readOnly = data.read_only === true;
-        document.getElementById("set-ssh-allow-exec").disabled = readOnly;
-        document.getElementById("set-ssh-allow-write").disabled = readOnly;
+        // Settings are read-only: only the connection test stays usable.
+        document.getElementById("set-ssh-test-target").disabled = false;
+        document.getElementById("set-ssh-test-btn").disabled = false;
       })
       .catch(function (err) {
         setSshStatus(err.message, true);
       });
 
-    document.getElementById("set-ssh-readonly").addEventListener("change", function () {
-      var disabled = this.checked;
-      document.getElementById("set-ssh-allow-exec").disabled = disabled;
-      document.getElementById("set-ssh-allow-write").disabled = disabled;
-      if (disabled) {
-        document.getElementById("set-ssh-allow-exec").checked = false;
-        document.getElementById("set-ssh-allow-write").checked = false;
-      }
-    });
-
-    document.getElementById("set-ssh-save-btn").addEventListener("click", function () {
-      var targetsText = document.getElementById("set-ssh-targets").value.trim();
-      var targets;
-      try {
-        targets = targetsText ? JSON.parse(targetsText) : {};
-      } catch (err) {
-        setSshStatus("Проверьте формат JSON целей.", true);
-        return;
-      }
-
-      var payload = {
-        enabled: document.getElementById("set-ssh-enabled").checked,
-        read_only: document.getElementById("set-ssh-readonly").checked,
-        allow_command_execution: document.getElementById("set-ssh-allow-exec").checked,
-        allow_write_operations: document.getElementById("set-ssh-allow-write").checked,
-        max_output_bytes:
-          parseInt(document.getElementById("set-ssh-max-output").value, 10) || 1048576,
-        known_hosts: document.getElementById("set-ssh-known-hosts").value.trim() || null,
-        command_allowlist: document
-          .getElementById("set-ssh-command-allowlist")
-          .value.split(/\r?\n/)
-          .map(function (v) {
-            return v.trim();
-          })
-          .filter(Boolean),
-        allow_privileged_operations: document.getElementById("set-ssh-allow-privileged").checked,
-        approval_required_for_write: document.getElementById("set-ssh-approval-write").checked,
-        approval_required_for_privileged: document.getElementById("set-ssh-approval-privileged")
-          .checked,
-        targets: targets,
-      };
-
-      setSshStatus("Сохранение...");
-      window.LogosDispatcher.request("/api/ssh-runtime/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-        .then(function (r) {
-          return r.json().then(function (data) {
-            if (!r.ok) throw new Error(data.detail || data.error || "Не удалось сохранить");
-            return data;
-          });
-        })
-        .then(function (data) {
-          populateSshSettings(data.settings || payload);
-          setSshStatus("SSH Runtime settings сохранены.");
-        })
-        .catch(function (err) {
-          setSshStatus(err.message, true);
-        });
-    });
-
     document.getElementById("set-ssh-test-btn").addEventListener("click", function () {
       var target = ((sshTestTargetEl && sshTestTargetEl.value) || "").trim();
       if (!target) {
         setSshStatus("Укажите target для проверки.", true);
-        return;
-      }
-      // The server tests the saved configuration, so unsaved edits must be saved before a test.
-      if (savedFormState !== null && formState() !== savedFormState) {
-        setSshStatus(
-          "Есть несохранённые изменения. Сначала сохраните SSH Runtime, затем проверьте подключение.",
-          true,
-        );
         return;
       }
       setSshStatus("Проверка подключения...");

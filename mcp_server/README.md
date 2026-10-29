@@ -6,7 +6,7 @@ The Logos MCP server: protocol and transport, the shared local identity, records
 
 Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
 
-- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`, `POST /api/mcp-servers`
+- **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`
 - **Read dialogs from outside (MCP)**: `POST {MCP_PATH}`
 
 ## Public API

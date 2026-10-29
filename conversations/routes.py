@@ -10,13 +10,10 @@ from conversations.host import (
     delete_conversation,
     get_conv_settings,
     get_current_owner_id,
-    normalize_tools_config,
-    save_conv_settings,
     update_conversation_model,
     update_conversation_title,
     upgrade_dialog_settings,
     validate_dialog_model,
-    validate_generation_params,
 )
 
 
@@ -89,41 +86,6 @@ def get_dialog_settings(conv_id):
     return jsonify(upgrade_dialog_settings(get_conv_settings(conv_id) or {}))
 
 
-def save_dialog_settings(conv_id):
-    owner_id = get_current_owner_id(required=False)
-    if not owner_id or not check_access(conv_id, owner_id):
-        return jsonify({"error": "conversation_not_found"}), 404
-    settings = request.get_json(silent=True)
-    if not isinstance(settings, dict):
-        return jsonify({"error": "JSON object is required"}), 400
-    # Refuse here what every later message would be refused for, while the window can still show why.
-    if str(settings.get("previous_response_id") or "").strip():
-        message = "previous_response_id cannot be used in a dialog; clear it"
-        return jsonify({"error": "invalid_params", "message": message}), 400
-    try:
-        validate_generation_params(
-            {
-                key: value
-                for key, value in settings.items()
-                if key != "previous_response_id"
-            }
-        )
-    except ValueError as exc:
-        return jsonify({"error": "invalid_params", "message": str(exc)}), 400
-    if "tools_config" in settings:
-        try:
-            settings["tools_config"] = normalize_tools_config(settings["tools_config"])
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
-    if "active_tool_categories" not in settings:
-        # Tool selection is saved by PUT /tools; a settings save must not drop it.
-        stored = upgrade_dialog_settings(get_conv_settings(conv_id) or {})
-        if "active_tool_categories" in stored:
-            settings["active_tool_categories"] = stored["active_tool_categories"]
-    save_conv_settings(conv_id, settings)
-    return jsonify({"status": "ok"})
-
-
 def install(app: Flask) -> None:
     """Serve the conversation API; endpoints keep the view names."""
     app.add_url_rule(
@@ -138,13 +100,9 @@ def install(app: Flask) -> None:
     app.add_url_rule(
         "/api/conversations/<conv_id>", view_func=remove_conv, methods=["DELETE"]
     )
+    # Settings are read-only: they are shown, never saved through the API.
     app.add_url_rule(
         "/api/conversations/<conv_id>/settings",
         view_func=get_dialog_settings,
         methods=["GET"],
-    )
-    app.add_url_rule(
-        "/api/conversations/<conv_id>/settings",
-        view_func=save_dialog_settings,
-        methods=["PUT"],
     )
