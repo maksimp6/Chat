@@ -992,37 +992,58 @@ def save_capture(path, png):
         raise
 
 
+def _run_worker():
+    raw = sys.stdin.buffer.read(16385)
+    if len(raw) > 16384:
+        raise AgentError("worker_request_limit")
+    request = json.loads(raw)
+    if not isinstance(request, dict):
+        raise AgentError("invalid_worker_request")
+    print(json.dumps({"ok": True, "result": worker(request)}))
+    return 0
+
+
+def _request_file(rest):
+    """(args, output) from a --request/--local-request invocation; no free text through a shell."""
+    if not rest:
+        raise AgentError("request_file_required")
+    output = None
+    if len(rest) == 3 and rest[1] == "--output":
+        output = rest[2]
+    elif len(rest) != 1:
+        raise AgentError("invalid_request_invocation")
+    with open(rest[0], "rb") as handle:
+        blob = handle.read(16385)
+    if len(blob) > 16384:
+        raise AgentError("request_file_limit")
+    args = json.loads(blob)
+    if not isinstance(args, dict) or not isinstance(args.get("command"), str):
+        raise AgentError("invalid_request_file")
+    return args, output
+
+
 def main():
-    runner_values = runner_guard()
-    if sys.argv[1:] == ["_worker"]:
-        raw = sys.stdin.buffer.read(16385)
-        if len(raw) > 16384:
-            raise AgentError("worker_request_limit")
-        request = json.loads(raw)
-        if not isinstance(request, dict):
-            raise AgentError("invalid_worker_request")
-        print(json.dumps({"ok": True, "result": worker(request)}))
-        return 0
+    argv = sys.argv[1:]
+    # The Actions worker is gated by the real GitHub runner; the local worker runs
+    # on the owner's own phone, where device_guard() inside worker() pins the Redmi 9
+    # identity on every command and no runner — and so no dispatch token — is needed.
+    if argv == ["_worker"]:
+        runner_guard()
+        return _run_worker()
+    if argv == ["_worker_local"]:
+        return _run_worker()
     # Request-file mode: the whole validated request lives in a JSON file, so no
     # argument (least of all free text) is ever passed through a shell or an
     # environment variable. Capture adds its RAM-disk output path here.
-    if sys.argv[1:2] == ["--request"]:
-        rest = sys.argv[2:]
-        if not rest:
-            raise AgentError("request_file_required")
-        output = None
-        if len(rest) == 3 and rest[1] == "--output":
-            output = rest[2]
-        elif len(rest) != 1:
-            raise AgentError("invalid_request_invocation")
-        with open(rest[0], "rb") as handle:
-            blob = handle.read(16385)
-        if len(blob) > 16384:
-            raise AgentError("request_file_limit")
-        args = json.loads(blob)
-        if not isinstance(args, dict) or not isinstance(args.get("command"), str):
-            raise AgentError("invalid_request_file")
+    if argv[:1] == ["--request"]:
+        runner_values = runner_guard()
+        args, output = _request_file(argv[1:])
         return run_client(args, output, runner_values)
+    # Local on-device mode: Logos drives its own phone directly, no GitHub, no token.
+    if argv[:1] == ["--local-request"]:
+        args, output = _request_file(argv[1:])
+        return run_client(args, output, {}, worker_mode="_worker_local")
+    runner_values = runner_guard()
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     for command in (
@@ -1070,7 +1091,7 @@ def main():
     return run_client(args, output, runner_values)
 
 
-def run_client(args, output, runner_values):
+def run_client(args, output, runner_values, worker_mode="_worker"):
     """Hand one validated request to the bounded root worker and print its result."""
     if output is not None and os.geteuid() == 0:
         raise AgentError("capture_requires_unprivileged_client")
@@ -1081,7 +1102,7 @@ def run_client(args, output, runner_values):
     ]
     invocation = " ".join(
         assignments
-        + [shlex.quote(value) for value in (python, "-I", "-S", script, "_worker")]
+        + [shlex.quote(value) for value in (python, "-I", "-S", script, worker_mode)]
     )
     names = ("PATH", "HOME", "TMPDIR", "PREFIX", "LANG")
     environment = {key: os.environ[key] for key in names if key in os.environ}

@@ -1,15 +1,18 @@
 """Logos tools for the Redmi 9 RootAgent, run as a GitHub Actions job.
 
-``rootagent_run`` dispatches the ``rootagent_command`` action of the Redmi 9 app
-server workflow on ``develop`` and returns the run id at once. ``rootagent_result``
-reads that run's status and, once the run has finished, its JSON result artifact.
 Logos drives the owner's phone as a user: status, probe, capture, tap, swipe,
-text, key, and the legacy relative move/click. The device work happens only
-inside that job, on the existing runner and only for ``develop``.
+text, key, browse, batch, and the legacy relative move/click.
 
-The token and the repository come from the server environment
-(``LOGOS_ROOTAGENT_DISPATCH_TOKEN``, ``LOGOS_ROOTAGENT_REPOSITORY``). The token is
-never returned, logged or written into an error text.
+When Logos runs on the phone itself (the normal deployment), ``rootagent_run``
+executes the device CLI directly through the root worker and returns the result
+synchronously — no GitHub, no token. The CLI's ``device_guard`` pins the Redmi 9
+identity as root on every command, which is the whole trust boundary.
+
+Only when Logos is not on the phone does ``rootagent_run`` fall back to
+dispatching the ``rootagent_command`` action of the Redmi 9 app server workflow on
+``develop`` and returning a run id for ``rootagent_result`` to read. That path
+needs ``LOGOS_ROOTAGENT_DISPATCH_TOKEN`` and ``LOGOS_ROOTAGENT_REPOSITORY`` in the
+environment; the token is never returned, logged or written into an error text.
 """
 
 from __future__ import annotations
@@ -20,9 +23,13 @@ import hashlib
 import json
 import os
 import re
+import subprocess
+import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from typing import Any, Mapping
 
 from tool_providers.schema import object_schema
@@ -325,10 +332,137 @@ def _results_file(
         raise _Failure("GitHub вернул результат в неверном виде", "execution") from None
 
 
+# The device CLI, relative to a repository root; the launcher exports these roots.
+CLI_RELATIVE = ("scripts", "redmi_root_agent.py")
+ROOT_ENV = ("LOGOS_PROJECT_ROOT", "LOGOS_LOCAL_REPO_DIR", "LOGOS_APP_DIR")
+LOCAL_TIMEOUT_SECONDS = 330
+# Commands whose worker result carries a screenshot as png_base64.
+CAPTURE_COMMANDS = ("capture", "browse", "batch")
+
+
+def _local_cli() -> str | None:
+    """The on-device CLI path when Logos runs on the phone itself, else None.
+
+    getprop marks an Android device; the CLI's own device_guard then pins the
+    Redmi 9 as root on every command, so no GitHub runner or token is involved.
+    """
+    if not os.path.exists("/system/bin/getprop"):
+        return None
+    roots = [os.environ.get(name) for name in ROOT_ENV]
+    roots.append(str(Path(__file__).resolve().parent.parent))
+    for root in roots:
+        if root:
+            cli = Path(root, *CLI_RELATIVE)
+            if cli.is_file():
+                return str(cli)
+    return None
+
+
+def _worker_request(command: str, args: Mapping[str, Any]) -> dict[str, Any]:
+    """The structured worker request for the local CLI, after _validated accepted args."""
+    request: dict[str, Any] = {"command": command}
+    package = args.get("package")
+    if command in ("capture", "move", "click") and isinstance(package, str) and package:
+        request["expected_package"] = package
+    if command in ("move", "click"):
+        request["dx"], request["dy"] = args["dx"], args["dy"]
+    elif command == "tap":
+        request["x"], request["y"] = args["x"], args["y"]
+    elif command == "swipe":
+        for key in ("x", "y", "x2", "y2"):
+            request[key] = args[key]
+        if args.get("duration_ms") is not None:
+            request["duration_ms"] = args["duration_ms"]
+    elif command == "text":
+        request["text"] = args["text"]
+    elif command == "key":
+        keycode = args.get("keycode")
+        request["keycode"] = str(keycode) if isinstance(keycode, int) else keycode
+    elif command == "browse":
+        request["url"] = args["url"]
+    elif command == "batch":
+        request["steps"] = args["steps"]
+    return request
+
+
+def _run_local(cli: str, command: str, args: Mapping[str, Any]) -> dict[str, Any]:
+    """Run one command on the phone directly through the root worker, synchronously."""
+    request = _worker_request(command, args)
+    workdir = tempfile.mkdtemp(prefix="rootagent-")
+    request_path = os.path.join(workdir, "request.json")
+    try:
+        with open(request_path, "w", encoding="utf-8") as handle:
+            json.dump(request, handle, ensure_ascii=False)
+        try:
+            completed = subprocess.run(
+                [sys.executable, "-I", "-S", cli, "--local-request", request_path],
+                capture_output=True,
+                timeout=LOCAL_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return _Failure(
+                "Команда на телефоне не завершилась за отведённое время", "execution",
+                local=True, command=command,
+            ).result
+        except OSError as error:
+            return _Failure(
+                f"Не удалось запустить устройство локально ({type(error).__name__})",
+                "execution", local=True, command=command,
+            ).result
+    finally:
+        try:
+            os.remove(request_path)
+        except OSError:
+            pass
+        try:
+            os.rmdir(workdir)
+        except OSError:
+            pass
+    line = completed.stdout.splitlines()[-1] if completed.stdout.strip() else b""
+    try:
+        payload = json.loads(line)
+    except ValueError:
+        return _Failure("Устройство вернуло не JSON", "execution", local=True, command=command).result
+    if completed.returncode or payload.get("ok") is False:
+        return _Failure(
+            f"Устройство отклонило команду: {payload.get('error', 'root_worker_failed')}",
+            "execution", local=True, command=command,
+        ).result
+    # run_client prints the worker metadata directly; a screenshot rides as png_base64.
+    result = payload if isinstance(payload, dict) else {}
+    capture = None
+    encoded = result.pop("png_base64", None)
+    if isinstance(encoded, str) and encoded:
+        try:
+            png = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError):
+            png = b""
+        if png:
+            capture = {
+                "bytes": len(png),
+                "sha256": hashlib.sha256(png).hexdigest(),
+                "png_base64": encoded,
+            }
+    return {
+        "success": True,
+        "local": True,
+        "command": command,
+        "submitted": True,
+        "verified": True,
+        "result": result,
+        "capture": capture,
+        "note": "Команда выполнена на телефоне напрямую; результат уже здесь.",
+    }
+
+
 def rootagent_run(
     arguments: Mapping[str, Any] | None, cfg: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:
     command, argument_text = _validated(dict(arguments or {}))
+    cli = _local_cli()
+    if cli is not None:
+        return _run_local(cli, command, dict(arguments or {}))
     try:
         token, owner, name = _configured()
         body = {
@@ -566,13 +700,14 @@ ROOTAGENT_TOOLS: dict[str, dict[str, Any]] = {
     "rootagent_run": {
         "title": "Redmi 9 RootAgent: запуск команды",
         "description": (
-            "Управлять телефоном Redmi 9 как пользователь через GitHub Actions: status, probe, "
-            "capture (снимок экрана), tap (нажатие в точке), swipe (свайп), text (ввод строки), "
-            "key (клавиша, в т.ч. системная), browse (разбудить экран, открыть url в "
-            "браузере и сразу снять экран), move и click (относительная мышь). Задание идёт "
-            "на ветке develop. Инструмент сразу возвращает run_id; результат читайте через "
-            "rootagent_result. Успешный ответ означает, что запуск принят, а не что действие "
-            "уже выполнено на телефоне."
+            "Управлять телефоном Redmi 9 как пользователь: status, probe, capture (снимок "
+            "экрана), tap (нажатие в точке), swipe (свайп), text (ввод строки), key (клавиша, "
+            "в т.ч. системная), browse (разбудить экран, открыть url в браузере и сразу снять "
+            "экран), move и click (относительная мышь). Когда Логос работает на самом телефоне, "
+            "команда выполняется на устройстве напрямую и результат (для capture/browse/batch — "
+            "снимок в base64) возвращается сразу в поле result/capture — rootagent_result не "
+            "нужен. Если Логос не на телефоне, команда ставится как задание GitHub Actions на "
+            "develop: тогда возвращается run_id, а результат читается через rootagent_result."
         ),
         "parameters": object_schema(_RUN_PROPERTIES, ["command"]),
         "capabilities": ["device", "rootagent", "github_actions"],

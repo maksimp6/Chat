@@ -179,18 +179,27 @@ sanitized acceptance report are in the linked job log.
 
 Logos reaches the RootAgent through two tools, `rootagent_run` and
 `rootagent_result` (category `rootagent`, source `tool_providers/rootagent.py`).
-`rootagent_run` dispatches the `rootagent_command` action of
-`.github/workflows/redmi9-app-server.yml` on `develop` and returns the run id at
-once; it never waits for the device. `rootagent_result` reads that run's status
-and, after the run completes, its JSON result. The device work happens only in
-that GitHub Actions job, on the existing `redmi9` runner.
+
+**On the phone (the normal deployment), `rootagent_run` runs the command directly
+on the device and returns the result at once — no GitHub, no token.** It invokes
+`scripts/redmi_root_agent.py --local-request <file>`, which hands the request to
+the root worker; the worker's `device_guard` pins the Redmi 9 identity as root on
+every command. For `capture`/`browse`/`batch` the screenshot comes back inline as
+base64 in the `capture` field, so `rootagent_result` is not needed.
+
+The GitHub Actions path is a fallback for when Logos is **not** on the phone:
+there `rootagent_run` dispatches the `rootagent_command` action of
+`.github/workflows/redmi9-app-server.yml` on `develop`, returns a run id, and
+`rootagent_result` reads the run's status and JSON result. That job runs on the
+existing `redmi9` runner and only for `develop`.
 
 ### What is configured, and by whom
 
-The server reads two values from its environment:
+Direct on-device execution needs no configuration at all. The two environment
+values below are only for the GitHub Actions fallback:
 `LOGOS_ROOTAGENT_DISPATCH_TOKEN` (the GitHub token) and
 `LOGOS_ROOTAGENT_REPOSITORY` (`owner/name`). The deploy provisions both onto the
-phone automatically, so there is one manual step only: the token.
+phone automatically, so the fallback has one manual step only: the token.
 
 | Setting | How it reaches the server | Manual step |
 | --- | --- | --- |
