@@ -38,6 +38,13 @@ jobs:
         timeout-minutes: 10
         env:
           LOGOS_REQUIRE_WIFI: "1"
+          # The long-running Logos server needs a token that outlives an Actions run
+          # to dispatch rootagent_command and publish its result. The owner stores it
+          # once as the repository secret ROOTAGENT_DISPATCH_TOKEN (fine-grained PAT,
+          # this repo, Actions read/write + Contents read/write); every deploy writes
+          # it onto the phone. Absent, the rootagent tool stays unconfigured, nothing
+          # else changes, and a token placed on the phone by hand is left untouched.
+          ROOTAGENT_DISPATCH_TOKEN: ${{ secrets.ROOTAGENT_DISPATCH_TOKEN }}
         run: |
           set -euo pipefail
           test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'

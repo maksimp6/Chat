@@ -187,14 +187,29 @@ that GitHub Actions job, on the existing `redmi9` runner.
 
 ### What is configured, and by whom
 
-| Setting | Where it lives | Set by | Required value |
-| --- | --- | --- | --- |
-| Token | Logos server environment variable `LOGOS_ROOTAGENT_DISPATCH_TOKEN` | Server operator | Fine-grained token on this repository only: Actions read and write, and Contents read and write (it writes `pending/<run_id>.json` and reads `runs/<run_id>.json` on the `rootagent-results` branch) |
-| Repository | Logos server environment variable `LOGOS_ROOTAGENT_REPOSITORY` | Server operator | `owner/name` of this repository |
+The server reads two values from its environment:
+`LOGOS_ROOTAGENT_DISPATCH_TOKEN` (the GitHub token) and
+`LOGOS_ROOTAGENT_REPOSITORY` (`owner/name`). The deploy provisions both onto the
+phone automatically, so there is one manual step only: the token.
 
-The token is never written to the repository, to logs, to tool results or to
-error text. If either variable is missing, the tool returns an explicit error
-and does not call GitHub.
+| Setting | How it reaches the server | Manual step |
+| --- | --- | --- |
+| Token | Repository secret `ROOTAGENT_DISPATCH_TOKEN` → deploy writes it to `logos-local-state/rootagent-dispatch.token` (mode 0600) → launcher sets `LOGOS_ROOTAGENT_DISPATCH_TOKEN` | **Once:** add the repository secret (Settings → Secrets and variables → Actions). A phone-local token file is left untouched when the secret is unset. |
+| Repository | The deploy writes `$GITHUB_REPOSITORY` to `logos-local-state/rootagent-repository` → launcher sets `LOGOS_ROOTAGENT_REPOSITORY` | None — derived from the deploy context. |
+
+The token must be a fine-grained personal access token on **this repository
+only**, with **Actions: read and write** and **Contents: read and write** (the
+server dispatches the workflow and writes `pending/<run_id>.json` / reads
+`runs/<run_id>.json` on the `rootagent-results` branch). A long-lived token is
+unavoidable: the server outlives any Actions run, and a run's own
+`GITHUB_TOKEN` expires with it.
+
+The flow end to end: owner adds the repository secret once → the next push (or a
+`deploy` dispatch) restarts the server with the token in its environment →
+`rootagent_run` works with no further setup. The token is never written to the
+repository, to logs, to tool results or to error text, and the runner masks it
+in deploy output. If either value is still missing, the tool returns an explicit
+error and does not call GitHub.
 
 ### What the job allows
 

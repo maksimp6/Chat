@@ -58,6 +58,20 @@ def main():
     for prefix in ("LOGOS", "ALICE"):
         env[prefix + "_MEMORY_PATH"] = str(state / "logos.memory")
         env[prefix + "_PROVIDER_CREDENTIAL_KEY"] = secret
+    # The RootAgent tool dispatches a GitHub Actions job and reads its result, so the
+    # server needs a token that outlives a run and the repository to call. The deploy
+    # writes both to private state files; bridge them when present. Absent, the tool
+    # simply reports itself unconfigured and nothing else is affected.
+    for name, filename in (
+        ("LOGOS_ROOTAGENT_REPOSITORY", "rootagent-repository"),
+        ("LOGOS_ROOTAGENT_DISPATCH_TOKEN", "rootagent-dispatch.token"),
+    ):
+        try:
+            value = (state / filename).read_text().strip()
+        except OSError:
+            continue
+        if value:
+            env[name] = value
     log_path = state / "backend.log"
     if log_path.exists() and log_path.stat().st_size > 10 * 1024 * 1024:
         log_path.replace(state / "backend.log.1")
