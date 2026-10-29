@@ -1233,61 +1233,6 @@ body {
   border-radius: 4px;
 }
 
-/* Chat progressive-enhancement states. */
-.logos-pro-app .approval-card {
-  border: 1px solid var(--accent);
-  background: var(--bg-bubble-bot);
-  border-radius: 12px;
-  padding: 14px;
-}
-
-.logos-pro-app .approval-card-title {
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: var(--accent-text);
-}
-
-.logos-pro-app .approval-card-action {
-  font-size: 14px;
-  margin-bottom: 8px;
-}
-
-.logos-pro-app .approval-card-params {
-  font-size: 12px;
-  background: var(--chip-bg);
-  padding: 8px;
-  border-radius: 6px;
-  margin-bottom: 10px;
-  white-space: pre-wrap;
-}
-
-.logos-pro-app .approval-card-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.logos-pro-app .approval-btn {
-  min-height: 44px;
-  padding: 10px 16px;
-  color: #fff;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.logos-pro-app .approval-btn-approve {
-  background: #1e7e34;
-}
-
-.logos-pro-app .approval-btn-reject {
-  background: #dc3545;
-}
-
-.logos-pro-app .approval-card.is-executing {
-  opacity: 0.75;
-}
-
 .logos-pro-app .copy-btn {
   min-width: 44px;
   min-height: 44px;

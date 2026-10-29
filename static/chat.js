@@ -1,126 +1,5 @@
-function renderApprovalCard(toolCall, origMsg) {
-  const chatbox = document.getElementById("chatbox");
-  if (!chatbox) return;
-
-  const card = document.createElement("div");
-  card.className = "msg bot approval-card";
-
-  const paramsStr = JSON.stringify(toolCall.arguments, null, 2);
-  const heading = document.createElement("div");
-  heading.className = "approval-card-title";
-  heading.textContent = "⚠️ Требуется подтверждение действия";
-
-  const action = document.createElement("div");
-  action.className = "approval-card-action";
-  const actionLabel = document.createElement("strong");
-  actionLabel.textContent = "Действие:";
-  action.appendChild(actionLabel);
-  action.appendChild(document.createTextNode(" " + (toolCall.description || toolCall.name)));
-
-  const pre = document.createElement("pre");
-  pre.className = "approval-card-params";
-  const code = document.createElement("code");
-  code.textContent = paramsStr;
-  pre.appendChild(code);
-
-  const actions = document.createElement("div");
-  actions.className = "approval-card-actions";
-
-  const approveBtn = document.createElement("button");
-  approveBtn.type = "button";
-  approveBtn.className = "logos-btn approval-btn approval-btn-approve";
-  approveBtn.textContent = "✓ Разрешить";
-
-  const rejectBtn = document.createElement("button");
-  rejectBtn.type = "button";
-  rejectBtn.className = "logos-btn approval-btn approval-btn-reject";
-  rejectBtn.textContent = "✗ Отклонить";
-
-  actions.appendChild(approveBtn);
-  actions.appendChild(rejectBtn);
-  card.appendChild(heading);
-  card.appendChild(action);
-  card.appendChild(pre);
-  card.appendChild(actions);
-  chatbox.appendChild(card);
-  chatbox.scrollTop = chatbox.scrollHeight;
-
-  approveBtn.addEventListener("click", function () {
-    // The result belongs to the chat where the action was approved, not to whichever chat is open later.
-    const cardConvId = currentConvId;
-    card.classList.add("is-executing");
-    card.replaceChildren(document.createTextNode("Выполняется..."));
-    var approvalPayload = {
-      conversation_id: cardConvId,
-      model: currentModel,
-      name: toolCall.name,
-      arguments: toolCall.arguments,
-      approval_token: toolCall.approval_token,
-      original_message: origMsg,
-    };
-    if (toolCall.name === "set_ui_theme" && window.LogosTheme) {
-      approvalPayload.current_theme = window.LogosTheme.getStored();
-    }
-    window.LogosDispatcher.request("/api/mcp/execute-approved", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(approvalPayload),
-    }, { timeoutMs: 300000 })
-      .then(async (r) => {
-        const data = await r.json().catch(() => ({}));
-        return { ok: r.ok, status: r.status, data };
-      })
-      .then((result) => {
-        const data = result.data || {};
-        card.remove();
-        deliverApprovalOutput(cardConvId, function () {
-          if (data.requires_approval) {
-            renderApprovalCard(data.tool_call, origMsg);
-          } else if (data.reply) {
-            if (data.execution_result && typeof window.applyThemeAssistantResult === "function") {
-              window.applyThemeAssistantResult(data.execution_result);
-            }
-            addMessage({
-              text: data.reply,
-              role: "bot",
-              cost: data.cost || 0,
-              timings: data.timings,
-              reasoning: data.reasoning,
-              usage: data.usage,
-              trace: data.trace,
-            });
-          } else {
-            addMessage({
-              // A 5xx or an unreadable body can follow an action that already ran:
-              // never invite a blind repeat in that case.
-              text: "⚠️ Ошибка выполнения: " + chatErrorReason(
-                data,
-                result.status,
-                result.status >= 500 || !(data.error || data.detail)
-                  ? "Результат действия не подтверждён: оно могло выполниться. Проверьте диалог, прежде чем повторять."
-                  : data.trace
-                    ? "Действие не выполнено. Причина записана в трассе: откройте «Детали» под этим сообщением."
-                    : "Действие не выполнено. Повторите запрос в чате.",
-              ),
-              role: "error",
-              trace: data.trace,
-            });
-          }
-        });
-      })
-      .catch(() => {
-        card.remove();
-        deliverApprovalOutput(cardConvId, function () {
-          addMessage({ text: "Результат действия не получен. Действие могло выполниться: проверьте диалог.", role: "error" });
-        });
-      });
-  });
-
-  rejectBtn.addEventListener("click", function () {
-    card.remove();
-    addMessage({ text: `⛔ Действие "${toolCall.name}" отклонено пользователем.`, role: "bot" });
-  });
-}
+// Shown when a tool needs the owner's approval: the approval UI was removed, so the action is not run.
+const APPROVAL_OFF_TEXT = "Действие требует подтверждения владельца, поэтому не выполнено. Подтверждение в чате отключено.";
 
 // Output of an approved action, kept per chat: shown now if that chat is open, else when it is opened again.
 const pendingApprovalOutputs = {};
@@ -1415,7 +1294,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const receipt = await readTurnReceipt(turn);
         if (currentConvId !== convId || pendingConversations.has(convId) || (turnStarts.get(convId) || 0) !== startMark) return;
         if (receipt && receipt.status === "stored") {
-          if (document.querySelector("#chatbox .approval-card")) return;
           loadHistory(convId);
           return;
         }
@@ -1441,7 +1319,6 @@ document.addEventListener("DOMContentLoaded", function () {
       if (currentConvId !== convId || pendingConversations.has(convId) || (turnStarts.get(convId) || 0) !== startMark) return;
       const status = turnStatus(messages, turn.baselineCount);
       if (status === "answered") {
-        if (document.querySelector("#chatbox .approval-card")) return;
         loadHistory(convId);
         return;
       }
@@ -2317,7 +2194,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // A reply is persisted and comes back with the history; an approval request is not, so it waits for its chat.
         if (data.requires_approval) {
           deliverApprovalOutput(turn.conversationId, function () {
-            renderApprovalCard(data.tool_call, data.original_message || turn.text);
+            addMessage({ text: APPROVAL_OFF_TEXT, role: "error" });
           });
           return null;
         }
