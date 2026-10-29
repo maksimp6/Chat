@@ -269,9 +269,10 @@ class YandexMcpMixin:
                 }
                 if s.get("server_description"):
                     mcp_tool["server_description"] = s["server_description"]
-                # The server's own "Defer Loading" switch: its tools wait for the tool search.
-                if s.get("defer_loading") is True:
-                    mcp_tool["defer_loading"] = True
+                # Defer loading is always on across the whole tool surface: an MCP
+                # server's tools, like the local ones, wait for the provider's tool
+                # search instead of loading eagerly.
+                mcp_tool["defer_loading"] = True
                 mcp_tools.append(mcp_tool)
 
         active_cats = None

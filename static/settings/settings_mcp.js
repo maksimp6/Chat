@@ -241,9 +241,7 @@
         '<div style="margin-bottom:4px;">' +
         UI.chk("mcp-ed-allowed-ro", srv.allowed_tools_read_only || false, "Read-only filter") +
         "</div>" +
-        '<div style="margin-bottom:8px;">' +
-        UI.chk("mcp-ed-defer", srv.defer_loading || false, "Defer Loading") +
-        "</div>" +
+        '<div style="margin-bottom:8px;font-size:12px;color:var(--m-muted,#666);">⏳ Defer Loading — всегда включено для всех инструментов, включая MCP; отключить нельзя.</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px;">' +
         UI.btn("mcp-ed-save", isNew ? "Создать" : "Сохранить", "accent") +
         UI.btn("mcp-ed-cancel", "Отмена") +
@@ -270,7 +268,6 @@
           allowed_tools: document.getElementById("mcp-ed-allowed").value.trim(),
           allowed_tools_read_only: document.getElementById("mcp-ed-allowed-ro").checked,
           require_approval: "never",
-          defer_loading: document.getElementById("mcp-ed-defer").checked,
         };
         // An empty secret field keeps the stored value, so it is not sent at all.
         if (!payload.authorization) delete payload.authorization;
