@@ -452,12 +452,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          import base64, hashlib, json, os, re, subprocess, sys
+          import base64, hashlib, json, os, re, subprocess, sys, tempfile
           import urllib.error, urllib.request
 
-          REPO = os.environ["GITHUB_REPOSITORY"]
-          SHA = os.environ["GITHUB_SHA"]
-          TEMP = os.environ["RUNNER_TEMP"]
+          REPO = os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat")
+          SHA = os.environ.get("GITHUB_SHA", "develop")
+          # This device runner does not always export RUNNER_TEMP; take a writable
+          # dir and export it so the device CLI's runner_guard sees it too.
+          TEMP = os.environ.get("RUNNER_TEMP") or tempfile.mkdtemp(prefix="rootagent-")
+          os.environ["RUNNER_TEMP"] = TEMP
           TOKEN = os.environ.get("GH_TOKEN", "")
           RUN_ID = os.environ.get("GITHUB_RUN_ID", "0")
           API = "https://api.github.com/repos/" + REPO
