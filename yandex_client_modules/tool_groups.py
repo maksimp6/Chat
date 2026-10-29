@@ -122,19 +122,59 @@ def unwrap_call(name: str, args: Any, category_tools: Any) -> tuple[str, Any]:
     if not name.startswith(GROUP_PREFIX) or not isinstance(args, dict):
         return name, args
     category = name[len(GROUP_PREFIX):]
-    members = [entry.get("name") for entry in category_tools(category) or []]
-    if not members:
+    tools = {entry.get("name"): entry for entry in category_tools(category) or []}
+    if not tools:
         return name, args
-    tool = args.get("tool")
-    if not isinstance(tool, str) or tool not in members:
+    tool, inner = _split_call(args)
+    if not isinstance(tool, str) or tool not in tools:
         raise ValueError(
             f"{name}: tool {tool!r} is not in category {category!r}; "
-            f"use one of: {', '.join(members)}"
+            f"use one of: {', '.join(tools)}"
         )
-    if "arguments" in args:
-        inner = args["arguments"]
-        if isinstance(inner, str):
-            inner = json.loads(inner) if inner.strip() else {}
-        return tool, inner if inner is not None else {}
-    # The schema is not strict, so a model may put the parameters beside "tool".
-    return tool, {key: value for key, value in args.items() if key != "tool"}
+    return tool, _fill_optional(inner, tools[tool].get("parameters"))
+
+
+def _as_object(value: Any) -> Any:
+    if isinstance(value, str):
+        return json.loads(value) if value.strip() else {}
+    return {} if value is None else value
+
+
+def _split_call(args: dict[str, Any]) -> tuple[Any, Any]:
+    """(tool, its arguments) from the shapes models actually send (#1703 follow-up).
+
+    The group is not strict, so Qwen3.6 sent, besides the documented
+    {tool, arguments}: everything nested one level down ({arguments: {tool,
+    arguments}}), the tool name inside arguments ({arguments: {tool, query}}),
+    "parameters" instead of "arguments", and the parameters beside "tool"."""
+    tool = args.get("tool")
+    payload_key = "arguments" if "arguments" in args else "parameters" if "parameters" in args else None
+    payload = _as_object(args[payload_key]) if payload_key else None
+    if not isinstance(tool, str) and isinstance(payload, dict) and isinstance(payload.get("tool"), str):
+        # The whole call was put inside "arguments": take it from there.
+        return _split_call(payload)
+    if payload_key is None:
+        return tool, {key: value for key, value in args.items() if key != "tool"}
+    return tool, payload
+
+
+def _fill_optional(arguments: Any, schema: Any) -> Any:
+    """Optional fields left out become null, which the executor drops again.
+
+    The tools carry strict schemas: every property is "required" and an optional
+    one is anyOf [..., null]. A model calling through a non-strict group leaves
+    optional fields out, and the call failed with "does not satisfy required"."""
+    if not isinstance(arguments, dict) or not isinstance(schema, dict):
+        return arguments
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return arguments
+    filled = dict(arguments)
+    for key in schema.get("required") or ():
+        prop = properties.get(key)
+        if key in filled or not isinstance(prop, dict):
+            continue
+        options = prop.get("anyOf") if isinstance(prop.get("anyOf"), list) else [prop]
+        if any(isinstance(option, dict) and option.get("type") == "null" for option in options):
+            filled[key] = None
+    return filled
