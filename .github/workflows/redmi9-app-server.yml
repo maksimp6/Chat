@@ -436,226 +436,176 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'rootagent_command' && github.ref == 'refs/heads/develop'
     runs-on: redmi9
     timeout-minutes: 8
-    # This phone runner cannot execute Node20 JS actions (actions/upload-artifact
-    # fails at job setup), so the result and any PNG are published to the
-    # rootagent-results branch through the GitHub API with pure Python, like every
-    # other job here. contents: write is needed only for that results branch.
+    # This phone runner is a small custom runner (scripts/redmi_python_runner.py):
+    # validate_job accepts only single run steps, env limited to literals /
+    # github.token / secrets.* / inputs.*, no uses actions, and no ${{ step }}
+    # expressions in the script. So the whole command runs in ONE Python step that
+    # validates the request, drives the device CLI, and publishes the result (and
+    # any capture PNG) to the rootagent-results branch through the GitHub API.
     permissions:
       contents: write
     steps:
-      - name: Validate the RootAgent request before anything runs
-        id: request
-        shell: bash
-        timeout-minutes: 1
+      - name: Run one RootAgent command on the Redmi 9 and publish the result
+        shell: python
+        timeout-minutes: 7
         env:
+          GH_TOKEN: ${{ github.token }}
           ROOTAGENT_COMMAND: ${{ inputs.rootagent_command }}
           ROOTAGENT_ARGS: ${{ inputs.rootagent_args }}
         run: |
-          set -uo pipefail
-          result="$RUNNER_TEMP/rootagent-result.json"
-          out="$(python -I - <<'PY' 2>&1
-          import json
-          import os
-          import re
+          import base64, hashlib, json, os, re, subprocess, sys
+          import urllib.error, urllib.request
 
-          COMMANDS = (
-              "status", "probe", "capture", "move", "click",
-              "tap", "swipe", "text", "key",
-          )
+          REPO = os.environ["GITHUB_REPOSITORY"]
+          SHA = os.environ["GITHUB_SHA"]
+          TEMP = os.environ["RUNNER_TEMP"]
+          TOKEN = os.environ.get("GH_TOKEN", "")
+          RUN_ID = os.environ.get("GITHUB_RUN_ID", "0")
+          API = "https://api.github.com/repos/" + REPO
+          BRANCH = "rootagent-results"
+          command = os.environ.get("ROOTAGENT_COMMAND", "")
+          raw = os.environ.get("ROOTAGENT_ARGS", "")
+
+          COMMANDS = ("status", "probe", "capture", "move", "click",
+                      "tap", "swipe", "text", "key")
           STRICT = re.compile(r"[A-Za-z0-9_. -]*")
           PACKAGE = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+")
           DELTA = re.compile(r"-?(?:0|[1-9][0-9]{0,2})")
           COORD = re.compile(r"0|[1-9][0-9]{0,4}")
           KEYCODE = re.compile(r"KEYCODE_[A-Z0-9_]+|[0-9]{1,4}")
-          command = os.environ.get("ROOTAGENT_COMMAND", "")
-          raw = os.environ.get("ROOTAGENT_ARGS", "")
-          if command not in COMMANDS:
-              raise SystemExit("rootagent_command must be one of " + ", ".join(COMMANDS))
-          request = {"command": command}
-          # The whole validated request is written to a JSON file and handed to the
-          # CLI with --request. No argument, least of all free text, is ever passed
-          # through a shell command line or an environment variable.
-          if command == "text":
-              if not raw:
-                  raise SystemExit("text requires a non-empty string")
-              if len(raw) > 4096 or "\x00" in raw or "\n" in raw or "\r" in raw:
-                  raise SystemExit("text must be at most 4096 characters on a single line")
-              request["text"] = raw
-          else:
-              if STRICT.fullmatch(raw) is None:
-                  raise SystemExit("rootagent_args may contain only letters, digits, underscore, dot, minus and spaces")
-              tokens = raw.split(" ") if raw else []
-              if command in ("status", "probe"):
-                  if tokens:
-                      raise SystemExit(f"{command} takes no arguments")
-              elif command == "capture":
-                  if len(tokens) > 1 or (tokens and PACKAGE.fullmatch(tokens[0]) is None):
-                      raise SystemExit("capture takes an optional package name, such as com.example.app")
-                  if tokens:
-                      request["expected_package"] = tokens[0]
-              elif command in ("move", "click"):
-                  if len(tokens) not in (2, 3) or any(DELTA.fullmatch(t) is None for t in tokens[:2]):
-                      raise SystemExit(f"{command} takes DX DY [PACKAGE]: two deltas and an optional package")
-                  if len(tokens) == 3 and PACKAGE.fullmatch(tokens[2]) is None:
-                      raise SystemExit("the third argument must be a package name")
-                  dx, dy = int(tokens[0]), int(tokens[1])
-                  if not (-500 <= dx <= 500 and -500 <= dy <= 500):
-                      raise SystemExit("move and click deltas must be integers from -500 through 500")
-                  request["dx"], request["dy"] = dx, dy
-                  if len(tokens) == 3:
-                      request["expected_package"] = tokens[2]
-              elif command == "tap":
-                  if len(tokens) != 2 or any(COORD.fullmatch(t) is None for t in tokens):
-                      raise SystemExit("tap takes X Y: two screen coordinates")
-                  request["x"], request["y"] = int(tokens[0]), int(tokens[1])
-              elif command == "swipe":
-                  if len(tokens) not in (4, 5) or any(COORD.fullmatch(t) is None for t in tokens):
-                      raise SystemExit("swipe takes X Y X2 Y2 [DURATION_MS]")
-                  request["x"], request["y"], request["x2"], request["y2"] = (int(t) for t in tokens[:4])
-                  if len(tokens) == 5:
-                      request["duration_ms"] = int(tokens[4])
-              elif command == "key":
-                  if len(tokens) != 1 or KEYCODE.fullmatch(tokens[0]) is None:
-                      raise SystemExit("key takes one keycode, such as KEYCODE_HOME or 3")
-                  request["keycode"] = tokens[0]
-          path = os.path.join(os.environ["RUNNER_TEMP"], "rootagent-request.json")
-          with open(path, "w", encoding="utf-8") as handle:
-              json.dump(request, handle)
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"command={command}\n")
-          print(f"rootagent_command {command} accepted")
-          PY
-          )"
-          status=$?
-          printf '%s\n' "$out"
-          if [ "$status" -ne 0 ]; then
-            printf '{"ok":false,"stage":"validate","exit":%s,"detail":%s}\n' \
-              "$status" "$(printf '%s' "$out" | python -I -c 'import json,sys; print(json.dumps(sys.stdin.read()[:2000]))')" > "$result"
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "ok=true" >> "$GITHUB_OUTPUT"
 
-      - name: Mount the RAM disk for a capture only
-        id: media
-        if: steps.request.outputs.ok == 'true' && steps.request.outputs.command == 'capture'
-        shell: bash
-        timeout-minutes: 2
-        run: |
-          set -euo pipefail
-          test "$(/system/bin/getprop ro.product.model)" = 'Redmi 9'
-          mkdir -p -m 700 "$RUNNER_TEMP/scripts"
-          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_media_ram.sh" -o "$RUNNER_TEMP/scripts/redmi_media_ram.sh"
-          # Media goes only to a fixed-size RAM disk: never to flash, wiped on unmount.
-          media=$(bash "$RUNNER_TEMP/scripts/redmi_media_ram.sh" mount)
-          echo "media=$media" >> "$GITHUB_OUTPUT"
-
-      - name: Run one bounded RootAgent command on the Redmi 9
-        id: run
-        if: steps.request.outputs.ok == 'true'
-        shell: bash
-        timeout-minutes: 3
-        run: |
-          set -uo pipefail
-          result="$RUNNER_TEMP/rootagent-result.json"
-          model="$(/system/bin/getprop ro.product.model 2>&1)"
-          if [ "$model" != 'Redmi 9' ]; then
-            printf '{"ok":false,"stage":"model","detail":%s}\n' "$(printf '%s' "$model" | python -I -c 'import json,sys;print(json.dumps(sys.stdin.read()[:400]))')" > "$result"
-            cat "$result"; exit 0
-          fi
-          mkdir -p -m 700 "$RUNNER_TEMP/scripts"
-          if ! curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 30 \
-            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/scripts/redmi_root_agent.py" -o "$RUNNER_TEMP/scripts/redmi_root_agent.py" 2>"$RUNNER_TEMP/curl.err"; then
-            printf '{"ok":false,"stage":"curl","detail":%s}\n' "$(cat "$RUNNER_TEMP/curl.err" | python -I -c 'import json,sys;print(json.dumps(sys.stdin.read()[:400]))')" > "$result"
-            cat "$result"; exit 0
-          fi
-          # The validator wrote the whole request to this JSON file; the CLI reads it
-          # with --request, so no argument passes through a shell line or environment.
-          argv=(--request "$RUNNER_TEMP/rootagent-request.json")
-          if [ "${{ steps.request.outputs.command }}" = "capture" ]; then
-            argv+=(--output "${{ steps.media.outputs.media }}/rootagent-capture.png")
-          fi
-          out="$(python "$RUNNER_TEMP/scripts/redmi_root_agent.py" "${argv[@]}" 2>&1)"; status=$?
-          if [ "$status" -eq 0 ]; then
-            printf '%s\n' "$out" > "$result"
-          else
-            printf '{"ok":false,"stage":"cli","exit":%s,"detail":%s}\n' \
-              "$status" "$(printf '%s' "$out" | python -I -c 'import json,sys;print(json.dumps(sys.stdin.read()[:2000]))')" > "$result"
-          fi
-          cat "$result"
-
-      - name: Publish the RootAgent result through the GitHub API
-        if: always()
-        shell: bash
-        timeout-minutes: 2
-        env:
-          # The token and these runner paths are not request payload; the request
-          # itself still travels only in the --request JSON file.
-          GH_TOKEN: ${{ github.token }}
-          MEDIA: ${{ steps.media.outputs.media }}
-          REQUEST_OK: ${{ steps.request.outputs.ok }}
-          RUN_OUTCOME: ${{ steps.run.outcome }}
-          IS_CAPTURE: ${{ steps.request.outputs.command == 'capture' && steps.media.outcome == 'success' }}
-        run: |
-          set -uo pipefail
-          result="$RUNNER_TEMP/rootagent-result.json"
-          if [ ! -s "$result" ]; then
-            printf '{"ok":false,"stage":"job","request_ok":"%s","run_outcome":"%s"}\n' \
-              "$REQUEST_OK" "$RUN_OUTCOME" > "$result"
-          fi
-          cat "$result"
-          python -I - <<'PY'
-          import base64, json, os, urllib.error, urllib.request
-
-          api = "https://api.github.com/repos/" + os.environ["GITHUB_REPOSITORY"]
-          token = os.environ["GH_TOKEN"]
-          branch = "rootagent-results"
-          run_id = os.environ["GITHUB_RUN_ID"]
-          temp = os.environ["RUNNER_TEMP"]
 
           def call(method, url, body=None):
               data = json.dumps(body).encode() if body is not None else None
-              request = urllib.request.Request(url, data=data, method=method, headers={
-                  "Authorization": "token " + token,
+              req = urllib.request.Request(url, data=data, method=method, headers={
+                  "Authorization": "token " + TOKEN,
                   "Accept": "application/vnd.github+json",
                   "X-GitHub-Api-Version": "2022-11-28",
                   "User-Agent": "logos-rootagent"})
               try:
-                  with urllib.request.urlopen(request, timeout=30) as response:
-                      return response.status, json.loads(response.read() or b"null")
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      return resp.status, json.loads(resp.read() or b"null")
               except urllib.error.HTTPError as error:
                   return error.code, None
 
-          code, _ = call("GET", f"{api}/git/ref/heads/{branch}")
-          if code == 404:
-              _, ref = call("GET", f"{api}/git/ref/heads/develop")
-              call("POST", f"{api}/git/refs",
-                   {"ref": f"refs/heads/{branch}", "sha": ref["object"]["sha"]})
 
-          def publish(path, raw, message):
-              content = base64.b64encode(raw).decode("ascii")
-              code, info = call("GET", f"{api}/contents/{path}?ref={branch}")
-              body = {"message": message, "content": content, "branch": branch}
+          def put_file(path, blob, message):
+              content = base64.b64encode(blob).decode("ascii")
+              code, info = call("GET", API + "/contents/" + path + "?ref=" + BRANCH)
+              body = {"message": message, "content": content, "branch": BRANCH}
               if code == 200 and isinstance(info, dict) and info.get("sha"):
                   body["sha"] = info["sha"]
-              status, _ = call("PUT", f"{api}/contents/{path}", body)
-              print(f"published {path}: HTTP {status}")
+              status, _ = call("PUT", API + "/contents/" + path, body)
+              print("published " + path + ": HTTP " + str(status))
 
-          with open(os.path.join(temp, "rootagent-result.json"), "rb") as handle:
-              publish(f"runs/{run_id}.json", handle.read(), f"rootagent result {run_id}")
 
-          if os.environ.get("IS_CAPTURE") == "true":
-              png = os.path.join(os.environ.get("MEDIA", ""), "rootagent-capture.png")
-              if os.path.isfile(png):
-                  with open(png, "rb") as handle:
-                      publish(f"runs/{run_id}.png", handle.read(), f"rootagent capture {run_id}")
-          PY
+          def finish(result):
+              print(json.dumps(result)[:1500])
+              exists, _ = call("GET", API + "/git/ref/heads/" + BRANCH)
+              if exists == 404:
+                  _, ref = call("GET", API + "/git/ref/heads/develop")
+                  if isinstance(ref, dict):
+                      call("POST", API + "/git/refs",
+                           {"ref": "refs/heads/" + BRANCH, "sha": ref["object"]["sha"]})
+              put_file("runs/" + RUN_ID + ".json",
+                       json.dumps(result).encode(), "rootagent result " + RUN_ID)
+              sys.exit(0)
 
-      - name: Unmount the RAM disk
-        if: always() && steps.media.outcome != 'skipped'
-        shell: bash
-        timeout-minutes: 2
-        run: |
-          set -euo pipefail
-          bash "$RUNNER_TEMP/scripts/redmi_media_ram.sh" umount
+
+          def build_request():
+              if command not in COMMANDS:
+                  raise ValueError("command must be one of " + ", ".join(COMMANDS))
+              request = {"command": command}
+              if command == "text":
+                  if not raw or len(raw) > 4096 or any(c in raw for c in ("\x00", "\n", "\r")):
+                      raise ValueError("text must be a non-empty single line up to 4096 chars")
+                  request["text"] = raw
+                  return request
+              if STRICT.fullmatch(raw) is None:
+                  raise ValueError("args may contain only letters, digits, _ . - and spaces")
+              tokens = raw.split(" ") if raw else []
+              if command in ("status", "probe"):
+                  if tokens:
+                      raise ValueError(command + " takes no arguments")
+              elif command == "capture":
+                  if len(tokens) > 1 or (tokens and PACKAGE.fullmatch(tokens[0]) is None):
+                      raise ValueError("capture takes an optional package name")
+                  if tokens:
+                      request["expected_package"] = tokens[0]
+              elif command in ("move", "click"):
+                  if len(tokens) not in (2, 3) or any(DELTA.fullmatch(t) is None for t in tokens[:2]):
+                      raise ValueError(command + " takes DX DY [PACKAGE]")
+                  if len(tokens) == 3 and PACKAGE.fullmatch(tokens[2]) is None:
+                      raise ValueError("the third argument must be a package name")
+                  request["dx"], request["dy"] = int(tokens[0]), int(tokens[1])
+                  if not (-500 <= request["dx"] <= 500 and -500 <= request["dy"] <= 500):
+                      raise ValueError("deltas must be -500..500")
+                  if len(tokens) == 3:
+                      request["expected_package"] = tokens[2]
+              elif command == "tap":
+                  if len(tokens) != 2 or any(COORD.fullmatch(t) is None for t in tokens):
+                      raise ValueError("tap takes X Y")
+                  request["x"], request["y"] = int(tokens[0]), int(tokens[1])
+              elif command == "swipe":
+                  if len(tokens) not in (4, 5) or any(COORD.fullmatch(t) is None for t in tokens):
+                      raise ValueError("swipe takes X Y X2 Y2 [DURATION_MS]")
+                  request["x"], request["y"], request["x2"], request["y2"] = (
+                      int(t) for t in tokens[:4])
+                  if len(tokens) == 5:
+                      request["duration_ms"] = int(tokens[4])
+              elif command == "key":
+                  if len(tokens) != 1 or KEYCODE.fullmatch(tokens[0]) is None:
+                      raise ValueError("key takes one keycode")
+                  request["keycode"] = tokens[0]
+              return request
+
+
+          try:
+              try:
+                  request = build_request()
+              except ValueError as error:
+                  finish({"ok": False, "stage": "validate", "detail": str(error)})
+
+              req_path = os.path.join(TEMP, "rootagent-request.json")
+              with open(req_path, "w", encoding="utf-8") as handle:
+                  json.dump(request, handle)
+
+              cli_path = os.path.join(TEMP, "redmi_root_agent.py")
+              cli_url = ("https://raw.githubusercontent.com/" + REPO + "/" + SHA
+                         + "/scripts/redmi_root_agent.py")
+              try:
+                  with urllib.request.urlopen(cli_url, timeout=30) as resp:
+                      with open(cli_path, "wb") as handle:
+                          handle.write(resp.read())
+              except Exception as error:
+                  finish({"ok": False, "stage": "download", "detail": type(error).__name__})
+
+              argv = [sys.executable, cli_path, "--request", req_path]
+              png_path = None
+              if command == "capture":
+                  png_path = os.path.join(TEMP, "rootagent-capture.png")
+                  argv += ["--output", png_path]
+              proc = subprocess.run(argv, capture_output=True, text=True, timeout=180)
+              if proc.returncode != 0:
+                  finish({"ok": False, "stage": "cli", "exit": proc.returncode,
+                          "detail": (proc.stdout + proc.stderr)[:2000]})
+              try:
+                  meta = json.loads(proc.stdout)
+              except ValueError:
+                  finish({"ok": False, "stage": "cli_output", "detail": proc.stdout[:2000]})
+
+              result = {"ok": True, "command": command, "result": meta}
+              if png_path and os.path.isfile(png_path):
+                  with open(png_path, "rb") as handle:
+                      png = handle.read()
+                  put_file("runs/" + RUN_ID + ".png", png, "rootagent capture " + RUN_ID)
+                  result["capture"] = {"path": "runs/" + RUN_ID + ".png",
+                                       "bytes": len(png),
+                                       "sha256": hashlib.sha256(png).hexdigest()}
+                  os.remove(png_path)
+              finish(result)
+          except SystemExit:
+              raise
+          except Exception as error:
+              finish({"ok": False, "stage": "exception",
+                      "detail": (type(error).__name__ + ": " + str(error))[:2000]})
