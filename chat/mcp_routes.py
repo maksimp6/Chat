@@ -197,6 +197,40 @@ REASONING_CUT_CONTINUE_PROMPT = (
 )
 
 
+# Sent when the model answered with a tool call written as text (#1707).
+TEXT_CALL_PROMPT = (
+    "Ты написал вызов инструмента текстом, и он не выполнился: это обычный текст "
+    "ответа, а не вызов функции. Если нужно выполнить это действие, вызови функцию "
+    "(у сгруппированных инструментов — функцию tools_<категория> с полями tool и "
+    "arguments). Не пиши вызов текстом."
+)
+
+
+def _tool_call_written_as_text(text) -> str | None:
+    """The call, normalized, when a reply is nothing but a tool call in JSON.
+
+    {"tool": ..., "arguments": ...} (the grouped form) or {"name": ...,
+    "arguments": ...}, alone or in one code fence. Prose around it is a real
+    answer and is left alone."""
+    body = (text or "").strip()
+    if body.startswith("```") and body.endswith("```"):
+        body = body[3:-3].strip()
+        if body.lower().startswith("json"):
+            body = body[4:].strip()
+    if not body.startswith("{"):
+        return None
+    try:
+        call = _json.loads(body)
+    except ValueError:
+        return None
+    if not isinstance(call, dict) or "arguments" not in call:
+        return None
+    name = call.get("tool") or call.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return None
+    return _json.dumps(call, ensure_ascii=False, sort_keys=True)
+
+
 def _cut_by_output_limit(response) -> bool:
     """True when the provider stopped this response at its output-token limit."""
     if not isinstance(response, dict) or response.get("status") != "incomplete":
@@ -744,6 +778,35 @@ def _define_logos_client(base: type) -> type:
                 )
             if parts:
                 response = _join_continued_parts(parts, response)
+
+            # #1707: a reply that is only a tool call written as text did nothing.
+            # The model is told so and gets another round; the same text again ends
+            # the turn with it, so a model that keeps writing it cannot loop.
+            told = set()
+            while (
+                isinstance(response, dict)
+                and response.get("status") == "completed"
+                and not extract_function_calls(response)
+            ):
+                text_call = _tool_call_written_as_text(self.extract_text(response))
+                if text_call is None or text_call in told:
+                    break
+                told.add(text_call)
+                if trace is not None:
+                    trace.add_event(
+                        "tool_call_written_as_text",
+                        {"response_id": response.get("id"), "call": text_call[:500]},
+                    )
+                request = {"role": "user", "content": TEXT_CALL_PROMPT}
+                if conversation_id:
+                    response = run_tools(follow_up([request], "text_call"))
+                else:
+                    continuation_history.extend(
+                        list(response.get("output") or []) + [request]
+                    )
+                    response = run_tools(
+                        follow_up(list(continuation_history), "text_call")
+                    )
 
             if trace is not None:
                 record_yandex_mcp_activity(trace)
