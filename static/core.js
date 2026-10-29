@@ -1,3 +1,27 @@
+// The server's own reason for a failed response, so the user sees why it failed
+// instead of a bare "HTTP 400" or "try again" (#1668). Resolves to an Error.
+window.LogosHttpError = function (response) {
+  var fallback = "HTTP " + response.status;
+  return response.json().then(
+    function (body) {
+      var error = body && body.error;
+      var text =
+        (body && (body.message || body.detail || body.title)) ||
+        (error && typeof error === "object" ? error.message || error.code : error);
+      return new Error(typeof text === "string" && text ? text : fallback);
+    },
+    function () {
+      return new Error(fallback);
+    },
+  );
+};
+
+// "Не удалось …: <reason>" for a toast.
+window.LogosErrorText = function (prefix, error) {
+  var reason = error && error.message ? error.message : String(error || "");
+  return reason ? prefix + ": " + reason : prefix;
+};
+
 let currentConvId = null;
 let conversations = [];
 let currentModel = "yandexgpt-5-pro";
@@ -124,7 +148,7 @@ window.changeModel = function (newModel, skipPatch) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: newModel }),
     }).then(function (response) {
-      if (!response.ok) throw new Error("HTTP " + response.status);
+      if (!response.ok) return window.LogosHttpError(response).then(function (e) { throw e; });
     }).catch(function (e) {
       console.error("[CORE] Model save failed:", e);
       if (modelSelectionSaves.get(selectedConvId) !== selectionId) return;
@@ -137,7 +161,7 @@ window.changeModel = function (newModel, skipPatch) {
         if (typeof updateModelButton === "function") updateModelButton();
         if (typeof updateUIForModel === "function") updateUIForModel();
       }
-      if (window.LogosToast) window.LogosToast.error("Не удалось сохранить выбранную модель");
+      if (window.LogosToast) window.LogosToast.error(window.LogosErrorText("Не удалось сохранить выбранную модель", e));
     }).finally(function () {
       if (modelSelectionSaves.get(selectedConvId) === selectionId) modelSelectionSaves.delete(selectedConvId);
     });
@@ -194,7 +218,7 @@ async function loadModels() {
     if (!response.ok) {
       reportModelLoad("http_error", { status: response.status });
       failureClassified = true;
-      throw new Error("HTTP " + response.status);
+      throw await window.LogosHttpError(response);
     }
     var payload;
     try {

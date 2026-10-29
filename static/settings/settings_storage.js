@@ -147,7 +147,7 @@
   function fetchRecord() {
     return window.LogosDispatcher.request("/api/settings", null, { timeoutMs: 5000 })
       .then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
+        if (!r.ok) return window.LogosHttpError(r).then(function (e) { throw e; });
         return r.json();
       })
       .then(recordFrom);

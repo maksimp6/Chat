@@ -28,7 +28,7 @@
     lockConfigControls();
     try {
       var response = await window.LogosDispatcher.request("/api/memory/manage");
-      if (!response.ok) throw new Error("HTTP " + response.status);
+      if (!response.ok) throw await window.LogosHttpError(response);
       var data = await response.json();
       var enabled = byId("memEnabled");
       var limit = byId("memLimit");
@@ -74,7 +74,7 @@
       lockConfigControls();
       var failed = byId("memoryFactsList");
       if (failed) failed.replaceChildren();
-      reportStatus("Не удалось загрузить память.");
+      reportStatus(window.LogosErrorText("Не удалось загрузить память", error));
     }
   };
 

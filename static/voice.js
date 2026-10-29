@@ -155,7 +155,9 @@
 
   function cancelServer(id) {
     if (!id) return Promise.resolve();
-    return jsonRequest("/api/voice/close", { session_id: id, cancel: true }).catch(function () {});
+    return jsonRequest("/api/voice/close", { session_id: id, cancel: true }).catch(function (error) {
+      if (window.LogosToast) window.LogosToast.error(window.LogosErrorText("Не удалось закрыть голосовую сессию", error));
+    });
   }
 
   function closeMicEvents() {

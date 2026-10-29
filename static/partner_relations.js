@@ -132,7 +132,7 @@
                 })
                 .then(showDetails)
                 .catch(function (err) {
-                  LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
+                  LogosToast.error(window.LogosErrorText("Не удалось открыть партнёра", err));
                 });
             };
             list.appendChild(row);
@@ -194,7 +194,7 @@
             });
           })
           .catch(function (err) {
-            LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
+            LogosToast.error(window.LogosErrorText("Не удалось сменить статус", err));
           });
       };
       detail.appendChild(status);
@@ -273,7 +273,7 @@
                 });
               })
               .catch(function (err) {
-                LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
+                LogosToast.error(window.LogosErrorText("Не удалось завершить", err));
               });
           };
           line.appendChild(done);
@@ -307,7 +307,7 @@
           return load();
         })
         .catch(function (err) {
-          LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
+          LogosToast.error(window.LogosErrorText("Не удалось сохранить партнёра", err));
         })
         .finally(function () {
           create.disabled = false;

@@ -40,7 +40,7 @@
 
     window.LogosDispatcher.request("/api/departments", { headers: { Accept: "application/json" } })
       .then(function (response) {
-        if (!response.ok) throw new Error("HTTP " + response.status);
+        if (!response.ok) return window.LogosHttpError(response).then(function (e) { throw e; });
         return response.json();
       })
       .then(function (data) {
@@ -77,7 +77,7 @@
                 row.querySelector("span").textContent = "Сессия: " + result.data.session.id;
               })
               .catch(function (error) {
-                LogosToast.error("Не удалось начать сессию. Попробуйте ещё раз.");
+                LogosToast.error(window.LogosErrorText("Не удалось начать сессию", error));
               });
           };
           list.appendChild(row);

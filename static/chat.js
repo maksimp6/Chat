@@ -428,7 +428,7 @@ function addMessage({
               {},
               { timeoutMs: 60000 },
             );
-            if (!res.ok) throw new Error("HTTP " + res.status);
+            if (!res.ok) throw await window.LogosHttpError(res);
             return res.json();
           }),
         );

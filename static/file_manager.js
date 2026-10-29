@@ -263,7 +263,7 @@ window.fetchVectorStores = function () {
               method: "DELETE",
             })
               .then(function (response) {
-                if (!response.ok) throw new Error("HTTP " + response.status);
+                if (!response.ok) return window.LogosHttpError(response).then(function (e) { throw e; });
                 return response.json().catch(function () {
                   return {};
                 });
@@ -275,7 +275,7 @@ window.fetchVectorStores = function () {
                 button.disabled = false;
                 button.textContent = originalText;
                 button.textContent = "Удалить";
-                LogosToast.error("Не удалось удалить. Попробуйте ещё раз.");
+                LogosToast.error(window.LogosErrorText("Не удалось удалить", error));
               });
           });
         });
@@ -329,14 +329,14 @@ window.fetchVectorStores = function () {
         body: JSON.stringify({ name: name }),
       })
         .then(function (r) {
-          if (!r.ok) throw new Error("HTTP " + r.status);
+          if (!r.ok) return window.LogosHttpError(r).then(function (e) { throw e; });
         })
         .then(function () {
           document.getElementById("vs-name-input").value = "";
           loadVsList();
         })
         .catch(function (e) {
-          LogosToast.error("Не удалось выполнить действие. Попробуйте ещё раз.");
+          LogosToast.error(window.LogosErrorText("Не удалось создать хранилище", e));
         })
         .finally(function () {
           var btn = document.getElementById("btn-create-vs");
