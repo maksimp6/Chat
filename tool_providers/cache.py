@@ -1,36 +1,39 @@
-"""Append-only text cache with vectors from every embedding model (category ``cache``).
+"""The Logos cache: one long text that only grows (category ``cache``).
 
-``CACHE_TOOLS`` holds three tools: ``cache_append`` adds a text, ``cache_read`` reads
-entries back and ``cache_search`` finds them by text, regular expression or meaning.
-The model and other tools write to one cache shared by every dialog; an entry keeps
-the dialog it came from. Nothing in the cache is ever changed or removed.
+``CACHE_TOOLS`` holds three tools: ``cache_append`` adds text to the end,
+``cache_read`` reads the text or a part of it and ``cache_search`` finds places in
+it by substring, regular expression or meaning. The model and other tools write to
+one text shared by every dialog. Nothing in it is ever changed or removed.
 
-Every appended text is embedded with each model of ``EMBEDDING_MODELS`` (v2 models at
-their largest size), and each vector is stored with the model URI it came from, so
-the entry records the version of every embedding model. A model that fails is listed
-in ``embedding_errors``; the text is stored either way. A semantic search embeds the
-question with the query models and compares it with each stored vector: a document
-vector with its paired query model, a query vector with the same model.
+Each append is one piece of the text: a heading line (time, source, dialog) and the
+appended text. Every piece is embedded with each model of ``EMBEDDING_MODELS`` (v2
+models at their largest size); the vectors are kept beside the text with the model
+URI each came from, so the version of every embedding model is recorded. A model
+that fails is listed in the piece's ``embedding_errors``; the text is appended either
+way. A semantic search embeds the question with the query models and compares it
+with each piece: a document vector with its paired query model, a query vector with
+the same model.
 
-Every entry is also put in the index: it is uploaded as a Markdown file
-(``logos-cache-<key>.md``) and added to each knowledge vector store
-(``knowledge_vector_store_ids``), the store the dialog's File Search searches. The
-entry keeps the file id and each store's answer; a failed upload or store is listed in
-``index_errors``, and the entry is stored either way.
+The whole text is in the index: after every append it is uploaded as one file
+(``logos-cache.md``) to each knowledge vector store (``knowledge_vector_store_ids``),
+the store the dialog's File Search searches, and the previous upload is taken out of
+the stores and deleted, so the index holds the current text once. A failure is
+returned in ``index_errors``; the append is kept either way.
 
-The cache is one JSON Lines file next to the memory file (``logos.cache.jsonl``).
-Appends hold an exclusive file lock, so processes sharing the file do not interleave.
-There is no limit on the number or size of entries (0 means no application limit).
+Files beside the memory file: ``logos.cache.md`` (the text),
+``logos.cache.vectors.jsonl`` (one record per piece) and ``logos.cache.index.json``
+(the uploaded file). Writers hold an exclusive file lock. There is no limit on the
+size of the text (0 means no application limit).
 """
 
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import json
 import re
 import threading
-import uuid
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -44,16 +47,52 @@ from tool_providers.host import (
 )
 from tool_providers.schema import object_schema
 
-CACHE_FILE_NAME = "logos.cache.jsonl"
-CACHE_FORMAT_VERSION = 2
+CACHE_FILE_NAME = "logos.cache.md"
+VECTORS_FILE_NAME = "logos.cache.vectors.jsonl"
+INDEX_STATE_FILE_NAME = "logos.cache.index.json"
+INDEX_FILE_NAME = "logos-cache.md"
 SEARCH_MODES = ("all", "text", "regex", "semantic")
 _TRANSPORTS = ["responses_api", "local_agent", "mcp"]
-_lock = threading.Lock()
+_text_lock = threading.Lock()
+_index_lock = threading.Lock()
 
 
 def cache_file_path() -> Path:
-    """The cache file: ``logos.cache.jsonl`` beside the memory file."""
+    """The cache text: ``logos.cache.md`` beside the memory file."""
     return memory_file_path().with_name(CACHE_FILE_NAME)
+
+
+def _vectors_path() -> Path:
+    return memory_file_path().with_name(VECTORS_FILE_NAME)
+
+
+def _index_state_path() -> Path:
+    return memory_file_path().with_name(INDEX_STATE_FILE_NAME)
+
+
+@contextlib.contextmanager
+def _locked(lock: threading.Lock, path: Path) -> Iterator[None]:
+    """Hold ``lock`` in this process and an exclusive lock on ``path`` + ``.lock``."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with lock, path.with_name(path.name + ".lock").open("a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def _read_text() -> str:
+    path = cache_file_path()
+    return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+def _read_pieces() -> list[dict[str, Any]]:
+    path = _vectors_path()
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8") as handle:
+        return [json.loads(line) for line in handle if line.strip()]
 
 
 # ---------------------------------------------------------------------------
@@ -65,23 +104,18 @@ def _call_of(cfg: Mapping[str, Any] | None) -> Any:
     return context.get("call") if isinstance(context, Mapping) else None
 
 
-def _caller(cfg: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Transport, user and dialog of the call, as far as the call carries them."""
-    call = _call_of(cfg)
-    if call is None:
-        return {"transport": None, "user_id": None, "conversation_id": None}
-    metadata = getattr(call, "metadata", None)
-    trace = metadata.get("execution_trace") if isinstance(metadata, Mapping) else None
-    data = getattr(trace, "trace", None)
+def _trace_of(cfg: Mapping[str, Any] | None) -> Any:
+    metadata = getattr(_call_of(cfg), "metadata", None)
+    return metadata.get("execution_trace") if isinstance(metadata, Mapping) else None
+
+
+def _conversation_of(cfg: Mapping[str, Any] | None) -> str | None:
+    data = getattr(_trace_of(cfg), "trace", None)
     context = data.get("context") if isinstance(data, Mapping) else None
     conversation = (
         context.get("conversation_id") if isinstance(context, Mapping) else None
     )
-    return {
-        "transport": str(getattr(call, "transport", "") or "") or None,
-        "user_id": str(getattr(call, "user_id", "") or "") or None,
-        "conversation_id": str(conversation or "") or None,
-    }
+    return str(conversation or "") or None
 
 
 def _failure(message: str, phase: str, **extra: Any) -> dict[str, Any]:
@@ -119,11 +153,7 @@ def _embed(text: str, name: str, spec: Mapping[str, Any], trace: Any) -> dict[st
             trace=trace,
         )
     except bound.EmbeddingError as exc:
-        return {
-            "error": exc.code,
-            "message": str(exc),
-            "tokens": exc.tokens_spent,
-        }
+        return {"error": exc.code, "message": str(exc), "tokens": exc.tokens_spent}
     except ValueError as exc:
         return {"error": "invalid_embedding_request", "message": str(exc), "tokens": 0}
     return {
@@ -135,207 +165,186 @@ def _embed(text: str, name: str, spec: Mapping[str, Any], trace: Any) -> dict[st
     }
 
 
-def _trace_of(cfg: Mapping[str, Any] | None) -> Any:
-    metadata = getattr(_call_of(cfg), "metadata", None)
-    return metadata.get("execution_trace") if isinstance(metadata, Mapping) else None
-
-
 # ---------------------------------------------------------------------------
 # Index (knowledge vector stores)
 
 
-def _index_document(entry: Mapping[str, Any]) -> str:
-    """The entry as the Markdown file File Search reads: its fields, then the text."""
-    fields = [
-        ("key", entry.get("key")),
-        ("created_at", entry.get("created_at")),
-        ("source", entry.get("source")),
-        ("tags", ", ".join(entry.get("tags") or [])),
-        ("conversation_id", entry.get("conversation_id")),
-        ("transport", entry.get("transport")),
-        ("user_id", entry.get("user_id")),
-    ]
-    header = "\n".join(f"- {name}: {value}" for name, value in fields if value)
-    return (
-        f"# Logos cache entry {entry.get('key')}\n\n{header}\n\n{entry.get('text')}\n"
-    )
+def _failure_record(exc: BaseException) -> dict[str, str]:
+    return {"error": type(exc).__name__, "message": str(exc)}
 
 
-def _index(entry: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Upload the entry and add it to every knowledge vector store: (index, errors)."""
+def _refresh_index() -> tuple[dict[str, Any], dict[str, Any]]:
+    """Put the current text in every knowledge store in place of the previous upload."""
     # Provider errors, credential errors (RuntimeError) and network errors (OSError).
     failures = (bound.YandexClientError, RuntimeError, OSError, ValueError)
-    filename = f"logos-cache-{entry.get('key')}.md"
-    index: dict[str, Any] = {"filename": filename, "file_id": None, "vector_stores": {}}
     errors: dict[str, Any] = {}
-    try:
-        client = bound.YandexResponsesClient(bound.Config)
-        uploaded = client.upload_file(
-            _index_document(entry).encode("utf-8"), filename, purpose="assistants"
+    state_path = _index_state_path()
+    with _locked(_index_lock, state_path):
+        previous = (
+            json.loads(state_path.read_text(encoding="utf-8"))
+            if state_path.exists()
+            else {}
         )
-    except failures as exc:
-        errors["upload"] = {"error": type(exc).__name__, "message": str(exc)}
-        return index, errors
-    file_id = uploaded.get("id") if isinstance(uploaded, Mapping) else None
-    if not file_id:
-        errors["upload"] = {"error": "no_file_id", "message": str(uploaded)}
-        return index, errors
-    index["file_id"] = file_id
-    for store_id in knowledge_vector_store_ids():
+        text = _read_text()
         try:
-            added = client.add_file_to_vs(store_id, file_id)
+            client = bound.YandexResponsesClient(bound.Config)
+            uploaded = client.upload_file(
+                text.encode("utf-8"), INDEX_FILE_NAME, purpose="assistants"
+            )
         except failures as exc:
-            errors[store_id] = {"error": type(exc).__name__, "message": str(exc)}
-            continue
-        index["vector_stores"][store_id] = {
-            "id": added.get("id") if isinstance(added, Mapping) else None,
-            "status": added.get("status") if isinstance(added, Mapping) else None,
+            errors["upload"] = _failure_record(exc)
+            return previous, errors
+        file_id = uploaded.get("id") if isinstance(uploaded, Mapping) else None
+        if not file_id:
+            errors["upload"] = {"error": "no_file_id", "message": str(uploaded)}
+            return previous, errors
+        state: dict[str, Any] = {
+            "file_id": file_id,
+            "filename": INDEX_FILE_NAME,
+            "chars": len(text),
+            "uploaded_at": datetime.now(UTC).isoformat(),
+            "vector_stores": {},
         }
-    return index, errors
-
-
-# ---------------------------------------------------------------------------
-# Storage
-
-
-def _read_entries(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-    entries = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if line:
-                entries.append(json.loads(line))
-    return entries
-
-
-def _public(entry: Mapping[str, Any]) -> dict[str, Any]:
-    """An entry without its vectors: each model keeps its URI, size and tokens."""
-    result = {key: value for key, value in entry.items() if key != "embeddings"}
-    result["embeddings"] = {
-        name: {key: value for key, value in record.items() if key != "vector"}
-        for name, record in (entry.get("embeddings") or {}).items()
-    }
-    return result
+        for store_id in knowledge_vector_store_ids():
+            try:
+                added = client.add_file_to_vs(store_id, file_id)
+            except failures as exc:
+                errors[store_id] = _failure_record(exc)
+                continue
+            state["vector_stores"][store_id] = (
+                added.get("status") if isinstance(added, Mapping) else None
+            )
+        old_id = previous.get("file_id")
+        if old_id and old_id != file_id:
+            # The previous upload holds an older copy of the same text.
+            for store_id in previous.get("vector_stores") or {}:
+                try:
+                    client.remove_file_from_vs(store_id, old_id)
+                except failures as exc:
+                    errors[f"remove:{store_id}"] = _failure_record(exc)
+            try:
+                client.delete_file(old_id)
+            except failures as exc:
+                errors["delete"] = _failure_record(exc)
+        state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        return state, errors
 
 
 # ---------------------------------------------------------------------------
 # Tools
 
 
+def _piece_public(piece: Mapping[str, Any], text: str | None = None) -> dict[str, Any]:
+    """A piece without its vectors; with its text when the whole text is given."""
+    result = {key: value for key, value in piece.items() if key != "embeddings"}
+    result["embeddings"] = {
+        name: {key: value for key, value in record.items() if key != "vector"}
+        for name, record in (piece.get("embeddings") or {}).items()
+    }
+    if text is not None:
+        start = piece.get("start") or 0
+        result["text"] = text[start : start + (piece.get("chars") or 0)]
+    return result
+
+
 def cache_append(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
-    """Append one text to the cache with a vector from every embedding model."""
+    """Append text to the end of the cache, embed it with every model, refresh the index."""
     text = arguments.get("text") if isinstance(arguments, Mapping) else None
     if not isinstance(text, str) or not text.strip():
         return _failure("text must be a non-empty string", "validation")
     source = arguments.get("source")
     source = source.strip() if isinstance(source, str) and source.strip() else "model"
-    tags = arguments.get("tags") or []
-    if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
-        return _failure("tags must be a list of strings", "validation")
 
     trace = _trace_of(cfg)
     embeddings: dict[str, Any] = {}
-    errors: dict[str, Any] = {}
+    embedding_errors: dict[str, Any] = {}
     tokens = 0
     for name, spec in _embedding_models().items():
         record = _embed(text, name, spec, trace)
         tokens += record.get("tokens") or 0
         if "error" in record:
-            errors[name] = record
+            embedding_errors[name] = record
         else:
             embeddings[name] = record
 
-    created_at = datetime.now(UTC)
-    entry: dict[str, Any] = {
-        "format_version": CACHE_FORMAT_VERSION,
-        # Names the entry before it has an id: the index file is uploaded first.
-        "key": f"{created_at:%Y%m%dT%H%M%S%fZ}-{uuid.uuid4().hex[:8]}",
-        "created_at": created_at.isoformat(),
-        "source": source,
-        "tags": list(dict.fromkeys(tags)),
-        **_caller(cfg),
-        "text": text,
-        "chars": len(text),
-        "embedding_tokens": tokens,
-        "embeddings": embeddings,
-        "embedding_errors": errors,
-    }
-    entry["index"], entry["index_errors"] = _index(entry)
+    created_at = datetime.now(UTC).isoformat()
+    conversation_id = _conversation_of(cfg)
+    heading = " · ".join(part for part in (created_at, source, conversation_id) if part)
     path = cache_file_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with _lock, path.open("a+", encoding="utf-8") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
-        try:
-            handle.seek(0)
-            entry = {"id": sum(1 for line in handle if line.strip()) + 1, **entry}
-            handle.seek(0, 2)
-            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    with _locked(_text_lock, path):
+        existing = _read_text()
+        separator = "\n\n" if existing else ""
+        piece_text = f"## {heading}\n\n{text}"
+        start = len(existing) + len(separator)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(separator + piece_text)
             handle.flush()
-        finally:
-            fcntl.flock(handle, fcntl.LOCK_UN)
-    return {"success": True, "path": str(path), "entry": _public(entry)}
+        piece = {
+            "start": start,
+            "chars": len(piece_text),
+            "created_at": created_at,
+            "source": source,
+            "conversation_id": conversation_id,
+            "embedding_tokens": tokens,
+            "embeddings": embeddings,
+            "embedding_errors": embedding_errors,
+        }
+        with _vectors_path().open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(piece, ensure_ascii=False) + "\n")
+        total = start + len(piece_text)
 
-
-def _matches(
-    entry: Mapping[str, Any], conversation_id: Any, source: Any, tag: Any
-) -> bool:
-    if conversation_id and entry.get("conversation_id") != conversation_id:
-        return False
-    if source and entry.get("source") != source:
-        return False
-    return not tag or tag in (entry.get("tags") or [])
-
-
-def cache_read(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
-    """Entries by id, or a page of entries filtered by dialog, source and tag."""
-    arguments = arguments if isinstance(arguments, Mapping) else {}
-    ids = arguments.get("ids")
-    if ids is not None and (
-        not isinstance(ids, list) or not all(type(item) is int for item in ids)
-    ):
-        return _failure("ids must be a list of integers", "validation")
-    offset = arguments.get("offset") or 0
-    limit = arguments.get("limit") or 0
-    if type(offset) is not int or offset < 0 or type(limit) is not int or limit < 0:
-        return _failure("offset and limit must be integers of 0 or more", "validation")
-    newest_first = arguments.get("order") != "asc"
-
-    path = cache_file_path()
-    entries = _read_entries(path)
-    total = len(entries)
-    if ids:
-        wanted = set(ids)
-        selected = [entry for entry in entries if entry.get("id") in wanted]
-    else:
-        selected = [
-            entry
-            for entry in entries
-            if _matches(
-                entry,
-                arguments.get("conversation_id"),
-                arguments.get("source"),
-                arguments.get("tag"),
-            )
-        ]
-    if newest_first:
-        selected.reverse()
-    matched = len(selected)
-    selected = selected[offset:]
-    if limit:
-        selected = selected[:limit]
+    index, index_errors = _refresh_index()
     return {
         "success": True,
         "path": str(path),
-        "total": total,
-        "matched": matched,
-        "entries": [_public(entry) for entry in selected],
+        "total_chars": total,
+        "piece": _piece_public(piece),
+        "index": index,
+        "index_errors": index_errors,
     }
 
 
+def cache_read(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+    """The cache text, whole or ``length`` characters from ``offset``."""
+    arguments = arguments if isinstance(arguments, Mapping) else {}
+    offset = arguments.get("offset") or 0
+    length = arguments.get("length") or 0
+    if type(offset) is not int or type(length) is not int or length < 0:
+        return _failure("offset and length must be integers", "validation")
+    text = _read_text()
+    start = max(0, len(text) + offset) if offset < 0 else min(offset, len(text))
+    end = min(start + length, len(text)) if length else len(text)
+    return {
+        "success": True,
+        "path": str(cache_file_path()),
+        "total_chars": len(text),
+        "start": start,
+        "end": end,
+        "text": text[start:end],
+    }
+
+
+def _text_hits(text: str, query: str, pattern: re.Pattern[str] | None) -> list[int]:
+    if pattern is not None:
+        return [match.start() for match in pattern.finditer(text)]
+    hits, needle, haystack = [], query.casefold(), text.casefold()
+    position = haystack.find(needle)
+    while position != -1:
+        hits.append(position)
+        position = haystack.find(needle, position + 1)
+    return hits
+
+
+def _piece_at(pieces: list[dict[str, Any]], position: int) -> int | None:
+    for number, piece in enumerate(pieces):
+        start = piece.get("start") or 0
+        if start <= position < start + (piece.get("chars") or 0):
+            return number
+    return None
+
+
 def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
-    """Find entries by substring, regular expression or meaning (every embedding model)."""
+    """Find places in the cache by substring, regular expression or meaning."""
     arguments = arguments if isinstance(arguments, Mapping) else {}
     query = arguments.get("query")
     if not isinstance(query, str) or not query.strip():
@@ -350,7 +359,6 @@ def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
     limit = arguments.get("limit") or 0
     if type(limit) is not int or limit < 0:
         return _failure("limit must be an integer of 0 or more", "validation")
-
     pattern = None
     if mode == "regex":
         try:
@@ -358,40 +366,30 @@ def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
         except re.error as exc:
             return _failure(f"invalid regular expression: {exc}", "validation")
 
-    path = cache_file_path()
-    entries = [
-        entry
-        for entry in _read_entries(path)
-        if _matches(
-            entry,
-            arguments.get("conversation_id"),
-            arguments.get("source"),
-            arguments.get("tag"),
-        )
-    ]
-    needle = query.casefold()
-    results = []
-    for entry in entries:
-        text = str(entry.get("text") or "")
-        text_match = (
-            bool(pattern.search(text))
-            if pattern is not None
-            else needle in text.casefold()
-        )
-        results.append({"entry": entry, "text_match": text_match})
+    text = _read_text()
+    pieces = _read_pieces()
+    hits = _text_hits(text, query, pattern) if mode != "semantic" else []
+    matched = {_piece_at(pieces, position) for position in hits}
 
     if mode in ("text", "regex"):
-        hits = [item for item in reversed(results) if item["text_match"]]
-        if limit:
-            hits = hits[:limit]
+        results: list[dict[str, Any]] = []
+        for position in hits[:limit] if limit else hits:
+            number = _piece_at(pieces, position)
+            results.append(
+                {
+                    "position": position,
+                    "piece": None
+                    if number is None
+                    else _piece_public(pieces[number], text),
+                }
+            )
         return {
             "success": True,
-            "path": str(path),
+            "path": str(cache_file_path()),
             "mode": mode,
-            "searched": len(entries),
-            "results": [
-                {"text_match": True, **_public(item["entry"])} for item in hits
-            ],
+            "total_chars": len(text),
+            "matches": len(hits),
+            "results": results,
         }
 
     trace = _trace_of(cfg)
@@ -412,20 +410,26 @@ def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
             )
         query_vectors[name] = record["vector"]
 
-    for item in results:
+    ranked = []
+    for number, piece in enumerate(pieces):
         scores = {}
-        for name, record in (item["entry"].get("embeddings") or {}).items():
+        for name, record in (piece.get("embeddings") or {}).items():
             vector = query_vectors.get(_query_model_for(name))
             if vector is not None and isinstance(record.get("vector"), list):
                 scores[name] = cosine_similarity(vector, record["vector"])
-        item["scores"] = scores
         if rank_by == "mean":
-            item["score"] = sum(scores.values()) / len(scores) if scores else None
+            score = sum(scores.values()) / len(scores) if scores else None
         else:
-            item["score"] = scores.get(rank_by)
-
-    ranked = sorted(
-        results,
+            score = scores.get(rank_by)
+        ranked.append(
+            {
+                "score": score,
+                "scores": scores,
+                "text_match": number in matched,
+                "piece": _piece_public(piece, text),
+            }
+        )
+    ranked.sort(
         key=lambda item: (
             item["score"] is not None,
             mode == "all" and item["text_match"],
@@ -433,28 +437,17 @@ def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
         ),
         reverse=True,
     )
-    if mode == "all":
-        ranked = [
-            item for item in ranked if item["text_match"] or item["score"] is not None
-        ]
     if limit:
         ranked = ranked[:limit]
     return {
         "success": True,
-        "path": str(path),
+        "path": str(cache_file_path()),
         "mode": mode,
         "rank_by": rank_by,
-        "searched": len(entries),
+        "total_chars": len(text),
+        "matches": len(hits),
         "query_embedding_tokens": tokens,
-        "results": [
-            {
-                "score": item["score"],
-                "scores": item["scores"],
-                "text_match": item["text_match"],
-                **_public(item["entry"]),
-            }
-            for item in ranked
-        ],
+        "results": ranked,
     }
 
 
@@ -464,22 +457,6 @@ def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str
 
 def _optional(schema: dict[str, Any]) -> dict[str, Any]:
     return {"anyOf": [schema, {"type": "null"}]}
-
-
-_FILTERS = {
-    "conversation_id": _optional(
-        {"type": "string", "description": "Only entries written in this dialog"}
-    ),
-    "source": _optional(
-        {
-            "type": "string",
-            "description": "Only entries of this source (model, a tool name)",
-        }
-    ),
-    "tag": _optional(
-        {"type": "string", "description": "Only entries carrying this tag"}
-    ),
-}
 
 
 def _definition(
@@ -508,12 +485,14 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
     "cache_append": _definition(
         title="Cache: append",
         description=(
-            "Append a text to the Logos cache. The cache only grows: an entry is never "
-            "changed or removed. The text is embedded with every embedding model "
+            "Append text to the end of the Logos cache: one long text that only grows "
+            "and is never changed or cut. The appended piece gets a heading line (time, "
+            "source, dialog) and is embedded with every embedding model "
             "(text-search-doc, text-search-query, text-embeddings-v2-doc, "
-            "text-embeddings-v2-query) and each vector is stored with its model version; the "
-            "entry is also put in the index (the knowledge vector stores file_search searches). "
-            "Use it every turn to record your own message and how you see this turn."
+            "text-embeddings-v2-query), each vector stored with its model version. "
+            "The whole text is then put in the index (the knowledge vector stores "
+            "file_search searches). Use it every turn to record your own message and "
+            "how you see this turn."
         ),
         parameters=object_schema(
             {
@@ -528,13 +507,6 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
                         "description": "Who writes it: model (when not given) or a tool name",
                     }
                 ),
-                "tags": _optional(
-                    {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Labels to find the entry by, e.g. answer, self-view",
-                    }
-                ),
             },
             ["text"],
         ),
@@ -544,35 +516,22 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
     "cache_read": _definition(
         title="Cache: read",
         description=(
-            "Read cache entries: the ones named by ids, or the entries filtered by dialog, "
-            "source and tag, newest first unless order is asc. Vectors are not returned; "
-            "each entry lists its embedding models with their versions and sizes."
+            "Read the cache text: all of it, or length characters from offset "
+            "(a negative offset counts from the end)."
         ),
         parameters=object_schema(
             {
-                "ids": _optional(
-                    {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Entry ids to read",
-                    }
-                ),
-                **_FILTERS,
-                "order": _optional(
-                    {
-                        "type": "string",
-                        "enum": ["desc", "asc"],
-                        "description": "desc: newest first",
-                    }
-                ),
                 "offset": _optional(
-                    {"type": "integer", "minimum": 0, "description": "Entries to skip"}
+                    {
+                        "type": "integer",
+                        "description": "First character; negative: from the end; 0 or not given: start",
+                    }
                 ),
-                "limit": _optional(
+                "length": _optional(
                     {
                         "type": "integer",
                         "minimum": 0,
-                        "description": "Entries to return; 0 or not given: all",
+                        "description": "Characters to read; 0 or not given: to the end",
                     }
                 ),
             },
@@ -584,11 +543,11 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
     "cache_search": _definition(
         title="Cache: search",
         description=(
-            "Search the cache. mode text: substring, regex: regular expression (both "
-            "case-insensitive, newest first); semantic: every entry ranked by cosine "
-            "similarity in each embedding model; all (when not given): semantic ranking "
-            "with the text match marked. Each result has a score per embedding model and "
-            "the ranking score (rank_by: mean of the models, or one model)."
+            "Search the cache text. mode text: substring, regex: regular expression "
+            "(both case-insensitive; every match with its position and the appended "
+            "piece it is in); semantic: every appended piece ranked by cosine similarity "
+            "in each embedding model; all (when not given): semantic ranking with text "
+            "matches first. rank_by: mean of the models (when not given) or one model."
         ),
         parameters=object_schema(
             {
@@ -617,7 +576,6 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
                         "description": "Ranking score: mean (when not given) or one model",
                     }
                 ),
-                **_FILTERS,
                 "limit": _optional(
                     {
                         "type": "integer",
@@ -636,8 +594,8 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
 
 __all__ = [
     "CACHE_FILE_NAME",
-    "CACHE_FORMAT_VERSION",
     "CACHE_TOOLS",
+    "INDEX_FILE_NAME",
     "SEARCH_MODES",
     "cache_append",
     "cache_file_path",
