@@ -15,7 +15,9 @@ from yandex_client_modules._binding import Binding, HostNotBound
 
 @dataclass(frozen=True, kw_only=True)
 class Host:
+    Config: Any  # core.config.Config
     CredentialCryptoError: Any  # secret_store.credential_crypto.CredentialCryptoError
+    EMBEDDING_MODELS: Any  # core.config.EMBEDDING_MODELS
     ExecutionTrace: Any  # observability.trace_manager.ExecutionTrace
     IMAGE_MODELS: Any  # core.config.IMAGE_MODELS
     ProviderQuotaExceeded: Any  # provider_accounts.quotas.ProviderQuotaExceeded

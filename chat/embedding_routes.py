@@ -3,48 +3,31 @@
 from __future__ import annotations
 
 import logging
-import math
-import time
-from types import SimpleNamespace
 
-import requests
 from flask import Blueprint, jsonify, request
 
-import os
 from chat._error_details import DETAILS, error_body
 from chat.host import (
     bound,
-    calculate_knowledge_cost,
+    embed_texts,
+    embedding_cost,
     get_current_trace,
-    provider_request_headers,
     traced_operation,
 )
 
 embedding_bp = Blueprint("embeddings", __name__)
 logger = logging.getLogger("logos.embeddings")
 
-UPSTREAM_URL = "https://ai.api.cloud.yandex.net/v1/embeddings"
 MAX_BATCH = (
     64  # same cap as scripts/rag_pipeline.py: the server key pays for every text
 )
 # The provider enforces its model-specific token limit. Character counts cannot
 # stand in for the provider tokenizer and must not truncate or reject valid text.
-UPSTREAM_TIMEOUT_SECONDS = 30
-# Whole-request budget, so a batch cannot hold a Flask worker for 30 seconds per text.
-REQUEST_BUDGET_SECONDS = 60
-MODES = {"doc": "text-search-doc", "query": "text-search-query"}
-V2_DIMENSIONS = {128, 256, 512, 768}
 ALLOWED_FIELDS = {"text", "texts", "model", "mode", "dimensions"}
 
 
 class _BadInput(ValueError):
     pass
-
-
-class _InvalidEmbedding(ValueError):
-    def __init__(self, tokens: int):
-        super().__init__("invalid embedding response")
-        self.tokens = tokens
 
 
 def _texts_from_body(body: dict) -> tuple[list[str], bool]:
@@ -66,66 +49,41 @@ def _texts_from_body(body: dict) -> tuple[list[str], bool]:
     return items, single
 
 
-def _token_count(value) -> int:
-    """Upstream token counts are integers; a fractional value is truncated, not an error."""
-    try:
-        return 0 if isinstance(value, bool) else max(0, int(float(value or 0)))
-    except (TypeError, ValueError, OverflowError):
-        return 0
-
-
-def _embed_one(
-    headers: dict[str, str],
-    model_uri: str,
-    text: str,
-    *,
-    dimensions: int | None = None,
-    timeout: float = UPSTREAM_TIMEOUT_SECONDS,
-) -> tuple[list[float], int]:
-    payload = {"model": model_uri, "input": text, "encoding_format": "float"}
-    if dimensions is not None:
-        payload["dimensions"] = dimensions
-    response = requests.post(
-        UPSTREAM_URL,
-        json=payload,
-        headers=headers,
-        timeout=timeout,
-    )
-    if response.status_code != 200:
-        raise requests.HTTPError(f"upstream status {response.status_code}")
-    data = response.json()
-    usage = data.get("usage") if isinstance(data, dict) else None
-    tokens = _token_count(usage.get("prompt_tokens")) if isinstance(usage, dict) else 0
-    records = (
-        data.get("data") if isinstance(data, dict) and "error" not in data else None
-    )
-    record = records[0] if isinstance(records, list) and len(records) == 1 else None
-    vector = record.get("embedding") if isinstance(record, dict) else None
-    try:
-        valid = (
-            isinstance(vector, list)
-            and len(vector) == (dimensions or 256)
-            and all(
-                type(value) in (int, float) and math.isfinite(value) for value in vector
-            )
+def _failed(exc: Exception):
+    """The response of an embedding call that did not complete (chat.host.EmbeddingError)."""
+    code = getattr(exc, "code", "embedding_upstream_failed")
+    completed = int(getattr(exc, "completed", 0))
+    tokens_spent = int(getattr(exc, "tokens_spent", 0))
+    if code == "embeddings_not_configured":
+        return jsonify(error_body("embeddings_not_configured")), 503
+    if code == "embedding_deadline_exceeded":
+        return (
+            jsonify(
+                error_body(
+                    "embedding_deadline_exceeded",
+                    completed=completed,
+                    tokens_spent=tokens_spent,
+                )
+            ),
+            504,
         )
-    except OverflowError:
-        valid = False
-    if not valid:
-        raise _InvalidEmbedding(tokens)
-    return vector, tokens
-
-
-def _cost(tokens: int) -> dict:
-    price = os.environ.get("EMBEDDING_PRICE_PER_1K_TOKENS")
-    try:
-        per_1k_tokens = float(price) if price not in (None, "") else None
-    except ValueError:
-        per_1k_tokens = None  # a bad price must not turn a paid request into a 500
-    if per_1k_tokens is not None and not math.isfinite(per_1k_tokens):
-        per_1k_tokens = None  # nan or inf would reach the JSON response unparseable
-    config = bound.KnowledgeCostConfig(embedding_per_1k_tokens=per_1k_tokens)
-    return calculate_knowledge_cost(embedding_tokens=tokens, config=config)
+    detail = DETAILS[
+        "embedding_dimensions_mismatch"
+        if code == "embedding_dimensions_mismatch"
+        else "embedding_upstream_failed"
+    ]
+    # Texts already embedded were paid for, so the answer reports how far the batch got.
+    return (
+        jsonify(
+            {
+                "error": "embedding_upstream_failed",
+                "detail": detail,
+                "completed": completed,
+                "tokens_spent": tokens_spent,
+            }
+        ),
+        502,
+    )
 
 
 @embedding_bp.route("/api/embeddings", methods=["POST"])
@@ -155,18 +113,22 @@ def create_embeddings():
             )
     else:
         mode = body.get("mode", "doc")
-        if not isinstance(mode, str) or mode not in MODES:
+        if not isinstance(mode, str) or mode not in bound.EMBEDDING_MODES:
             return jsonify(error_body("mode must be doc or query")), 400
-        model_name = MODES[mode]
+        model_name = bound.EMBEDDING_MODES[mode]
     dimensions = body.get("dimensions")
     if "dimensions" in body:
         if not model_name.startswith("text-embeddings-v2-"):
+            return jsonify(error_body("dimensions requires an embedding v2 model")), 400
+        if (
+            type(dimensions) is not int
+            or dimensions not in bound.V2_EMBEDDING_DIMENSIONS
+        ):
             return jsonify(
-                error_body("dimensions requires an embedding v2 model")
-            ), 400
-        if type(dimensions) is not int or dimensions not in V2_DIMENSIONS:
-            return jsonify(
-                error_body("invalid_dimensions", dimensions=sorted(V2_DIMENSIONS))
+                error_body(
+                    "invalid_dimensions",
+                    dimensions=sorted(bound.V2_EMBEDDING_DIMENSIONS),
+                )
             ), 400
     try:
         items, single = _texts_from_body(body)
@@ -174,64 +136,15 @@ def create_embeddings():
         return jsonify(error_body(str(exc), detail_of="invalid_embedding_request")), 400
 
     try:
-        credential = bound._resolve_global_provider_credential(
-            SimpleNamespace(_config=bound.Config), get_current_trace()
+        result = embed_texts(
+            items,
+            model=model_name,
+            dimensions=dimensions if "dimensions" in body else None,
+            trace=get_current_trace(),
         )
-        headers = provider_request_headers(credential)
-        headers["x-project"] = credential.project_id
-    except Exception:
-        return jsonify(error_body("embeddings_not_configured")), 503
-    if not credential.api_key or not str(credential.project_id or "").strip():
-        return jsonify(error_body("embeddings_not_configured")), 503
-
-    model_uri = f"emb://{credential.project_id.strip()}/{bound.EMBEDDING_MODELS[model_name]['upstream']}"
-    vectors, total_tokens = [], 0
-    started = time.monotonic()
-    for text in items:
-        remaining = REQUEST_BUDGET_SECONDS - (time.monotonic() - started)
-        if remaining <= 0:
-            return (
-                jsonify(
-                    error_body(
-                        "embedding_deadline_exceeded",
-                        completed=len(vectors),
-                        tokens_spent=total_tokens,
-                    )
-                ),
-                504,
-            )
-        try:
-            vector, tokens = _embed_one(
-                headers,
-                model_uri,
-                text,
-                dimensions=dimensions,
-                timeout=min(UPSTREAM_TIMEOUT_SECONDS, remaining),
-            )
-        except (requests.RequestException, ValueError) as exc:
-            # Texts already embedded were paid for, so report how far the batch got.
-            return (
-                jsonify(
-                    {
-                        "error": "embedding_upstream_failed",
-                        "detail": DETAILS["embedding_upstream_failed"],
-                        "completed": len(vectors),
-                        "tokens_spent": total_tokens + getattr(exc, "tokens", 0),
-                    }
-                ),
-                502,
-            )
-        if vectors and len(vector) != len(vectors[0]):
-            return jsonify(
-                {
-                    "error": "embedding_upstream_failed",
-                    "detail": DETAILS["embedding_dimensions_mismatch"],
-                    "completed": len(vectors),
-                    "tokens_spent": total_tokens + tokens,
-                }
-            ), 502
-        vectors.append(vector)
-        total_tokens += tokens
+    except bound.EmbeddingError as exc:
+        return _failed(exc)
+    vectors, total_tokens = result["vectors"], result["tokens"]
 
     trace = get_current_trace()
     if trace is not None:
@@ -247,10 +160,10 @@ def create_embeddings():
         "embeddings model=%s texts=%d tokens=%d", model_name, len(items), total_tokens
     )
     payload = {
-        "model": model_uri,
+        "model": result["model_uri"],
         "tokens": total_tokens,
-        "cost": _cost(total_tokens),
-        "dimensions": dimensions or 256,
+        "cost": embedding_cost(total_tokens),
+        "dimensions": result["dimensions"],
     }
     if single:
         payload["embedding"] = vectors[0]

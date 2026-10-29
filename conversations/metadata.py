@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import requests
-
 
 def create_conversation_request(client, metadata=None):
     """Create a Yandex Conversation using the documented request body.

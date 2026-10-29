@@ -105,12 +105,13 @@ def _chat():
     from core.config import CLASSIFIER_MODELS
     from core.config import Config
     from core.config import EMBEDDING_MODELS
+    from yandex_client_modules.embeddings import MODES as EMBEDDING_MODES
+    from yandex_client_modules.embeddings import EmbeddingError
     from observability.trace_manager import ExecutionTrace
     from provider_accounts.credentials import ExpiredCredentialError
     from core.config import IMAGE_MODELS
     from yandex_client_modules.image_generation import IMAGE_SIZES
     from yandex_client_modules.image_generation import ImageGenerationError
-    from economy.knowledge_economics import KnowledgeCostConfig
     from yandex_client_modules.image_generation import MAX_PROMPT_CHARS
     from yandex_client_modules.realtime import MODEL_UPSTREAMS
     from provider_accounts.model_discovery import ModelDiscoveryError
@@ -126,6 +127,9 @@ def _chat():
     from yandex_client_modules.realtime import TTS_MODEL
     from tool_providers.universal_tool_platform import UniversalToolCall
     from tool_providers.universal_tool_platform import UniversalToolExecutor
+    from yandex_client_modules.embeddings import (
+        V2_DIMENSIONS as V2_EMBEDDING_DIMENSIONS,
+    )
     from core.config import VOICE_MODELS
     from yandex_client_modules.client import YandexResponsesClient
     from yandex_client_modules.request_mixin import (
@@ -146,13 +150,14 @@ def _chat():
     from observability.trace_manager import bind_current_trace
     from economy.billing import build_ai_billing_item
     from yandex_client_modules.image_generation import build_generation_payload
-    from economy.knowledge_economics import calculate_knowledge_cost
     from conversations.ownership import check_access
     from core.model_profiles import completion_model_keys
     from agent_skills.registry import compose_skill_instructions
     from storage.records import create_conversation
     from invocation.manager import create_invocation
     from invocation.trace import create_invocation_trace
+    from yandex_client_modules.embeddings import embed_texts
+    from economy.knowledge_economics import embedding_cost
     from invocation.manager import fail_invocation
     from court.filing import file_case as file_court_case
     from invocation.manager import finish_invocation
@@ -201,12 +206,13 @@ def _chat():
         CLASSIFIER_MODELS=CLASSIFIER_MODELS,
         Config=Config,
         EMBEDDING_MODELS=EMBEDDING_MODELS,
+        EMBEDDING_MODES=EMBEDDING_MODES,
+        EmbeddingError=EmbeddingError,
         ExecutionTrace=ExecutionTrace,
         ExpiredCredentialError=ExpiredCredentialError,
         IMAGE_MODELS=IMAGE_MODELS,
         IMAGE_SIZES=IMAGE_SIZES,
         ImageGenerationError=ImageGenerationError,
-        KnowledgeCostConfig=KnowledgeCostConfig,
         MAX_PROMPT_CHARS=MAX_PROMPT_CHARS,
         MODEL_UPSTREAMS=MODEL_UPSTREAMS,
         ModelDiscoveryError=ModelDiscoveryError,
@@ -222,6 +228,7 @@ def _chat():
         TTS_MODEL=TTS_MODEL,
         UniversalToolCall=UniversalToolCall,
         UniversalToolExecutor=UniversalToolExecutor,
+        V2_EMBEDDING_DIMENSIONS=V2_EMBEDDING_DIMENSIONS,
         VOICE_MODELS=VOICE_MODELS,
         YandexResponsesClient=YandexResponsesClient,
         _record_quota_usage=_record_quota_usage,
@@ -234,13 +241,14 @@ def _chat():
         bind_current_trace=bind_current_trace,
         build_ai_billing_item=build_ai_billing_item,
         build_generation_payload=build_generation_payload,
-        calculate_knowledge_cost=calculate_knowledge_cost,
         check_access=check_access,
         completion_model_keys=completion_model_keys,
         compose_skill_instructions=compose_skill_instructions,
         create_conversation=create_conversation,
         create_invocation=create_invocation,
         create_invocation_trace=create_invocation_trace,
+        embed_texts=embed_texts,
+        embedding_cost=embedding_cost,
         fail_invocation=fail_invocation,
         file_court_case=file_court_case,
         finish_invocation=finish_invocation,
@@ -862,7 +870,9 @@ def _workspace():
 
 def _yandex_client_modules():
     from yandex_client_modules import host
+    from core.config import Config
     from secret_store.credential_crypto import CredentialCryptoError
+    from core.config import EMBEDDING_MODELS
     from observability.trace_manager import ExecutionTrace
     from core.config import IMAGE_MODELS
     from provider_accounts.quotas import ProviderQuotaExceeded
@@ -887,7 +897,9 @@ def _yandex_client_modules():
     from core.config import upstream_model_id
 
     return host.Host(
+        Config=Config,
         CredentialCryptoError=CredentialCryptoError,
+        EMBEDDING_MODELS=EMBEDDING_MODELS,
         ExecutionTrace=ExecutionTrace,
         IMAGE_MODELS=IMAGE_MODELS,
         ProviderQuotaExceeded=ProviderQuotaExceeded,

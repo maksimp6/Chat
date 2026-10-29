@@ -147,6 +147,27 @@ def calculate_knowledge_cost(
     }
 
 
+def embedding_cost(tokens: int) -> dict[str, Any]:
+    """The cost of ``tokens`` of embedding input at the deployment's embedding price.
+
+    ``EMBEDDING_PRICE_PER_1K_TOKENS`` names the price per thousand tokens; without
+    it, or with an unreadable or non-finite value, the cost stays unknown: a bad
+    price must not turn a paid request into a failure.
+    """
+    import math
+    import os
+
+    price = os.environ.get("EMBEDDING_PRICE_PER_1K_TOKENS")
+    try:
+        per_1k_tokens = float(price) if price not in (None, "") else None
+    except ValueError:
+        per_1k_tokens = None
+    if per_1k_tokens is not None and not math.isfinite(per_1k_tokens):
+        per_1k_tokens = None
+    config = KnowledgeCostConfig(embedding_per_1k_tokens=per_1k_tokens)
+    return calculate_knowledge_cost(embedding_tokens=tokens, config=config)
+
+
 def record_knowledge_operation(
     trace: Any,
     *,

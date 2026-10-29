@@ -1612,6 +1612,18 @@ def _chat_turn(*, t_start, admission=None, live=None):
             return jsonify(
                 error_body("invalid_params", message="params must be an object")
             ), 400
+        # Who wrote the question when it was not typed in the chat: a task on the
+        # schedule or a photo task names itself here, and the stored question keeps it.
+        source = data.get("source")
+        if source is not None and (
+            not isinstance(source, str) or not source.strip() or len(source) > 128
+        ):
+            return jsonify(
+                error_body(
+                    "invalid_params",
+                    message="source must be a non-empty string of at most 128 characters",
+                )
+            ), 400
         params = dict(raw_params or {})
         params_role = params.pop("role", None)
         role = data.get("role") or params_role
@@ -1743,6 +1755,7 @@ def _chat_turn(*, t_start, admission=None, live=None):
                 invocation.conversation_id,
                 "user",
                 message or "[Фото]",
+                source=source,
                 attachments={"images": len(images)} if images else None,
                 request_id=request_id,
             )

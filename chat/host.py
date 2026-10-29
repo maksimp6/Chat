@@ -19,6 +19,8 @@ class Host:
     CLASSIFIER_MODELS: Any  # core.config.CLASSIFIER_MODELS
     Config: Any  # core.config.Config
     EMBEDDING_MODELS: Any  # core.config.EMBEDDING_MODELS
+    EMBEDDING_MODES: Any  # yandex_client_modules.embeddings.MODES
+    EmbeddingError: Any  # yandex_client_modules.embeddings.EmbeddingError
     ExecutionTrace: Any  # observability.trace_manager.ExecutionTrace
     ExpiredCredentialError: Any  # provider_accounts.credentials.ExpiredCredentialError
     IMAGE_MODELS: Any  # core.config.IMAGE_MODELS
@@ -26,7 +28,6 @@ class Host:
     ImageGenerationError: (
         Any  # yandex_client_modules.image_generation.ImageGenerationError
     )
-    KnowledgeCostConfig: Any  # economy.knowledge_economics.KnowledgeCostConfig
     MAX_PROMPT_CHARS: Any  # yandex_client_modules.image_generation.MAX_PROMPT_CHARS
     MODEL_UPSTREAMS: Any  # yandex_client_modules.realtime.MODEL_UPSTREAMS
     ModelDiscoveryError: Any  # provider_accounts.model_discovery.ModelDiscoveryError
@@ -48,6 +49,7 @@ class Host:
     UniversalToolExecutor: (
         Any  # tool_providers.universal_tool_platform.UniversalToolExecutor
     )
+    V2_EMBEDDING_DIMENSIONS: Any  # yandex_client_modules.embeddings.V2_DIMENSIONS
     VOICE_MODELS: Any  # core.config.VOICE_MODELS
     YandexResponsesClient: Any  # yandex_client_modules.client.YandexResponsesClient
     _record_quota_usage: Any  # yandex_client_modules.request_mixin.record_quota_usage
@@ -66,15 +68,14 @@ class Host:
     build_generation_payload: (
         Any  # yandex_client_modules.image_generation.build_generation_payload
     )
-    calculate_knowledge_cost: (
-        Any  # economy.knowledge_economics.calculate_knowledge_cost
-    )
     check_access: Any  # conversations.ownership.check_access
     completion_model_keys: Any  # core.model_profiles.completion_model_keys
     compose_skill_instructions: Any  # agent_skills.registry.compose_skill_instructions
     create_conversation: Any  # storage.records.create_conversation
     create_invocation: Any  # invocation.manager.create_invocation
     create_invocation_trace: Any  # invocation.trace.create_invocation_trace
+    embed_texts: Any  # yandex_client_modules.embeddings.embed_texts
+    embedding_cost: Any  # economy.knowledge_economics.embedding_cost
     fail_invocation: Any  # invocation.manager.fail_invocation
     file_court_case: Any  # court.filing.file_case
     finish_invocation: Any  # invocation.manager.finish_invocation
@@ -150,13 +151,14 @@ __all__ = [
     "bind_current_trace",
     "build_ai_billing_item",
     "build_generation_payload",
-    "calculate_knowledge_cost",
     "check_access",
     "completion_model_keys",
     "compose_skill_instructions",
     "create_conversation",
     "create_invocation",
     "create_invocation_trace",
+    "embed_texts",
+    "embedding_cost",
     "fail_invocation",
     "file_court_case",
     "finish_invocation",
@@ -221,10 +223,6 @@ def build_generation_payload(*args: Any, **kwargs: Any) -> Any:
     return current().build_generation_payload(*args, **kwargs)
 
 
-def calculate_knowledge_cost(*args: Any, **kwargs: Any) -> Any:
-    return current().calculate_knowledge_cost(*args, **kwargs)
-
-
 def check_access(*args: Any, **kwargs: Any) -> Any:
     return current().check_access(*args, **kwargs)
 
@@ -247,6 +245,14 @@ def create_invocation(*args: Any, **kwargs: Any) -> Any:
 
 def create_invocation_trace(*args: Any, **kwargs: Any) -> Any:
     return current().create_invocation_trace(*args, **kwargs)
+
+
+def embed_texts(*args: Any, **kwargs: Any) -> Any:
+    return current().embed_texts(*args, **kwargs)
+
+
+def embedding_cost(*args: Any, **kwargs: Any) -> Any:
+    return current().embedding_cost(*args, **kwargs)
 
 
 def fail_invocation(*args: Any, **kwargs: Any) -> Any:
