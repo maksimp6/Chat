@@ -1,6 +1,6 @@
 # `tool_providers`
 
-The tool platform: provider-agnostic tool contracts and the execution pipeline, the shared tool registry, and the built-in tool sources (git, Termux, system, filesystem, Wikipedia, profiler, theme, SSH runtime) with JSON Schema helpers and the read-only policy.
+The tool platform: provider-agnostic tool contracts and the execution pipeline, the shared tool registry, and the built-in tool sources (git, Termux, system, filesystem, Wikipedia, profiler, theme, SSH runtime, PTY terminal sessions) with JSON Schema helpers and the read-only policy.
 
 ## Role in a dialog
 
@@ -13,7 +13,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 
 ## Public API
 
-`from tool_providers import …`: `filesystem`, `registry`, `runtime_tools`, `universal_tool_platform`.
+`from tool_providers import …`: `filesystem`, `registry`, `runtime_tools`, `tty`, `universal_tool_platform`.
 
 | Module | Purpose |
 | --- | --- |
@@ -21,6 +21,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | [`tool_providers.registry`](registry.py) | Provider-agnostic registry for Logos tools. |
 | [`tool_providers.runtime_tools`](runtime_tools.py) | Universal tool definitions backed by the SSH Runtime. |
 | [`tool_providers.rootagent`](rootagent.py) | Logos tools `rootagent_run` and `rootagent_result` for the Redmi 9 RootAgent job on GitHub Actions. Registered as the `rootagent` external tool source through `composition/tool_sources.py`; not in `__all__`. |
+| [`tool_providers.tty`](tty.py) | PTY terminal sessions (category `tty`): tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list. Owner-checked; opening needs the owner's approval. Not yet verified on the Redmi (Termux). |
 | [`tool_providers.universal_tool_platform`](universal_tool_platform.py) | Provider-agnostic tool contracts and execution pipeline for Logos. |
 
 Other units reach it only through their own ports:

@@ -28,6 +28,7 @@
 | forge | forge/tools.py | 6 | printing3d.quote, printing3d.finance.assess/status/plan.set, printing3d.order.create, printing3d.orders.list, printing3d.treasury.summary |
 | browser | browser/tools.py (composition/tool_sources.py) | 17 | browser_open, browser_read, browser_find, browser_extract, browser_click, browser_fill_form, browser_act, browser_wait, browser_evaluate, browser_screenshot, browser_history, browser_tabs, browser_session, browser_cookies, browser_search, browser_request, browser_download |
 | rootagent | tool_providers/rootagent.py (composition/tool_sources.py) | 2 | rootagent_run (запуск status, probe, capture, move, click как задания GitHub Actions на develop; capture, move, click требуют подтверждения), rootagent_result (статус запуска и JSON-результат по run_id). Настройка и границы — [docs/redmi-root-agent.md](../redmi-root-agent.md#logos-tool) |
+| tty | tool_providers/tty.py (composition/tool_sources.py) | 6 | tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list |
 
 ## Браузер (категория browser)
 
@@ -93,6 +94,38 @@
 - **TLS.** Проверка сертификатов включена. Отключить её может только настройка владельца
   `ignore_tls_errors` (`browser/settings.py`, по умолчанию выключена): модель этот
   аргумент не передаёт и не меняет.
+
+## Терминал PTY (категория tty)
+
+Определены в `tool_providers/tty.py` (`TTY_TOOLS`), подключаются через
+`composition/tool_sources.py` после категории `browser`; доступны в диалоге и через MCP.
+Как и у browser, модели они предлагаются только тогда, когда в списке категорий диалога
+отмечен «Модуль: tty».
+
+**Не проверено на Redmi (Termux).** Путь PTY пока проверен только чтением кода; запуска
+на устройстве и тестов не было (NOT_RUN).
+
+| Инструмент | Что делает |
+| --- | --- |
+| tty_open | Открыть shell на новом псевдотерминале от имени пользователя приложения; возвращает session_id. Требует подтверждения владельца: без него фаза `approval_required` |
+| tty_write | Отправить текст в сессию (строка с `\n` или управляющий символ, например `\u0003` для Ctrl+C). Второго подтверждения нет |
+| tty_read | Вывод с последнего чтения: текст UTF-8 (некорректные байты заменяются), признак завершения shell и код выхода; `max_bytes` ограничивает одно чтение, 0 или не указано — без ограничения |
+| tty_resize | Изменить размер окна сессии (колонки, строки) |
+| tty_close | Закрыть сессию: убить группу процессов shell и освободить псевдотерминал |
+| tty_list | Сессии владельца: pid, каталог, размер окна, завершён ли shell |
+
+- **Владелец.** Сессию открывает владелец вызова (`user_id`, иначе владелец диалога из
+  трассировки). Остальные инструменты работают только с сессиями того же владельца,
+  иначе фаза `authorization`. Вызов без владельца сессию не открывает.
+- **Окружение.** shell — значение `SHELL`, если оно абсолютное, иначе `/bin/sh`.
+  Окружение — только PATH, HOME, LANG, LC_ALL, USER и TERM=xterm-256color; секреты
+  backend в него не попадают. Рабочий каталог — HOME или абсолютный существующий
+  каталог, переданный в `cwd`.
+- **Права.** shell запускается от пользователя приложения; повышения до root, su и sudo нет.
+- **Лимиты.** Таймаута простоя, числа сессий и размера буфера вывода нет (0 — без
+  лимита приложения). Сессии живут в памяти процесса; при штатном завершении процесса
+  открытые сессии закрываются, при аварийном завершении или SIGTERM — нет.
+- **Вывод.** Вывод терминала и аргумент `data` не попадают в трассировку открытым текстом.
 
 ## Bridge-инструменты MCP-сервера (logos_*)
 

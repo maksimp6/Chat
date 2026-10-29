@@ -49,6 +49,12 @@ def _rootagent_tools():
     return ROOTAGENT_TOOLS
 
 
+def _tty_tools():
+    from tool_providers.tty import TTY_TOOLS
+
+    return TTY_TOOLS
+
+
 # (category, loader, log label, exception logged instead of raised)
 SOURCES = (
     ("government", _government_tools, "Government", Exception),
@@ -58,4 +64,5 @@ SOURCES = (
     ("cloud", _cloud_tools, "Cloud tools", Exception),
     ("browser", _browser_tools, "Browser", Exception),
     ("rootagent", _rootagent_tools, "Root agent", Exception),
+    ("tty", _tty_tools, "TTY", Exception),
 )
