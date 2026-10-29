@@ -239,12 +239,217 @@ def open_url(url):
     return component
 
 
-def run_step(step, width, height):
+# --- Kernel-level input through /dev/uinput -------------------------------------
+# This MIUI build silently drops events injected with /system/bin/input (exit 0,
+# no effect), while the uinput mouse is honoured. So taps, swipes, keys and text
+# go through virtual uinput devices that Android reads like real hardware.
+UINPUT = "/dev/uinput"
+UI_SET_EVBIT, UI_SET_KEYBIT, UI_SET_ABSBIT = 0x40045564, 0x40045565, 0x40045567
+UI_SET_PROPBIT, UI_DEV_CREATE, UI_DEV_DESTROY = 0x4004556E, 0x5501, 0x5502
+EV_SYN, EV_KEY, EV_ABS = 0, 1, 3
+BTN_TOUCH, INPUT_PROP_DIRECT = 0x14A, 0x01
+ABS_X, ABS_Y = 0x00, 0x01
+ABS_MT_SLOT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y = 0x2F, 0x35, 0x36
+ABS_MT_TRACKING_ID = 0x39
+KEY_LEFTSHIFT = 42
+# Linux key codes for ASCII on a US layout (Android's Generic.kcm): char -> (code, shift).
+_PLAIN = {
+    **dict(zip("abcdefghijklmnopqrstuvwxyz",
+               (30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38, 50,
+                49, 24, 25, 16, 19, 31, 20, 22, 47, 17, 45, 21, 44))),
+    **dict(zip("1234567890", range(2, 12))),
+    " ": 57, "-": 12, "=": 13, "[": 26, "]": 27, ";": 39, "'": 40, "`": 41,
+    "\\": 43, ",": 51, ".": 52, "/": 53, "\t": 15,
+}
+_SHIFTED = dict(zip('!@#$%^&*()_+{}:"~|<>?', (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+                                              26, 27, 39, 40, 41, 43, 51, 52, 53)))
+ASCII_KEYS = {c: (k, False) for c, k in _PLAIN.items()}
+ASCII_KEYS.update({c.upper(): (k, True) for c, k in _PLAIN.items() if c.isalpha()})
+ASCII_KEYS.update({c: (k, True) for c, k in _SHIFTED.items()})
+# Android key names and numbers -> Linux key codes (Generic.kl).
+ANDROID_KEYS = {
+    "HOME": 172, "BACK": 158, "ENTER": 28, "DEL": 14, "FORWARD_DEL": 111,
+    "TAB": 15, "SPACE": 57, "ESCAPE": 1, "MENU": 139, "POWER": 116,
+    "WAKEUP": 143, "VOLUME_UP": 115, "VOLUME_DOWN": 114, "VOLUME_MUTE": 113,
+    "DPAD_UP": 103, "DPAD_DOWN": 108, "DPAD_LEFT": 105, "DPAD_RIGHT": 106,
+    "APP_SWITCH": 580, "SEARCH": 217, "MOVE_HOME": 102, "MOVE_END": 107,
+    "PAGE_UP": 104, "PAGE_DOWN": 109,
+    **{c.upper(): k for c, k in _PLAIN.items() if c.isalnum()},
+}
+ANDROID_NUMBERS = {
+    3: "HOME", 4: "BACK", 19: "DPAD_UP", 20: "DPAD_DOWN", 21: "DPAD_LEFT",
+    22: "DPAD_RIGHT", 24: "VOLUME_UP", 25: "VOLUME_DOWN", 26: "POWER",
+    61: "TAB", 62: "SPACE", 66: "ENTER", 67: "DEL", 82: "MENU", 84: "SEARCH",
+    111: "ESCAPE", 112: "FORWARD_DEL", 164: "VOLUME_MUTE", 187: "APP_SWITCH",
+    224: "WAKEUP",
+}
+
+
+def linux_key(token):
+    """The Linux key code for KEYCODE_NAME, a bare name, or an Android key number."""
+    text = str(token)
+    if text.isdigit():
+        name = ANDROID_NUMBERS.get(int(text))
+    else:
+        name = text.removeprefix("KEYCODE_")
+    if name not in ANDROID_KEYS:
+        raise AgentError("unsupported_keycode")
+    return ANDROID_KEYS[name]
+
+
+class VirtualDevice:
+    """One uinput device that lives only for this call."""
+
+    def __init__(self, name, keys=(), size=None):
+        import fcntl
+
+        self._ioctl = fcntl.ioctl
+        self.fd = os.open(UINPUT, os.O_WRONLY | os.O_NONBLOCK)
+        try:
+            self._ioctl(self.fd, UI_SET_EVBIT, EV_SYN)
+            absmax = [0] * 64
+            if keys:
+                self._ioctl(self.fd, UI_SET_EVBIT, EV_KEY)
+                for code in keys:
+                    self._ioctl(self.fd, UI_SET_KEYBIT, code)
+            if size:
+                width, height = size
+                self._ioctl(self.fd, UI_SET_EVBIT, EV_KEY)
+                self._ioctl(self.fd, UI_SET_KEYBIT, BTN_TOUCH)
+                self._ioctl(self.fd, UI_SET_EVBIT, EV_ABS)
+                for axis in (ABS_X, ABS_Y, ABS_MT_SLOT, ABS_MT_POSITION_X,
+                             ABS_MT_POSITION_Y, ABS_MT_TRACKING_ID):
+                    self._ioctl(self.fd, UI_SET_ABSBIT, axis)
+                self._ioctl(self.fd, UI_SET_PROPBIT, INPUT_PROP_DIRECT)
+                absmax[ABS_X] = absmax[ABS_MT_POSITION_X] = width - 1
+                absmax[ABS_Y] = absmax[ABS_MT_POSITION_Y] = height - 1
+                absmax[ABS_MT_TRACKING_ID] = 65535
+            # struct uinput_user_dev: name, input_id (BUS_VIRTUAL), ff_effects_max,
+            # absmax, absmin, absfuzz, absflat.
+            os.write(self.fd, struct.pack(
+                "80sHHHHI64i64i64i64i", name.encode("ascii"), 0x06, 0x1D6B, 0x0104,
+                1, 0, *absmax, *([0] * 64), *([0] * 64), *([0] * 64)))
+            self._ioctl(self.fd, UI_DEV_CREATE)
+        except Exception:
+            os.close(self.fd)
+            raise
+        # Android's InputReader needs a moment to add the new device.
+        time.sleep(1.5)
+
+    def emit(self, kind, code, value):
+        os.write(self.fd, struct.pack("llHHi", 0, 0, kind, code, value))
+
+    def sync(self):
+        self.emit(EV_SYN, 0, 0)
+
+    def close(self):
+        time.sleep(0.5)
+        try:
+            self._ioctl(self.fd, UI_DEV_DESTROY)
+        finally:
+            os.close(self.fd)
+
+
+class Injector:
+    """Touch and keyboard input for one call; devices are created on first use."""
+
+    def __init__(self, width, height):
+        self.size = (width, height)
+        self.touch = None
+        self.keys = None
+        self.tracking = 0
+
+    def _touch(self):
+        if self.touch is None:
+            self.touch = VirtualDevice("rootagent-touch", size=self.size)
+        return self.touch
+
+    def _keyboard(self):
+        if self.keys is None:
+            codes = {KEY_LEFTSHIFT, *ANDROID_KEYS.values()}
+            self.keys = VirtualDevice("rootagent-keys", keys=sorted(codes))
+        return self.keys
+
+    def _point(self, device, x, y):
+        device.emit(EV_ABS, ABS_MT_POSITION_X, x)
+        device.emit(EV_ABS, ABS_MT_POSITION_Y, y)
+        device.emit(EV_ABS, ABS_X, x)
+        device.emit(EV_ABS, ABS_Y, y)
+
+    def _down(self, x, y):
+        device = self._touch()
+        self.tracking += 1
+        device.emit(EV_ABS, ABS_MT_SLOT, 0)
+        device.emit(EV_ABS, ABS_MT_TRACKING_ID, self.tracking)
+        self._point(device, x, y)
+        device.emit(EV_KEY, BTN_TOUCH, 1)
+        device.sync()
+        return device
+
+    def _up(self, device):
+        device.emit(EV_ABS, ABS_MT_TRACKING_ID, -1)
+        device.emit(EV_KEY, BTN_TOUCH, 0)
+        device.sync()
+
+    def tap(self, x, y):
+        device = self._down(x, y)
+        time.sleep(0.08)
+        self._up(device)
+        time.sleep(0.15)
+
+    def swipe(self, x, y, x2, y2, duration_ms=300):
+        device = self._down(x, y)
+        steps = max(8, min(120, duration_ms // 16))
+        for index in range(1, steps + 1):
+            self._point(device, x + (x2 - x) * index // steps, y + (y2 - y) * index // steps)
+            device.sync()
+            time.sleep(duration_ms / 1000 / steps)
+        self._up(device)
+        time.sleep(0.15)
+
+    def press(self, code, shift=False):
+        device = self._keyboard()
+        if shift:
+            device.emit(EV_KEY, KEY_LEFTSHIFT, 1)
+            device.sync()
+        device.emit(EV_KEY, code, 1)
+        device.sync()
+        device.emit(EV_KEY, code, 0)
+        device.sync()
+        if shift:
+            device.emit(EV_KEY, KEY_LEFTSHIFT, 0)
+            device.sync()
+        time.sleep(0.03)
+
+    def key(self, token):
+        self.press(linux_key(token))
+
+    def text(self, value):
+        for char in value:
+            self.press(*ASCII_KEYS[char])
+
+    def close(self):
+        for device in (self.touch, self.keys):
+            if device is not None:
+                device.close()
+
+
+def check_text(value):
+    """ASCII on a US layout is what a virtual keyboard can type."""
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > 4096
+        or any(char not in ASCII_KEYS for char in value)
+    ):
+        raise AgentError("text_must_be_ascii_keyboard_characters")
+
+
+def run_step(step, injector, width, height):
     """One user action of a batch: tap, swipe, text, key, wait or browse."""
     if not isinstance(step, dict) or len(step) != 1:
         raise AgentError("invalid_batch_step")
     ((kind, value),) = step.items()
-    input_cmd = "/system/bin/input"
     if kind == "tap":
         if (
             not isinstance(value, list)
@@ -253,7 +458,7 @@ def run_step(step, width, height):
             or not _bounded_int(value[1], 0, height)
         ):
             raise AgentError("invalid_batch_tap")
-        bounded_command([input_cmd, "tap", str(value[0]), str(value[1])])
+        injector.tap(value[0], value[1])
     elif kind == "swipe":
         limits = (width, height, width, height, 60000)
         if (
@@ -262,23 +467,12 @@ def run_step(step, width, height):
             or any(not _bounded_int(v, 0, lim) for v, lim in zip(value, limits))
         ):
             raise AgentError("invalid_batch_swipe")
-        bounded_command([input_cmd, "swipe", *(str(v) for v in value)])
+        injector.swipe(*value[:4], value[4] if len(value) == 5 else 300)
     elif kind == "text":
-        # Android's input text types ASCII only.
-        if (
-            not isinstance(value, str)
-            or not value
-            or len(value) > 4096
-            or not value.isascii()
-            or any(c in value for c in "\x00\n\r")
-        ):
-            raise AgentError("invalid_batch_text")
-        bounded_command([input_cmd, "text", value.replace(" ", "%s")])
+        check_text(value)
+        injector.text(value)
     elif kind == "key":
-        token = str(value) if type(value) is int else value
-        if not isinstance(token, str) or KEYCODE.fullmatch(token) is None:
-            raise AgentError("invalid_batch_key")
-        bounded_command([input_cmd, "keyevent", token])
+        injector.key(value)
     elif kind == "wait":
         if not _bounded_int(value, 0, 120000):
             raise AgentError("invalid_batch_wait")
@@ -305,10 +499,10 @@ def wake_display():
     """
     attempts = []
     actions = (
-        ("keyevent", lambda: bounded_command(
-            ["/system/bin/input", "keyevent", "KEYCODE_WAKEUP"])),
         ("mouse", mouse_nudge),
         ("power_key", press_power_key),
+        ("keyevent", lambda: bounded_command(
+            ["/system/bin/input", "keyevent", "KEYCODE_WAKEUP"])),
     )
     for name, action in actions:
         if wakefulness() == "Awake":
@@ -556,7 +750,11 @@ def worker(request):
         x, y = request["x"], request["y"]
         if not _bounded_int(x, 0, width) or not _bounded_int(y, 0, height):
             raise AgentError("coordinates_out_of_bounds")
-        bounded_command(["/system/bin/input", "tap", str(x), str(y)])
+        injector = Injector(width, height)
+        try:
+            injector.tap(x, y)
+        finally:
+            injector.close()
         return {
             "command": "tap",
             "x": x,
@@ -574,12 +772,13 @@ def worker(request):
         ):
             raise AgentError("coordinates_out_of_bounds")
         duration = request.get("duration_ms")
-        argv = ["/system/bin/input", "swipe", str(x), str(y), str(x2), str(y2)]
-        if duration is not None:
-            if not _bounded_int(duration, 1, 60000):
-                raise AgentError("invalid_swipe_duration")
-            argv.append(str(duration))
-        bounded_command(argv)
+        if duration is not None and not _bounded_int(duration, 1, 60000):
+            raise AgentError("invalid_swipe_duration")
+        injector = Injector(width, height)
+        try:
+            injector.swipe(x, y, x2, y2, duration or 300)
+        finally:
+            injector.close()
         return {
             "command": "swipe",
             "from": [x, y],
@@ -591,10 +790,12 @@ def worker(request):
         }
     if command == "text":
         value = request["text"]
-        if not isinstance(value, str) or not value or len(value) > 4096:
-            raise AgentError("invalid_text")
-        # argv, never a shell; Android input text reads a space as %s.
-        bounded_command(["/system/bin/input", "text", value.replace(" ", "%s")])
+        check_text(value)
+        injector = Injector(*screen_size())
+        try:
+            injector.text(value)
+        finally:
+            injector.close()
         # The text itself is the owner's input and is never echoed into the result.
         return {
             "command": "text",
@@ -610,7 +811,11 @@ def worker(request):
             token = code
         else:
             raise AgentError("invalid_keycode")
-        bounded_command(["/system/bin/input", "keyevent", token])
+        injector = Injector(*screen_size())
+        try:
+            injector.key(token)
+        finally:
+            injector.close()
         return {
             "command": "key",
             "keycode": token,
@@ -664,7 +869,11 @@ def worker(request):
         except AgentError:
             pass
         width, height = screen_size()
-        done = [run_step(step, width, height) for step in steps]
+        injector = Injector(width, height)
+        try:
+            done = [run_step(step, injector, width, height) for step in steps]
+        finally:
+            injector.close()
         png = bounded_command(["/system/bin/screencap", "-p"], PNG_LIMIT, 15)
         metadata = validate_png(png)
         state = screen_state()
