@@ -49,7 +49,6 @@
   "git_status": "branch",
   "glob_search": "search",
   "grep_search": "search",
-  "helper_delegate": "person",
   "http_fetch": "search",
   "inspect_app_internals": "info",
   "list_contacts": "person",

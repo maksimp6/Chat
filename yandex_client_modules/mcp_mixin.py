@@ -68,24 +68,12 @@ CACHE_NOTE = (
     "пользователю целиком, а после него — как ты видишь этот ход: что пришло на вход, "
     "какие инструкции и инструменты ты видишь, на что опирается ответ и в чём ты не "
     "уверен. Затем дай пользователю тот же ответ. Если cache_append вернул ошибку, "
-    "embedding_errors или index_errors, сообщи об этом в ответе дословно. Когда нужен "
-    "прежний контекст или прежние твои ответы, читай кэш через cache_read — он "
-    "всегда отдаёт весь текст целиком — и ищи в нём через cache_search."
+    "embedding_errors или index_errors, сообщи об этом в ответе дословно. Чтобы найти "
+    "в кэше прежний контекст или прежние твои ответы, вызови cache_search: поиск "
+    "выполняет модель-помощник, которую ты выбираешь, — она читает весь кэш и "
+    "возвращает найденные места дословно с их заголовками; её ответ проверяй, её "
+    "ошибки называй дословно. cache_read всегда отдаёт весь текст кэша целиком."
 )
-
-# The helper tool (tool_providers/helper.py) lets the model hand parts of the work to
-# another model; without a note the model would not know it may delegate.
-HELPER_NOTE = (
-    "\n\nВ этом диалоге есть модель-помощник (инструмент helper_delegate): ей можно "
-    "поручить часть работы. Помощник выполняет полный ход Логоса с теми же "
-    "инструментами, в своём разговоре, и возвращает ответ. Делегируй ему задачи, "
-    "которые можно сделать отдельно или параллельно (поиск, разбор материалов, "
-    "проверку, черновик), и выбирай модель под задачу. Помощник не видит этот диалог: "
-    "передавай задачу целиком и нужный контекст. Чтобы продолжить с тем же "
-    "помощником, передай helper_conversation_id из прежнего результата. Ответ "
-    "помощника проверяй и не выдавай за свой без проверки; его ошибки называй дословно."
-)
-
 
 class YandexMcpMixin:
     def _execute_single_tool(
@@ -431,12 +419,6 @@ class YandexMcpMixin:
             ask_params["instructions"] = (
                 ask_params.get("instructions") or ""
             ) + CACHE_NOTE
-        if execution_policy is None and any(
-            tool.get("name") == "helper_delegate" for tool in local_tools
-        ):
-            ask_params["instructions"] = (
-                ask_params.get("instructions") or ""
-            ) + HELPER_NOTE
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
         if not tools and ask_params.get("tool_choice") == "required":

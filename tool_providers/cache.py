@@ -1,18 +1,22 @@
 """The Logos cache: one long text that only grows (category ``cache``).
 
 ``CACHE_TOOLS`` holds three tools: ``cache_append`` adds text to the end,
-``cache_read`` reads the whole text (it is only read in full) and ``cache_search`` finds places in
-it by substring, regular expression or meaning. The model and other tools write to
-one text shared by every dialog. Nothing in it is ever changed or removed.
+``cache_read`` reads the whole text (it is only read in full) and ``cache_search``
+hands a question to a helper model, which reads the whole text and answers with what
+it found there. The model and other tools write to one text shared by every dialog.
+Nothing in it is ever changed or removed.
 
 Each append is one piece of the text: a heading line (time, source, dialog) and the
 appended text. Every piece is embedded with each model of ``EMBEDDING_MODELS`` (v2
 models at their largest size); the vectors are kept beside the text with the model
 URI each came from, so the version of every embedding model is recorded. A model
 that fails is listed in the piece's ``embedding_errors``; the text is appended either
-way. A semantic search embeds the question with the query models and compares it
-with each piece: a document vector with its paired query model, a query vector with
-the same model.
+way.
+
+The search is a helper model (one of ``TEXT_MODELS``, chosen by the caller): it gets
+the whole cache text and the question in one provider request without tools, and its
+answer is returned with the request's status, errors and usage. The request is
+recorded on the caller's execution trace.
 
 The whole text is in the index: after every append it is uploaded as one file
 (``logos-cache.md``) to each knowledge vector store (``knowledge_vector_store_ids``),
@@ -31,7 +35,6 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import json
-import re
 import threading
 from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime
@@ -40,7 +43,6 @@ from typing import Any
 
 from tool_providers.host import (
     bound,
-    cosine_similarity,
     embed_texts,
     knowledge_vector_store_ids,
     memory_file_path,
@@ -51,7 +53,17 @@ CACHE_FILE_NAME = "logos.cache.md"
 VECTORS_FILE_NAME = "logos.cache.vectors.jsonl"
 INDEX_STATE_FILE_NAME = "logos.cache.index.json"
 INDEX_FILE_NAME = "logos-cache.md"
-SEARCH_MODES = ("all", "text", "regex", "semantic")
+# The dialog settings' own maximum is "high"; "xhigh" is offered where the model has it.
+REASONING_EFFORTS = ("high", "xhigh", "medium", "low", "minimal", "none")
+SEARCH_ROLE = (
+    "Ты — модель-помощник Логоса для поиска в кэше. Кэш — один длинный текст, который "
+    "только растёт: в него дописывают модель и инструменты всех диалогов; каждый кусок "
+    "начинается строкой «## время · источник · диалог». Тебе дан весь текст кэша и "
+    "запрос основной модели. Найди в кэше всё, что относится к запросу, и верни: "
+    "найденные места дословно, с заголовками их кусков (время, источник, диалог), и "
+    "краткий вывод по запросу. Опирайся только на текст кэша; если в нём ничего "
+    "подходящего нет, так и скажи. Не придумывай записи, даты и источники."
+)
 _TRANSPORTS = ["responses_api", "local_agent", "mcp"]
 _text_lock = threading.Lock()
 _index_lock = threading.Lock()
@@ -85,14 +97,6 @@ def _locked(lock: threading.Lock, path: Path) -> Iterator[None]:
 def _read_text() -> str:
     path = cache_file_path()
     return path.read_text(encoding="utf-8") if path.exists() else ""
-
-
-def _read_pieces() -> list[dict[str, Any]]:
-    path = _vectors_path()
-    if not path.exists():
-        return []
-    with path.open("r", encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
 
 
 # ---------------------------------------------------------------------------
@@ -136,11 +140,6 @@ def _largest_dimensions(name: str, spec: Mapping[str, Any]) -> int | None:
         return None
     sizes = [size for size in spec.get("dimensions") or () if type(size) is int]
     return max(sizes) if sizes else None
-
-
-def _query_model_for(name: str) -> str:
-    """The model that embeds a question compared with vectors of ``name``."""
-    return name[: -len("-doc")] + "-query" if name.endswith("-doc") else name
 
 
 def _embed(text: str, name: str, spec: Mapping[str, Any], trace: Any) -> dict[str, Any]:
@@ -315,130 +314,44 @@ def cache_read(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, 
     }
 
 
-def _text_hits(text: str, query: str, pattern: re.Pattern[str] | None) -> list[int]:
-    if pattern is not None:
-        return [match.start() for match in pattern.finditer(text)]
-    hits, needle, haystack = [], query.casefold(), text.casefold()
-    position = haystack.find(needle)
-    while position != -1:
-        hits.append(position)
-        position = haystack.find(needle, position + 1)
-    return hits
-
-
-def _piece_at(pieces: list[dict[str, Any]], position: int) -> int | None:
-    for number, piece in enumerate(pieces):
-        start = piece.get("start") or 0
-        if start <= position < start + (piece.get("chars") or 0):
-            return number
-    return None
-
-
 def cache_search(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
-    """Find places in the cache by substring, regular expression or meaning."""
+    """A helper model reads the whole cache and answers what it found for the query."""
     arguments = arguments if isinstance(arguments, Mapping) else {}
     query = arguments.get("query")
     if not isinstance(query, str) or not query.strip():
         return _failure("query must be a non-empty string", "validation")
-    mode = arguments.get("mode") or "all"
-    if mode not in SEARCH_MODES:
-        return _failure(f"mode must be one of {', '.join(SEARCH_MODES)}", "validation")
-    models = _embedding_models()
-    rank_by = arguments.get("rank_by") or "mean"
-    if rank_by != "mean" and rank_by not in models:
-        return _failure("rank_by must be mean or an embedding model", "validation")
-    limit = arguments.get("limit") or 0
-    if type(limit) is not int or limit < 0:
-        return _failure("limit must be an integer of 0 or more", "validation")
-    pattern = None
-    if mode == "regex":
-        try:
-            pattern = re.compile(query, re.IGNORECASE)
-        except re.error as exc:
-            return _failure(f"invalid regular expression: {exc}", "validation")
+    model = arguments.get("model")
+    models = dict(bound.TEXT_MODELS)
+    if model not in models:
+        return _failure(
+            "model must be one of the text models", "validation", models=sorted(models)
+        )
+    effort = arguments.get("reasoning_effort") or "high"
+    if effort not in REASONING_EFFORTS:
+        return _failure("unknown reasoning_effort", "validation")
 
     text = _read_text()
-    pieces = _read_pieces()
-    hits = _text_hits(text, query, pattern) if mode != "semantic" else []
-    matched = {_piece_at(pieces, position) for position in hits}
-
-    if mode in ("text", "regex"):
-        results: list[dict[str, Any]] = []
-        for position in hits[:limit] if limit else hits:
-            number = _piece_at(pieces, position)
-            results.append(
-                {
-                    "position": position,
-                    "piece": None
-                    if number is None
-                    else _piece_public(pieces[number], text),
-                }
-            )
-        return {
-            "success": True,
-            "path": str(cache_file_path()),
-            "mode": mode,
-            "total_chars": len(text),
-            "matches": len(hits),
-            "results": results,
-        }
-
-    trace = _trace_of(cfg)
-    query_vectors: dict[str, Any] = {}
-    tokens = 0
-    for name in dict.fromkeys(_query_model_for(name) for name in models):
-        if name not in models:
-            continue
-        record = _embed(query, name, models[name], trace)
-        tokens += record.get("tokens") or 0
-        if "error" in record:
-            return _failure(
-                f"the query was not embedded with {name}: {record['message']}",
-                "execution",
-                code=record["error"],
-                model=name,
-                embedding_tokens=tokens,
-            )
-        query_vectors[name] = record["vector"]
-
-    ranked = []
-    for number, piece in enumerate(pieces):
-        scores = {}
-        for name, record in (piece.get("embeddings") or {}).items():
-            vector = query_vectors.get(_query_model_for(name))
-            if vector is not None and isinstance(record.get("vector"), list):
-                scores[name] = cosine_similarity(vector, record["vector"])
-        if rank_by == "mean":
-            score = sum(scores.values()) / len(scores) if scores else None
-        else:
-            score = scores.get(rank_by)
-        ranked.append(
-            {
-                "score": score,
-                "scores": scores,
-                "text_match": number in matched,
-                "piece": _piece_public(piece, text),
-            }
-        )
-    ranked.sort(
-        key=lambda item: (
-            item["score"] is not None,
-            mode == "all" and item["text_match"],
-            item["score"] if item["score"] is not None else 0.0,
-        ),
-        reverse=True,
+    client = bound.YandexResponsesClient(bound.Config)
+    response = client.ask(
+        f"Запрос основной модели:\n{query.strip()}\n\n"
+        f"Весь текст кэша ({len(text)} символов):\n\n{text}",
+        model,
+        params={"instructions": SEARCH_ROLE, "reasoning_effort": effort},
+        execution_trace=_trace_of(cfg),
     )
-    if limit:
-        ranked = ranked[:limit]
+    reasoning, answer = client.extract_reasoning_and_text(response)
     return {
         "success": True,
         "path": str(cache_file_path()),
-        "mode": mode,
-        "rank_by": rank_by,
         "total_chars": len(text),
-        "matches": len(hits),
-        "query_embedding_tokens": tokens,
-        "results": ranked,
+        "model": model,
+        "response_id": response.get("id"),
+        "status": response.get("status"),
+        "error": response.get("error"),
+        "incomplete_details": response.get("incomplete_details"),
+        "answer": answer,
+        "reasoning": reasoning,
+        "usage": client.extract_usage(response),
     }
 
 
@@ -514,48 +427,35 @@ CACHE_TOOLS: dict[str, dict[str, Any]] = {
     "cache_search": _definition(
         title="Cache: search",
         description=(
-            "Search the cache text. mode text: substring, regex: regular expression "
-            "(both case-insensitive; every match with its position and the appended "
-            "piece it is in); semantic: every appended piece ranked by cosine similarity "
-            "in each embedding model; all (when not given): semantic ranking with text "
-            "matches first. rank_by: mean of the models (when not given) or one model."
+            "Search the cache with a helper model: it reads the whole cache text and "
+            "answers the query with the places it found, quoted with their headings "
+            "(time, source, dialog), and a short conclusion. Choose the helper model "
+            "for the search."
         ),
         parameters=object_schema(
             {
                 "query": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "What to find",
+                    "description": "What to find in the cache, in full",
                 },
-                "mode": _optional(
+                "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": (
+                        "Text model key of the helper, e.g. deepseek-v4.1-flash, "
+                        "logos-runtime, yandexgpt-5.1, qwen3.6-35b-a3b"
+                    ),
+                },
+                "reasoning_effort": _optional(
                     {
                         "type": "string",
-                        "enum": list(SEARCH_MODES),
-                        "description": "all when not given",
-                    }
-                ),
-                "rank_by": _optional(
-                    {
-                        "type": "string",
-                        "enum": [
-                            "mean",
-                            "text-search-doc",
-                            "text-search-query",
-                            "text-embeddings-v2-doc",
-                            "text-embeddings-v2-query",
-                        ],
-                        "description": "Ranking score: mean (when not given) or one model",
-                    }
-                ),
-                "limit": _optional(
-                    {
-                        "type": "integer",
-                        "minimum": 0,
-                        "description": "Results to return; 0 or not given: all",
+                        "enum": list(REASONING_EFFORTS),
+                        "description": "Helper's reasoning depth: high when not given",
                     }
                 ),
             },
-            ["query"],
+            ["query", "model"],
         ),
         read_only=True,
         func=cache_search,
@@ -567,7 +467,8 @@ __all__ = [
     "CACHE_FILE_NAME",
     "CACHE_TOOLS",
     "INDEX_FILE_NAME",
-    "SEARCH_MODES",
+    "REASONING_EFFORTS",
+    "SEARCH_ROLE",
     "cache_append",
     "cache_file_path",
     "cache_read",

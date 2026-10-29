@@ -813,14 +813,12 @@ def _tool_providers():
     from core.config import EMBEDDING_MODELS
     from yandex_client_modules.embeddings import EmbeddingError
     from kristall import KristallError
-    from chat.mcp_routes import LogosClient
     from remote_runtime.ssh import SSHRuntimeError
     from core.config import TEXT_MODELS
     from yandex_client_modules.errors import YandexClientError
     from yandex_client_modules.client import YandexResponsesClient
     from remote_runtime.ssh_settings import assert_operation_allowed
     from remote_runtime.ssh_settings import build_runtime
-    from yandex_client_modules.embeddings import cosine_similarity
     from yandex_client_modules.embeddings import embed_texts
     from agent_runtime.local_gateway import enqueue_local_tool_job
     from composition.tool_sources import SOURCES as external_tool_sources
@@ -834,14 +832,12 @@ def _tool_providers():
         EMBEDDING_MODELS=EMBEDDING_MODELS,
         EmbeddingError=EmbeddingError,
         KristallError=KristallError,
-        LogosClient=LogosClient,
         SSHRuntimeError=SSHRuntimeError,
         TEXT_MODELS=TEXT_MODELS,
         YandexClientError=YandexClientError,
         YandexResponsesClient=YandexResponsesClient,
         assert_operation_allowed=assert_operation_allowed,
         build_runtime=build_runtime,
-        cosine_similarity=cosine_similarity,
         embed_texts=embed_texts,
         enqueue_local_tool_job=enqueue_local_tool_job,
         external_tool_sources=external_tool_sources,
