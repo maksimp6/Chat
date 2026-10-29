@@ -439,6 +439,22 @@ class Injector:
                 device.close()
 
 
+def input_report(text):
+    """The parts of dumpsys input that explain where injected touches went."""
+    lines = text.splitlines()
+    keep = []
+    for index, line in enumerate(lines):
+        if "rootagent" in line:
+            keep.extend(lines[max(0, index - 1) : index + 40])
+    marker = next(
+        (i for i, line in enumerate(lines) if "Input Dispatcher State" in line), None
+    )
+    if marker is not None:
+        keep.append("----")
+        keep.extend(lines[marker : marker + 120])
+    return "\n".join(keep)[:60000]
+
+
 def check_text(value):
     """ASCII on a US layout is what a virtual keyboard can type."""
     if (
@@ -450,7 +466,7 @@ def check_text(value):
         raise AgentError("text_must_be_ascii_keyboard_characters")
 
 
-def run_step(step, injector, width, height):
+def run_step(step, injector, width, height, diagnostics=None):
     """One user action of a batch: tap, swipe, text, key, wait or browse."""
     if not isinstance(step, dict) or len(step) != 1:
         raise AgentError("invalid_batch_step")
@@ -478,6 +494,13 @@ def run_step(step, injector, width, height):
         injector.text(value)
     elif kind == "key":
         injector.key(value)
+    elif kind == "diag":
+        # dumpsys input while this call's virtual devices exist: whether Android
+        # registered them, which display they map to, and where events went.
+        if diagnostics is None:
+            raise AgentError("invalid_batch_step")
+        report = bounded_command(["/system/bin/dumpsys", "input"], 4 * 1024 * 1024, 15)
+        diagnostics.append(input_report(report.decode("utf-8", "replace")))
     elif kind == "wait":
         if not _bounded_int(value, 0, 120000):
             raise AgentError("invalid_batch_wait")
@@ -875,8 +898,9 @@ def worker(request):
             pass
         width, height = screen_size()
         injector = Injector(width, height)
+        diagnostics = []
         try:
-            done = [run_step(step, injector, width, height) for step in steps]
+            done = [run_step(step, injector, width, height, diagnostics) for step in steps]
         finally:
             injector.close()
         png = bounded_command(["/system/bin/screencap", "-p"], PNG_LIMIT, 15)
@@ -886,6 +910,7 @@ def worker(request):
             **metadata,
             "command": "batch",
             "steps_done": done,
+            "diagnostics": diagnostics,
             "wakefulness": woken,
             "wake_attempts": wake_attempts,
             "display_on": state["display_on"],
