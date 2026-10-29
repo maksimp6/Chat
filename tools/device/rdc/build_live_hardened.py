@@ -17,7 +17,6 @@ DEST = BASE / "hardening-v1"
 EXPECTED = {
     "android_live_server.py": "d65962c0b1320e02e0b2a8d0185c0d825d4608bc6cbdddebda3f63fdc39ebd8e",
     "android_actions.py": "48ab9da0823d7a9a634b5501feae44561cd52c7332e7f3d7c7222bdbd5b3af2c",
-    "android_accessibility.py": "1f0f8e62cd81ff70176cdfe04a3951a59c6b01d56ca77122a47b4aa3d9f95bf6",
 }
 
 
@@ -105,40 +104,6 @@ def keyguard_state(window_dump):
     return s
 
 
-def build_accessibility(s):
-    s = replace(s, "import re\n", "import re\nimport secrets\n", "accessibility dependencies")
-    start = s.index("def read_accessibility():")
-    end = s.index("    nodes = []", start)
-    replacement = '''def read_accessibility(serial):
-    """Dump XML to private shell-owned temp and clean it on every exit.
-
-    Never use public /sdcard paths, serial is from the Live Server's pinned
-    device check; no screen text is printed to logs.
-    """
-    if not isinstance(serial,str) or not re.fullmatch(r"[A-Za-z0-9._:-]{5,100}",serial):
-        raise RuntimeError("Untrusted accessibility device")
-    temporary="/data/local/tmp/logos-live-ui-"+secrets.token_hex(12)+".xml"
-    prefix=["adb","-s",serial]
-    try:
-        result=subprocess.run(prefix+["shell","uiautomator","dump",temporary],
-                              capture_output=True,timeout=15)
-        if result.returncode:
-            raise RuntimeError("UI hierarchy unavailable")
-        result=subprocess.run(prefix+["exec-out","cat",temporary],
-                              capture_output=True,timeout=8,check=True)
-        if len(result.stdout)>2_000_000:
-            raise RuntimeError("UI hierarchy too large")
-        root=ET.fromstring(result.stdout)
-    finally:
-        cleanup=subprocess.run(prefix+["shell","rm","-f",temporary],
-                               capture_output=True,timeout=6)
-        if cleanup.returncode:
-            raise RuntimeError("UI hierarchy cleanup failed")
-'''
-    s = s[:start] + replacement + s[end:]
-    return s
-
-
 def build_server(s):
     s = replace(s, "from android_dom_diff import diff as dom_diff\n", "", "remove raw DOM diff")
     s = replace(s, "from android_state_merge import StateMerger\n", "", "remove raw StateMerger")
@@ -149,6 +114,13 @@ def build_server(s):
         "from android_public_tree import public_tree\n",
         "from android_public_tree import public_tree\nfrom android_screen_dom import build as build_ocr_dom\n",
         "safe OCR presentation",
+    )
+    # The screen tree comes from our screen reader (android_screen_dom), not uiautomator.
+    s = replace(
+        s,
+        "from android_accessibility import read_accessibility\n",
+        "",
+        "remove uiautomator hierarchy",
     )
     s = replace(
         s,
@@ -182,6 +154,11 @@ CAPTURE_STATE""",
         self._verified_serial=serial
         return status
 
+    def read_screen(self):
+        """The screen tree from our screen reader: a fresh screenshot read into nodes."""
+        execute([ACTIONS,"screenshot"])
+        return build_ocr_dom(IMAGE)
+
     def safe_screen(self):
         """No observation or generic actions while Keyguard is showing."""
         status=self.bound_status()
@@ -191,9 +168,8 @@ CAPTURE_STATE""",
     )
     if s.count("hierarchy = read_accessibility()") != 2:
         raise AssertionError("expected two accessibility handlers")
-    s = s.replace(
-        "hierarchy = read_accessibility()", "hierarchy = read_accessibility(self._verified_serial)"
-    )
+    s = s.replace("hierarchy = read_accessibility()", "hierarchy = self.read_screen()")
+    s = s.replace('"source": "uiautomator"', '"source": "screen_reader"')
     s = replace(
         s,
         """            if path == "/status":
@@ -301,7 +277,6 @@ def main():
         edits = {
             "android_live_server.py": build_server,
             "android_actions.py": build_actions,
-            "android_accessibility.py": build_accessibility,
         }
         for name, change in edits.items():
             s = (BASE / name).read_text(encoding="utf-8")

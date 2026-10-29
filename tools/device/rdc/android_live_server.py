@@ -11,7 +11,6 @@ import sys
 import time
 import threading
 from android_delta import DeltaDetector
-from android_accessibility import read_accessibility
 from android_public_tree import public_tree
 from android_screen_dom import build as build_ocr_dom
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -71,6 +70,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send(401, {"error": "unauthorized"})
             return False
         return True
+
+    def read_screen(self):
+        """The screen tree from our screen reader: a fresh screenshot read into nodes."""
+        execute([ACTIONS, "screenshot"])
+        return build_ocr_dom(IMAGE)
 
     def bound_status(self):
         """Re-evaluate device binding on every request, keep identity private."""
@@ -142,7 +146,7 @@ class Handler(BaseHTTPRequestHandler):
                 with FRAME_LOCK:
                     if not self.safe_screen():
                         return self.send(403, {"error": "device_not_authorized"})
-                    hierarchy = read_accessibility(self._verified_serial)
+                    hierarchy = self.read_screen()
                     if not self.safe_screen():
                         return self.send(409, {"error": "screen_changed"})
                     tree = public_tree(hierarchy)
@@ -151,7 +155,7 @@ class Handler(BaseHTTPRequestHandler):
                 with FRAME_LOCK:
                     if not self.safe_screen():
                         return self.send(403, {"error": "device_not_authorized"})
-                    hierarchy = read_accessibility(self._verified_serial)
+                    hierarchy = self.read_screen()
                     if not self.safe_screen():
                         return self.send(409, {"error": "screen_changed"})
                 roles = {
@@ -161,7 +165,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(
                     200,
                     {
-                        "source": "uiautomator",
+                        "source": "screen_reader",
                         "count": hierarchy["count"],
                         "roles": roles,
                         "redacted": True,
