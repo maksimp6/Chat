@@ -436,8 +436,12 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'rootagent_command' && github.ref == 'refs/heads/develop'
     runs-on: redmi9
     timeout-minutes: 8
+    # This phone runner cannot execute Node20 JS actions (actions/upload-artifact
+    # fails at job setup), so the result and any PNG are published to the
+    # rootagent-results branch through the GitHub API with pure Python, like every
+    # other job here. contents: write is needed only for that results branch.
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Validate the RootAgent request before anything runs
         id: request
@@ -581,36 +585,72 @@ jobs:
           fi
           cat "$result"
 
-      - name: Ensure a result file exists
+      - name: Publish the RootAgent result through the GitHub API
         if: always()
         shell: bash
-        timeout-minutes: 1
+        timeout-minutes: 2
+        env:
+          # The token and these runner paths are not request payload; the request
+          # itself still travels only in the --request JSON file.
+          GH_TOKEN: ${{ github.token }}
+          MEDIA: ${{ steps.media.outputs.media }}
+          REQUEST_OK: ${{ steps.request.outputs.ok }}
+          RUN_OUTCOME: ${{ steps.run.outcome }}
+          IS_CAPTURE: ${{ steps.request.outputs.command == 'capture' && steps.media.outcome == 'success' }}
         run: |
           set -uo pipefail
           result="$RUNNER_TEMP/rootagent-result.json"
           if [ ! -s "$result" ]; then
             printf '{"ok":false,"stage":"job","request_ok":"%s","run_outcome":"%s"}\n' \
-              "${{ steps.request.outputs.ok }}" "${{ steps.run.outcome }}" > "$result"
+              "$REQUEST_OK" "$RUN_OUTCOME" > "$result"
           fi
           cat "$result"
+          python -I - <<'PY'
+          import base64, json, os, urllib.error, urllib.request
 
-      - name: Upload the RootAgent result as a workflow artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rootagent-command-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/rootagent-result.json
-          retention-days: 1
-          if-no-files-found: warn
+          api = "https://api.github.com/repos/" + os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          branch = "rootagent-results"
+          run_id = os.environ["GITHUB_RUN_ID"]
+          temp = os.environ["RUNNER_TEMP"]
 
-      - name: Upload the captured PNG as a workflow artifact
-        if: always() && steps.request.outputs.command == 'capture' && steps.media.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: rootagent-capture-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ steps.media.outputs.media }}/rootagent-capture.png
-          retention-days: 1
-          if-no-files-found: ignore
+          def call(method, url, body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              request = urllib.request.Request(url, data=data, method=method, headers={
+                  "Authorization": "token " + token,
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "logos-rootagent"})
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      return response.status, json.loads(response.read() or b"null")
+              except urllib.error.HTTPError as error:
+                  return error.code, None
+
+          code, _ = call("GET", f"{api}/git/ref/heads/{branch}")
+          if code == 404:
+              _, ref = call("GET", f"{api}/git/ref/heads/develop")
+              call("POST", f"{api}/git/refs",
+                   {"ref": f"refs/heads/{branch}", "sha": ref["object"]["sha"]})
+
+          def publish(path, raw, message):
+              content = base64.b64encode(raw).decode("ascii")
+              code, info = call("GET", f"{api}/contents/{path}?ref={branch}")
+              body = {"message": message, "content": content, "branch": branch}
+              if code == 200 and isinstance(info, dict) and info.get("sha"):
+                  body["sha"] = info["sha"]
+              status, _ = call("PUT", f"{api}/contents/{path}", body)
+              print(f"published {path}: HTTP {status}")
+
+          with open(os.path.join(temp, "rootagent-result.json"), "rb") as handle:
+              publish(f"runs/{run_id}.json", handle.read(), f"rootagent result {run_id}")
+
+          if os.environ.get("IS_CAPTURE") == "true":
+              png = os.path.join(os.environ.get("MEDIA", ""), "rootagent-capture.png")
+              if os.path.isfile(png):
+                  with open(png, "rb") as handle:
+                      publish(f"runs/{run_id}.png", handle.read(), f"rootagent capture {run_id}")
+          PY
 
       - name: Unmount the RAM disk
         if: always() && steps.media.outcome != 'skipped'

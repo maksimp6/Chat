@@ -14,14 +14,15 @@ never returned, logged or written into an error text.
 
 from __future__ import annotations
 
-import io
+import base64
+import binascii
+import hashlib
 import json
 import os
 import re
 import urllib.error
 import urllib.parse
 import urllib.request
-import zipfile
 from typing import Any, Mapping
 
 from tool_providers.schema import object_schema
@@ -54,10 +55,9 @@ PACKAGE = re.compile(PACKAGE_PATTERN)
 KEYCODE_PATTERN = r"KEYCODE_[A-Z0-9_]+|[0-9]{1,4}"
 KEYCODE = re.compile(KEYCODE_PATTERN)
 REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
-RESULT_ARTIFACT = "rootagent-command"
-CAPTURE_ARTIFACT = "rootagent-capture"
-RESULT_FILE = "rootagent-result.json"
-REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
+# The phone runner cannot run Node20 JS actions, so the job publishes its result
+# and any PNG to this branch through the GitHub API instead of as artifacts.
+RESULTS_BRANCH = "rootagent-results"
 
 
 class _Failure(Exception):
@@ -235,61 +235,32 @@ def _dispatched_run(raw: bytes) -> tuple[int | None, str | None]:
     return payload["workflow_run_id"], html if isinstance(html, str) else None
 
 
-def _artifact_archive(url: str, token: str) -> bytes:
-    """The artifact zip. GitHub redirects to a signed URL, and that hop carries no token."""
+def _results_file(
+    owner: str, name: str, token: str, path: str
+) -> tuple[bool, bytes | None]:
+    """Read one file from the rootagent-results branch via the contents API.
+
+    Returns (found, bytes). A 404 means the job has not published it yet.
+    """
+    quoted = urllib.parse.quote(path)
+    url = _repository_url(owner, name, f"contents/{quoted}?ref={RESULTS_BRANCH}")
     try:
-        _, data = _github("GET", url, token)
-        return data
+        _, raw = _github("GET", url, token)
     except urllib.error.HTTPError as error:
-        location = error.headers.get("Location") if error.code in REDIRECT_CODES else None
-        if location is None:
-            raise _http_failure(error, token) from None
+        if error.code == 404:
+            return False, None
+        raise _http_failure(error, token) from None
     except Exception as error:
         raise _Failure(
-            f"Не удалось скачать артефакт результата ({type(error).__name__})", "execution"
+            f"GitHub не ответил на чтение результата ({type(error).__name__})", "execution"
         ) from None
-    if urllib.parse.urlsplit(location).scheme != "https":
-        raise _Failure("Адрес загрузки артефакта не https: артефакт не прочитан", "execution")
     try:
-        request = urllib.request.Request(location, headers={"User-Agent": "logos-rootagent"})
-        with urllib.request.urlopen(request, timeout=API_TIMEOUT_SECONDS) as response:
-            return response.read()
-    except Exception as error:
-        raise _Failure(
-            f"Не удалось скачать артефакт результата ({type(error).__name__})", "execution"
-        ) from None
-
-
-def _result_json(artifact: Mapping[str, Any], token: str) -> Any:
-    url = artifact.get("archive_download_url")
-    if not isinstance(url, str) or not url.startswith(API + "/"):
-        raise _Failure("Артефакт результата без адреса загрузки", "execution")
-    data = _artifact_archive(url, token)
-    try:
-        with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            payload = archive.read(RESULT_FILE)
-        return json.loads(payload)
-    except (KeyError, ValueError, OSError, RuntimeError, zipfile.BadZipFile):
-        raise _Failure(
-            f"Артефакт результата не содержит читаемый {RESULT_FILE}", "execution"
-        ) from None
-
-
-def _latest(artifacts: list, prefix: str) -> dict[str, Any] | None:
-    matches = [
-        item
-        for item in artifacts
-        if isinstance(item, dict) and str(item.get("name") or "").startswith(prefix)
-    ]
-    return max(matches, key=lambda item: str(item.get("created_at") or ""), default=None)
-
-
-def _artifact_summary(item: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "name": item.get("name"),
-        "size_in_bytes": item.get("size_in_bytes"),
-        "expired": bool(item.get("expired")),
-    }
+        payload = json.loads(raw)
+        if payload.get("encoding") != "base64":
+            raise ValueError
+        return True, base64.b64decode(payload["content"])
+    except (ValueError, KeyError, TypeError, binascii.Error):
+        raise _Failure("GitHub вернул результат в неверном виде", "execution") from None
 
 
 def rootagent_run(
@@ -370,30 +341,31 @@ def rootagent_result(
             "status": run.get("status"),
             "conclusion": run.get("conclusion"),
             "run_url": run.get("html_url"),
-            "artifacts": [],
             "result": None,
+            "capture": None,
         }
         if run.get("status") != "completed":
             return result
-        listing = _api_json(
-            owner, name, token, f"actions/runs/{run_id}/artifacts?per_page=100"
-        )
-        found = listing.get("artifacts") if isinstance(listing, dict) else None
-        if not isinstance(found, list):
-            raise _Failure("GitHub вернул список артефактов в неверном виде", "execution")
-        result_artifact = _latest(found, f"{RESULT_ARTIFACT}-{run_id}-")
-        capture_artifact = _latest(found, f"{CAPTURE_ARTIFACT}-{run_id}-")
-        result["artifacts"] = [
-            _artifact_summary(item)
-            for item in (result_artifact, capture_artifact)
-            if item is not None
-        ]
-        if result_artifact is None:
-            result["note"] = "Артефакт результата не найден: команда не записала результат"
-        elif result_artifact.get("expired"):
-            result["note"] = "Артефакт результата истёк по сроку хранения"
-        else:
-            result["result"] = _result_json(result_artifact, token)
+        found, raw = _results_file(owner, name, token, f"runs/{run_id}.json")
+        if not found or raw is None:
+            result["note"] = (
+                "Результат ещё не опубликован на ветке rootagent-results; "
+                "повторите чтение немного позже"
+            )
+            return result
+        try:
+            result["result"] = json.loads(raw)
+        except ValueError:
+            raise _Failure("Опубликованный результат не JSON", "execution") from None
+        png_found, png = _results_file(owner, name, token, f"runs/{run_id}.png")
+        if png_found and png is not None:
+            result["capture"] = {
+                "branch": RESULTS_BRANCH,
+                "path": f"runs/{run_id}.png",
+                "bytes": len(png),
+                "sha256": hashlib.sha256(png).hexdigest(),
+                "png_base64": base64.b64encode(png).decode("ascii"),
+            }
         return result
     except _Failure as failure:
         return failure.result
@@ -520,8 +492,8 @@ ROOTAGENT_TOOLS: dict[str, dict[str, Any]] = {
         "title": "Redmi 9 RootAgent: результат запуска",
         "description": (
             "Прочитать запуск rootagent_run по run_id: статус, итог и JSON-результат команды, "
-            "когда запуск завершён. Снимок PNG этим инструментом не передаётся: возвращаются только "
-            "имя и размер его артефакта."
+            "когда запуск завершён. Результат и снимок (для capture — PNG в base64) читаются с "
+            "ветки rootagent-results, куда задание публикует их через GitHub API."
         ),
         "parameters": object_schema(
             {
