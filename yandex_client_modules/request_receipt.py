@@ -238,6 +238,9 @@ def _view_tool(tool: dict[str, Any]) -> tuple[str, str]:
         return kind, str(tool.get("server_label") or tool.get("name") or kind)
     function = tool.get("function") if isinstance(tool.get("function"), dict) else {}
     name = str(tool.get("name") or function.get("name") or "?")
+    if name.startswith("tools_"):
+        # A whole category sent as one function (tool_groups): its own row.
+        return name[len("tools_"):] or name, name
     return re.split(r"[._]", name, maxsplit=1)[0] or name, name
 
 
