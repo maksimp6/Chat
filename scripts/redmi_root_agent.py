@@ -174,16 +174,62 @@ def wakefulness():
     return match.group(1) if match else None
 
 
+def power_key_device():
+    """The kernel input device that reports KEY_POWER, from getevent -pl."""
+    listing = bounded_command(["/system/bin/getevent", "-pl"], 512 * 1024).decode(
+        "utf-8", "replace"
+    )
+    device = None
+    for line in listing.splitlines():
+        match = re.match(r"\s*add device \d+: (/dev/input/event\d+)", line)
+        if match:
+            device = match.group(1)
+        elif device and re.search(r"\bKEY_POWER\b", line):
+            return device
+    return None
+
+
+def press_power_key():
+    """One real KEY_POWER press and release on the power key's own input device."""
+    device = power_key_device()
+    if device is None:
+        raise AgentError("power_key_device_not_found")
+    for code, value in (("116", "1"), ("116", "0")):
+        bounded_command(["/system/bin/sendevent", device, "1", code, value])
+        bounded_command(["/system/bin/sendevent", device, "0", "0", "0"])
+
+
+def mouse_nudge():
+    with mouse_connection() as connection:
+        submit_mouse(connection, "move", 1, 1)
+
+
 def wake_display():
     """Wake the display within this call; a separate run would see it time out again.
 
-    KEYCODE_WAKEUP only: it wakes a sleeping device and does nothing to an awake
-    one, while KEYCODE_POWER toggles and would turn a just-woken screen off.
+    Injected KEYCODE_WAKEUP does not wake this MIUI device, so it falls back to a
+    move through the existing uinput mouse daemon and then to a real KEY_POWER
+    press on the power key's input device. Each one is tried only while the
+    device is not Awake, so a toggle never turns a woken screen off again.
     """
-    if wakefulness() != "Awake":
-        bounded_command(["/system/bin/input", "keyevent", "KEYCODE_WAKEUP"])
+    attempts = []
+    actions = (
+        ("keyevent", lambda: bounded_command(
+            ["/system/bin/input", "keyevent", "KEYCODE_WAKEUP"])),
+        ("mouse", mouse_nudge),
+        ("power_key", press_power_key),
+    )
+    for name, action in actions:
+        if wakefulness() == "Awake":
+            break
+        try:
+            action()
+        except (AgentError, OSError) as error:
+            attempts.append(f"{name}: {error}")
+            continue
         time.sleep(1.5)
-    return wakefulness()
+        attempts.append(f"{name}: {wakefulness()}")
+    return wakefulness(), attempts
 
 
 def validate_png(png):
@@ -488,7 +534,7 @@ def worker(request):
             raise AgentError("invalid_wait")
         # Wake, open and capture in one call: between separate runs the screen
         # times out again, which is why a lone capture came back black.
-        woken = wake_display()
+        woken, wake_attempts = wake_display()
         try:
             bounded_command(["/system/bin/wm", "dismiss-keyguard"])
         except AgentError:
@@ -512,6 +558,7 @@ def worker(request):
             "command": "browse",
             "url": url,
             "wakefulness": woken,
+            "wake_attempts": wake_attempts,
             "display_on": state["display_on"],
             "keyguard_locked_or_unknown": not state["unlocked"],
             "focus_package": state["package"],
