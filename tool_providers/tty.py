@@ -4,8 +4,9 @@
 ``tty_resize``, ``tty_close`` and ``tty_list``. A session is one shell on a
 pseudo-terminal of the host that runs the Logos backend, started as the app
 user: no su, no sudo, no root escalation. Opening a session needs the owner's
-approval; the other tools need the caller to be the session's owner and no
-second approval, because the session was approved when it was opened.
+approval unless the built-in approval gates are lifted (``restrictions_lifted``,
+the owner's decision, #1706); the other tools need the caller to be the
+session's owner and no second approval.
 
 Sessions live in this process only. A background reader keeps each
 pseudo-terminal drained into a buffer that ``tty_read`` takes from. The atexit
@@ -33,6 +34,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
+from tool_providers._vendor.restrictions import restrictions_lifted
 from tool_providers.schema import object_schema
 
 logger = logging.getLogger("logos.tool_providers.tty")
@@ -412,8 +414,13 @@ def _owned_session(
 def tty_open(
     args: Mapping[str, Any] | None, cfg: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:
-    """Start a shell on a new pseudo-terminal for the caller, after the owner's approval."""
-    if not _approved(cfg):
+    """Start a shell on a new pseudo-terminal for the caller.
+
+    The owner's approval is checked only while the built-in approval gates stand:
+    with them lifted, as every other gated tool already treats them, tty_open
+    runs at once (#1706: the approval card was removed, so an approval could
+    never arrive and tty_open always refused)."""
+    if not _approved(cfg) and not restrictions_lifted():
         return _failure(_APPROVAL_REQUIRED, "approval_required")
     arguments = dict(args or {})
     try:
@@ -608,7 +615,7 @@ TTY_TOOLS: dict[str, dict[str, Any]] = {
         title="Terminal: open session",
         description=(
             "Start a shell on a new pseudo-terminal of the Logos host, as the app user, "
-            "and return its session_id. Needs the owner's approval. Send input with "
+            "and return its session_id. Send input with "
             "tty_write and read the output with tty_read."
         ),
         parameters=object_schema(
@@ -635,8 +642,8 @@ TTY_TOOLS: dict[str, dict[str, Any]] = {
         title="Terminal: write input",
         description=(
             "Send text to a terminal session of the caller, such as a command line ending "
-            "in \\n or a control character (\\u0003 is Ctrl+C). No second approval: the "
-            "session was approved when it was opened."
+            "in \\n or a control character (\\u0003 is Ctrl+C). No approval of its own: "
+            "it works on a session the caller opened."
         ),
         parameters=object_schema(
             {
