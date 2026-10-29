@@ -2266,3 +2266,11 @@ body {
 .logos-pro-app .msg-model-view-fold-summary {
   cursor: pointer;
 }
+
+/* Phone width: the second button row wraps instead of scrolling sideways, so every button is visible (#1718). */
+@media (max-width: 768px) {
+  .logos-pro-app #header .header-row-secondary {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
