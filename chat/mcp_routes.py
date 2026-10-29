@@ -215,6 +215,13 @@ ANNOUNCED_CALL_PROMPT = (
 )
 
 
+# Sent when the answer ended with tool calls and no text: the user still needs the answer (#1710).
+EMPTY_REPLY_PROMPT = (
+    "Ты вызвал инструменты, но не написал ответ пользователю. Напиши итоговый ответ "
+    "по результатам инструментов: что сделано, что нашлось, что не удалось и почему."
+)
+
+
 def _announced_without_call(text) -> str | None:
     """The reply, stripped, when it ends on a colon: an action announced, not done.
 
@@ -830,6 +837,29 @@ def _define_logos_client(base: type) -> type:
                     )
                     response = run_tools(
                         follow_up(list(continuation_history), "text_call")
+                    )
+
+            # #1710: a finished answer with no text (only tool calls) gets one round asking for the answer.
+            if (
+                isinstance(response, dict)
+                and response.get("status") == "completed"
+                and not extract_function_calls(response)
+                and not self.extract_text(response).strip()
+            ):
+                request = {"role": "user", "content": EMPTY_REPLY_PROMPT}
+                if trace is not None:
+                    trace.add_event(
+                        "empty_reply_after_tools",
+                        {"response_id": response.get("id")},
+                    )
+                if conversation_id:
+                    response = run_tools(follow_up([request], "empty_reply"))
+                else:
+                    continuation_history.extend(
+                        list(response.get("output") or []) + [request]
+                    )
+                    response = run_tools(
+                        follow_up(list(continuation_history), "empty_reply")
                     )
 
             if trace is not None:
