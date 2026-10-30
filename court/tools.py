@@ -148,10 +148,6 @@ def _interrogate(args, cfg=None):
     }
 
 
-def _sue(args, cfg=None):
-    return {"success": True, **sue(str(args.get("conversation_id") or ""))}
-
-
 def _conclude(args, cfg=None):
     hearing = conclude(str(args.get("conversation_id") or ""), str(args.get("text") or ""))
     return {"success": True, "hearing": hearing}
@@ -192,8 +188,6 @@ _ACTIONS: dict[str, dict[str, Any]] = {
                   "about": "подать дело заседания в GitHub"},
     "speak": {"fn": _speak, "required": ["conversation_id"], "write": True,
               "about": "слово суда в групповом чате диалога"},
-    "sue": {"fn": _sue, "required": ["conversation_id"], "write": True,
-            "about": "иск владельца по диалогу conversation_id: создаёт диалог «⚖️ Суд: …», где судья сразу начинает заседание; вердикт уже вынесен иском"},
     "sue": {"fn": _sue, "required": ["conversation_id"], "write": True,
             "about": "иск владельца по диалогу conversation_id: создаёт диалог «⚖️ Суд: …», где судья сразу "
                      "ищет, в чём виноват ИИ, и выносит вердикты; пользователь всегда прав"},
