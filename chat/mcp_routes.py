@@ -2404,20 +2404,21 @@ def get_conv_messages(conv_id):
     try:
         after = _message_id_arg("after")
         before = _message_id_arg("before")
+        since = _message_id_arg("since")
     except ValueError as error:
         return jsonify(error_body("invalid_params", message=str(error))), 400
     messages = get_messages(conv_id)
     if after is not None:
         newer = [message for message in messages if message["id"] > after]
+        body = {
+            "messages": newer,
+            "count": len(messages),
+            "last": messages[-1] if messages else None,
+        }
+        if since is not None:
+            body["range_count"] = sum(1 for message in messages if message["id"] >= since)
         return jsonify(
-            validate_api_contract(
-                "chat.conversation.messages.after.response",
-                {
-                    "messages": newer,
-                    "count": len(messages),
-                    "last": messages[-1] if messages else None,
-                },
-            )
+            validate_api_contract("chat.conversation.messages.after.response", body)
         )
     if "application/x-ndjson" in (request.headers.get("Accept") or ""):
         older = [

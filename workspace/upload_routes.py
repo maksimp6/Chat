@@ -38,6 +38,7 @@ import zlib
 from pathlib import Path
 from typing import Any
 
+import requests
 from flask import Blueprint, jsonify, request
 
 from workspace.file_routes import (
@@ -285,54 +286,113 @@ def _uncertain(upload_id: str, meta: dict[str, Any]):
     return jsonify({"error": "completion_uncertain", **_state(upload_id, meta)}), 409
 
 
+# Completions this process is sending to Files, by upload id: a repeat waits for the one running instead of sending the
+# file again or answering before it ends.
+_sending: dict[str, threading.Event] = {}
+_sending_guard = threading.Lock()
+
+
+def _maybe_stored(error: Exception) -> bool:
+    """Whether Files may have stored the file although the send failed.
+
+    Files answered that it did not store it (400, 404, 413, 429, an auth failure), or the
+    connection never opened: the file was not stored and the completion may be repeated.
+    No answer after the body may have gone, or a server error at Files: it may be stored.
+    """
+    status = getattr(error, "status_code", None)
+    if status in (400, 404, 413, 429):
+        return False
+    if status == 502 and "Auth failed" in str(error):
+        return False
+    return not isinstance(error.__cause__, requests.exceptions.ConnectTimeout)
+
+
+def _save_meta(upload_id: str, meta: dict[str, Any]) -> None:
+    """Writes the record after the send; a failure is logged, the answer to the browser stays right."""
+    try:
+        _write_meta(upload_id, meta)
+    except OSError as error:
+        logger.error("[UPLOADS] Record not written after the send: %s", error)
+
+
 @upload_bp.route("/api/uploads/<upload_id>/complete", methods=["POST"])
 def complete_upload(upload_id):
     if _load(upload_id) is None:
         return _not_found()
-    with _lock(upload_id):
-        meta = _load(upload_id)
-        if meta is None:
-            return _not_found()
-        if meta.get("completed") is not None:
-            # A repeated completion (its first answer was lost on the way) answers the same.
-            return jsonify(meta["completed"]), 201
-        # Files may have stored the file already: sending it again would store a second copy.
-        if meta.get("uncertain") or meta.get("completing"):
-            return _uncertain(upload_id, meta)
-        if meta["received"] != meta["size"]:
-            return jsonify({"error": "upload_incomplete", **_state(upload_id, meta)}), 409
-        if meta["kind"] == "image":
-            return jsonify({"upload_id": upload_id, "size": meta["size"]})
-        _, part_path = _paths(upload_id)
-        try:
-            content = part_path.read_bytes()
-            # Marked before sending: a process that stops while Files stores the file leaves this mark.
-            _write_meta(upload_id, {**meta, "completing": True})
-        except OSError as error:
-            return _storage_failed(error)
+    while True:
+        with _sending_guard:
+            running = _sending.get(upload_id)
+        if running is not None:
+            # The same completion is being sent: its outcome is the answer.
+            running.wait()
+        with _lock(upload_id):
+            with _sending_guard:
+                if upload_id in _sending:
+                    # It started meanwhile: wait for it too.
+                    continue
+            meta = _load(upload_id)
+            if meta is None:
+                return _not_found()
+            if meta.get("completed") is not None:
+                # A repeated completion (its first answer was lost on the way) answers the same.
+                return jsonify(meta["completed"]), 201
+            # Files may have stored the file already (no answer in time, or a process that stopped while sending left
+            # its mark): sending it again would store a second copy.
+            if meta.get("uncertain") or meta.get("completing"):
+                return _uncertain(upload_id, meta)
+            if meta["received"] != meta["size"]:
+                return jsonify({"error": "upload_incomplete", **_state(upload_id, meta)}), 409
+            if meta["kind"] == "image":
+                return jsonify({"upload_id": upload_id, "size": meta["size"]})
+            _, part_path = _paths(upload_id)
+            try:
+                content = part_path.read_bytes()
+                # Marked before sending: a process that stops while Files stores the file leaves this mark.
+                _write_meta(upload_id, {**meta, "completing": True})
+            except OSError as error:
+                return _storage_failed(error)
+            done = threading.Event()
+            with _sending_guard:
+                _sending[upload_id] = done
+            break
+    # Files is called without the lock, so the other uploads sharing it go on meanwhile.
+    try:
         try:
             client = get_client()
             logger.info(
                 "[UPLOADS] Sending '%s', %d bytes, to Files", meta["name"], len(content)
             )
             result = client.upload_file(content, meta["name"], purpose=meta["purpose"])
-        except bound.YandexClientError as e:
-            if getattr(e, "status_code", None) == 504:
-                # No answer in time: the file may be stored. The browser says so instead of sending it again.
-                _write_meta(upload_id, {**meta, "uncertain": True})
+        except (bound.ExpiredCredentialError, bound.NoActiveCredentialError) as error:
+            # Raised before any request went out (no active key, or an expired one): nothing was stored, and the
+            # completion can be repeated once the key is fixed.
+            logger.error("[UPLOADS] Completion not sent: %s", error)
+            with _lock(upload_id):
+                _save_meta(upload_id, meta)
+            return jsonify({"error": _FILES_FAILED}), 503
+        except Exception as error:
+            if not isinstance(error, bound.YandexClientError) or _maybe_stored(error):
+                # Anything else may come after Files stored the file (an answer that could not be read).
+                if not isinstance(error, bound.YandexClientError):
+                    logger.error("[UPLOADS] Completion failed: %s", error, exc_info=True)
+                with _lock(upload_id):
+                    _save_meta(upload_id, {**meta, "uncertain": True})
                 return _uncertain(upload_id, meta)
-            _write_meta(upload_id, meta)
-            return _err_response(e)
-        except Exception as e:
-            logger.error("[UPLOADS] Completion failed: %s", e, exc_info=True)
-            _write_meta(upload_id, {**meta, "uncertain": True})
-            return _uncertain(upload_id, meta)
-        _write_meta(upload_id, {**meta, "completed": result})
-        try:
-            part_path.unlink()
-        except FileNotFoundError:
-            pass
+            # Files refused the file: the upload stays and its completion can be repeated (after the key is fixed).
+            with _lock(upload_id):
+                _save_meta(upload_id, meta)
+            return _err_response(error)
+        with _lock(upload_id):
+            _save_meta(upload_id, {**meta, "completed": result})
+            try:
+                part_path.unlink()
+            except OSError:
+                pass
         return jsonify(result), 201
+    finally:
+        with _sending_guard:
+            _sending.pop(upload_id, None)
+        done.set()
 
 
 def read_upload(upload_id: Any) -> bytes:

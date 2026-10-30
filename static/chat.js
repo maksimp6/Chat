@@ -105,12 +105,7 @@ function loadRendererScript(name) {
   script.src = (window.__LOGOS_STATIC_BASE || "/static") + spec.path + "?v=" +
     encodeURIComponent(window.__LOGOS_STATIC_VERSION || "");
   script.async = true;
-  script.onload = function () {
-    state.loading = false;
-    state.failures = 0;
-    renderPendingMarkdown();
-  };
-  script.onerror = function () {
+  const failed = function () {
     state.loading = false;
     state.failures += 1;
     var pauseMs = Math.min(RENDERER_RETRY_CAP_MS, RENDERER_RETRY_BASE_MS * Math.pow(2, state.failures - 1));
@@ -118,6 +113,17 @@ function loadRendererScript(name) {
     script.remove();
     if (name !== "katex") setTimeout(function () { loadRendererScript(name); }, pauseMs);
   };
+  script.onload = function () {
+    // A page that is not the script (a login or captive-portal page) loads too: only a defined renderer counts.
+    if (!spec.ready()) {
+      failed();
+      return;
+    }
+    state.loading = false;
+    state.failures = 0;
+    renderPendingMarkdown();
+  };
+  script.onerror = failed;
   (document.head || document.documentElement).appendChild(script);
 }
 
@@ -769,6 +775,8 @@ function renderStoredMessage(convId, msg, owner, hasImage) {
     ? msg.source.match(/^image-request:([A-Za-z0-9_-]{16,128})$/)
     : null;
   if (node && imageRequest && !hasImage(imageRequest[1])) checkStoredImageRequest(convId, node, imageRequest[1]);
+  // The stored message behind the node: a refresh finds the question of a new stored error on screen by it.
+  if (node) node.logosMessage = msg;
   return node;
 }
 
@@ -1011,6 +1019,26 @@ function keptByRefresh(node) {
   return Boolean(node.classList) && (node.classList.contains("history-end") || node.classList.contains("history-partial"));
 }
 
+// A message shown only on this page that may be stored under an id the page does not know yet: a question or an
+// answer without an id. A note (an error, a stop) is not stored as such and does not count.
+function mayBeStored(node) {
+  return Boolean(node.classList) && node.classList.contains("msg") && !node.classList.contains("error");
+}
+
+// The question of a new stored error, found on screen before ``mark``: undefined when the screen cannot tell.
+function ownerOnScreen(shown, mark) {
+  for (let index = mark; index >= 0; index -= 1) {
+    const msg = shown[index].logosMessage;
+    if (!msg) {
+      if (mayBeStored(shown[index])) return undefined;
+      continue;
+    }
+    if (msg.source === "error") continue;
+    return msg.role === "user" ? msg : null;
+  }
+  return null;
+}
+
 function storedMessageId(node) {
   const id = node.dataset && node.dataset.messageId ? Number(node.dataset.messageId) : NaN;
   return Number.isInteger(id) && id > 0 ? id : null;
@@ -1018,9 +1046,9 @@ function storedMessageId(node) {
 
 function refreshHistory(convId, shown) {
   const chatbox = document.getElementById("chatbox");
-  // The chat is read again from the last stored message before the first message shown only on this page (a question
-  // sent here before the server named it, a note, an error): everything from there is drawn again from what the server
-  // stored, as a full reload did, and nothing stored is skipped.
+  // The chat is read again from the last stored message before the first message shown only on this page that the
+  // server may have stored (a question or an answer without an id): everything after it that is not a stored message
+  // up to it is drawn again from what the server stored, as a full reload did. Notes before it stay.
   let lastId = null;
   let mark = -1;
   for (let index = 0; index < shown.length; index += 1) {
@@ -1031,15 +1059,26 @@ function refreshHistory(convId, shown) {
         lastId = id;
         mark = index;
       }
-    } else if (node.classList && node.classList.contains("msg")) {
+    } else if (mayBeStored(node)) {
       break;
     }
   }
   if (!chatbox || lastId === null) return streamHistory(convId, { replace: shown });
-  const tail = shown.slice(mark + 1).filter(function (node) { return !keptByRefresh(node); });
+  const readFrom = lastId;
+  const tail = shown.slice(mark + 1).filter(function (node) {
+    if (keptByRefresh(node)) return false;
+    const id = storedMessageId(node);
+    return id === null || id > readFrom;
+  });
+  // The oldest stored message shown: the server counts its messages from there, so a message stored elsewhere (another
+  // tab or device) between the ones shown is found.
+  const since = shown.reduce(function (min, node) {
+    const id = storedMessageId(node);
+    return id !== null && (min === null || id < min) ? id : min;
+  }, null);
   const token = chatbox.dataset.historyLoad;
   const current = function () { return convId === currentConvId && chatbox.dataset.historyLoad === token; };
-  return window.LogosDispatcher.request(`/api/conversations/${convId}/messages?after=${lastId}`)
+  return window.LogosDispatcher.request(`/api/conversations/${convId}/messages?after=${lastId}&since=${since}`)
     .then((r) => {
       if (!r.ok) {
         const error = new Error("HTTP " + r.status);
@@ -1055,7 +1094,8 @@ function refreshHistory(convId, shown) {
       let owner = null;
       if (newest && newest.source === "error") {
         owner = errorOwner(newer.slice(0, -1).reverse());
-        // The question it answers is older than what came: only the whole history tells.
+        // The question it answers is older than what came: it is on screen, or only the whole history tells.
+        if (owner === undefined) owner = ownerOnScreen(shown, mark);
         if (owner === undefined) return streamHistory(convId, { replace: shown });
       }
       try {
@@ -1072,6 +1112,16 @@ function refreshHistory(convId, shown) {
           });
         });
         waitForOpenQuestion(convId, Number(data.count) || 0, data.last);
+        // Fewer stored messages on screen than the server has from the oldest one shown: some were stored elsewhere
+        // meanwhile; only the whole history brings them in order.
+        const onScreen = new Set();
+        Array.from(chatbox.children).forEach(function (node) {
+          const id = storedMessageId(node);
+          if (id !== null) onScreen.add(id);
+        });
+        if (typeof data.range_count === "number" && data.range_count > onScreen.size) {
+          return streamHistory(convId, { replace: Array.from(chatbox.children) });
+        }
       } catch (renderErr) {
         console.error("[CHAT] Render history error:", renderErr);
         chatbox.appendChild(historyErrorBlock(convId, "Не удалось показать диалог. Нажмите «Повторить» или обновите страницу."));
@@ -2436,6 +2486,13 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!node || !node.isConnected || node.dataset.messageId) return;
     if (Number.isInteger(turn.serverUserMessageId) && turn.serverUserMessageId > 0) {
       node.dataset.messageId = String(turn.serverUserMessageId);
+      node.logosMessage = {
+        id: turn.serverUserMessageId,
+        role: "user",
+        text: turn.text,
+        source: null,
+        attachments: turn.questionImages ? { images: turn.questionImages } : {},
+      };
     }
   }
 
@@ -2761,6 +2818,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (input.value === rawText) input.value = "";
           // A newer question makes the earlier errors stale: only the newest error keeps its «Повторить».
           document.querySelectorAll("#chatbox .msg-retry-btn").forEach(function (button) { button.remove(); });
+          turn.questionImages = sentImages.length;
           turn.questionNode = addMessage({
             text: sentImages.length
               ? (turn.text ? turn.text + " · фото: " : "Фото: ") + sentImages.length

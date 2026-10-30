@@ -31,6 +31,8 @@ Everything `workspace` uses from other units is a field of `Host` in [`workspace
 | Port | Provided by |
 | --- | --- |
 | `Config` | `core.config.Config` |
+| `ExpiredCredentialError` | `provider_accounts.credentials.ExpiredCredentialError` |
+| `NoActiveCredentialError` | `provider_accounts.credentials.NoActiveCredentialError` |
 | `YandexClientError` | `yandex_client_modules.errors.YandexClientError` |
 | `YandexResponsesClient` | `yandex_client_modules.client.YandexResponsesClient` |
 

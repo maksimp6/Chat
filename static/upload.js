@@ -200,29 +200,43 @@
         if (!passes(error)) throw error;
       }
     }
-    // A completion is sent again only when no answer came: Files may store a file only once, so any answer from the
-    // server, an error too, is final (a completion that may have stored the file answers completion_uncertain).
+    // A completion is sent again only when no answer came or Files asked to wait (408, 429): the server answers
+    // completion_uncertain when Files may have stored the file, and any other answer is final. Once it is sent it is
+    // not stopped: Files may be storing the file.
+    if (typeof settings.onCompleting === "function") settings.onCompleting();
     const image = settings.kind === "image";
-    return persist(function () {
-      return request(path + "/complete", { method: "POST" }, MAX_WAIT_MS, signal).then(function (body) {
-        if (image ? typeof body.upload_id !== "string" : typeof body.id !== "string") throw badAnswer();
-        return body;
+    try {
+      return await persist(function () {
+        return request(path + "/complete", { method: "POST" }, MAX_WAIT_MS).then(function (body) {
+          if (image ? typeof body.upload_id !== "string" : typeof body.id !== "string") throw badAnswer();
+          return body;
+        });
+      }, function (error) {
+        return noAnswer(error) || (Boolean(error) && (error.status === 408 || error.status === 429));
       });
-    }, noAnswer, signal);
+    } catch (error) {
+      // Everything has arrived: the upload stays, and sending again with options.uploadId completes it (after the
+      // cause, a provider key for example, is fixed) without sending the file again.
+      if (error && typeof error === "object") error.completion = true;
+      throw error;
+    }
   }
 
   // Sends ``blob`` and resolves with the completion answer: for a file what POST /api/files answers, for an image
   // {upload_id, size}. options: name, kind ("file" | "image"), purpose, signal, onProgress(received, size),
-  // onCreated(uploadId). The page stays busy (no automatic reload) until the upload ends. A stopped or failed upload
-  // drops its copy on the server; one whose completion may have stored the file (completion_uncertain) keeps it.
+  // onCreated(uploadId), onCompleting(), uploadId (go on with an upload made before). The page stays busy (no
+  // automatic reload) until the upload ends. An upload stopped or refused before everything arrived drops its copy
+  // on the server; once everything has arrived the copy stays (error.uploadId), so a failed completion can be
+  // repeated without sending the file again.
   async function send(blob, options) {
     const settings = options || {};
-    const uploadId = newUploadId();
+    const uploadId = typeof settings.uploadId === "string" && settings.uploadId ? settings.uploadId : newUploadId();
     const release = typeof window.LogosDispatcher.hold === "function" ? window.LogosDispatcher.hold() : function () {};
     try {
       return await upload(blob, settings, uploadId);
     } catch (error) {
-      if (!(error && error.body && error.body.error === "completion_uncertain")) discard(uploadId);
+      if (error && typeof error === "object") error.uploadId = uploadId;
+      if (!(error && error.completion)) discard(uploadId);
       throw error;
     } finally {
       release();

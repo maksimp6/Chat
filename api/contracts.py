@@ -210,12 +210,15 @@ CHAT_MESSAGE = _object(
 CONTRACTS = {
     # GET /api/conversations/<id>/messages?after=<message id>: only the messages newer than
     # one the client already shows, the number of messages and the last one.
+    # With ?since=<message id>, range_count is how many messages have an id from it on:
+    # the client compares it with what it shows to find messages it misses.
     "chat.conversation.messages.after.response": _object(
         {
             "messages": _list(CHAT_MESSAGE),
             "count": INTEGER,
             "last": _nullable(CHAT_MESSAGE),
-        }
+        },
+        optional={"range_count": INTEGER},
     ),
     # The same with Accept: application/x-ndjson[, ?before=<message id>]: a start line with
     # the number of messages in the conversation, one message per line, newest first, then

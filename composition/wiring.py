@@ -864,11 +864,15 @@ def _web_shell():
 def _workspace():
     from workspace import host
     from core.config import Config
+    from provider_accounts.credentials import ExpiredCredentialError
+    from provider_accounts.credentials import NoActiveCredentialError
     from yandex_client_modules.errors import YandexClientError
     from yandex_client_modules.client import YandexResponsesClient
 
     return host.Host(
         Config=Config,
+        ExpiredCredentialError=ExpiredCredentialError,
+        NoActiveCredentialError=NoActiveCredentialError,
         YandexClientError=YandexClientError,
         YandexResponsesClient=YandexResponsesClient,
     )

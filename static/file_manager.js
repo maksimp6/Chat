@@ -626,86 +626,107 @@ window.fetchVectorStores = function () {
     var uploadStatusEl = document.getElementById("file-upload-status");
     var pendingUploads = 0;
 
+    // One file sent in pieces that survive a broken connection (static/upload.js): on a slow link a file of any size
+    // arrives, and a drop costs at most the piece in flight. ``uploadId`` goes on with an upload whose pieces all
+    // arrived but whose completion failed, without sending the file again.
+    function startUpload(file, uploadId) {
+      var div = document.createElement("div");
+      div.style.cssText =
+        "padding:10px;border-bottom:1px solid var(--m-section-border,#eee);display:flex;align-items:center;gap:12px;opacity:0.6;";
+      div.innerHTML = [
+        '<div style="flex:1;min-width:0;">',
+        '    <div style="font-weight:bold;color:var(--m-text,#222);word-break:break-all;">' +
+          UI.escapeHtml(file.name) +
+          ' <span class="file-upload-progress" style="font-size:11px;color:var(--m-accent,#4a90d9);">(загрузка...)</span></div>',
+        '    <div style="font-size:12px;color:var(--m-muted,#666);">' +
+          formatBytes(file.size) +
+          "</div>",
+        "</div>",
+      ].join("");
+      uploadStatusEl.appendChild(div);
+      pendingUploads += 1;
+
+      var progress = div.querySelector(".file-upload-progress");
+      // On a slow link an upload can take hours and goes on through drops: «Отменить» stops it and drops the copy on
+      // the server. Once the file is being stored it cannot be stopped, so the button goes.
+      var controller = new AbortController();
+      var cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "logos-btn";
+      cancel.textContent = "Отменить";
+      cancel.addEventListener("click", function () {
+        controller.abort();
+      });
+      div.appendChild(cancel);
+      Promise.resolve()
+        .then(function () {
+          return window.LogosUpload.send(file, {
+            name: file.name,
+            kind: "file",
+            purpose: "assistants",
+            signal: controller.signal,
+            uploadId: uploadId || undefined,
+            onProgress: function (received, size) {
+              if (progress && size > 0) progress.textContent = "(загрузка " + Math.floor((received * 100) / size) + "%)";
+            },
+            onCompleting: function () {
+              cancel.remove();
+              if (progress) progress.textContent = "(сохранение...)";
+            },
+          });
+        })
+        .then(function () {
+          div.remove();
+        })
+        .catch(function (err) {
+          if (controller.signal.aborted && !(err && err.completion)) {
+            div.remove();
+            return;
+          }
+          // Files may have stored a file whose completion got no answer in time, so the user is told to check the
+          // list first instead of sending it again.
+          var uncertain = isNoAnswer(err) || (err && err.body && err.body.error === "completion_uncertain");
+          var text = uncertain
+            ? "Сервер не ответил вовремя: файл мог сохраниться. Проверьте список, прежде чем загружать его снова."
+            : err.message;
+          div.innerHTML = [
+            '<div style="flex:1;min-width:0;">',
+            '    <div style="font-weight:bold;color:var(--m-danger,#c33);word-break:break-all;">' +
+              UI.escapeHtml(file.name) +
+              ' <span style="font-size:11px;">(ошибка)</span></div>',
+            '    <div style="font-size:12px;color:var(--m-muted,#666);">' +
+              UI.escapeHtml(text) +
+              "</div>",
+            "</div>",
+          ].join("");
+          div.style.opacity = "1";
+          // Everything arrived but Files refused it (a provider key, for example): once that is fixed, «Повторить»
+          // only completes the upload.
+          if (!uncertain && err && err.completion && err.uploadId) {
+            var again = document.createElement("button");
+            again.type = "button";
+            again.className = "logos-btn";
+            again.textContent = "Повторить";
+            again.addEventListener("click", function () {
+              div.remove();
+              startUpload(file, err.uploadId);
+            });
+            div.appendChild(again);
+          }
+        })
+        .finally(function () {
+          pendingUploads -= 1;
+          // The list is rebuilt once, after the last upload settles, so no row disappears early.
+          if (pendingUploads === 0) loadFiles();
+        });
+    }
+
     document.getElementById("file-upload").addEventListener("change", function (e) {
       var files = e.target.files;
       if (!files.length) return;
 
       for (var i = 0; i < files.length; i++) {
-        (function (file) {
-          var div = document.createElement("div");
-          div.style.cssText =
-            "padding:10px;border-bottom:1px solid var(--m-section-border,#eee);display:flex;align-items:center;gap:12px;opacity:0.6;";
-          div.innerHTML = [
-            '<div style="flex:1;min-width:0;">',
-            '    <div style="font-weight:bold;color:var(--m-text,#222);word-break:break-all;">' +
-              UI.escapeHtml(file.name) +
-              ' <span class="file-upload-progress" style="font-size:11px;color:var(--m-accent,#4a90d9);">(загрузка...)</span></div>',
-            '    <div style="font-size:12px;color:var(--m-muted,#666);">' +
-              formatBytes(file.size) +
-              "</div>",
-            "</div>",
-          ].join("");
-          uploadStatusEl.appendChild(div);
-          pendingUploads += 1;
-
-          var progress = div.querySelector(".file-upload-progress");
-          // On a slow link an upload can take hours and goes on through drops: «Отменить» stops it and drops the copy
-          // on the server.
-          var controller = new AbortController();
-          var cancel = document.createElement("button");
-          cancel.type = "button";
-          cancel.className = "logos-btn";
-          cancel.textContent = "Отменить";
-          cancel.addEventListener("click", function () {
-            controller.abort();
-          });
-          div.appendChild(cancel);
-          // Sent in pieces that survive a broken connection (static/upload.js): on a slow link a file of any size
-          // arrives, and a drop costs at most the piece in flight.
-          Promise.resolve()
-            .then(function () {
-              return window.LogosUpload.send(file, {
-                name: file.name,
-                kind: "file",
-                purpose: "assistants",
-                signal: controller.signal,
-                onProgress: function (received, size) {
-                  if (progress && size > 0) progress.textContent = "(загрузка " + Math.floor((received * 100) / size) + "%)";
-                },
-              });
-            })
-            .then(function () {
-              div.remove();
-            })
-            .catch(function (err) {
-              if (controller.signal.aborted) {
-                div.remove();
-                return;
-              }
-              // Files may have stored a file whose completion got no answer in time, so the user is told to check the
-              // list first instead of sending it again.
-              var uncertain = isNoAnswer(err) || (err && err.body && err.body.error === "completion_uncertain");
-              var text = uncertain
-                ? "Сервер не ответил вовремя: файл мог сохраниться. Проверьте список, прежде чем загружать его снова."
-                : err.message;
-              div.innerHTML = [
-                '<div style="flex:1;min-width:0;">',
-                '    <div style="font-weight:bold;color:var(--m-danger,#c33);word-break:break-all;">' +
-                  UI.escapeHtml(file.name) +
-                  ' <span style="font-size:11px;">(ошибка)</span></div>',
-                '    <div style="font-size:12px;color:var(--m-muted,#666);">' +
-                  UI.escapeHtml(text) +
-                  "</div>",
-                "</div>",
-              ].join("");
-              div.style.opacity = "1";
-            })
-            .finally(function () {
-              pendingUploads -= 1;
-              // The list is rebuilt once, after the last upload settles, so no row disappears early.
-              if (pendingUploads === 0) loadFiles();
-            });
-        })(files[i]);
+        startUpload(files[i], null);
       }
       e.target.value = "";
     });
