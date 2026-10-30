@@ -55,10 +55,76 @@
     return controller.signal;
   }
 
+  // The time limit of one request: until the headers it is the whole wait; after them it counts only silence, and
+  // every received piece of the body starts it again. A body that keeps flowing is read to its end at any link speed
+  // (a long history at 1.25 KB/s), a stalled one ends after the same time as before. abort() ends the request with a
+  // TimeoutError, the error a whole-request timeout gave.
+  function idleTimeout(timeoutMs) {
+    const controller = new AbortController();
+    let timer = null;
+    const fire = function () {
+      timer = null;
+      controller.abort(new DOMException("The request stalled for " + timeoutMs + " ms", "TimeoutError"));
+    };
+    return {
+      signal: controller.signal,
+      arm: function () {
+        if (controller.signal.aborted) return;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(fire, timeoutMs);
+      },
+      stop: function () {
+        if (timer) clearTimeout(timer);
+        timer = null;
+      },
+    };
+  }
+
+  // Statuses whose response may not carry a body: a Response built with one throws.
+  const NULL_BODY_STATUSES = [101, 103, 204, 205, 304];
+
+  // The same response, with a body that re-arms the idle timer on every piece read and stops it at the end.
+  function withIdleBody(response, limit) {
+    if (
+      !response.body ||
+      NULL_BODY_STATUSES.indexOf(response.status) !== -1 ||
+      typeof TransformStream !== "function" ||
+      typeof response.body.pipeThrough !== "function"
+    ) {
+      limit.stop();
+      return response;
+    }
+    let rebuilt;
+    let stream;
+    try {
+      stream = new TransformStream({
+        transform: function (chunk, controller) {
+          limit.arm();
+          controller.enqueue(chunk);
+        },
+        flush: function () {
+          limit.stop();
+        },
+      });
+      rebuilt = new Response(stream.readable, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+    } catch (error) {
+      // A browser that cannot rebuild the response reads the original body (still unlocked); the limit then keeps
+      // counting from the headers, as a whole-request timeout did.
+      return response;
+    }
+    // A failure of the original body (the time limit aborted it) reaches the reader through the rebuilt one.
+    response.body.pipeTo(stream.writable).catch(function () {});
+    return rebuilt;
+  }
+
   function request(input, init, options) {
     const settings = options || {};
     const requestedTimeout = Number(settings.timeoutMs);
-    // An explicit 0 means no total timeout: the caller bounds the request itself (a live answer runs as long as
+    // An explicit 0 means no time limit: the caller bounds the request itself (a live answer runs as long as
     // the turn does). A missing or invalid value still gets the default.
     const unbounded = settings.timeoutMs === 0;
     const timeoutMs = Math.min(
@@ -68,11 +134,11 @@
       MAX_TIMEOUT_MS,
     );
     const requestInit = Object.assign({}, init || {});
-    if (!unbounded && typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
-      // The caller's signal (for example «Stop») and the timeout both end the request.
-      requestInit.signal = requestInit.signal
-        ? combineSignals(requestInit.signal, AbortSignal.timeout(timeoutMs))
-        : AbortSignal.timeout(timeoutMs);
+    const limit = !unbounded && typeof AbortController === "function" ? idleTimeout(timeoutMs) : null;
+    if (limit) {
+      // The caller's signal (for example «Stop») and the time limit both end the request.
+      requestInit.signal = requestInit.signal ? combineSignals(requestInit.signal, limit.signal) : limit.signal;
+      limit.arm();
     }
 
     const trace = beginRequestTrace(input);
@@ -82,8 +148,11 @@
     // Release the slot once, first: a throw while reporting the response must not
     // release it again, and the error handler must not run for a success path.
     return fetch(input, requestInit).then(
-      function (response) {
+      function (received) {
         activeRequests = Math.max(activeRequests - 1, 0);
+        // The headers came: from here on only silence ends the request.
+        if (limit) limit.arm();
+        const response = limit ? withIdleBody(received, limit) : received;
         if (trace) {
           trace.event("response", {
             path: requestPath(input),
@@ -100,6 +169,7 @@
       },
       function (error) {
         activeRequests = Math.max(activeRequests - 1, 0);
+        if (limit) limit.stop();
         if (trace) {
           trace.error(error);
           trace.end("error");
