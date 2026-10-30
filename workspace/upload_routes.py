@@ -14,9 +14,9 @@ after a drop and goes on from there.
 - ``POST /api/uploads/<id>/complete``: a file goes to Files as ``POST /api/files`` sends
   it and the answer is the same; an image answers ``{upload_id, size}`` for the
   attachments of ``POST /api/chat``. A repeated completion answers the same again. A
-  file is never sent to Files twice: when Files did not answer in time (it may have
-  stored the file), or the process stopped while sending, the completion answers
-  ``409 completion_uncertain``.
+  file is never sent to Files twice by itself: when Files may have stored it, or the
+  process stopped while sending, the completion answers ``409 completion_uncertain``;
+  ``?force=1`` sends it anyway once the person has checked the list.
 
 A piece is written to a file of its own first and appended only once it arrived
 whole and its offset is still the received size: a piece cut off by a broken
@@ -206,12 +206,13 @@ def get_upload(upload_id):
 def delete_upload(upload_id):
     if _load(upload_id) is None:
         return _not_found()
-    with _sending_guard:
-        sending = upload_id in _sending
-    if sending:
-        # Files is storing it right now: a deletion would not stop that.
-        return jsonify({"error": "completion_in_progress"}), 409
     with _lock(upload_id):
+        # Checked under the lock: a completion registers its send while it holds it.
+        with _sending_guard:
+            sending = upload_id in _sending
+        if sending:
+            # Files is storing it right now: a deletion would not stop that.
+            return jsonify({"error": "completion_in_progress"}), 409
         try:
             _remove(upload_id)
         except OSError as error:
@@ -354,6 +355,8 @@ def _save_meta(upload_id: str, meta: dict[str, Any]) -> None:
 def complete_upload(upload_id):
     if _load(upload_id) is None:
         return _not_found()
+    # The person checked Files after completion_uncertain and wants the file sent anyway.
+    force = request.args.get("force") == "1"
     while True:
         with _sending_guard:
             running = _sending.get(upload_id)
@@ -373,8 +376,9 @@ def complete_upload(upload_id):
                 return jsonify(meta["completed"]), 201
             # Files may have stored the file already (no answer in time, or a process that stopped while sending left
             # its mark): sending it again would store a second copy.
-            if meta.get("uncertain") or meta.get("completing"):
+            if (meta.get("uncertain") or meta.get("completing")) and not force:
                 return _uncertain(upload_id, meta)
+            meta = {key: value for key, value in meta.items() if key not in ("uncertain", "completing")}
             if meta["received"] != meta["size"]:
                 return jsonify({"error": "upload_incomplete", **_state(upload_id, meta)}), 409
             if meta["kind"] == "image":

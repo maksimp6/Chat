@@ -84,7 +84,15 @@ window.fetchVectorStores = function () {
     return (error && error.message) || "Неизвестная ошибка";
   }
 
+  // Uploads whose pieces all arrived but whose completion failed keep their copy on the server for «Повторить» or
+  // «Сохранить всё равно». The rows that offer them go with the window, so their copies go too when it opens again.
+  var keptUploads = new Set();
+
   window.openFileManagerModal = function () {
+    keptUploads.forEach(function (uploadId) {
+      window.LogosUpload.discard(uploadId);
+    });
+    keptUploads.clear();
     var UI = window.SettingsUI;
     var existing = document.getElementById("file-manager-modal");
     if (existing) existing.remove();
@@ -628,8 +636,10 @@ window.fetchVectorStores = function () {
 
     // One file sent in pieces that survive a broken connection (static/upload.js): on a slow link a file of any size
     // arrives, and a drop costs at most the piece in flight. ``uploadId`` goes on with an upload whose pieces all
-    // arrived but whose completion failed, without sending the file again.
-    function startUpload(file, uploadId) {
+    // arrived but whose completion failed, without sending the file again; ``force`` completes it although Files may
+    // have stored it (the person checked the list).
+    function startUpload(file, uploadId, force) {
+      if (uploadId) keptUploads.delete(uploadId);
       var div = document.createElement("div");
       div.style.cssText =
         "padding:10px;border-bottom:1px solid var(--m-section-border,#eee);display:flex;align-items:center;gap:12px;opacity:0.6;";
@@ -667,12 +677,19 @@ window.fetchVectorStores = function () {
             signal: controller.signal,
             uploadId: uploadId || undefined,
             resumable: true,
+            force: Boolean(force),
             onProgress: function (received, size) {
               if (progress && size > 0) progress.textContent = "(загрузка " + Math.floor((received * 100) / size) + "%)";
             },
             onCompleting: function () {
-              cancel.remove();
+              // Files may be storing the file now: it cannot be stopped.
+              cancel.hidden = true;
               if (progress) progress.textContent = "(сохранение...)";
+            },
+            onCompletionWaiting: function () {
+              // Files is not reachable: nothing is being stored, so the wait can be stopped.
+              cancel.hidden = false;
+              if (progress) progress.textContent = "(файлы недоступны, повтор...)";
             },
           });
         })
@@ -680,7 +697,7 @@ window.fetchVectorStores = function () {
           div.remove();
         })
         .catch(function (err) {
-          if (controller.signal.aborted && !(err && err.completion)) {
+          if (err && err.name === "UploadStoppedError") {
             div.remove();
             return;
           }
@@ -704,18 +721,29 @@ window.fetchVectorStores = function () {
             "</div>",
           ].join("");
           div.style.opacity = "1";
-          // Everything arrived but Files refused it (a provider key, for example): once that is fixed, «Повторить»
-          // only completes the upload.
-          if (!uncertain && err && err.completion && err.uploadId) {
+          // Everything arrived and the copy stays: «Повторить» only completes the upload once the cause (a provider key,
+          // for example) is fixed; after completion_uncertain «Сохранить всё равно» sends it once the list was checked.
+          // «Убрать» drops the copy.
+          if (err && err.completion && err.uploadId) {
+            keptUploads.add(err.uploadId);
             var again = document.createElement("button");
             again.type = "button";
             again.className = "logos-btn";
-            again.textContent = "Повторить";
+            again.textContent = uncertain ? "Сохранить всё равно" : "Повторить";
             again.addEventListener("click", function () {
               div.remove();
-              startUpload(file, err.uploadId);
+              startUpload(file, err.uploadId, uncertain);
             });
-            div.appendChild(again);
+            var drop = document.createElement("button");
+            drop.type = "button";
+            drop.className = "logos-btn";
+            drop.textContent = "Убрать";
+            drop.addEventListener("click", function () {
+              keptUploads.delete(err.uploadId);
+              window.LogosUpload.discard(err.uploadId);
+              div.remove();
+            });
+            div.append(again, drop);
           }
         })
         .finally(function () {

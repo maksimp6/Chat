@@ -59,7 +59,8 @@
   }
 
   function statusError(response, body) {
-    const error = new Error((body && body.error) || "HTTP " + response.status);
+    // A body with a code and a text (files_key_unavailable and the like) is read by its text.
+    const error = new Error((body && (body.message || body.error)) || "HTTP " + response.status);
     error.status = response.status;
     error.body = body || {};
     return error;
@@ -203,23 +204,32 @@
     // A completion is sent again only when no answer came or Files asked to wait (408, 429): the server answers
     // completion_uncertain when Files may have stored the file, and any other answer is final. Once it is sent it is
     // not stopped: Files may be storing the file.
-    if (typeof settings.onCompleting === "function") settings.onCompleting();
     const image = settings.kind === "image";
-    // A photo's completion only names it (nothing goes to Files), so it can still be stopped.
-    const completionSignal = image ? signal : undefined;
+    const completePath = path + "/complete" + (settings.force ? "?force=1" : "");
+    const unreachable = function (error) {
+      return Boolean(error) && error.status === 503 && Boolean(error.body) && error.body.error === "files_unreachable";
+    };
     try {
-      return await persist(function () {
-        return request(path + "/complete", { method: "POST" }, MAX_WAIT_MS, completionSignal).then(function (body) {
+      for (let tries = 1; ; tries += 1) {
+        // A photo's completion only names it (nothing goes to Files), so it can always be stopped; a file's cannot
+        // while it is sent, since Files may be storing it.
+        if (typeof settings.onCompleting === "function") settings.onCompleting();
+        try {
+          const body = await request(completePath, { method: "POST" }, MAX_WAIT_MS, image ? signal : undefined);
           if (image ? typeof body.upload_id !== "string" : typeof body.id !== "string") throw badAnswer();
           return body;
-        });
-      }, function (error) {
-        if (noAnswer(error)) return true;
-        if (!error) return false;
-        // Files was not reached (the connection did not open): nothing was stored, so it goes again.
-        return error.status === 408 || error.status === 429 ||
-          (error.status === 503 && error.body && error.body.error === "files_unreachable");
-      }, completionSignal);
+        } catch (error) {
+          if (image && signal && signal.aborted) throw stopped();
+          // Sent again only when no answer came, Files asked to wait (408, 429) or Files was not reached.
+          const again = noAnswer(error) || (Boolean(error) && (error.status === 408 || error.status === 429)) ||
+            unreachable(error);
+          if (!again) throw error;
+          // Files was not reached: nothing is being stored, so this wait can be stopped (the copy is dropped then).
+          const stoppable = image || unreachable(error);
+          if (stoppable && !image && typeof settings.onCompletionWaiting === "function") settings.onCompletionWaiting();
+          await pause(retryDelayMs(tries), stoppable ? signal : undefined);
+        }
+      }
     } catch (error) {
       // Everything has arrived: the upload stays, and sending again with options.uploadId completes it (after the
       // cause, a provider key for example, is fixed) without sending the file again.
@@ -230,11 +240,12 @@
 
   // Sends ``blob`` and resolves with the completion answer: for a file what POST /api/files answers, for an image
   // {upload_id, size}. options: name, kind ("file" | "image"), purpose, signal, onProgress(received, size),
-  // onCreated(uploadId), onCompleting(), uploadId (go on with an upload made before), resumable (the caller can
-  // repeat a failed completion). The page stays busy (no automatic reload) until the upload ends. A stopped or failed
-  // upload drops its copy on the server, except when everything arrived, the completion was refused and the caller is
-  // resumable: then the copy stays (error.uploadId) and sending again with options.uploadId completes it without
-  // sending the file again.
+  // onCreated(uploadId), onCompleting(), onCompletionWaiting() (a file's completion waits for Files and can be stopped
+  // now), uploadId (go on with an upload made before), resumable (the caller can repeat a failed completion), force
+  // (complete although Files may have stored the file: the person checked). The page stays busy (no automatic
+  // reload) until the upload ends. A stopped or failed upload drops its copy on the server, except when everything
+  // arrived, the completion failed and the caller is resumable: then the copy stays (error.uploadId) and sending again
+  // with options.uploadId completes it without sending the file again.
   async function send(blob, options) {
     const settings = options || {};
     const uploadId = typeof settings.uploadId === "string" && settings.uploadId ? settings.uploadId : newUploadId();
@@ -243,8 +254,8 @@
       return await upload(blob, settings, uploadId);
     } catch (error) {
       if (error && typeof error === "object") error.uploadId = uploadId;
-      const uncertain = Boolean(error && error.body && error.body.error === "completion_uncertain");
-      const kept = Boolean(error && error.completion && settings.resumable && !uncertain);
+      const stoppedNow = Boolean(error && error.name === "UploadStoppedError");
+      const kept = Boolean(error && error.completion && settings.resumable && !stoppedNow);
       if (!kept) discard(uploadId);
       throw error;
     } finally {

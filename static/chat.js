@@ -864,9 +864,16 @@ async function streamHistory(convId, options) {
   if (fresh) {
     // Replacing a copy on screen, the new one goes where it is: what was added after it (a question sent now) stays
     // below.
-    const connected = replaced ? replaced.filter(function (node) { return node.isConnected; }) : [];
-    if (connected.length) connected[connected.length - 1].after(end);
+    const owned = new Set(replaced || []);
+    let lastOwned = null;
+    Array.from(chatbox.children).forEach(function (node) {
+      if (owned.has(node)) lastOwned = node;
+    });
+    if (lastOwned) lastOwned.after(end);
     else chatbox.appendChild(end);
+  } else if (settings.above && settings.above.isConnected) {
+    // Older messages are still on their way: the marker above them tells a refresh that the history is incomplete.
+    chatbox.insertBefore(end, settings.above);
   }
   // The oldest history node on screen: older messages go above it.
   let oldest = settings.above || null;
@@ -878,7 +885,12 @@ async function streamHistory(convId, options) {
   let heldError = null;
   const olderThanHeld = [];
 
+  let gaveWay = false;
   const giveWay = function () {
+    if (gaveWay) return;
+    gaveWay = true;
+    // A full read brings the whole history: a block that offered to load older messages of an earlier read goes.
+    if (fresh) chatbox.querySelectorAll(".history-partial").forEach(function (node) { node.remove(); });
     if (!replaced) return;
     replaced.forEach(function (node) {
       if (node !== end) node.remove();
@@ -1116,12 +1128,17 @@ function refreshHistory(convId, shown) {
             if (node.isConnected) node.querySelectorAll(".msg-retry-btn").forEach(function (button) { button.remove(); });
           });
         }
+        // What was added while this was read (a question sent now, its waiting line) stays below what is drawn.
+        const snapshot = new Set(shown);
+        const below = Array.from(chatbox.children).find(function (node) { return !snapshot.has(node); }) || null;
         const drawn = [];
         newer.forEach(function (msg, index) {
           const node = renderStoredMessage(convId, msg, index === newer.length - 1 ? owner : null, function (id) {
             return newer.some(function (candidate) { return candidate.source === "image:" + id; });
           });
-          if (node) drawn.push(node);
+          if (!node) return;
+          if (below && below.isConnected) chatbox.insertBefore(node, below);
+          drawn.push(node);
         });
         // Fewer stored messages on screen than the server has from the oldest one shown: some were stored elsewhere
         // meanwhile; only the whole history brings them in order. It replaces only what this refresh owns: what was
@@ -1132,7 +1149,11 @@ function refreshHistory(convId, shown) {
           if (id !== null && id >= since) onScreen.add(id);
         });
         if (typeof data.range_count === "number" && data.range_count > onScreen.size) {
-          const owned = shown.filter(function (node) { return node.isConnected && !keptByRefresh(node); }).concat(drawn);
+          // An open question is awaited even if the full read below breaks before it reaches it.
+          waitForOpenQuestion(convId, Number(data.count) || 0, data.last);
+          const owned = shown.filter(function (node) {
+            return node.isConnected && !node.classList.contains("history-end");
+          }).concat(drawn);
           return streamHistory(convId, { replace: owned });
         }
         waitForOpenQuestion(convId, Number(data.count) || 0, data.last);
@@ -2504,6 +2525,14 @@ document.addEventListener("DOMContentLoaded", function () {
     const node = turn.questionNode;
     if (!node || !node.isConnected || node.dataset.messageId) return;
     if (Number.isInteger(turn.serverUserMessageId) && turn.serverUserMessageId > 0) {
+      const chatbox = document.getElementById("chatbox");
+      const stored = chatbox ? findRenderedMessage(chatbox, turn.serverUserMessageId) : null;
+      if (stored && stored !== node) {
+        // A history read drew the stored question meanwhile: the bubble drawn at send gives way to it.
+        node.remove();
+        turn.questionNode = stored;
+        return;
+      }
       node.dataset.messageId = String(turn.serverUserMessageId);
       node.logosMessage = {
         id: turn.serverUserMessageId,
