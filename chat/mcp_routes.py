@@ -230,6 +230,9 @@ def _announced_without_call(text) -> str | None:
     return body if body.endswith(":") else None
 
 
+_TEXT_CALL_MARKER = "[TOOL_CALL_START]"
+
+
 def _tool_call_written_as_text(text) -> str | None:
     """The call, normalized, when a reply is nothing but a tool call in JSON.
 
@@ -241,6 +244,10 @@ def _tool_call_written_as_text(text) -> str | None:
         body = body[3:-3].strip()
         if body.lower().startswith("json"):
             body = body[4:].strip()
+    # The model's own marker form, [TOOL_CALL_START]name {json...}: often cut off, so it is not parsed,
+    # only recognized as a call that never ran (#1721).
+    if body.startswith(_TEXT_CALL_MARKER):
+        return " ".join(body.split())
     if not body.startswith("{"):
         return None
     try:
