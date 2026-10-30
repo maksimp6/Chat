@@ -405,8 +405,8 @@ def build_response_payload(
         if user_cap > 0:
             params["max_output_tokens"] = user_cap
         params.pop("reasoning", None)
-    # Background mode is off unless asked for (owner, 30.10.2026, #1723): it queued every
-    # round at the provider for 1-3 minutes before the first event.
+    # Background mode is off (owner, 30.10.2026, #1723): it queued every round at the
+    # provider for 1-3 minutes before the first event.
     is_background = params.get("background", False)
 
     if is_background:
