@@ -49,7 +49,8 @@ Other units reach it only through their own ports:
 | `GET /api/court/hearings` | The sittings, newest first. |
 | `GET /api/court/hearings/<id>` | One sitting. |
 
-The HTTP side only reads the hall, and a sitting's record is never removed. Opening, judging again, decisions, filing to GitHub, closing and reopening are said in the court chat: the ⚖️ window's «Подать в суд» opens a new dialog where the current model and the Court sit (`LogosGroupChat.seat`, participants kept for that dialog only), and the model does what is asked with the `court` tool.
+The HTTP side only reads the hall, and a sitting's record is never removed. Everything else is said in the court chat. The ⚖️ window's «Подать в суд» opens a new dialog named «⚖️ Суд: <dialog>» whose model is the judge: the owner's issue is the verdict (`owner_verdict: ВИНОВЕН`), so the judge finds why the AI answered badly, not whether. The judge questions the accused with `court` action `interrogate`: the question goes as the user into a copy of the accused dialog (`POST /api/conversations/<id>/copy`, a new provider conversation holding the same messages, «⚖️ Улики: <dialog>»), so the original dialog never hears of the court. The judge writes the conclusion of guilt with action `conclusion`; the window shows it with the sitting.
+
 
 ## Tools
 

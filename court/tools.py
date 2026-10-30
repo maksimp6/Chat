@@ -15,9 +15,11 @@ from court._vendor.schema import object_schema
 from court.hearings import (
     DECISIONS,
     close_hearing,
+    conclude,
     decide_case,
     file_hearing_case,
     get_hearing,
+    interrogate,
     list_hearings,
     open_hearing,
     rejudge_hearing,
@@ -134,6 +136,18 @@ def _speak(args, cfg=None):
     }
 
 
+def _interrogate(args, cfg=None):
+    return {
+        "success": True,
+        **interrogate(str(args.get("conversation_id") or ""), str(args.get("message") or "")),
+    }
+
+
+def _conclude(args, cfg=None):
+    hearing = conclude(str(args.get("conversation_id") or ""), str(args.get("text") or ""))
+    return {"success": True, "hearing": hearing}
+
+
 def _close(args, cfg=None):
     hearing = close_hearing(
         str(args.get("hearing_id") or ""), str(args.get("reason") or "")
@@ -169,6 +183,11 @@ _ACTIONS: dict[str, dict[str, Any]] = {
                   "about": "подать дело заседания в GitHub"},
     "speak": {"fn": _speak, "required": ["conversation_id"], "write": True,
               "about": "слово суда в групповом чате диалога"},
+    "interrogate": {"fn": _interrogate, "required": ["conversation_id", "message"], "write": True,
+                    "about": "допрос обвиняемого: message уходит от лица пользователя в копию его диалога "
+                             "conversation_id, оригинал не меняется и обвиняемый не знает о суде; ответ — его реплика"},
+    "conclusion": {"fn": _conclude, "required": ["conversation_id", "text"], "write": True,
+                   "about": "заключение вины в открытое заседание над диалогом conversation_id: почему ИИ ответил плохо"},
     "hearing_close": {"fn": _close, "required": ["hearing_id", "reason"], "write": True,
                       "about": "закрыть заседание с причиной"},
     "hearing_reopen": {"fn": _reopen, "required": ["hearing_id", "reason"], "write": True,
@@ -202,6 +221,8 @@ _FIELDS = {
     },
     "decision": {"type": "string", "enum": list(DECISIONS)},
     "reason": {"type": "string", "minLength": 1},
+    "message": {"type": "string", "minLength": 1, "description": "interrogate: вопрос обвиняемому от лица пользователя"},
+    "text": {"type": "string", "minLength": 1, "description": "conclusion: текст заключения вины"},
     **_HEARING,
     **_CASE,
     **_CRISIS,

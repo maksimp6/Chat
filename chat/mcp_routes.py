@@ -2364,6 +2364,63 @@ def conversations():
     return jsonify({"conversations": list_owned_conversations(owner_id)})
 
 
+@mcp_bp.route("/api/conversations/<conv_id>/copy", methods=["POST"])
+def copy_conversation(conv_id):
+    """A copy of a dialog for the Court: its messages in a new dialog with its own provider
+    conversation, so what is asked in the copy never reaches the original."""
+    owner_id = get_current_owner_id()
+    if not check_access(conv_id, owner_id):
+        return jsonify(error_body("conversation_not_found")), 404
+    data = request.get_json(silent=True) or {}
+    try:
+        model = validate_dialog_model(data.get("model"))
+    except ValueError:
+        return jsonify(error_body("model_not_available_for_dialog")), 400
+    except bound.ModelDiscoveryError:
+        return jsonify(error_body("model_catalog_unavailable")), 503
+    turns = [
+        m
+        for m in get_messages(conv_id)
+        if m.get("role") in ("user", "assistant")
+        and m.get("source") != "court"
+        and str(m.get("text") or "").strip()
+    ]
+    items = [
+        {
+            "type": "message",
+            "role": m["role"],
+            "content": [
+                {
+                    "type": "input_text" if m["role"] == "user" else "output_text",
+                    "text": m["text"],
+                }
+            ],
+        }
+        for m in turns
+    ]
+    client = logos_client_type()(bound.Config)
+    trace = bound.ExecutionTrace()
+    try:
+        provider_id = client.create_conversation(execution_trace=trace)["id"]
+        if items:
+            client.add_conversation_items(provider_id, items, trace)
+    except Exception as exc:
+        logger.exception("[COPY] Provider copy of %s failed", conv_id)
+        return jsonify(error_body("provider_copy_failed", message=str(exc))), 502
+    copy_id = str(uuid.uuid4())
+    title = normalize_conversation_title(
+        data.get("title") or get_conversation_title(conv_id)
+    )
+    set_owner(copy_id, owner_id)
+    create_conversation(copy_id, title, model)
+    set_yandex_conversation(copy_id, provider_id)
+    for m in turns:
+        add_message(copy_id, m["role"], m["text"])
+    return jsonify(
+        {"id": copy_id, "title": title, "model": model, "messages": len(turns)}
+    ), 201
+
+
 def _message_id_arg(name):
     """The message id in query argument ``name``: None when it is absent; ValueError when it is not an id."""
     raw = request.args.get(name)

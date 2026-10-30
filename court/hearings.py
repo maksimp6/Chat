@@ -14,8 +14,12 @@ The HTTP API is the blueprint ``court_bp`` (``/api/court``), the hall itself is
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import time
+import urllib.error
+import urllib.request
 from typing import Any
 from uuid import uuid4
 
@@ -37,10 +41,12 @@ from court.judging import COURT_SOURCE, judge_dialog, rules_table
 __all__ = [
     "DECISIONS",
     "close_hearing",
+    "conclude",
     "court_bp",
     "decide_case",
     "file_hearing_case",
     "get_hearing",
+    "interrogate",
     "list_hearings",
     "open_hearing",
     "prepare_court_records",
@@ -167,6 +173,9 @@ def open_hearing(
         "crisis": bool(crisis),
         "closure": "OPEN",
         "closure_reason": "",
+        # The owner's issue is the verdict: the sitting finds why, never whether.
+        "owner_verdict": "ВИНОВЕН",
+        "conclusion": None,
         "protocol": protocol,
         "cases": [_new_case(case) for case in protocol["cases"]],
         "revision": 1,
@@ -461,6 +470,65 @@ def speak(conversation_id: str, *, crisis: bool | None = None) -> dict[str, Any]
         )
         hearing = _save(hearing)
     return {"message_id": message_id, "text": text, "hearing": hearing}
+
+
+# --- the judge's questions to the accused and the conclusion of guilt ----------
+
+
+def _local_post(path: str, body: dict[str, Any]) -> Any:
+    """A request to this Logos server itself: the copy and the questions take the chat's own routes."""
+    port = os.environ.get("LOGOS_PORT") or "8080"
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{port}{path}",
+        data=json.dumps(body).encode("utf-8"),
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req) as response:
+            return json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        raise ValueError(f"{path}: {exc.read().decode('utf-8', 'replace')}") from exc
+
+
+def interrogate(conversation_id: str, message: str) -> dict[str, Any]:
+    """Ask the accused as the user, in a copy of its dialog: the original never hears of the court."""
+    owner = _owner()
+    conversation_id = str(conversation_id)
+    _dialog_messages(conversation_id, owner)
+    key = "court/copy/" + conversation_id
+    copy = get_store().get(key)
+    if copy is None:
+        row = next(
+            (r for r in list_owned_conversations(owner) if r.get("id") == conversation_id),
+            {},
+        )
+        title = get_conversation_title(conversation_id, "") or conversation_id
+        made = _local_post(
+            f"/api/conversations/{conversation_id}/copy",
+            {"model": row.get("model"), "title": f"⚖️ Улики: {title}"},
+        )
+        copy = {"id": made["id"], "model": made["model"]}
+        with get_store().transaction() as tx:
+            tx.set(key, copy)
+    answer = _local_post(
+        "/api/chat",
+        {"conversation_id": copy["id"], "model": copy["model"], "message": str(message)},
+    )
+    return {
+        "copy_id": copy["id"],
+        "question": str(message),
+        "answer": answer.get("reply") if isinstance(answer, dict) else answer,
+    }
+
+
+def conclude(conversation_id: str, text: str) -> dict[str, Any]:
+    """The judge's conclusion of guilt on the open sitting over the dialog."""
+    hearing = _hearing_of(str(conversation_id))
+    if hearing is None:
+        raise ValueError("no open sitting over this dialog: open it first (hearing_open)")
+    hearing["conclusion"] = {"text": str(text), "at": int(time.time())}
+    return _save(hearing)
 
 
 # --- HTTP: the hall is read here; it is changed only by what is said in the court chat --------------------------------------------------------------------

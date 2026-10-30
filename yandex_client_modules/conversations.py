@@ -54,6 +54,27 @@ class YandexConversationMixin:
         except requests.RequestException as exc:
             raise YandexClientError("Create conversation: " + str(exc)) from exc
 
+    def add_conversation_items(self, provider_id, items, execution_trace=None):
+        """Append message items to a provider conversation, twenty items per request."""
+        from yandex_client_modules.request_mixin import (
+            _resolve_global_provider_credential,
+            provider_request_headers,
+        )
+
+        credential = _resolve_global_provider_credential(self, execution_trace)
+        headers = provider_request_headers(credential)
+        url = f"{self.conversations_url}/{provider_id}/items"
+        try:
+            for start in range(0, len(items), 20):
+                chunk = {"items": items[start : start + 20]}
+                self._log_request("POST", url, json=chunk)
+                resp = self._log_response(
+                    self.session.post(url, json=chunk, headers=headers, timeout=30)
+                )
+                resp.raise_for_status()
+        except requests.RequestException as exc:
+            raise YandexClientError("Add conversation items: " + str(exc)) from exc
+
     def _conversation_created(self, data, execution_trace):
         provider_id = data.get("id") if isinstance(data, dict) else None
         if not isinstance(provider_id, str) or not provider_id.strip():

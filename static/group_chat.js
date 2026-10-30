@@ -36,36 +36,6 @@
 
   var memoryOnly = readStored();
 
-  // A dialog can keep its own participants: a court chat seats its model and the Court only there.
-  var DIALOGS_KEY = "group_chat_dialogs";
-
-  function readDialogs() {
-    try {
-      var value = JSON.parse(localStorage.getItem(DIALOGS_KEY) || "{}");
-      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-    } catch (error) {
-      return {};
-    }
-  }
-
-  var dialogsMemory = readDialogs();
-
-  function ownKeys() {
-    var id = typeof currentConvId !== "undefined" ? currentConvId : null;
-    var keys = id ? dialogsMemory[id] : null;
-    return Array.isArray(keys) ? keys : null;
-  }
-
-  function seat(conversationId, keys) {
-    dialogsMemory[conversationId] = keys.slice();
-    try {
-      localStorage.setItem(DIALOGS_KEY, JSON.stringify(dialogsMemory));
-    } catch (error) {
-      // The seating then lasts until the page is reloaded.
-    }
-    syncButton();
-  }
-
   function dialogModels() {
     var text = (typeof modelsData !== "undefined" && modelsData.text) || {};
     return Object.keys(text).filter(function (key) {
@@ -82,7 +52,7 @@
   // The chosen participants that can still answer; fewer than two means the chat is not a group.
   function models() {
     var available = dialogModels().concat([COURT]);
-    return (ownKeys() || memoryOnly).filter(function (key) { return available.includes(key); });
+    return memoryOnly.filter(function (key) { return available.includes(key); });
   }
 
   function label(key) {
@@ -132,9 +102,7 @@
         if (box.checked) chosen.add(key);
         else chosen.delete(key);
         // Order of the catalog is the order of the answers.
-        var picked = keys.filter(function (k) { return chosen.has(k); });
-        if (ownKeys()) seat(currentConvId, picked);
-        else writeStored(picked);
+        writeStored(keys.filter(function (k) { return chosen.has(k); }));
         status.textContent = summary();
       });
       row.appendChild(box);
@@ -194,7 +162,6 @@
 
   window.LogosGroupChat = {
     models: models, followUpText: followUpText, label: label, open: open, COURT: COURT, courtTurn: courtTurn,
-    seat: seat,
   };
   window.openGroupChatModal = open;
   window.LogosCoreAPI.ui.actions.register("group.close", close);
@@ -202,6 +169,5 @@
   else syncButton();
   // The catalog loads after the page: the button is checked again once it has.
   window.addEventListener("logos:model-changed", syncButton);
-  window.addEventListener("logos:conversation-selected", syncButton);
   window.addEventListener("load", function () { setTimeout(syncButton, 3000); });
 })();
