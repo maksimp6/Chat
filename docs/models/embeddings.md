@@ -9,8 +9,8 @@ credentials, and sends its project in the provider headers.
 | --- | --- | --- |
 | `text-search-doc` | `text-search-doc/latest` | 256 |
 | `text-search-query` | `text-search-query/latest` | 256 |
-| `text-embeddings-v2-doc` | `text-embeddings-v2-doc/` | 128, 256, 512, 768 |
-| `text-embeddings-v2-query` | `text-embeddings-v2-query/` | 128, 256, 512, 768 |
+| `text-embeddings-v2-doc` | `text-embeddings-v2-doc/latest` | 128, 256, 512, 768 |
+| `text-embeddings-v2-query` | `text-embeddings-v2-query/latest` | 128, 256, 512, 768 |
 
 The full URI is `emb://<active-project>/<suffix>`. These models are listed in the
 separate `embedding` section of `/api/models`, not in the chat model selector.

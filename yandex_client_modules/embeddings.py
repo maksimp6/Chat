@@ -112,7 +112,9 @@ def embed_one(
         UPSTREAM_URL, json=payload, headers=headers, timeout=timeout
     )
     if response.status_code != 200:
-        raise requests.HTTPError(f"upstream status {response.status_code}")
+        # The provider says why it refused (model URI, dimensions, quota); keep that text.
+        detail = response.text[:300]
+        raise requests.HTTPError(f"upstream status {response.status_code}: {detail}")
     data = response.json()
     usage = data.get("usage") if isinstance(data, dict) else None
     tokens = _token_count(usage.get("prompt_tokens")) if isinstance(usage, dict) else 0
@@ -205,7 +207,7 @@ def embed_texts(
             # Texts already embedded were paid for, so the error says how far it got.
             raise EmbeddingError(
                 "embedding_upstream_failed",
-                "the embedding provider did not answer this text",
+                f"the embedding provider did not answer this text: {exc}",
                 completed=len(vectors),
                 tokens_spent=total_tokens + getattr(exc, "tokens", 0),
             ) from exc

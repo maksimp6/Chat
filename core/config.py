@@ -247,13 +247,13 @@ EMBEDDING_MODELS = {
     },
     "text-embeddings-v2-doc": {
         "name": "Text Embeddings v2 Document",
-        "upstream": "text-embeddings-v2-doc/",
+        "upstream": "text-embeddings-v2-doc/latest",
         "type": "embedding",
         "dimensions": [128, 256, 512, 768],
     },
     "text-embeddings-v2-query": {
         "name": "Text Embeddings v2 Query",
-        "upstream": "text-embeddings-v2-query/",
+        "upstream": "text-embeddings-v2-query/latest",
         "type": "embedding",
         "dimensions": [128, 256, 512, 768],
     },
