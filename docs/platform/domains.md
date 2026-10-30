@@ -18,6 +18,10 @@ The platform uses the domain `maxxxpavlov.online` for all production services:
 - `oauth.maxxxpavlov.online` — OAuth 2.0 identity provider
 - `chrome.maxxxpavlov.online` — Chrome worker for browser operations
 - `agent-shell.maxxxpavlov.online` — Agent execution runtime
+- `maxxxpavlov.online` and `www.maxxxpavlov.online` — static site (`site` service)
+- `ai-proxy.maxxxpavlov.online` — AI Studio reverse proxy (`ai-proxy` service); set `YANDEX_BASE_URL` to `https://ai-proxy.maxxxpavlov.online/v1`
+
+All of these are served over HTTPS only. Every subdomain of `maxxxpavlov.online` must have a certificate that covers it (a wildcard `*.maxxxpavlov.online` plus the apex covers new subdomains).
 
 ### HTTPS Requirement
 

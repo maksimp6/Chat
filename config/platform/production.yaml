@@ -9,4 +9,6 @@ lanes:
       - chrome
       - logos
       - logos-browser
+      - site
+      - ai-proxy
     owner_id: "293531601"

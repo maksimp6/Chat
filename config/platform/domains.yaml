@@ -14,5 +14,16 @@ chrome.maxxxpavlov.online:
   service: chrome
   protocol: https
 
+maxxxpavlov.online:
+  service: site
+  protocol: https
+
+www.maxxxpavlov.online:
+  service: site
+  protocol: https
+
+ai-proxy.maxxxpavlov.online:
+  service: ai-proxy
+  protocol: https
 
 
