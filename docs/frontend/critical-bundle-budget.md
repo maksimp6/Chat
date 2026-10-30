@@ -38,13 +38,14 @@ critical-path budget and the whole-page weight are never accidentally mixed.
 
 ## Raw vs gzip rule
 
-Raw bytes on disk are the authoritative number for this budget: `app.py`
-does not enable HTTP compression and no gzip/Brotli step exists in
-`deploy/`, so raw bytes are what a client actually downloads today. Gzip
-size (Python's `gzip` module, `compresslevel=9`, each file compressed
-independently, matching how a compressing server would encode separate HTTP
-responses) is reported by the script for reference only, in case compression
-is added at a reverse proxy later — it is not used to decide pass/fail.
+Raw bytes on disk are the authoritative number for this budget. Since
+30.10.2026 the web process itself gzips text responses for clients that
+accept it (`web_shell/compression.py`, level 9, each file compressed
+independently), so a browser downloads about the gzip size the script
+reports; a client without `Accept-Encoding: gzip` still downloads the raw
+bytes. The gate keeps measuring raw bytes so it does not depend on the
+client. Static files at the current `?v=` fingerprint are cached as
+immutable, so a repeat visit downloads none of them.
 
 `templates/index.html` is measured as the template file on disk, not a
 Jinja-rendered response. The only runtime substitutions are the

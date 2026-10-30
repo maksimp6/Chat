@@ -15,6 +15,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | Module | Purpose |
 | --- | --- |
 | [`web_shell.shell`](shell.py) | The web shell: page, health, readiness, version, caching, errors and storage start-up. |
+| [`web_shell.compression`](compression.py) | Fewer bytes on a slow link: gzip for text responses (streams flushed per piece), JSON without ASCII escapes. |
 | [`web_shell.version`](version.py) | What this process serves: the UI fingerprint, the code revision and the boot time. |
 
 ## Ports

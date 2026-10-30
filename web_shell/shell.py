@@ -18,6 +18,7 @@ from web_shell.host import (
     memory_file_path,
     problem,
 )
+from web_shell.compression import install as install_compression
 from web_shell.version import boot_version
 
 logger = logging.getLogger("logos.web_shell")
@@ -55,7 +56,17 @@ def _set_web_cache_headers(response):
     if request.path == "/":
         response.headers["Cache-Control"] = "no-store, max-age=0"
     elif request.path.startswith("/static/"):
-        response.headers.setdefault("Cache-Control", "no-cache")
+        # The page asks for every file with ?v= set to the fingerprint of all served UI bytes (web_shell.version), so
+        # a file at the current fingerprint never changes: the browser keeps it without asking again. On a 10 kb/s
+        # link a repeat visit then loads only the page itself. Any other request still revalidates.
+        if (
+            STATIC_ASSET_VERSION
+            and request.args.get("v") == STATIC_ASSET_VERSION
+            and response.status_code in (200, 304)
+        ):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers.setdefault("Cache-Control", "no-cache")
     elif request.path.startswith("/api/"):
         # API responses may contain user-specific state, traces, settings, or credentials.
         response.headers["Cache-Control"] = "no-store"
@@ -133,6 +144,8 @@ def install(app: Flask) -> None:
     STATIC_ASSET_VERSION = APP_VERSION["ui_version"]
     logger.info("[BOOT] hello: Logos backend module loaded")
     app.register_error_handler(Exception, _handle_unexpected_error)
+    # Response hooks run in reverse order: compression comes last, after every hook that sets headers.
+    install_compression(app)
     app.after_request(_set_web_cache_headers)
     if _memory_path_configured():
         _initialize_storage()
