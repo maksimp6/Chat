@@ -126,11 +126,16 @@
         LogosToast.show("Трейс загружен в файловый менеджер.");
       })
       .catch(function (error) {
-        var reason = error && error.body && error.body.error === "completion_uncertain"
+        var code = error && error.body ? error.body.error : null;
+        var reason = code === "completion_uncertain"
           ? "сервер не ответил вовремя, трейс мог сохраниться: проверьте файловый менеджер"
-          : error && error.status
-            ? "сервер отклонил файл (HTTP " + error.status + ")"
-            : "ошибка сервера";
+          : code === "files_unreachable" || (error && (error.status === 429 || error.status === 408))
+            ? "файлы временно недоступны, повторите позже"
+            : error && error.body && error.body.message
+              ? error.body.message
+              : error && error.status
+                ? "сервер отклонил файл (HTTP " + error.status + ")"
+                : "ошибка сервера";
         LogosToast.error("Не удалось загрузить трейс: " + reason);
       })
       .finally(function () {

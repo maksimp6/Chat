@@ -274,6 +274,8 @@
   // server answers (an upload already gone counts as dropped), or while its completion is being sent.
   function discard(uploadId) {
     if (!uploadId) return Promise.resolve();
+    // The page waits for it before an automatic reload, so the copy is not left behind.
+    const release = typeof window.LogosDispatcher.hold === "function" ? window.LogosDispatcher.hold() : function () {};
     return persist(function () {
       return request("/api/uploads/" + encodeURIComponent(uploadId), { method: "DELETE" }, BASE_WAIT_MS).catch(
         function (error) {
@@ -284,8 +286,12 @@
     }, function (error) {
       return passes(error) || (Boolean(error) && error.status === 409);
     }).then(
-      function () {},
-      function () {},
+      function () {
+        release();
+      },
+      function () {
+        release();
+      },
     );
   }
 

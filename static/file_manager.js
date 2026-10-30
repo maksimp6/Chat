@@ -87,11 +87,29 @@ window.fetchVectorStores = function () {
   // The upload rows outlive the window: an upload goes on (for hours on a slow link) while the window is closed, and
   // its row comes back, with its «Отменить», «Повторить» or «Сохранить всё равно», when the window opens again.
   var uploadRows = new Set();
-  // Uploads whose pieces all arrived but whose completion failed keep their copy on the server for those buttons.
-  // When the page goes (a reload), nothing can use them any more, so they are dropped.
-  var keptUploads = new Set();
+  // Uploads whose pieces all arrived but whose completion failed keep their copy on the server for those buttons, and
+  // keep the page from its automatic reload while they wait for the person (upload id -> release of that hold). Only a
+  // reload the person starts drops them.
+  var keptUploads = new Map();
+  // Uploads running in any window, and the file list of the window open now: a row carried into a new window acts on
+  // that window.
+  var pendingUploads = 0;
+  var reloadFileList = function () {};
+
+  function keepUpload(uploadId) {
+    if (keptUploads.has(uploadId)) return;
+    var release = typeof window.LogosDispatcher.hold === "function" ? window.LogosDispatcher.hold() : function () {};
+    keptUploads.set(uploadId, release);
+  }
+
+  function releaseKept(uploadId) {
+    var release = keptUploads.get(uploadId);
+    keptUploads.delete(uploadId);
+    if (release) release();
+  }
+
   window.addEventListener("pagehide", function () {
-    keptUploads.forEach(function (uploadId) {
+    keptUploads.forEach(function (release, uploadId) {
       try {
         fetch("/api/uploads/" + encodeURIComponent(uploadId), { method: "DELETE", keepalive: true }).catch(function () {});
       } catch (error) {
@@ -640,7 +658,7 @@ window.fetchVectorStores = function () {
     // Строки загрузок и ошибок лежат в #file-upload-status, а не в #file-list: список
     // перечитывается целиком, и вместе с ним исчезли бы строки ошибок и незавершённых загрузок.
     var uploadStatusEl = document.getElementById("file-upload-status");
-    var pendingUploads = 0;
+    reloadFileList = loadFiles;
     uploadRows.forEach(function (row) {
       uploadStatusEl.appendChild(row);
     });
@@ -650,7 +668,8 @@ window.fetchVectorStores = function () {
     // arrived but whose completion failed, without sending the file again; ``force`` completes it although Files may
     // have stored it (the person checked the list).
     function startUpload(file, uploadId, force) {
-      if (uploadId) keptUploads.delete(uploadId);
+      // The copy is used now: the send's own hold keeps the page until it ends.
+      if (uploadId) releaseKept(uploadId);
       var div = document.createElement("div");
       div.style.cssText =
         "padding:10px;border-bottom:1px solid var(--m-section-border,#eee);display:flex;align-items:center;gap:12px;opacity:0.6;";
@@ -664,9 +683,12 @@ window.fetchVectorStores = function () {
           "</div>",
         "</div>",
       ].join("");
-      uploadStatusEl.appendChild(div);
+      // The window open now, also when this is «Повторить» on a row carried from an earlier window.
+      (document.getElementById("file-upload-status") || uploadStatusEl).appendChild(div);
       uploadRows.add(div);
       pendingUploads += 1;
+      // The list is read again once, when the last upload ends or when the person must check it now.
+      var listNow = false;
       var forgetRow = function () {
         uploadRows.delete(div);
         div.remove();
@@ -741,7 +763,7 @@ window.fetchVectorStores = function () {
           // for example) is fixed; after completion_uncertain «Сохранить всё равно» sends it once the list was checked.
           // «Убрать» drops the copy.
           if (err && err.completion && err.uploadId) {
-            keptUploads.add(err.uploadId);
+            keepUpload(err.uploadId);
             var again = document.createElement("button");
             again.type = "button";
             again.className = "logos-btn";
@@ -755,13 +777,16 @@ window.fetchVectorStores = function () {
             drop.className = "logos-btn";
             drop.textContent = "Убрать";
             drop.addEventListener("click", function () {
-              keptUploads.delete(err.uploadId);
-              window.LogosUpload.discard(err.uploadId);
+              // The copy stays known (and dropped on the way out of the page) until the server confirms.
+              var release = keptUploads.get(err.uploadId);
               forgetRow();
+              window.LogosUpload.discard(err.uploadId).then(function () {
+                if (keptUploads.get(err.uploadId) === release) releaseKept(err.uploadId);
+              });
             });
             div.append(again, drop);
             // The list is what the person checks before «Сохранить всё равно»: it is read again now.
-            if (uncertain) loadFiles();
+            if (uncertain) listNow = true;
           } else {
             // Nothing is kept for this row: it does not come back when the window opens again.
             uploadRows.delete(div);
@@ -770,7 +795,7 @@ window.fetchVectorStores = function () {
         .finally(function () {
           pendingUploads -= 1;
           // The list is rebuilt once, after the last upload settles, so no row disappears early.
-          if (pendingUploads === 0) loadFiles();
+          if (pendingUploads === 0 || listNow) reloadFileList();
         });
     }
 

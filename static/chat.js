@@ -849,8 +849,9 @@ async function streamHistory(convId, options) {
   const settings = options || {};
   let replaced = settings.replace || null;
   const fresh = !settings.above;
-  // Going on with a read that a newer full read has replaced: that read brings everything.
-  if (!fresh && settings.token !== undefined && settings.token !== chatbox.dataset.historyLoad) return;
+  // Going on with a read whose copy a newer full read has replaced: that read brings everything. A newer read that
+  // broke before its first message replaced nothing, so the block still works then.
+  if (!fresh && settings.token !== undefined && settings.token !== chatbox.dataset.historyShown) return;
   if (fresh && !replaced) chatbox.replaceChildren();
   chatbox.dataset.conversationId = convId;
   if (fresh) {
@@ -875,6 +876,7 @@ async function streamHistory(convId, options) {
     else chatbox.appendChild(end);
   } else if (settings.above && settings.above.isConnected) {
     // Older messages are still on their way: the marker above them tells a refresh that the history is incomplete.
+    end.classList.add("history-above");
     chatbox.insertBefore(end, settings.above);
   }
   // The oldest history node on screen: older messages go above it.
@@ -891,6 +893,8 @@ async function streamHistory(convId, options) {
   const giveWay = function () {
     if (gaveWay) return;
     gaveWay = true;
+    // This read's copy is the one on screen now (an older-part block of an earlier read no longer goes on).
+    if (fresh) chatbox.dataset.historyShown = token;
     // A full read brings the whole history: a block that offered to load older messages of an earlier read goes.
     if (fresh) chatbox.querySelectorAll(".history-partial").forEach(function (node) { node.remove(); });
     if (!replaced) return;
@@ -1134,9 +1138,11 @@ function refreshHistory(convId, shown) {
         // The new messages go right after what this refresh read from, in order: what was added meanwhile below it (a
         // question sent now, its waiting line) stays below, and what another read adds above stays above. A message
         // already on screen (a question stamped meanwhile) stays where it is, and the next ones follow it.
+        // A full read still going on draws its newest messages just above its end marker, so new ones go below that
+        // marker; the marker of a read adding older messages above is not a place to draw at.
         let after = null;
         Array.from(chatbox.children).forEach(function (node) {
-          if (shown.indexOf(node) !== -1 && !node.classList.contains("history-end")) after = node;
+          if (shown.indexOf(node) !== -1 && !node.classList.contains("history-above")) after = node;
         });
         const drawn = [];
         newer.forEach(function (msg, index) {
