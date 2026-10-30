@@ -100,6 +100,40 @@ stop_app() {
   rm -f "$state/backend.pid"
 }
 
+# A restart never cuts a reply the user is waiting for: it waits until the running server
+# reports no chat turn. A server without the report (older code) is not waited for.
+drain_turns() {
+  [[ -n $pid ]] && alive "$pid" || return 0
+  local running waited=0
+  while running=$(curl --noproxy '*' --fail --silent --max-time 5 "$base/api/chat/turns/running"       | "$python" -c 'import json,sys; print(int(json.load(sys.stdin)["running"]))' 2>/dev/null)       && [[ $running =~ ^[0-9]+$ && $running -gt 0 ]]; do
+    (( waited % 60 == 0 )) && echo "DEPLOY_WAITING_FOR_TURNS running=$running waited_s=$waited"
+    sleep 5
+    waited=$((waited + 5))
+  done
+  return 0
+}
+
+# A server that accepts connections but does not answer is recorded before it is replaced.
+# The job log (a public repository) gets only process and memory state, no content; the
+# stack of every thread (faulthandler on SIGUSR1) stays in local state as hang-*.txt.
+record_unresponsive() {
+  [[ -n $pid ]] && alive "$pid" || return 0
+  curl --noproxy '*' --fail --silent --max-time 10 "$base/healthz" -o /dev/null && return 0
+  echo "DEPLOY_SERVER_UNRESPONSIVE pid=$pid"
+  grep -E '^(State|Threads|VmRSS|VmSwap|voluntary_ctxt_switches|nonvoluntary_ctxt_switches):' "/proc/$pid/status" || true
+  echo "DEPLOY_THREAD_STATES $(cat /proc/"$pid"/task/*/stat 2>/dev/null | sed 's/^.*) //' | cut -d' ' -f1 | sort | uniq -c | paste -sd' ')"
+  echo "DEPLOY_LOADAVG $(cat /proc/loadavg)"
+  grep -E '^(MemTotal|MemAvailable|SwapFree):' /proc/meminfo || true
+  local dump size
+  dump="$state/hang-$(date +%Y%m%d-%H%M%S).txt"
+  size=$(stat -c %s "$state/backend.log" 2>/dev/null || echo 0)
+  kill -USR1 "$pid" 2>/dev/null || true
+  sleep 3
+  tail -c +"$((size + 1))" "$state/backend.log" >"$dump" 2>/dev/null || true
+  echo "DEPLOY_HANG_DUMP $(basename "$dump") bytes=$(stat -c %s "$dump" 2>/dev/null || echo 0)"
+  return 0
+}
+
 outcome=already_running
 provision_rootagent() {
   # Bridge the RootAgent dispatch credential and repository from the deploy context
@@ -298,6 +332,8 @@ PY
   git -C "$app" for-each-ref --sort=-creatordate --format='%(refname)' refs/logos/deployments/ \
     | tail -n +21 | while read -r ref; do git -C "$app" update-ref -d "$ref"; done || true
   mkdir -p "$state/deploy-backups"
+  record_unresponsive
+  drain_turns
   stop_app
   if backup_memory && checkout_revision "$target" && start_app && wait_ready && process_revision_matches "$target"; then
     outcome=updated
@@ -314,6 +350,7 @@ PY
   exit 1
 fi
 
+if [[ $action == restart ]]; then record_unresponsive; drain_turns; fi
 if [[ $action == restart || $action == stop ]]; then stop_app; fi
 if [[ $action == stop ]]; then echo 'LOGOS_STOPPED'; exit 0; fi
 if [[ $action != status ]]; then start_app; fi

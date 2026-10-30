@@ -1,6 +1,7 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 
 from flask import Blueprint, copy_current_request_context, request, jsonify, Response
+import contextlib
 import contextvars
 import json as _json
 import threading
@@ -1713,6 +1714,31 @@ def _chat_error_response(
     ), 500
 
 
+# Chat turns this process is running. A deploy waits until none runs before it restarts the
+# server, so a reply the user is waiting for is never cut by an update.
+_turns_running = 0
+_turns_lock = threading.Lock()
+
+
+@contextlib.contextmanager
+def _running_turn():
+    global _turns_running
+    with _turns_lock:
+        _turns_running += 1
+    try:
+        yield
+    finally:
+        with _turns_lock:
+            _turns_running -= 1
+
+
+@mcp_bp.route("/api/chat/turns/running", methods=["GET"])
+def chat_turns_running():
+    """How many chat turns this process is running (the deploy waits for 0)."""
+    with _turns_lock:
+        return jsonify({"running": _turns_running})
+
+
 @mcp_bp.route("/api/chat", methods=["POST"])
 def chat():
     """POST /api/chat: one turn, answered as JSON or, with Accept: text/event-stream,
@@ -1729,7 +1755,8 @@ def chat():
         return _start_live_turn(t_start, admission)
     status, body = 500, {}
     try:
-        rv = _chat_turn(t_start=t_start, admission=admission)
+        with _running_turn():
+            rv = _chat_turn(t_start=t_start, admission=admission)
         status, body = _response_parts(rv)
     finally:
         # Recorded even when the turn raised, so a re-sent request never runs twice.
@@ -1782,9 +1809,10 @@ def _start_live_turn(t_start, admission):
     def worker():
         status, body = 500, None
         try:
-            status, body = _response_parts(
-                _chat_turn(t_start=t_start, admission=admission, live=live)
-            )
+            with _running_turn():
+                status, body = _response_parts(
+                    _chat_turn(t_start=t_start, admission=admission, live=live)
+                )
         except BaseException:
             logger.exception("[CHAT] Живой ход завершился сбоем")
             status = 500
