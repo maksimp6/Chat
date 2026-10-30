@@ -122,7 +122,23 @@ class YandexConversationMixin:
                     f"Create conversation: HTTP {resp.status_code}",
                     status_code=resp.status_code,
                 )
-            # not_sent, rejected, ambiguous or an unreadable answer: sent again.
+            if outcome == "ambiguous" or reason == "invalid_json":
+                # The provider may already have created the conversation, so a second
+                # POST could create another one: an unknown outcome is not retried (#1682).
+                unknown_reason = reason or failure_reason(exc, resp)
+                unknown_status = resp.status_code if resp is not None else None
+                raise YandexClientError(
+                    "Create conversation: outcome unknown ("
+                    + (str(exc) if exc is not None else f"HTTP {unknown_status}" if unknown_status else unknown_reason)
+                    + ")",
+                    status_code=unknown_status
+                    if unknown_status is not None and unknown_status >= 400
+                    else None,
+                    user_text=conversation_failed_text(
+                        time.monotonic() - first, unknown_reason
+                    ),
+                ) from exc
+            # not_sent or a transient refusal (408, 425, 429, 503): sent again.
             attempt += 1
             reason = reason or failure_reason(exc, resp)
             status_code = resp.status_code if resp is not None else None

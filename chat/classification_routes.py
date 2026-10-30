@@ -165,7 +165,9 @@ def classify_text():
             )
         ), 502
     if not 200 <= response.status_code < 300:
-        if response.status_code in {400, 401, 403, 404, 429}:
+        # Only a rate limit proves the request was not accepted (D3, #1681); any other
+        # answer may have been processed, so the reservation stays.
+        if response.status_code == 429:
             release_request(reservation)
         return jsonify(
             error_body(
