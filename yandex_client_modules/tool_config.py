@@ -97,7 +97,7 @@ def upgrade_dialog_settings(settings: Any) -> Any:
         upgraded["tools_config"] = tools
     # Only a missing key takes the new default: a stored stream value is a choice and stays.
     if revision < 3 and "stream" not in upgraded:
-        upgraded["stream"] = True
+        upgraded["stream"] = False
     # A selection saved before the cache category existed could not have chosen it.
     categories = upgraded.get("active_tool_categories")
     if revision < 4 and isinstance(categories, list) and "cache" not in categories:
