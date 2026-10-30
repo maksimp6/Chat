@@ -96,6 +96,7 @@
     <link rel="stylesheet" href="{{ static_root }}/departments.css?v={{ static_version }}" />
     <link rel="stylesheet" href="{{ static_root }}/environments.css?v={{ static_version }}" />
     <script src="{{ static_root }}/departments.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/group_chat.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/partner_relations.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/environments.js?v={{ static_version }}" defer></script>
   </head>
@@ -234,6 +235,15 @@
               data-action="header.departments.open"
             >
               🏢</button
+            ><button
+              id="group-chat-btn"
+              type="button"
+              class="header-btn logos-btn"
+              title="Групповой чат"
+              aria-label="Групповой чат"
+              data-action="header.group.open"
+            >
+              👥</button
             ><button
               id="provider-credentials-btn"
               type="button"

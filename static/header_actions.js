@@ -24,6 +24,7 @@
     actions.register("header.treasury.open", call("openTreasuryPanel"));
     actions.register("header.dozzle.open", call("openDozzleLogs"));
     actions.register("header.departments.open", call("openDepartmentsModal"));
+    actions.register("header.group.open", call("openGroupChatModal"));
     actions.register("header.credentials.open", call("openProviderCredentialsModal"));
 
   }

@@ -1024,13 +1024,45 @@ document.addEventListener("DOMContentLoaded", function () {
     return Boolean(modelsData && modelsData.voice && modelsData.voice[modelKey]);
   }
 
+  // Group chat: the user's own message goes to the first chosen model, then each other chosen model is asked
+  // to speak into the same chat. Without two chosen models this is an ordinary send.
+  // «Стоп» ends the whole chain, not only the answer being written.
+  let groupStopped = false;
+  async function sendGroupAware() {
+    const group = window.LogosGroupChat ? window.LogosGroupChat.models() : [];
+    if (group.length < 2 || !input || !input.value.trim() || pendingImages.length) return sendTurn(null);
+    const original = currentModel;
+    groupStopped = false;
+    try {
+      for (let index = 0; index < group.length; index += 1) {
+        if (index > 0) {
+          if (!currentConvId || pendingConversations.has(currentConvId)) break;
+          input.value = window.LogosGroupChat.followUpText(group[index], group);
+        }
+        window.changeModel(group[index], true);
+        await sendTurn(null);
+        if (groupStopped) break;
+        // A turn that failed puts its text back into the input: the chain stops there, and a
+        // follow-up that was never the user's own words is not left in the input.
+        if (input.value) {
+          if (index > 0) input.value = "";
+          break;
+        }
+      }
+    } finally {
+      window.changeModel(original, true);
+      if (typeof updateModelButton === "function") updateModelButton();
+    }
+  }
+
   function sendMessage() {
     const running = currentConvId ? activeChatRequests.get(currentConvId) : null;
     if (running) {
+      groupStopped = true;
       running.abort();
       return;
     }
-    return sendTurn(null);
+    return sendGroupAware();
   }
 
   window.addEventListener("logos:conversation-selected", syncSendButton);
@@ -2553,7 +2585,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         // Enter only sends: during an answer the send is refused with a hint, and «Стоп» alone stops it.
-        sendTurn(null);
+        sendGroupAware();
       }
     });
 
