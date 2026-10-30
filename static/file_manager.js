@@ -140,12 +140,6 @@ window.fetchVectorStores = function () {
       return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + " " + units[i];
     }
 
-    // The server accepts up to 128 MB: budget a fixed base plus time at a 512 KB/s floor,
-    // capped at the dispatcher's 5-minute maximum.
-    function uploadTimeoutMs(bytes) {
-      return Math.min(30000 + Math.ceil(bytes / (512 * 1024)) * 1000, 300000);
-    }
-
     // Resolves with whether the copy worked, so the caller can say so.
     function copyToClipboard(text) {
       return Promise.resolve()
@@ -645,7 +639,7 @@ window.fetchVectorStores = function () {
             '<div style="flex:1;min-width:0;">',
             '    <div style="font-weight:bold;color:var(--m-text,#222);word-break:break-all;">' +
               UI.escapeHtml(file.name) +
-              ' <span style="font-size:11px;color:var(--m-accent,#4a90d9);">(загрузка...)</span></div>',
+              ' <span class="file-upload-progress" style="font-size:11px;color:var(--m-accent,#4a90d9);">(загрузка...)</span></div>',
             '    <div style="font-size:12px;color:var(--m-muted,#666);">' +
               formatBytes(file.size) +
               "</div>",
@@ -654,21 +648,17 @@ window.fetchVectorStores = function () {
           uploadStatusEl.appendChild(div);
           pendingUploads += 1;
 
-          var formData = new FormData();
-          formData.append("file", file);
-          formData.append("purpose", "assistants");
-
-          window.LogosDispatcher.request(
-            "/api/files",
-            { method: "POST", body: formData },
-            { timeoutMs: uploadTimeoutMs(file.size) },
-          )
-            .then(function (r) {
-              if (!r.ok)
-                return readJson(r).then(function (body) {
-                  throw statusError(r, body && body.error);
-                });
-            })
+          var progress = div.querySelector(".file-upload-progress");
+          // Sent in pieces that survive a broken connection (static/upload.js): on a slow link a file of any size
+          // arrives, and a drop costs at most the piece in flight.
+          window.LogosUpload.send(file, {
+            name: file.name,
+            kind: "file",
+            purpose: "assistants",
+            onProgress: function (received, size) {
+              if (progress && size > 0) progress.textContent = "(загрузка " + Math.floor((received * 100) / size) + "%)";
+            },
+          })
             .then(function () {
               div.remove();
             })

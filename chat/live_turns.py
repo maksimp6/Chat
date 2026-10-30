@@ -477,7 +477,7 @@ def fingerprint(data: dict[str, Any]) -> str:
             [
                 data.get("message"),
                 data.get("model") or params.get("model"),
-                # The photos themselves (their data URLs), so a different photo is a different turn.
+                # The photos themselves (their data URLs or upload ids), so a different photo is a different turn.
                 attachments if isinstance(attachments, list) else [],
                 data.get("retry_message_id"),
             ],

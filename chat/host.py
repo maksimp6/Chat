@@ -104,6 +104,7 @@ class Host:
     provider_request_headers: (
         Any  # yandex_client_modules.request_mixin.provider_request_headers
     )
+    read_upload: Any  # workspace.upload_routes.read_upload
     record_usage: Any  # provider_accounts.quotas.record_usage
     record_yandex_mcp_activity: Any  # mcp_server.trace.record_yandex_mcp_activity
     registry: Any  # tool_providers.registry.registry
@@ -174,6 +175,7 @@ __all__ = [
     "normalize_conversation_title",
     "open_image_file",
     "persist_invocation_trace",
+    "read_upload",
     "provider_request_headers",
     "record_usage",
     "record_yandex_mcp_activity",
@@ -328,6 +330,10 @@ def open_image_file(*args: Any, **kwargs: Any) -> Any:
 
 def persist_invocation_trace(*args: Any, **kwargs: Any) -> Any:
     return current().persist_invocation_trace(*args, **kwargs)
+
+
+def read_upload(*args: Any, **kwargs: Any) -> Any:
+    return current().read_upload(*args, **kwargs)
 
 
 def provider_request_headers(*args: Any, **kwargs: Any) -> Any:

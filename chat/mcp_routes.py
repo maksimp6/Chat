@@ -50,6 +50,7 @@ from chat.host import (
     maybe_update_conversation_title,
     normalize_conversation_title,
     persist_invocation_trace,
+    read_upload,
     record_yandex_mcp_activity,
     reset_current_trace,
     set_owner,
@@ -433,8 +434,29 @@ def _detect_image_mime(image_bytes: bytes) -> str | None:
     return None
 
 
+def _uploaded_image_url(upload_id: Any) -> str:
+    """A completed image upload (POST /api/uploads, kind image) as a base64 data URL."""
+    if not isinstance(upload_id, str):
+        raise ValueError("upload_id must be a string")
+    try:
+        image_bytes = read_upload(upload_id)
+    except ValueError:
+        raise ValueError("each upload_id must name a complete image upload") from None
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise ValueError("each image must be at most 5 MB")
+    detected = _detect_image_mime(image_bytes)
+    if detected is None:
+        raise ValueError("unsupported image format")
+    return f"data:{detected};base64," + base64.b64encode(image_bytes).decode("ascii")
+
+
 def _validated_images(raw: Any) -> list[str]:
-    """Return the attached images as data URLs, or raise ValueError for a bad attachment."""
+    """Return the attached images as data URLs, or raise ValueError for a bad attachment.
+
+    An attachment is ``{"data_url": ...}``, or ``{"upload_id": ...}`` for a photo sent
+    before in pieces (POST /api/uploads): on a 10 kb/s link the turn itself then stays
+    small and a broken connection does not send the photo again.
+    """
     if raw is None:
         return []
     if not isinstance(raw, list) or len(raw) > MAX_IMAGES_PER_MESSAGE:
@@ -443,6 +465,9 @@ def _validated_images(raw: Any) -> list[str]:
         )
     data_urls = []
     for item in raw:
+        if isinstance(item, dict) and "upload_id" in item and "data_url" not in item:
+            data_urls.append(_uploaded_image_url(item.get("upload_id")))
+            continue
         url = item.get("data_url") if isinstance(item, dict) else None
         if not isinstance(url, str):
             raise ValueError("each attachment must have a data_url string")

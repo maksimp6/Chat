@@ -17,6 +17,7 @@ logos.memory
 logos.memory.lock
 .logos-environments/
 .safe_backups/
+data/uploads/
 
 # Logs and debug dumps
 logs/

@@ -10,12 +10,19 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 
 ## Public API
 
-`from workspace import …`: `file_routes`, `project_tree`.
+`from workspace import …`: `file_routes`, `project_tree`, `upload_routes`.
 
 | Module | Purpose |
 | --- | --- |
 | [`workspace.file_routes`](file_routes.py) | Flask routes for Files and Vector Stores API |
 | [`workspace.project_tree`](project_tree.py) | Functional project tree API with safe, bounded filesystem traversal. |
+| [`workspace.upload_routes`](upload_routes.py) | Uploads that survive a broken connection: a file or a photo sent in pieces at an offset (`/api/uploads`). |
+
+Other units reach it only through their own ports:
+
+| Provides | To |
+| --- | --- |
+| `workspace.upload_routes.read_upload` | `chat` |
 
 ## Ports
 
@@ -30,4 +37,4 @@ Everything `workspace` uses from other units is a field of `Host` in [`workspace
 ## Install
 
 - `composition/wiring.py` registers the `workspace` host factory (`register_all()`, or `register_units("workspace")` for this unit alone); the host is built on first use.
-- `composition/web.py` registers the blueprints `file_bp` (`workspace.file_routes`), `project_tree_bp` (`workspace.project_tree`).
+- `composition/web.py` registers the blueprints `file_bp` (`workspace.file_routes`), `upload_bp` (`workspace.upload_routes`), `project_tree_bp` (`workspace.project_tree`).

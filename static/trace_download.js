@@ -92,12 +92,6 @@
     }
   }
 
-  // The server accepts up to 128 MB: budget a fixed base plus time at a 512 KB/s floor,
-  // capped at the dispatcher's 5-minute maximum.
-  function uploadTimeoutMs(bytes) {
-    return Math.min(30000 + Math.ceil(bytes / (512 * 1024)) * 1000, 300000);
-  }
-
   function uploadToFileManager() {
     var payload;
     try {
@@ -108,9 +102,6 @@
     }
 
     var blob = new Blob([payload], { type: "application/json" });
-    var form = new FormData();
-    form.append("file", blob, traceFilename());
-    form.append("purpose", "assistants");
 
     var button = document.getElementById(uploadButtonId);
     if (button) {
@@ -118,27 +109,21 @@
       button.textContent = "⏳ Загрузка...";
     }
 
-    window.LogosDispatcher.request(
-      "/api/files",
-      { method: "POST", body: form },
-      { timeoutMs: uploadTimeoutMs(blob.size) },
-    )
-      .then(function (response) {
-        return response
-          .json()
-          .catch(function () {
-            return {};
-          })
-          .then(function (data) {
-            if (!response.ok) throw new Error("сервер отклонил файл (HTTP " + response.status + ")");
-            return data;
-          });
-      })
+    // Sent in pieces that survive a broken connection (static/upload.js): on a slow link a trace of any size arrives.
+    window.LogosUpload.send(blob, {
+      name: traceFilename(),
+      kind: "file",
+      purpose: "assistants",
+      onProgress: function (received, size) {
+        var currentButton = document.getElementById(uploadButtonId);
+        if (currentButton && size > 0) currentButton.textContent = "⏳ " + Math.floor((received * 100) / size) + "%";
+      },
+    })
       .then(function () {
         LogosToast.show("Трейс загружен в файловый менеджер.");
       })
       .catch(function (error) {
-        var reason = error instanceof TypeError ? "нет связи с сервером" : "ошибка сервера";
+        var reason = error && error.status ? "сервер отклонил файл (HTTP " + error.status + ")" : "ошибка сервера";
         LogosToast.error("Не удалось загрузить трейс: " + reason);
       })
       .finally(function () {

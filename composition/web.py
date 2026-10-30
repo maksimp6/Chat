@@ -57,12 +57,14 @@ from runtime.api import runtime_bp
 from storage.records import open_journal_store
 from web_shell import install as install_web_shell
 from workspace.file_routes import file_bp
+from workspace.upload_routes import upload_bp
 from workspace.project_tree import project_tree_bp
 
 BLUEPRINTS = (
     mcp_bp,
     chatgpt_mcp_bp,
     file_bp,
+    upload_bp,
     runtime_bp,
     local_agent_bp,
     cloudru_iam_bp,

@@ -39,7 +39,7 @@ Other units reach it only through their own ports:
 Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`](host.py), read only when a function runs. Functions keep their names as call shims; other ports are `bound.<name>`.
 
 <details>
-<summary>69 ports</summary>
+<summary>70 ports</summary>
 
 | Port | Provided by |
 | --- | --- |
@@ -98,6 +98,7 @@ Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`]
 | `normalize_conversation_title` | `storage.records.normalize_conversation_title` |
 | `open_image_file` | `storage.generated_images.open_image_file` |
 | `persist_invocation_trace` | `invocation.manager.persist_invocation_trace` |
+| `read_upload` | `workspace.upload_routes.read_upload` |
 | `record_usage` | `provider_accounts.quotas.record_usage` |
 | `record_yandex_mcp_activity` | `mcp_server.trace.record_yandex_mcp_activity` |
 | `registry` | `tool_providers.registry.registry` |

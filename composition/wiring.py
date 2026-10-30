@@ -181,6 +181,7 @@ def _chat():
     from storage.records import normalize_conversation_title
     from storage.generated_images import open_image_file
     from invocation.manager import persist_invocation_trace
+    from workspace.upload_routes import read_upload
     from yandex_client_modules.request_mixin import provider_request_headers
     from provider_accounts.quotas import record_usage
     from mcp_server.trace import record_yandex_mcp_activity
@@ -270,6 +271,7 @@ def _chat():
         normalize_conversation_title=normalize_conversation_title,
         open_image_file=open_image_file,
         persist_invocation_trace=persist_invocation_trace,
+        read_upload=read_upload,
         provider_request_headers=provider_request_headers,
         record_usage=record_usage,
         record_yandex_mcp_activity=record_yandex_mcp_activity,
