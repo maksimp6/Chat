@@ -1133,9 +1133,13 @@ document.addEventListener("DOMContentLoaded", function () {
   const attachBtn = document.getElementById("attach-btn");
   const imageInput = document.getElementById("image-input");
   const previewBox = document.getElementById("image-previews");
-  // Photos chosen for the next message; each has a file name and a base64 data URL.
+  // Photos chosen for the next message. Each has its file name, the photo as it is sent (blob), its preview URL, and
+  // once its upload is complete, the id the message names it by (uploadId).
   let pendingImages = [];
+  // Photos not ready to send yet: being prepared or still uploading.
   let imagesInFlight = 0;
+  // Photos being prepared that are not in the tray yet.
+  let imagesPreparing = 0;
   const MAX_IMAGES = 4;
   const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -1145,9 +1149,9 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!previewBox) return;
     previewBox.replaceChildren();
     previewBox.hidden = pendingImages.length === 0;
-    pendingImages.forEach(function (image, index) {
+    pendingImages.forEach(function (image) {
       const thumb = document.createElement("img");
-      thumb.src = image.dataUrl;
+      thumb.src = image.previewUrl;
       thumb.alt = image.name;
       thumb.className = "image-preview";
       const remove = document.createElement("button");
@@ -1155,41 +1159,118 @@ document.addEventListener("DOMContentLoaded", function () {
       remove.textContent = "×";
       remove.setAttribute("aria-label", "Убрать фото");
       remove.addEventListener("click", function () {
-        pendingImages.splice(index, 1);
-        renderPendingImages();
+        dropPendingImage(image);
       });
       const item = document.createElement("span");
       item.className = "image-preview-item";
       item.append(thumb, remove);
+      image.progressEl = null;
+      if (!image.uploadId) {
+        // How much of the photo the server has: on a slow link the upload takes a while.
+        const progress = document.createElement("span");
+        progress.className = "image-preview-progress";
+        progress.textContent = (image.progress || 0) + "%";
+        image.progressEl = progress;
+        item.appendChild(progress);
+      }
       previewBox.appendChild(item);
     });
   }
 
-  function readAsDataUrl(file) {
-    return new Promise(function (resolve, reject) {
-      const reader = new FileReader();
-      reader.onload = function () {
-        resolve(reader.result);
-      };
-      reader.onerror = function () {
-        reject(reader.error);
-      };
-      reader.readAsDataURL(file);
+  // A photo is drawn again at most PHOTO_MAX_SIDE px on its long side and saved as WebP (JPEG where the browser cannot
+  // write WebP) at PHOTO_QUALITY: a 3–5 MB phone photo becomes about 150–300 KB, minutes instead of an hour at
+  // 10 kb/s. The orientation from EXIF is applied; EXIF itself (with GPS) is not carried over. The preview shows the
+  // photo as it is sent. When the result is not smaller, the original goes.
+  const PHOTO_MAX_SIDE = 1600;
+  const PHOTO_QUALITY = 0.8;
+
+  function canvasBlob(canvas, type, quality) {
+    return new Promise(function (resolve) {
+      try {
+        canvas.toBlob(resolve, type, quality);
+      } catch (error) {
+        resolve(null);
+      }
     });
+  }
+
+  async function compressPhoto(file) {
+    if (typeof createImageBitmap !== "function") return file;
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch (error) {
+      return file;
+    }
+    try {
+      const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) return file;
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      let result = await canvasBlob(canvas, "image/webp", PHOTO_QUALITY);
+      if (!result || result.type !== "image/webp") {
+        // JPEG has no transparency: a PNG that may have it goes as it is.
+        if (file.type === "image/png") return file;
+        result = await canvasBlob(canvas, "image/jpeg", PHOTO_QUALITY);
+      }
+      return result && result.size > 0 && result.size < file.size ? result : file;
+    } finally {
+      if (typeof bitmap.close === "function") bitmap.close();
+    }
+  }
+
+  // Uploads a photo of the tray in pieces (static/upload.js), so a broken connection costs at most the piece in flight
+  // and the message itself stays small. The send waits until every photo of the tray is uploaded.
+  function uploadPendingImage(image) {
+    window.LogosUpload.send(image.blob, {
+      name: image.name,
+      kind: "image",
+      signal: image.controller.signal,
+      onProgress: function (received, size) {
+        image.progress = size > 0 ? Math.floor((received * 100) / size) : 0;
+        if (image.progressEl) image.progressEl.textContent = image.progress + "%";
+      },
+    })
+      .then(function (done) {
+        image.uploadId = done.upload_id;
+        if (image.progressEl) image.progressEl.remove();
+        image.progressEl = null;
+      })
+      .catch(function (error) {
+        // Removed from the tray: its upload was stopped on purpose.
+        if (image.controller.signal.aborted) return;
+        window.LogosToast.error("Фото «" + image.name + "» не загрузилось" + (error && error.message ? ": " + error.message : "") +
+          ". Прикрепите его снова.");
+        dropPendingImage(image);
+      })
+      .finally(function () {
+        imagesInFlight -= 1;
+        syncSendButton();
+      });
+  }
+
+  // A photo leaves the tray: its upload stops and the copy on the server is dropped.
+  function dropPendingImage(image) {
+    pendingImages = pendingImages.filter(function (candidate) { return candidate !== image; });
+    image.controller.abort();
+    if (image.uploadId) window.LogosUpload.discard(image.uploadId);
+    if (image.previewUrl) URL.revokeObjectURL(image.previewUrl);
+    renderPendingImages();
   }
 
   // Photos are for the chat they were attached in; switching chats drops them.
   window.addEventListener("logos:conversation-selected", function () {
     if (!pendingImages.length) return;
-    pendingImages = [];
-    renderPendingImages();
+    pendingImages.slice().forEach(dropPendingImage);
   });
 
   // Photos go only to a model that reads them; switching to another model drops the tray.
   window.addEventListener("logos:model-changed", function () {
     if (!pendingImages.length || window.modelAcceptsPhotos(currentModel)) return;
-    pendingImages = [];
-    renderPendingImages();
+    pendingImages.slice().forEach(dropPendingImage);
   });
 
   if (attachBtn && imageInput) {
@@ -1200,8 +1281,8 @@ document.addEventListener("DOMContentLoaded", function () {
       const files = Array.from(imageInput.files || []);
       imageInput.value = "";
       for (const file of files) {
-        // Count photos still being read, so two quick picks cannot pass the limit together.
-        if (pendingImages.length + imagesInFlight >= MAX_IMAGES) {
+        // Count photos still being prepared, so two quick picks cannot pass the limit together.
+        if (pendingImages.length + imagesPreparing >= MAX_IMAGES) {
           window.LogosToast.error("Можно прикрепить не больше " + MAX_IMAGES + " фото");
           break;
         }
@@ -1212,21 +1293,37 @@ document.addEventListener("DOMContentLoaded", function () {
         // The photo belongs to the chat and model it was picked in, even if the user switches while it is read.
         const scope = currentConvId + "|" + currentModel;
         imagesInFlight += 1;
+        imagesPreparing += 1;
         syncSendButton();
+        let image = null;
         try {
-          const dataUrl = await readAsDataUrl(file);
+          const blob = await compressPhoto(file);
           if (currentConvId + "|" + currentModel !== scope) {
             window.LogosToast.error("Фото «" + file.name + "» не прикреплено: сменился диалог или модель");
           } else {
-            pendingImages.push({ name: file.name, dataUrl: dataUrl });
+            image = {
+              name: file.name,
+              blob: blob,
+              previewUrl: URL.createObjectURL(blob),
+              uploadId: null,
+              progress: 0,
+              controller: new AbortController(),
+            };
+            pendingImages.push(image);
             renderPendingImages();
           }
         } catch (error) {
           window.LogosToast.error("Не удалось прочитать фото «" + file.name + "»");
         } finally {
-          imagesInFlight -= 1;
-          syncSendButton();
+          imagesPreparing -= 1;
+          // A photo in the tray stays not ready until its upload ends (uploadPendingImage).
+          if (!image) {
+            imagesInFlight -= 1;
+            syncSendButton();
+          }
         }
+        // Not awaited: the next photo is prepared while this one is uploading.
+        if (image) uploadPendingImage(image);
       }
     });
   }
@@ -2764,8 +2861,9 @@ document.addEventListener("DOMContentLoaded", function () {
           retry_message_id: turn.userMessageId === null ? undefined : turn.userMessageId,
           model: turn.model,
           params: turn.params,
+          // The photos were uploaded in pieces when they were attached; the message names them.
           attachments: sentImages.map(function (image) {
-            return { data_url: image.dataUrl };
+            return { upload_id: image.uploadId };
           }),
           request_id: turn.chatRequestId,
         }), live, chatController.signal);
