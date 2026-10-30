@@ -22,7 +22,7 @@ Other units reach it only through their own ports:
 | Provides | To |
 | --- | --- |
 | `api.contracts.ContractViolation` | `runtime` |
-| `api.contracts.validate_api_contract` | `runtime` |
+| `api.contracts.validate_api_contract` | `chat`, `runtime` |
 | `api.yandex_transport.yandex_request` | `tools.narration` |
 
 ## Ports

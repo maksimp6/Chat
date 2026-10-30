@@ -56,6 +56,7 @@ from chat.host import (
     set_yandex_conversation,
     settle_billing_to_treasury,
     start_invocation,
+    validate_api_contract,
     validate_dialog_model,
     validate_generation_params,
 )
@@ -2308,12 +2309,96 @@ def conversations():
     return jsonify({"conversations": list_owned_conversations(owner_id)})
 
 
+def _message_id_arg(name):
+    """The message id in query argument ``name``: None when it is absent; ValueError when it is not an id."""
+    raw = request.args.get(name)
+    if raw is None:
+        return None
+    if not re.fullmatch(r"[0-9]{1,18}", raw.strip()):
+        raise ValueError(f"{name} must be a message id")
+    return int(raw.strip())
+
+
+def _message_lines(messages, count):
+    """NDJSON lines: the conversation's message count, the messages newest first, the end."""
+    yield _json.dumps(
+        validate_api_contract("chat.conversation.messages.stream.start", {"count": count})
+    ) + "\n"
+    for message in reversed(messages):
+        yield _json.dumps(
+            validate_api_contract("chat.conversation.messages.stream.message", message),
+            ensure_ascii=False,
+        ) + "\n"
+    yield _json.dumps(
+        validate_api_contract("chat.conversation.messages.stream.end", {"end": True})
+    ) + "\n"
+
+
 @mcp_bp.route("/api/conversations/<conv_id>/messages", methods=["GET"])
 def get_conv_messages(conv_id):
+    """The stored history of a conversation, in three forms for a slow link (10 kb/s):
+
+    - ``?after=<id>``: only the messages newer than the one the client already shows
+      (with the count and the last message), so a client that waited for an answer
+      reads that answer, not the history again;
+    - ``Accept: application/x-ndjson`` (``?before=<id>``): a stream, newest first, one
+      message per line, so the latest messages show first and a broken read goes on
+      from the oldest one received;
+    - otherwise the whole history as JSON, as before.
+    """
     owner_id = get_current_owner_id(required=False)
     if not check_access(conv_id, owner_id):
         return jsonify(error_body("conversation_not_found")), 404
-    return jsonify({"messages": get_messages(conv_id)})
+    try:
+        after = _message_id_arg("after")
+        before = _message_id_arg("before")
+    except ValueError as error:
+        return jsonify(error_body("invalid_params", message=str(error))), 400
+    messages = get_messages(conv_id)
+    if after is not None:
+        newer = [message for message in messages if message["id"] > after]
+        return jsonify(
+            validate_api_contract(
+                "chat.conversation.messages.after.response",
+                {
+                    "messages": newer,
+                    "count": len(messages),
+                    "last": messages[-1] if messages else None,
+                },
+            )
+        )
+    if "application/x-ndjson" in (request.headers.get("Accept") or ""):
+        older = [
+            message for message in messages if before is None or message["id"] < before
+        ]
+        return Response(
+            _message_lines(older, len(messages)),
+            mimetype="application/x-ndjson",
+            headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        )
+    return jsonify({"messages": messages})
+
+
+@mcp_bp.route("/api/conversations/<conv_id>/state", methods=["GET"])
+def get_conv_state(conv_id):
+    """How many messages a conversation has and which is the last: what a client waiting
+    for an answer compares every few seconds, about 100 bytes instead of the history."""
+    owner_id = get_current_owner_id(required=False)
+    if not check_access(conv_id, owner_id):
+        return jsonify(error_body("conversation_not_found")), 404
+    messages = get_messages(conv_id)
+    last = messages[-1] if messages else None
+    return jsonify(
+        validate_api_contract(
+            "chat.conversation.state.response",
+            {
+                "count": len(messages),
+                "last_id": last["id"] if last else None,
+                "last_role": last["role"] if last else None,
+                "last_source": last.get("source") if last else None,
+            },
+        )
+    )
 
 
 @mcp_bp.route("/api/mcp/execute-approved", methods=["POST"])

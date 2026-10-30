@@ -190,7 +190,49 @@ TRACE = _object(
     },
 )
 
+# One stored chat message as the conversation history lists it (storage.records.get_messages).
+CHAT_MESSAGE = _object(
+    {
+        "id": INTEGER,
+        "role": NONEMPTY_STRING,
+        "text": ANY_JSON,
+        "cost": ANY_JSON,
+        "created_at": ANY_JSON,
+        "timings": ANY_JSON,
+        "usage": ANY_JSON,
+        "total_duration_ms": ANY_JSON,
+        "trace": ANY_JSON,
+        "source": ANY_JSON,
+        "attachments": ANY_JSON,
+    }
+)
+
 CONTRACTS = {
+    # GET /api/conversations/<id>/messages?after=<message id>: only the messages newer than
+    # one the client already shows, the number of messages and the last one.
+    "chat.conversation.messages.after.response": _object(
+        {
+            "messages": _list(CHAT_MESSAGE),
+            "count": INTEGER,
+            "last": _nullable(CHAT_MESSAGE),
+        }
+    ),
+    # The same with Accept: application/x-ndjson[, ?before=<message id>]: a start line with
+    # the number of messages in the conversation, one message per line, newest first, then
+    # an end line.
+    "chat.conversation.messages.stream.start": _object({"count": INTEGER}),
+    "chat.conversation.messages.stream.message": CHAT_MESSAGE,
+    "chat.conversation.messages.stream.end": _object({"end": BOOLEAN}),
+    # GET /api/conversations/<id>/state: what a waiting client compares, without the history.
+    "chat.conversation.state.response": _object(
+        {
+            "count": INTEGER,
+            "last_id": NULLABLE_INTEGER,
+            "last_role": NULLABLE_STRING,
+            "last_source": NULLABLE_JSON,
+        }
+    ),
+    "chat.error.basic": _object({"error": NONEMPTY_STRING}, additional=ANY_JSON),
     "runtime.profile.list.response": _object({"profiles": _list(SESSION_PROFILE)}),
     "runtime.profile.response": SESSION_PROFILE,
     "runtime.profile.clone.request": _object(

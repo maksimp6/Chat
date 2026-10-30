@@ -118,6 +118,7 @@ class Host:
     settle_billing_to_treasury: Any  # economy.billing.settle_billing_to_treasury
     start_invocation: Any  # invocation.manager.start_invocation
     traced_operation: Any  # observability.trace_manager.traced_operation
+    validate_api_contract: Any  # api.contracts.validate_api_contract
     validate_dialog_model: (
         Any  # provider_accounts.model_discovery.validate_dialog_model
     )
@@ -187,6 +188,7 @@ __all__ = [
     "settle_billing_to_treasury",
     "start_invocation",
     "traced_operation",
+    "validate_api_contract",
     "validate_dialog_model",
     "validate_generation_params",
 ]
@@ -378,6 +380,10 @@ def settle_billing_to_treasury(*args: Any, **kwargs: Any) -> Any:
 
 def start_invocation(*args: Any, **kwargs: Any) -> Any:
     return current().start_invocation(*args, **kwargs)
+
+
+def validate_api_contract(*args: Any, **kwargs: Any) -> Any:
+    return current().validate_api_contract(*args, **kwargs)
 
 
 def validate_dialog_model(*args: Any, **kwargs: Any) -> Any:

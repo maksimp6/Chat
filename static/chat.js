@@ -667,7 +667,8 @@ function checkStoredImageRequest(convId, anchor, imageRequestId) {
 }
 
 // A failed history load names its cause (no connection, slow or failing server) and offers «Повторить».
-function historyErrorBlock(convId, message) {
+// ``retryLoad`` goes on where the load stopped; without it the history is loaded again.
+function historyErrorBlock(convId, message, retryLoad) {
   const error = document.createElement("div");
   error.className = "empty-state error-state";
   const text = document.createElement("p");
@@ -678,7 +679,8 @@ function historyErrorBlock(convId, message) {
   retry.textContent = "Повторить";
   retry.addEventListener("click", function () {
     error.remove();
-    loadHistory(convId);
+    if (typeof retryLoad === "function") retryLoad();
+    else loadHistory(convId);
   });
   error.append(text, retry);
   return error;
@@ -702,16 +704,294 @@ function historyReloadErrorText(err) {
   return "Не удалось обновить диалог: нет связи с сервером. Проверьте соединение и нажмите «Повторить».";
 }
 
-function loadHistory(convId) {
+// The question a stored error answers: going back from the error past other errors, the first message is that
+// question when it is a user message. ``older`` is newest first; undefined means it ended before telling.
+function errorOwner(older) {
+  for (let index = 0; index < older.length; index += 1) {
+    if (older[index].source === "error") continue;
+    return older[index].role === "user" ? older[index] : null;
+  }
+  return undefined;
+}
+
+// One stored message as the chat shows it. ``owner`` is the question a stored error answers: «Повторить» re-sends it,
+// and only the newest error gets one. ``hasImage(id)`` tells whether an image request already has its picture.
+function renderStoredMessage(convId, msg, owner, hasImage) {
+  const retryText = owner ? owner.text : null;
+  // A user message that carried photos shows their count, as it did when it was sent.
+  const photos = msg.role === "user" && msg.attachments ? msg.attachments.images : 0;
+  const node = addMessage({
+    text: photos ? (msg.text ? msg.text + " · фото: " : "Фото: ") + photos : msg.text,
+    role: msg.source === "error" ? "error" : msg.role,
+    cost: msg.cost || 0,
+    timings: msg.timings,
+    totalDurationMs: msg.total_duration_ms || 0,
+    reasoning: msg.reasoning,
+    usage: msg.usage,
+    trace: msg.trace,
+    id: msg.id,
+    onRetry: retryText === null ? undefined : function () {
+      return window.logosRetryTurn({
+        text: retryText,
+        conversationId: convId,
+        userMessageId: owner.id,
+        imageCount: owner.attachments ? owner.attachments.images || 0 : 0,
+        replaces: node,
+      });
+    },
+    // A question with photos is not offered for editing: the photos would not go with the edited text.
+    editText: retryText !== null && !(owner.attachments && owner.attachments.images) ? retryText : undefined,
+  });
+  const imageRequest = msg.role === "user" && typeof msg.source === "string"
+    ? msg.source.match(/^image-request:([A-Za-z0-9_-]{16,128})$/)
+    : null;
+  if (node && imageRequest && !hasImage(imageRequest[1])) checkStoredImageRequest(convId, node, imageRequest[1]);
+  return node;
+}
+
+function waitForOpenQuestion(convId, count, last) {
+  // A plain question with no answer yet is still being answered on the server: wait for it, as after a lost connection.
+  if (last && last.role === "user" && !last.source && typeof window.logosResumeWaitingTurn === "function") {
+    window.logosResumeWaitingTurn(convId, Math.max(0, count - 1), last);
+  }
+}
+
+function showEmptyChat(chatbox, before) {
+  const empty = document.createElement("div");
+  empty.className = "empty-state";
+  empty.textContent = "Начните диалог";
+  if (before && before.isConnected) chatbox.insertBefore(empty, before);
+  else chatbox.appendChild(empty);
+}
+
+const HISTORY_STREAM_TYPE = "application/x-ndjson";
+// Each full load of a chat gets a number; a load or refresh of an earlier one stops once a newer full load started.
+let historyLoadSeq = 0;
+
+// The lines of a history stream, each passed to ``receive`` as it arrives; receive() returning false stops the read.
+async function readHistoryLines(response, receive) {
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  const take = function (last) {
+    let newline;
+    while ((newline = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (!line) continue;
+      let item = null;
+      try {
+        item = JSON.parse(line);
+      } catch (error) {
+        item = null;
+      }
+      if (item && receive(item) === false) return false;
+    }
+    // A line cut off at the end is dropped: without its end line the read counts as broken.
+    if (last) buffer = "";
+    return true;
+  };
+  if (!response.body || typeof response.body.getReader !== "function") {
+    buffer = await response.text();
+    take(true);
+    return;
+  }
+  const reader = response.body.getReader();
+  for (;;) {
+    const chunk = await reader.read();
+    buffer += chunk.done ? decoder.decode() : decoder.decode(chunk.value, { stream: true });
+    if (take(chunk.done) === false) {
+      reader.cancel().catch(function () {});
+      return;
+    }
+    if (chunk.done) return;
+  }
+}
+
+// Reads the history as a stream, newest message first, and shows each one as it arrives: on a slow link (10 kb/s) the
+// latest messages are on screen at once and the older ones follow above them. A broken read keeps what arrived, and
+// «Повторить» goes on above the oldest message received instead of starting again.
+// options.replace: the copy shown before, which gives way once the new one starts to arrive.
+// options.above, options.sources: going on above that node; the sources of the newer messages already shown.
+async function streamHistory(convId, options) {
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return;
-  // Reloading the open chat keeps its messages on screen until the new copy arrives, so a failed reload hides nothing.
-  const shown = chatbox.dataset.conversationId === convId && chatbox.querySelector(".msg")
-    ? Array.from(chatbox.children)
-    : null;
-  if (!shown) chatbox.replaceChildren();
+  const settings = options || {};
+  let replaced = settings.replace || null;
+  const fresh = !settings.above;
+  if (fresh && !replaced) chatbox.replaceChildren();
   chatbox.dataset.conversationId = convId;
-  return window.LogosDispatcher.request(`/api/conversations/${convId}/messages`)
+  if (fresh) {
+    historyLoadSeq += 1;
+    chatbox.dataset.historyLoad = String(historyLoadSeq);
+  }
+  const token = chatbox.dataset.historyLoad;
+  const current = function () { return convId === currentConvId && chatbox.dataset.historyLoad === token; };
+  // Where the newest message goes: what is added below it meanwhile (a question sent now) stays below.
+  const end = document.createElement("div");
+  end.className = "history-end";
+  end.hidden = true;
+  if (fresh) chatbox.appendChild(end);
+  // The oldest history node on screen: older messages go above it.
+  let oldest = settings.above || null;
+  const sources = settings.sources || new Set();
+  let count = null;
+  let newestSeen = !fresh;
+  let finished = false;
+  // The newest message when it is an error: shown once the question it answers is known.
+  let heldError = null;
+  const olderThanHeld = [];
+
+  const giveWay = function () {
+    if (!replaced) return;
+    replaced.forEach(function (node) {
+      if (node !== end) node.remove();
+    });
+    replaced = null;
+  };
+  // The distance from the bottom of the chat before a batch of messages (the lines of one received piece) went in. It is
+  // restored once the batch is in, so the view does not jump while older messages arrive above it.
+  let keptFromBottom = null;
+  const keepView = function () {
+    if (keptFromBottom !== null) return;
+    keptFromBottom = chatbox.scrollHeight - chatbox.scrollTop;
+    Promise.resolve().then(function () {
+      chatbox.scrollTop = chatbox.scrollHeight - keptFromBottom;
+      keptFromBottom = null;
+    });
+  };
+  // Shows one message: an older one above the oldest shown, the held newest error at the bottom of the history.
+  const show = function (msg, owner, atEnd) {
+    keepView();
+    const node = renderStoredMessage(convId, msg, owner, function (id) { return sources.has("image:" + id); });
+    if (!node) return;
+    const ref = !atEnd && oldest && oldest.isConnected ? oldest : end;
+    if (ref.isConnected) chatbox.insertBefore(node, ref);
+    if (!atEnd || !oldest) oldest = node;
+  };
+  const showHeld = function () {
+    if (!heldError) return;
+    const msg = heldError;
+    heldError = null;
+    show(msg, null, true);
+  };
+  const receive = function (item) {
+    if (!current()) return false;
+    if (item.end === true) {
+      finished = true;
+      return true;
+    }
+    if (typeof item.id !== "number") {
+      if (typeof item.count === "number") count = item.count;
+      // The new copy is arriving: the one shown before gives way.
+      giveWay();
+      return true;
+    }
+    giveWay();
+    const newest = !newestSeen;
+    newestSeen = true;
+    if (newest && item.source === "error") {
+      heldError = item;
+    } else {
+      if (heldError) {
+        olderThanHeld.push(item);
+        const owner = errorOwner(olderThanHeld);
+        if (owner !== undefined) {
+          const msg = heldError;
+          heldError = null;
+          show(msg, owner, true);
+        }
+      }
+      show(item, null, false);
+      if (newest) waitForOpenQuestion(convId, count === null ? 1 : count, item);
+    }
+    if (typeof item.source === "string") sources.add(item.source);
+    return true;
+  };
+
+  try {
+    const query = !fresh && oldest && oldest.dataset.messageId ? "?before=" + encodeURIComponent(oldest.dataset.messageId) : "";
+    const response = await window.LogosDispatcher.request(`/api/conversations/${convId}/messages${query}`, {
+      headers: { Accept: HISTORY_STREAM_TYPE + ", application/json" },
+    });
+    if (!response.ok) {
+      const error = new Error("HTTP " + response.status);
+      error.status = response.status;
+      throw error;
+    }
+    if ((response.headers.get("Content-Type") || "").indexOf(HISTORY_STREAM_TYPE) === -1) {
+      // A server without the stream answers with the whole history, oldest first.
+      const data = await response.json();
+      const all = Array.isArray(data.messages) ? data.messages : [];
+      receive({ count: all.length });
+      for (let index = all.length - 1; index >= 0; index -= 1) {
+        if (receive(all[index]) === false) break;
+      }
+      finished = true;
+    } else {
+      await readHistoryLines(response, receive);
+    }
+    if (!current()) {
+      end.remove();
+      return;
+    }
+    if (!finished) {
+      const cut = new Error("The history stream ended before its end line");
+      cut.name = "HistoryCutError";
+      throw cut;
+    }
+    showHeld();
+    if (fresh && !chatbox.querySelector(".msg")) showEmptyChat(chatbox, end);
+    end.remove();
+    flushApprovalOutputs(convId);
+  } catch (err) {
+    if (!current()) {
+      end.remove();
+      return;
+    }
+    // The newest error whose question did not arrive is shown without «Повторить».
+    showHeld();
+    end.remove();
+    if (err && err.status === 404) {
+      // Deleted in another tab or on another device: the chat leaves this list, and no retry is offered for it.
+      window.LogosToast.error("Диалог удалён.");
+      if (typeof deleteConv === "function") deleteConv(convId);
+      return;
+    }
+    console.error("[CHAT] Fetch history error:", err);
+    chatbox.querySelectorAll(".error-state").forEach(function (node) { node.remove(); });
+    if (oldest && oldest.isConnected) {
+      // What arrived stays; the rest is read on from the oldest message received.
+      const above = oldest;
+      const block = historyErrorBlock(
+        convId,
+        "Показана только часть диалога: связь прервалась. Нажмите «Повторить», чтобы догрузить более ранние сообщения.",
+        function () { streamHistory(convId, { above: above, sources: sources }); },
+      );
+      chatbox.insertBefore(block, above);
+    } else if (replaced && replaced.some(function (node) { return node.isConnected; })) {
+      // The chat already on screen stays: the error and «Повторить» go under it, worded as a failed refresh.
+      chatbox.appendChild(historyErrorBlock(convId, historyReloadErrorText(err)));
+      chatbox.scrollTop = chatbox.scrollHeight;
+    } else {
+      chatbox.replaceChildren(historyErrorBlock(convId, historyErrorText(err)));
+    }
+  }
+}
+
+// Brings the open chat up to date by reading only the messages after the newest one it shows: a client that waited
+// for an answer reads that answer, not the history again. Notes shown only on this page (a stopped turn, a lost answer,
+// the question as it was sent) give way to what the server stored, as a full reload did; what was added while this
+// was read stays.
+function refreshHistory(convId, shown) {
+  const chatbox = document.getElementById("chatbox");
+  const storedIds = shown
+    .map(function (node) { return node.dataset && node.dataset.messageId ? Number(node.dataset.messageId) : NaN; })
+    .filter(function (id) { return Number.isInteger(id) && id > 0; });
+  if (!chatbox || !storedIds.length) return streamHistory(convId, { replace: shown });
+  const lastId = storedIds.reduce(function (max, id) { return id > max ? id : max; }, 0);
+  const token = chatbox.dataset.historyLoad;
+  const current = function () { return convId === currentConvId && chatbox.dataset.historyLoad === token; };
+  return window.LogosDispatcher.request(`/api/conversations/${convId}/messages?after=${lastId}`)
     .then((r) => {
       if (!r.ok) {
         const error = new Error("HTTP " + r.status);
@@ -721,89 +1001,63 @@ function loadHistory(convId) {
       return r.json();
     })
     .then((data) => {
-      // The user may have switched conversations while this request was in flight.
-      if (convId !== currentConvId) return;
-      // Only the copy shown before the reload is replaced; whatever was added while it was read stays.
-      if (shown) shown.forEach(function (node) { node.remove(); });
+      if (!current()) return;
+      const newer = Array.isArray(data.messages) ? data.messages : [];
+      const newest = newer[newer.length - 1];
+      let owner = null;
+      if (newest && newest.source === "error") {
+        owner = errorOwner(newer.slice(0, -1).reverse());
+        // The question it answers is older than what came: only the whole history tells.
+        if (owner === undefined) return streamHistory(convId, { replace: shown });
+      }
       try {
-        let rendered = 0;
-        // The question still waiting for an answer, as the messages are read in order.
-        let question = null;
-        (data.messages || []).forEach((msg, index, all) => {
-          // A stored error answers the open question; «Повторить» re-sends it, and only the newest error keeps the button.
-          const owner = msg.source === "error" && index === all.length - 1 ? question : null;
-          const retryText = owner ? owner.text : null;
-          // A user message that carried photos shows their count, as it did when it was sent.
-          const photos = msg.role === "user" && msg.attachments ? msg.attachments.images : 0;
-          const node = addMessage({
-            text: photos ? (msg.text ? msg.text + " · фото: " : "Фото: ") + photos : msg.text,
-            role: msg.source === "error" ? "error" : msg.role,
-            cost: msg.cost || 0,
-            timings: msg.timings,
-            totalDurationMs: msg.total_duration_ms || 0,
-            reasoning: msg.reasoning,
-            usage: msg.usage,
-            trace: msg.trace,
-            id: msg.id,
-            onRetry: retryText === null ? undefined : function () {
-              return window.logosRetryTurn({
-                text: retryText,
-                conversationId: convId,
-                userMessageId: owner.id,
-                imageCount: owner.attachments ? owner.attachments.images || 0 : 0,
-                replaces: node,
-              });
-            },
-            // A question with photos is not offered for editing: the photos would not go with the edited text.
-            editText: retryText !== null && !(owner.attachments && owner.attachments.images) ? retryText : undefined,
-          });
-          if (node) rendered += 1;
-          const imageRequest = msg.role === "user" && typeof msg.source === "string"
-            ? msg.source.match(/^image-request:([A-Za-z0-9_-]{16,128})$/)
-            : null;
-          if (imageRequest && !all.some(function (candidate) { return candidate.source === "image:" + imageRequest[1]; })) {
-            if (node) checkStoredImageRequest(convId, node, imageRequest[1]);
-          }
-          if (msg.role === "user") question = msg;
-          else if (msg.source !== "error") question = null;
+        shown.forEach(function (node) {
+          // The marker of a history stream still reading stays: it places that stream's newest message.
+          if (node.classList && node.classList.contains("history-end")) return;
+          if (!(node.dataset && node.dataset.messageId)) node.remove();
         });
-        const stored = data.messages || [];
-        const lastStored = stored[stored.length - 1];
-        // A plain question with no answer yet is still being answered on the server: wait for it, as after a lost connection.
-        if (lastStored && lastStored.role === "user" && !lastStored.source && typeof window.logosResumeWaitingTurn === "function") {
-          window.logosResumeWaitingTurn(convId, stored.length - 1, lastStored);
+        // A newer message makes the earlier errors stale: only the newest error keeps its «Повторить».
+        if (newer.length) {
+          shown.forEach(function (node) {
+            if (node.isConnected) node.querySelectorAll(".msg-retry-btn").forEach(function (button) { button.remove(); });
+          });
         }
-        if (!rendered) {
-          const empty = document.createElement("div");
-          empty.className = "empty-state";
-          empty.textContent = "Начните диалог";
-          chatbox.replaceChildren(empty);
-        }
+        newer.forEach(function (msg, index) {
+          renderStoredMessage(convId, msg, index === newer.length - 1 ? owner : null, function (id) {
+            return newer.some(function (candidate) { return candidate.source === "image:" + id; });
+          });
+        });
+        waitForOpenQuestion(convId, Number(data.count) || 0, data.last);
       } catch (renderErr) {
         console.error("[CHAT] Render history error:", renderErr);
-        chatbox.replaceChildren(historyErrorBlock(convId, "Не удалось показать диалог. Нажмите «Повторить» или обновите страницу."));
+        chatbox.appendChild(historyErrorBlock(convId, "Не удалось показать диалог. Нажмите «Повторить» или обновите страницу."));
       }
       flushApprovalOutputs(convId);
     })
     .catch((err) => {
-      if (convId !== currentConvId) return;
+      if (!current()) return;
       if (err && err.status === 404) {
-        // Deleted in another tab or on another device: the chat leaves this list, and no retry is offered for it.
         window.LogosToast.error("Диалог удалён.");
         if (typeof deleteConv === "function") deleteConv(convId);
         return;
       }
       console.error("[CHAT] Fetch history error:", err);
-      // The chat already on screen stays: the error and «Повторить» go under it,
-      // one block at a time, worded as a failed refresh.
-      if (shown && shown.some(function (node) { return node.isConnected; })) {
-        chatbox.querySelectorAll(".error-state").forEach(function (node) { node.remove(); });
-        chatbox.appendChild(historyErrorBlock(convId, historyReloadErrorText(err)));
-        chatbox.scrollTop = chatbox.scrollHeight;
-      } else {
-        chatbox.replaceChildren(historyErrorBlock(convId, historyErrorText(err)));
-      }
+      // The chat already on screen stays: the error and «Повторить» go under it, one block at a time.
+      chatbox.querySelectorAll(".error-state").forEach(function (node) { node.remove(); });
+      chatbox.appendChild(historyErrorBlock(convId, historyReloadErrorText(err)));
+      chatbox.scrollTop = chatbox.scrollHeight;
     });
+}
+
+function loadHistory(convId) {
+  const chatbox = document.getElementById("chatbox");
+  if (!chatbox) return;
+  // Reloading the open chat reads only what it does not show yet, and keeps its messages on screen meanwhile.
+  const shown = chatbox.dataset.conversationId === convId && chatbox.querySelector(".msg")
+    ? Array.from(chatbox.children)
+    : null;
+  chatbox.dataset.conversationId = convId;
+  return shown ? refreshHistory(convId, shown) : streamHistory(convId);
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -1180,22 +1434,33 @@ document.addEventListener("DOMContentLoaded", function () {
     };
   }
 
-  async function fetchMessageCount(convId) {
+  // How many messages the conversation stores and which is the last, about 100 bytes: a waiting turn compares these,
+  // so on a slow link (10 kb/s) a wait never reads the whole history. Null when the server cannot be read now.
+  async function fetchConversationState(convId, signal) {
     try {
-      const response = await window.LogosDispatcher.request("/api/conversations/" + convId + "/messages", undefined, { timeoutMs: 15000 });
+      const response = await window.LogosDispatcher.request(
+        "/api/conversations/" + convId + "/state",
+        signal ? { signal: signal } : undefined,
+        { timeoutMs: 15000 },
+      );
       if (!response.ok) return null;
-      const data = await response.json();
-      return Array.isArray(data.messages) ? data.messages.length : null;
+      const state = await response.json();
+      return state && typeof state.count === "number" ? state : null;
     } catch (error) {
       return null;
     }
   }
 
+  async function fetchMessageCount(convId) {
+    const state = await fetchConversationState(convId);
+    return state ? state.count : null;
+  }
+
   // "missing": nothing was stored after the send. "pending": the user message is stored, the answer is not.
   // "answered": the answer (or an error answer) is stored.
-  function turnStatus(messages, baseline) {
-    if (messages.length <= baseline) return "missing";
-    return messages[messages.length - 1].role === "assistant" ? "answered" : "pending";
+  function turnStatus(state, baseline) {
+    if (state.count <= baseline) return "missing";
+    return state.last_role === "assistant" ? "answered" : "pending";
   }
 
   // An accepted turn whose count before the send failed (the phone was offline then) takes its baseline from the count
@@ -1361,20 +1626,10 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!hasBaseline) continue;
       }
       if (recovery.cancelled) break;
-      let status = null;
-      try {
-        const response = await window.LogosDispatcher.request(
-          "/api/conversations/" + turn.conversationId + "/messages",
-          recovery.signal ? { signal: recovery.signal } : undefined,
-          { timeoutMs: 15000 },
-        );
-        if (!response.ok) continue;
-        const data = await response.json();
-        status = turnStatus(Array.isArray(data.messages) ? data.messages : [], turn.baselineCount);
-      } catch (error) {
-        // Still offline: keep waiting until the window closes.
-        continue;
-      }
+      const state = await fetchConversationState(turn.conversationId, recovery.signal);
+      // Still offline: keep waiting until the window closes.
+      if (!state) continue;
+      let status = turnStatus(state, turn.baselineCount);
       if (recovery.cancelled) break;
       // A stored question (the server accepted it, or a retry of a stored one) adds no message while it is answered:
       // an unchanged count means it is still pending, not that the server never received it.
@@ -1433,17 +1688,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
       if (typeof turn.baselineCount !== "number" && !(await ensureTurnBaseline(turn))) continue;
-      let messages;
-      try {
-        const response = await window.LogosDispatcher.request("/api/conversations/" + convId + "/messages", undefined, { timeoutMs: 15000 });
-        if (!response.ok) continue;
-        const data = await response.json();
-        messages = Array.isArray(data.messages) ? data.messages : [];
-      } catch (error) {
-        continue;
-      }
+      const state = await fetchConversationState(convId);
+      if (!state) continue;
       if (currentConvId !== convId || pendingConversations.has(convId) || (turnStarts.get(convId) || 0) !== startMark) return;
-      const status = turnStatus(messages, turn.baselineCount);
+      const status = turnStatus(state, turn.baselineCount);
       if (status === "answered") {
         loadHistory(convId);
         return;
