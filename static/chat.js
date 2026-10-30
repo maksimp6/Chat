@@ -341,9 +341,37 @@ function copyThroughSelection(text) {
   return copied ? Promise.resolve() : Promise.reject(new Error("Copy was refused"));
 }
 
+// The proofs named in a court's word (доказательство, proof) are marked inside the bubble.
+const COURT_PROOF_PATTERN = /доказательств\w*|proof\w*/gi;
+function markCourtProofs(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(function (node) {
+    if (!COURT_PROOF_PATTERN.test(node.nodeValue)) return;
+    COURT_PROOF_PATTERN.lastIndex = 0;
+    const fragment = document.createDocumentFragment();
+    let last = 0;
+    COURT_PROOF_PATTERN.lastIndex = 0;
+    let match;
+    while ((match = COURT_PROOF_PATTERN.exec(node.nodeValue)) !== null) {
+      fragment.appendChild(document.createTextNode(node.nodeValue.slice(last, match.index)));
+      const mark = document.createElement("mark");
+      mark.className = "msg-proof";
+      mark.textContent = match[0];
+      fragment.appendChild(mark);
+      last = match.index + match[0].length;
+    }
+    fragment.appendChild(document.createTextNode(node.nodeValue.slice(last)));
+    COURT_PROOF_PATTERN.lastIndex = 0;
+    node.parentNode.replaceChild(fragment, node);
+  });
+}
+
 function addMessage({
   text,
   role,
+  source,
   cost = 0,
   timings,
   totalDurationMs,
@@ -365,6 +393,8 @@ function addMessage({
 
   const msg = document.createElement("div");
   msg.className = `msg ${uiRole}`;
+  const isCourt = source === "court";
+  if (isCourt) msg.classList.add("msg-court");
   if (messageId) msg.dataset.messageId = String(messageId);
   const bubble = document.createElement("div");
   bubble.className = "bubble";
@@ -374,6 +404,7 @@ function addMessage({
   }
   htmlContent += parseMarkdown(text);
   bubble.innerHTML = htmlContent;
+  if (isCourt) markCourtProofs(bubble);
   msg.appendChild(bubble);
 
   if (uiRole === "error" && typeof onRetry === "function") {
@@ -752,6 +783,7 @@ function renderStoredMessage(convId, msg, owner, hasImage) {
   const node = addMessage({
     text: photos ? (msg.text ? msg.text + " · фото: " : "Фото: ") + photos : msg.text,
     role: msg.source === "error" ? "error" : msg.role,
+    source: msg.source,
     cost: msg.cost || 0,
     timings: msg.timings,
     totalDurationMs: msg.total_duration_ms || 0,

@@ -2285,3 +2285,18 @@ body {
     overflow-x: visible;
   }
 }
+
+/* Court: the judge's word (source court) and the user's words are set apart, and the proofs the court names are marked (the trace is not touched). */
+.msg.msg-court .bubble {
+  border-left: 3px solid #e0a030;
+  background: rgba(224, 160, 48, 0.08);
+}
+.msg.user .bubble {
+  border-left: 3px solid #4aa3ff;
+}
+.msg-proof {
+  background: rgba(63, 178, 127, 0.25);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
