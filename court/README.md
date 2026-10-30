@@ -56,7 +56,7 @@ Other units reach it only through their own ports:
 
 ## Tools
 
-Category `court`. Reading needs no approval: `court.rules`, `court.judge_dialog`, `court.hearings.list`, `court.hearing.get`. Changing the hall needs the owner's approval: `court.speak` (the Court's word into the chat), `court.hearing.open`, `court.hearing.rejudge`, `court.hearing.decide` (recorded in the owner's name, because the approval is theirs; a decision by the executor would be S2.5), `court.case.file`, `court.hearing.close`, `court.hearing.reopen`.
+Category `court`, one function `court`: the field `action` picks the action. Reading needs no approval: `rules`, `judge_dialog`, `hearings_list`, `hearing_get`. Changing the hall needs the owner's approval (`metadata.approval_actions`): `speak` (the Court's word into the chat), `hearing_open`, `hearing_rejudge`, `hearing_decide` (recorded in the owner's name, because the approval is theirs; a decision by the executor would be S2.5), `case_file`, `hearing_close`, `hearing_reopen`. Each action checks its own required fields and answers with the missing names.
 
 ## Ports
 

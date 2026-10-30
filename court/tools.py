@@ -148,130 +148,79 @@ def _reopen(args, cfg=None):
     return {"success": True, "hearing": hearing}
 
 
+# The whole hall is one tool: ``action`` names what to do. Each action keeps its own
+# function, the fields it needs and whether it changes the hall.
+_ACTIONS: dict[str, dict[str, Any]] = {
+    "rules": {"fn": _rules, "required": [], "write": False,
+              "about": "правила судов и состояния решений"},
+    "judge_dialog": {"fn": _judge, "required": [], "write": False,
+                     "about": "суд над диалогом без записи заседания (conversation_id или messages)"},
+    "hearings_list": {"fn": _list, "required": [], "write": False,
+                      "about": "заседания зала"},
+    "hearing_get": {"fn": _get, "required": ["hearing_id"], "write": False,
+                    "about": "одно заседание целиком"},
+    "hearing_open": {"fn": _open, "required": ["conversation_id"], "write": True,
+                     "about": "открыть заседание над диалогом"},
+    "hearing_rejudge": {"fn": _rejudge, "required": ["hearing_id"], "write": True,
+                        "about": "пересмотр заседания: суды проходят заново"},
+    "hearing_decide": {"fn": _decide, "required": ["hearing_id", "case", "decision", "reason"], "write": True,
+                       "about": "решение владельца по делу заседания"},
+    "case_file": {"fn": _file, "required": ["hearing_id", "case"], "write": True,
+                  "about": "подать дело заседания в GitHub"},
+    "speak": {"fn": _speak, "required": ["conversation_id"], "write": True,
+              "about": "слово суда в групповом чате диалога"},
+    "hearing_close": {"fn": _close, "required": ["hearing_id", "reason"], "write": True,
+                      "about": "закрыть заседание с причиной"},
+    "hearing_reopen": {"fn": _reopen, "required": ["hearing_id", "reason"], "write": True,
+                       "about": "возобновить закрытое заседание с причиной"},
+}
+
+
+def court(args, cfg=None):
+    """One function for the hall: ``action`` picks the action, the other fields are its input."""
+    action = args.get("action")
+    entry = _ACTIONS.get(action) if isinstance(action, str) else None
+    if entry is None:
+        return {"success": False, "error": "action must be one of: " + ", ".join(_ACTIONS)}
+    missing = [name for name in entry["required"] if args.get(name) in (None, "")]
+    if missing:
+        return {"success": False, "error": f"{action}: missing {', '.join(missing)}"}
+    return entry["fn"](args, cfg)
+
+
+_FIELDS = {
+    "action": {
+        "type": "string",
+        "enum": list(_ACTIONS),
+        "description": "Что сделать: " + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items()),
+    },
+    "conversation_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "messages": {
+        "type": "array",
+        "description": "Вместо conversation_id (judge_dialog): сообщения с role, text, created_at и, при наличии, kind",
+        "items": {"type": "object"},
+    },
+    "decision": {"type": "string", "enum": list(DECISIONS)},
+    "reason": {"type": "string", "minLength": 1},
+    **_HEARING,
+    **_CASE,
+    **_CRISIS,
+}
+
+_WRITE_ACTIONS = [name for name, entry in _ACTIONS.items() if entry["write"]]
+
 COURT_TOOLS = {
-    "court.rules": _tool(
-        _rules,
-        read_only=True,
-        requires_approval=False,
-        schema=object_schema({}, []),
-        title="Court Rules",
-        description="Правила судов Логоса (S2, S4, S5, S3) с вердиктами и состояния решений по делу.",
-    ),
-    "court.judge_dialog": _tool(
-        _judge,
-        read_only=True,
-        requires_approval=False,
-        schema=object_schema(
-            {
-                "conversation_id": {"type": "string", "minLength": 1, "maxLength": 128},
-                "messages": {
-                    "type": "array",
-                    "description": "Вместо conversation_id: сообщения с role, text, created_at и, при наличии, kind",
-                    "items": {"type": "object"},
-                },
-                **_CRISIS,
-            },
-            [],
+    "court": {
+        **_tool(
+            court,
+            read_only=False,
+            requires_approval=True,
+            schema=object_schema(_FIELDS, ["action"]),
+            title="Court",
+            description="Зал суда Логоса одной функцией: поле action выбирает действие. "
+            + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items())
+            + ". Действия, которые меняют зал, требуют подтверждения владельца.",
         ),
-        title="Court Judge Dialog",
-        description="Суд над диалогом без записи заседания: протокол по сообщениям — номер, вердикт, цитата, правило; вспышки и черновики дел.",
-    ),
-    "court.hearings.list": _tool(
-        _list,
-        read_only=True,
-        requires_approval=False,
-        schema=object_schema({}, []),
-        title="Court Hearings List",
-        description="Заседания зала: диалог, вердикт, число дел и их решения.",
-    ),
-    "court.hearing.get": _tool(
-        _get,
-        read_only=True,
-        requires_approval=False,
-        schema=object_schema(_HEARING, ["hearing_id"]),
-        title="Court Hearing Get",
-        description="Одно заседание целиком: протокол, вспышки, дела, решения и их история.",
-    ),
-    "court.hearing.open": _tool(
-        _open,
-        read_only=False,
-        requires_approval=True,
-        schema=object_schema(
-            {
-                "conversation_id": {"type": "string", "minLength": 1, "maxLength": 128},
-                **_CRISIS,
-            },
-            ["conversation_id"],
-        ),
-        title="Court Hearing Open",
-        description="Открыть заседание над диалогом: суды проходят по всем сообщениям, протокол и черновики дел сохраняются в зале.",
-    ),
-    "court.hearing.rejudge": _tool(
-        _rejudge,
-        read_only=False,
-        requires_approval=True,
-        schema=object_schema({**_HEARING, **_CRISIS}, ["hearing_id"]),
-        title="Court Hearing Rejudge",
-        description="Пересмотр: суды проходят по диалогу заново, решения по сохранившимся делам остаются с записью в истории.",
-    ),
-    "court.hearing.decide": _tool(
-        _decide,
-        read_only=False,
-        requires_approval=True,
-        schema=object_schema(
-            {
-                **_HEARING,
-                **_CASE,
-                "decision": {"type": "string", "enum": list(DECISIONS)},
-                "reason": {"type": "string", "minLength": 1},
-            },
-            ["hearing_id", "case", "decision", "reason"],
-        ),
-        title="Court Case Decide",
-        description="Решение владельца по делу заседания (подтверждается владельцем); прежнее решение остаётся в истории.",
-    ),
-    "court.case.file": _tool(
-        _file,
-        read_only=False,
-        requires_approval=True,
-        schema=object_schema({**_HEARING, **_CASE}, ["hearing_id", "case"]),
-        title="Court Case File",
-        description="Подать дело заседания в GitHub: issue «Суд Логоса» с меткой from-dialog, цитаты — в зашифрованной улике.",
-    ),
-    "court.speak": _tool(
-        _speak,
-        read_only=False,
-        requires_approval=True,
-        schema=object_schema(
-            {
-                "conversation_id": {"type": "string", "minLength": 1, "maxLength": 128},
-                **_CRISIS,
-            },
-            ["conversation_id"],
-        ),
-        title="Court Speak",
-        description="Слово суда в групповом чате диалога: вердикты по репликам с прошлого слова суда записываются в чат, заседание над диалогом открывается или обновляется.",
-    ),
-    "court.hearing.close": _tool(
-        _close,
-        read_only=False,
-        requires_approval=True,
-        schema=object_schema(
-            {**_HEARING, "reason": {"type": "string", "minLength": 1}},
-            ["hearing_id", "reason"],
-        ),
-        title="Court Hearing Close",
-        description="Закрыть заседание с причиной.",
-    ),
-    "court.hearing.reopen": _tool(
-        _reopen,
-        read_only=False,
-        requires_approval=True,
-        schema=object_schema(
-            {**_HEARING, "reason": {"type": "string", "minLength": 1}},
-            ["hearing_id", "reason"],
-        ),
-        title="Court Hearing Reopen",
-        description="Возобновить закрытое заседание с причиной.",
-    ),
+        "metadata": {"approval_actions": _WRITE_ACTIONS},
+    },
 }
