@@ -21,6 +21,7 @@
 | filesystem | tool_providers/filesystem.py | 17 | read_file, write_file, apply_patch, list_directory, glob_search, grep_search, file_stat, calculate_hash, copy_or_move_file, delete_path, make_directory, run_command, http_fetch, get_system_info, python_ast_outline, zip_compress, zip_extract |
 | wikipedia | tool_providers/wikipedia.py | 2 | wikipedia_search, wikipedia_summary |
 | profiler | tool_providers/profiler.py | 2 | inspect_app_internals, profile_application_performance |
+| dialog | conversations/tools.py | 1 | dialog (action: list, get, messages; read-only, low) |
 | theme | tool_providers/theme.py | 1 | set_ui_theme (dark/dim/light) |
 | runtime | tool_providers/runtime_tools.py | 2 | local_runtime_exec, ssh_runtime_exec (+ ssh_runtime_read_file, ssh_runtime_write_file) |
 | government | organization/government.py | 12 | gov.case.create, gov.requirements, gov.collect_data, gov.validate_data, gov.tax_options, gov.prepare_application, gov.prepare_documents, gov.submit, gov.process_response, gov.request_approval, gov.status, gov.archive_case |

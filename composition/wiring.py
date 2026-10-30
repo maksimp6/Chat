@@ -355,6 +355,7 @@ def _conversations():
     from storage.records import get_conversations
     from economy.treasury_identity import get_current_owner_id
     from agent_memory.client import get_memory_client
+    from storage.records import get_messages
     from storage.records import memory_file_path
     from storage.records import update_conversation_model
     from storage.records import update_conversation_title
@@ -368,6 +369,7 @@ def _conversations():
         get_conversations=get_conversations,
         get_current_owner_id=get_current_owner_id,
         get_memory_client=get_memory_client,
+        get_messages=get_messages,
         memory_file_path=memory_file_path,
         update_conversation_model=update_conversation_model,
         update_conversation_title=update_conversation_title,

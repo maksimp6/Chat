@@ -38,6 +38,7 @@
   "copy_or_move_file": "document",
   "court": "scales",
   "delete_path": "trash",
+  "dialog": "chat",
   "file_stat": "document",
   "get_clipboard": "clipboard",
   "get_device_location": "server",

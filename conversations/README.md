@@ -14,6 +14,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 - **Send a message (the turn)**: `POST /api/chat`
 - **Delete a dialog**: `DELETE /api/conversations/<conv_id>`
 - **Read dialogs from outside (MCP)**: `POST {MCP_PATH}`
+- **Read dialogs as Logos (tool `dialog`, category `dialog`)**: list, one dialog and its messages, read-only
 
 ## Public API
 
@@ -23,6 +24,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | --- | --- |
 | [`conversations.ownership`](ownership.py) | Legacy ownership metadata for shared local conversations. |
 | [`conversations.routes`](routes.py) | HTTP API of one conversation: title, model, deletion and dialog settings. |
+| [`conversations.tools`](tools.py) | Tool `dialog` (category `dialog`, icon `static/icons/tools/dialog.svg`): `action` `list`, `get`, `messages`. Registered through `composition/tool_sources.py`; not in `__all__`. |
 
 Other units reach it only through their own ports:
 
@@ -45,6 +47,7 @@ Everything `conversations` uses from other units is a field of `Host` in [`conve
 | `get_conversations` | `storage.records.get_conversations` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_memory_client` | `agent_memory.client.get_memory_client` |
+| `get_messages` | `storage.records.get_messages` |
 | `memory_file_path` | `storage.records.memory_file_path` |
 | `save_conv_settings` | `storage.records.save_conv_settings` |
 | `update_conversation_model` | `storage.records.update_conversation_model` |

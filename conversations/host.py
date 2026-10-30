@@ -23,6 +23,7 @@ class Host:
     get_conversations: Any  # storage.records.get_conversations
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_memory_client: Any  # agent_memory.client.get_memory_client
+    get_messages: Any  # storage.records.get_messages
     memory_file_path: Any  # storage.records.memory_file_path
     update_conversation_model: Any  # storage.records.update_conversation_model
     update_conversation_title: Any  # storage.records.update_conversation_title
@@ -49,6 +50,7 @@ __all__ = [
     "get_conversations",
     "get_current_owner_id",
     "get_memory_client",
+    "get_messages",
     "memory_file_path",
     "update_conversation_model",
     "update_conversation_title",
@@ -71,6 +73,10 @@ def get_current_owner_id(*args: Any, **kwargs: Any) -> Any:
 
 def get_memory_client(*args: Any, **kwargs: Any) -> Any:
     return current().get_memory_client(*args, **kwargs)
+
+
+def get_messages(*args: Any, **kwargs: Any) -> Any:
+    return current().get_messages(*args, **kwargs)
 
 
 def memory_file_path(*args: Any, **kwargs: Any) -> Any:
