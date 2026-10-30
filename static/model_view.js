@@ -81,6 +81,14 @@
     return list;
   }
 
+  // The input items a model sees, as the person reads them: a tool call says which tool and with what arguments, its result says what came back.
+  var INPUT_LABELS = {
+    message: "сообщение",
+    function_call: "вызов инструмента",
+    function_call_output: "результат инструмента",
+    reasoning: "рассуждение",
+  };
+
   function renderInput(input) {
     var list = el("div", "msg-model-view-list");
     (input.items || []).forEach(function (item) {
@@ -90,7 +98,7 @@
         list.appendChild(row);
         return;
       }
-      var head = [item.type, item.role, item.name].filter(Boolean).join(" · ") + " · " + fmt(item.chars) + " симв.";
+      var head = [INPUT_LABELS[item.type] || item.type, item.role, item.name].filter(Boolean).join(" · ") + " · " + fmt(item.chars) + " симв.";
       row.appendChild(el("strong", "", head));
       var text = joined(item.text_parts);
       if (text) row.appendChild(el("pre", "msg-model-view-pre", text));

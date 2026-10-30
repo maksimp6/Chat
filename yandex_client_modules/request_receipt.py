@@ -302,8 +302,15 @@ def build_model_view(payload: dict[str, Any]) -> dict[str, Any]:
             row["role"] = item["role"]
         if kind == "message":
             row["text_parts"] = _view_parts(_view_message_text(item), 10)
-        elif kind == "function_call" and isinstance(item.get("name"), str):
-            row["name"] = item["name"]
+        elif kind == "function_call":
+            if isinstance(item.get("name"), str):
+                row["name"] = item["name"]
+            row["text_parts"] = _view_parts(str(item.get("arguments") or ""), 10)
+        elif kind == "function_call_output":
+            output = item.get("output")
+            row["text_parts"] = _view_parts(
+                output if isinstance(output, str) else json.dumps(output, ensure_ascii=False), 10
+            )
         input_rows.append(row)
     if len(items) > _VIEW_ITEMS:
         input_rows.append({"type": "omitted", "count": len(items) - _VIEW_ITEMS})
