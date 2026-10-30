@@ -110,20 +110,27 @@
     }
 
     // Sent in pieces that survive a broken connection (static/upload.js): on a slow link a trace of any size arrives.
-    window.LogosUpload.send(blob, {
-      name: traceFilename(),
-      kind: "file",
-      purpose: "assistants",
-      onProgress: function (received, size) {
-        var currentButton = document.getElementById(uploadButtonId);
-        if (currentButton && size > 0) currentButton.textContent = "⏳ " + Math.floor((received * 100) / size) + "%";
-      },
-    })
+    Promise.resolve()
+      .then(function () {
+        return window.LogosUpload.send(blob, {
+          name: traceFilename(),
+          kind: "file",
+          purpose: "assistants",
+          onProgress: function (received, size) {
+            var currentButton = document.getElementById(uploadButtonId);
+            if (currentButton && size > 0) currentButton.textContent = "⏳ " + Math.floor((received * 100) / size) + "%";
+          },
+        });
+      })
       .then(function () {
         LogosToast.show("Трейс загружен в файловый менеджер.");
       })
       .catch(function (error) {
-        var reason = error && error.status ? "сервер отклонил файл (HTTP " + error.status + ")" : "ошибка сервера";
+        var reason = error && error.body && error.body.error === "completion_uncertain"
+          ? "сервер не ответил вовремя, трейс мог сохраниться: проверьте файловый менеджер"
+          : error && error.status
+            ? "сервер отклонил файл (HTTP " + error.status + ")"
+            : "ошибка сервера";
         LogosToast.error("Не удалось загрузить трейс: " + reason);
       })
       .finally(function () {

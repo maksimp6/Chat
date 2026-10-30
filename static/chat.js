@@ -1238,6 +1238,20 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  function hasTransparency(context, width, height) {
+    let pixels;
+    try {
+      pixels = context.getImageData(0, 0, width, height).data;
+    } catch (error) {
+      // Cannot tell: the photo is treated as transparent and goes as it is.
+      return true;
+    }
+    for (let index = 3; index < pixels.length; index += 4) {
+      if (pixels[index] < 255) return true;
+    }
+    return false;
+  }
+
   async function compressPhoto(file) {
     if (typeof createImageBitmap !== "function") return file;
     let bitmap;
@@ -1256,8 +1270,9 @@ document.addEventListener("DOMContentLoaded", function () {
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       let result = await canvasBlob(canvas, "image/webp", PHOTO_QUALITY);
       if (!result || result.type !== "image/webp") {
-        // JPEG has no transparency: a PNG that may have it goes as it is.
-        if (file.type === "image/png") return file;
+        // The browser cannot write WebP (Safari, every iOS browser). JPEG has no transparency, so a photo with
+        // transparent pixels goes as it is; an opaque one (a screenshot) is saved as JPEG.
+        if (file.type !== "image/jpeg" && hasTransparency(context, canvas.width, canvas.height)) return file;
         result = await canvasBlob(canvas, "image/jpeg", PHOTO_QUALITY);
       }
       return result && result.size > 0 && result.size < file.size ? result : file;
@@ -1269,15 +1284,20 @@ document.addEventListener("DOMContentLoaded", function () {
   // Uploads a photo of the tray in pieces (static/upload.js), so a broken connection costs at most the piece in flight
   // and the message itself stays small. The send waits until every photo of the tray is uploaded.
   function uploadPendingImage(image) {
-    window.LogosUpload.send(image.blob, {
-      name: image.name,
-      kind: "image",
-      signal: image.controller.signal,
-      onProgress: function (received, size) {
-        image.progress = size > 0 ? Math.floor((received * 100) / size) : 0;
-        if (image.progressEl) image.progressEl.textContent = image.progress + "%";
-      },
-    })
+    // Started inside a promise: without static/upload.js (its load broke) the photo fails like any other upload and
+    // never holds the send forever.
+    Promise.resolve()
+      .then(function () {
+        return window.LogosUpload.send(image.blob, {
+          name: image.name,
+          kind: "image",
+          signal: image.controller.signal,
+          onProgress: function (received, size) {
+            image.progress = size > 0 ? Math.floor((received * 100) / size) : 0;
+            if (image.progressEl) image.progressEl.textContent = image.progress + "%";
+          },
+        });
+      })
       .then(function (done) {
         image.uploadId = done.upload_id;
         if (image.progressEl) image.progressEl.remove();
@@ -1296,12 +1316,16 @@ document.addEventListener("DOMContentLoaded", function () {
       });
   }
 
-  // A photo leaves the tray: its upload stops and the copy on the server is dropped.
+  // A photo leaves the tray: its upload stops, and the copy on the server is dropped (an upload stopped midway drops
+  // its own copy). A photo that went with a message keeps its copy and preview: that message's «Повторить» sends it
+  // again.
   function dropPendingImage(image) {
     pendingImages = pendingImages.filter(function (candidate) { return candidate !== image; });
     image.controller.abort();
-    if (image.uploadId) window.LogosUpload.discard(image.uploadId);
-    if (image.previewUrl) URL.revokeObjectURL(image.previewUrl);
+    if (!image.sent) {
+      if (image.uploadId && window.LogosUpload) window.LogosUpload.discard(image.uploadId);
+      if (image.previewUrl) URL.revokeObjectURL(image.previewUrl);
+    }
     renderPendingImages();
   }
 
@@ -1330,7 +1354,8 @@ document.addEventListener("DOMContentLoaded", function () {
           window.LogosToast.error("Можно прикрепить не больше " + MAX_IMAGES + " фото");
           break;
         }
-        if (!IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_BYTES) {
+        // The 5 MB limit is for the photo as it is sent, after compression: a larger phone photo usually fits then.
+        if (!IMAGE_TYPES.includes(file.type)) {
           window.LogosToast.error("Фото «" + file.name + "»: нужен PNG, JPEG или WebP до 5 МБ");
           continue;
         }
@@ -1342,7 +1367,9 @@ document.addEventListener("DOMContentLoaded", function () {
         let image = null;
         try {
           const blob = await compressPhoto(file);
-          if (currentConvId + "|" + currentModel !== scope) {
+          if (blob.size > MAX_IMAGE_BYTES) {
+            window.LogosToast.error("Фото «" + file.name + "»: нужен PNG, JPEG или WebP до 5 МБ");
+          } else if (currentConvId + "|" + currentModel !== scope) {
             window.LogosToast.error("Фото «" + file.name + "» не прикреплено: сменился диалог или модель");
           } else {
             image = {
@@ -2669,6 +2696,8 @@ document.addEventListener("DOMContentLoaded", function () {
     let recovering = false;
     // Photos belong to this message only; they return to the tray if the send fails.
     // Sent photos leave the tray. A retry finds them there again after a failed send, so they are removed here too.
+    // They keep their server copy from now on: this message's «Повторить» may send them again.
+    sentImages.forEach(function (image) { image.sent = true; });
     pendingImages = pendingImages.filter(function (image) {
       return !sentImages.includes(image);
     });

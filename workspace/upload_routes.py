@@ -4,15 +4,19 @@ On a 10 kb/s link (1.25 KB/s) one request cannot carry a file: every drop starts
 over. Here the browser sends the file in pieces at an offset, asks how much arrived
 after a drop and goes on from there.
 
-- ``POST /api/uploads`` ``{name, size, kind: "file" | "image"[, purpose]}``:
-  ``201 {id, name, kind, received: 0, size}``.
+- ``POST /api/uploads`` ``{name, size, kind: "file" | "image"[, purpose][, id]}``:
+  ``201 {id, name, kind, received: 0, size}``. An ``id`` chosen by the browser (32 hex
+  digits) makes a repeated create, whose first answer was lost, answer the same upload.
 - ``PUT /api/uploads/<id>`` with ``Upload-Offset: <received>`` and the next piece as
   the body: ``{id, name, kind, received, size}``; another offset: ``409 offset_mismatch``
   with the received size.
 - ``GET /api/uploads/<id>``: how much arrived. ``DELETE /api/uploads/<id>``: dropped.
 - ``POST /api/uploads/<id>/complete``: a file goes to Files as ``POST /api/files`` sends
   it and the answer is the same; an image answers ``{upload_id, size}`` for the
-  attachments of ``POST /api/chat``. A repeated completion answers the same again.
+  attachments of ``POST /api/chat``. A repeated completion answers the same again. A
+  file is never sent to Files twice: when Files did not answer in time (it may have
+  stored the file), or the process stopped while sending, the completion answers
+  ``409 completion_uncertain``.
 
 A piece is written to a file of its own first and appended only once it arrived
 whole and its offset is still the received size: a piece cut off by a broken
@@ -28,7 +32,9 @@ import re
 import shutil
 import tempfile
 import threading
+import time
 import uuid
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -51,9 +57,11 @@ _KINDS = ("file", "image")
 # How much of a piece is read from the connection at a time.
 _READ_BYTES = 64 * 1024
 _FILES_FAILED = "Внутренняя ошибка сервиса файлов"
+# Pieces older than this process belong to requests that died with an earlier one.
+_BOOTED_AT = time.time()
 
-_locks: dict[str, threading.Lock] = {}
-_locks_guard = threading.Lock()
+# A fixed set of locks shared by hash, so their number does not grow with the uploads.
+_LOCKS = tuple(threading.Lock() for _ in range(64))
 
 
 def upload_dir() -> Path:
@@ -66,8 +74,26 @@ def _paths(upload_id: str) -> tuple[Path, Path]:
 
 
 def _lock(upload_id: str) -> threading.Lock:
-    with _locks_guard:
-        return _locks.setdefault(upload_id, threading.Lock())
+    return _LOCKS[zlib.crc32(upload_id.encode("ascii")) % len(_LOCKS)]
+
+
+def _storage_failed(error: OSError):
+    # A full or read-only disk does not pass by itself: the browser stops instead of trying again.
+    logger.error("[UPLOADS] Storage failed: %s", error)
+    return jsonify({"error": "upload_storage_failed"}), 507
+
+
+def _drop_stale_pieces() -> None:
+    """Pieces left by requests of an earlier process (a restart in the middle of a piece)."""
+    try:
+        for piece in upload_dir().glob("*.piece"):
+            try:
+                if piece.stat().st_mtime < _BOOTED_AT:
+                    piece.unlink()
+            except OSError:
+                pass
+    except OSError:
+        pass
 
 
 def _load(upload_id: Any) -> dict[str, Any] | None:
@@ -144,12 +170,25 @@ def create_upload():
                 "error": f"File type not allowed. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
             }
         ), 400
-    upload_id = uuid.uuid4().hex
-    upload_dir().mkdir(parents=True, exist_ok=True)
-    _, part_path = _paths(upload_id)
-    part_path.touch()
+    upload_id = data.get("id", uuid.uuid4().hex)
+    if not isinstance(upload_id, str) or not _ID_PATTERN.fullmatch(upload_id):
+        return jsonify({"error": "id must be 32 hex digits"}), 400
     meta = {"name": name, "size": size, "kind": kind, "purpose": purpose}
-    _write_meta(upload_id, meta)
+    with _lock(upload_id):
+        existing = _load(upload_id)
+        if existing is not None:
+            # The same create sent again: the upload it made answers.
+            if all(existing.get(key) == value for key, value in meta.items()):
+                return jsonify(_state(upload_id, existing))
+            return jsonify({"error": "upload_id_taken"}), 409
+        try:
+            upload_dir().mkdir(parents=True, exist_ok=True)
+            _drop_stale_pieces()
+            _, part_path = _paths(upload_id)
+            part_path.touch()
+            _write_meta(upload_id, meta)
+        except OSError as error:
+            return _storage_failed(error)
     return jsonify(_state(upload_id, {**meta, "received": 0})), 201
 
 
@@ -166,7 +205,10 @@ def delete_upload(upload_id):
     if _load(upload_id) is None:
         return _not_found()
     with _lock(upload_id):
-        _remove(upload_id)
+        try:
+            _remove(upload_id)
+        except OSError as error:
+            return _storage_failed(error)
     return jsonify({"id": upload_id, "deleted": True})
 
 
@@ -189,9 +231,12 @@ def append_upload(upload_id):
     if expected is not None and expected > remaining:
         return jsonify({"error": "piece_exceeds_size", **_state(upload_id, meta)}), 413
     _, part_path = _paths(upload_id)
-    handle, piece_name = tempfile.mkstemp(
-        prefix=upload_id + ".", suffix=".piece", dir=upload_dir()
-    )
+    try:
+        handle, piece_name = tempfile.mkstemp(
+            prefix=upload_id + ".", suffix=".piece", dir=upload_dir()
+        )
+    except OSError as error:
+        return _storage_failed(error)
     try:
         written = 0
         with os.fdopen(handle, "wb") as piece:
@@ -226,15 +271,24 @@ def append_upload(upload_id):
                 shutil.copyfileobj(piece, part)
             current["received"] = offset + written
         return jsonify(_state(upload_id, current))
+    except OSError as error:
+        # A full disk while the piece is written or appended; an appended part is still a correct prefix.
+        return _storage_failed(error)
     finally:
         try:
             os.unlink(piece_name)
-        except FileNotFoundError:
+        except OSError:
             pass
+
+
+def _uncertain(upload_id: str, meta: dict[str, Any]):
+    return jsonify({"error": "completion_uncertain", **_state(upload_id, meta)}), 409
 
 
 @upload_bp.route("/api/uploads/<upload_id>/complete", methods=["POST"])
 def complete_upload(upload_id):
+    if _load(upload_id) is None:
+        return _not_found()
     with _lock(upload_id):
         meta = _load(upload_id)
         if meta is None:
@@ -242,12 +296,20 @@ def complete_upload(upload_id):
         if meta.get("completed") is not None:
             # A repeated completion (its first answer was lost on the way) answers the same.
             return jsonify(meta["completed"]), 201
+        # Files may have stored the file already: sending it again would store a second copy.
+        if meta.get("uncertain") or meta.get("completing"):
+            return _uncertain(upload_id, meta)
         if meta["received"] != meta["size"]:
             return jsonify({"error": "upload_incomplete", **_state(upload_id, meta)}), 409
         if meta["kind"] == "image":
             return jsonify({"upload_id": upload_id, "size": meta["size"]})
         _, part_path = _paths(upload_id)
-        content = part_path.read_bytes()
+        try:
+            content = part_path.read_bytes()
+            # Marked before sending: a process that stops while Files stores the file leaves this mark.
+            _write_meta(upload_id, {**meta, "completing": True})
+        except OSError as error:
+            return _storage_failed(error)
         try:
             client = get_client()
             logger.info(
@@ -255,10 +317,16 @@ def complete_upload(upload_id):
             )
             result = client.upload_file(content, meta["name"], purpose=meta["purpose"])
         except bound.YandexClientError as e:
+            if getattr(e, "status_code", None) == 504:
+                # No answer in time: the file may be stored. The browser says so instead of sending it again.
+                _write_meta(upload_id, {**meta, "uncertain": True})
+                return _uncertain(upload_id, meta)
+            _write_meta(upload_id, meta)
             return _err_response(e)
         except Exception as e:
             logger.error("[UPLOADS] Completion failed: %s", e, exc_info=True)
-            return jsonify({"error": _FILES_FAILED}), 500
+            _write_meta(upload_id, {**meta, "uncertain": True})
+            return _uncertain(upload_id, meta)
         _write_meta(upload_id, {**meta, "completed": result})
         try:
             part_path.unlink()

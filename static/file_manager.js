@@ -649,22 +649,43 @@ window.fetchVectorStores = function () {
           pendingUploads += 1;
 
           var progress = div.querySelector(".file-upload-progress");
+          // On a slow link an upload can take hours and goes on through drops: «Отменить» stops it and drops the copy
+          // on the server.
+          var controller = new AbortController();
+          var cancel = document.createElement("button");
+          cancel.type = "button";
+          cancel.className = "logos-btn";
+          cancel.textContent = "Отменить";
+          cancel.addEventListener("click", function () {
+            controller.abort();
+          });
+          div.appendChild(cancel);
           // Sent in pieces that survive a broken connection (static/upload.js): on a slow link a file of any size
           // arrives, and a drop costs at most the piece in flight.
-          window.LogosUpload.send(file, {
-            name: file.name,
-            kind: "file",
-            purpose: "assistants",
-            onProgress: function (received, size) {
-              if (progress && size > 0) progress.textContent = "(загрузка " + Math.floor((received * 100) / size) + "%)";
-            },
-          })
+          Promise.resolve()
+            .then(function () {
+              return window.LogosUpload.send(file, {
+                name: file.name,
+                kind: "file",
+                purpose: "assistants",
+                signal: controller.signal,
+                onProgress: function (received, size) {
+                  if (progress && size > 0) progress.textContent = "(загрузка " + Math.floor((received * 100) / size) + "%)";
+                },
+              });
+            })
             .then(function () {
               div.remove();
             })
             .catch(function (err) {
-              // A timed-out upload may still have been saved, so the user is told to check the list first.
-              var text = isNoAnswer(err)
+              if (controller.signal.aborted) {
+                div.remove();
+                return;
+              }
+              // Files may have stored a file whose completion got no answer in time, so the user is told to check the
+              // list first instead of sending it again.
+              var uncertain = isNoAnswer(err) || (err && err.body && err.body.error === "completion_uncertain");
+              var text = uncertain
                 ? "Сервер не ответил вовремя: файл мог сохраниться. Проверьте список, прежде чем загружать его снова."
                 : err.message;
               div.innerHTML = [

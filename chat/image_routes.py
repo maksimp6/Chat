@@ -3,10 +3,12 @@
 import hashlib
 import json
 import logging
+import os
 import re
 import time
 
 import requests
+
 from flask import Blueprint, jsonify, request, send_file
 
 from chat._error_details import DETAILS, error_body
@@ -348,16 +350,19 @@ def read_generated_image(conv_id, request_id):
             image,
             mimetype=mime_type,
             download_name=request_id + (".png" if mime_type == "image/png" else ".jpg"),
-            # A generated picture never changes: its request id is its version, and a download broken on a slow link
-            # (10 kb/s) goes on with a Range request instead of starting over.
-            conditional=True,
+            conditional=False,
             etag=request_id,
             max_age=0,
         )
         response.headers["Cache-Control"] = "private, no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.call_on_close(image.close)
-        return response
+        # A generated picture never changes: its request id is its version, and a download broken on a slow link
+        # (10 kb/s) goes on with a Range request instead of starting over. send_file cannot size an open file, so the
+        # size comes from its descriptor.
+        size = os.fstat(image.fileno()).st_size
+        response.content_length = size
+        return response.make_conditional(request, accept_ranges=True, complete_length=size)
     except Exception:
         image.close()
         raise
