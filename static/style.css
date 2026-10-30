@@ -1441,6 +1441,11 @@ body {
   display: contents;
 }
 
+/* The wrapper has no box, so the last element inside it ends the bubble. */
+.logos-pro-app .bubble > .md-pending:last-child > :last-child {
+  margin-bottom: 0;
+}
+
 .logos-pro-app .bubble .md-render-fallback {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

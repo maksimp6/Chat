@@ -20,9 +20,9 @@ function flushApprovalOutputs(convId) {
 
 // The vendored parsers own Markdown/TeX syntax. Keep Logos-specific presentation
 // and the existing image-source policy at the renderer boundary.
-// On a slow link the chat does not wait for them: markdown-it and texmath load after this script, KaTeX (76 KB even
-// compressed) only when a message has a formula. Until they arrive a message is shown as plain text, or without its
-// formulas, and it is drawn again once they are here.
+// On a slow link the chat does not wait for them: this script loads markdown-it and texmath itself (no deferred script
+// waits for them), KaTeX (76 KB even compressed) only when a message has a formula. Until they arrive a message is
+// shown as plain text, or without its formulas, and it is drawn again once they are here.
 var chatMarkdownRenderer = null;
 // Whether chatMarkdownRenderer renders formulas (texmath with KaTeX).
 var chatMarkdownMath = false;
@@ -81,57 +81,79 @@ function getChatMarkdownRenderer() {
 
 // TeX in the delimiters texmath reads: $$…$$, $…$, \(…\), \[…\].
 var CHAT_FORMULA_PATTERN = /\$\$[\s\S]+?\$\$|\$[^\s$][^$\n]*\$|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]/;
-var katexRequested = false;
+// How close to the bottom the chat counts as following the newest message.
+var CHAT_PINNED_PX = 80;
 
-// KaTeX loads once, the first time a message has a formula; a failed load is tried again by the next formula.
-function requestKatex() {
-  if (katexRequested || window.katex) return;
-  katexRequested = true;
+// The renderer scripts this chat loads itself, so that no deferred script waits for them: markdown-it and texmath at
+// once, KaTeX on the first formula. A failed load is tried again after a pause that doubles from the base to the cap,
+// as the chat's re-sends do; markdown-it and texmath on their own, KaTeX by the next formula after the pause.
+var RENDERER_SCRIPTS = {
+  markdown: { path: "/vendor/markdown-it-15.0.3/markdown-it.min.js", ready: function () { return typeof window.markdownit === "function"; } },
+  texmath: { path: "/vendor/markdown-it-texmath-1.0.0/texmath.js", ready: function () { return typeof texmath === "function"; } },
+  katex: { path: "/vendor/katex-0.19.1/katex.min.js", ready: function () { return Boolean(window.katex); } },
+};
+var RENDERER_RETRY_BASE_MS = 1000;
+var RENDERER_RETRY_CAP_MS = 15000;
+var rendererLoads = {};
+
+function loadRendererScript(name) {
+  var spec = RENDERER_SCRIPTS[name];
+  var state = rendererLoads[name] || (rendererLoads[name] = { loading: false, failures: 0, retryAt: 0 });
+  if (spec.ready() || state.loading || Date.now() < state.retryAt) return;
+  state.loading = true;
   var script = document.createElement("script");
-  script.src = (window.__LOGOS_STATIC_BASE || "/static") + "/vendor/katex-0.19.1/katex.min.js?v=" +
+  script.src = (window.__LOGOS_STATIC_BASE || "/static") + spec.path + "?v=" +
     encodeURIComponent(window.__LOGOS_STATIC_VERSION || "");
   script.async = true;
-  script.onload = renderPendingMarkdown;
+  script.onload = function () {
+    state.loading = false;
+    state.failures = 0;
+    renderPendingMarkdown();
+  };
   script.onerror = function () {
-    katexRequested = false;
+    state.loading = false;
+    state.failures += 1;
+    var pauseMs = Math.min(RENDERER_RETRY_CAP_MS, RENDERER_RETRY_BASE_MS * Math.pow(2, state.failures - 1));
+    state.retryAt = Date.now() + pauseMs;
     script.remove();
+    if (name !== "katex") setTimeout(function () { loadRendererScript(name); }, pauseMs);
   };
   (document.head || document.documentElement).appendChild(script);
 }
 
-// Messages drawn before their renderer arrived, by the id of the element that holds each one: its source text.
-var pendingMarkdown = new Map();
-var pendingMarkdownSeq = 0;
+loadRendererScript("markdown");
+loadRendererScript("texmath");
 
-function pendingMarkdownHtml(source, html) {
-  pendingMarkdownSeq += 1;
-  var id = String(pendingMarkdownSeq);
-  pendingMarkdown.set(id, source);
-  return '<div class="md-pending" data-md-pending="' + id + '">' + html + "</div>";
+function escapeAttribute(text) {
+  return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Draws again every message shown before markdown-it or KaTeX arrived. A message whose element is gone is dropped;
-// one that still lacks its renderer is kept for the next arrival.
+// A message drawn before its renderer arrived keeps its source on its own element, so nothing outlives the element
+// (a live answer is drawn again every 250 ms).
+function pendingMarkdownHtml(source, html) {
+  return '<div class="md-pending" data-md-source="' + escapeAttribute(source) + '">' + html + "</div>";
+}
+
+// Draws again every message shown before markdown-it or KaTeX arrived; one that still lacks its renderer stays
+// pending. A chat that followed its newest message keeps following it although the drawn formulas are taller.
 function renderPendingMarkdown() {
-  var entries = Array.from(pendingMarkdown.entries());
-  pendingMarkdown.clear();
-  entries.forEach(function (entry) {
-    var el = document.querySelector('[data-md-pending="' + entry[0] + '"]');
-    if (!el) return;
+  var pending = document.querySelectorAll(".md-pending[data-md-source]");
+  if (!pending.length) return;
+  var chatbox = document.getElementById("chatbox");
+  var pinned = Boolean(chatbox) && chatbox.scrollHeight - chatbox.scrollTop - chatbox.clientHeight <= CHAT_PINNED_PX;
+  pending.forEach(function (el) {
     var holder = document.createElement("div");
-    holder.innerHTML = parseMarkdown(entry[1]);
+    holder.innerHTML = parseMarkdown(el.getAttribute("data-md-source"));
     el.replaceWith.apply(el, Array.from(holder.childNodes));
   });
+  if (pinned) chatbox.scrollTop = chatbox.scrollHeight;
 }
-
-// markdown-it and texmath come after this script; every deferred script has run before DOMContentLoaded.
-document.addEventListener("DOMContentLoaded", renderPendingMarkdown);
 
 function parseMarkdown(text) {
   if (text === null || text === undefined || text === "") return "";
   var source = typeof text === "string" ? text : JSON.stringify(text);
   var formula = CHAT_FORMULA_PATTERN.test(source);
-  if (formula && !window.katex) requestKatex();
+  if (formula) loadRendererScript("katex");
   var renderer = null;
   try {
     renderer = getChatMarkdownRenderer();
@@ -670,7 +692,8 @@ function checkStoredImageRequest(convId, anchor, imageRequestId) {
 // ``retryLoad`` goes on where the load stopped; without it the history is loaded again.
 function historyErrorBlock(convId, message, retryLoad) {
   const error = document.createElement("div");
-  error.className = "empty-state error-state";
+  // A block that goes on loading older messages is not an empty-chat note: addMessage and a refresh keep it.
+  error.className = typeof retryLoad === "function" ? "error-state history-partial" : "empty-state error-state";
   const text = document.createElement("p");
   text.textContent = message;
   const retry = document.createElement("button");
@@ -878,14 +901,15 @@ async function streamHistory(convId, options) {
     if (!current()) return false;
     if (item.end === true) {
       finished = true;
+      // An empty conversation: the copy shown before gives way to nothing.
+      giveWay();
       return true;
     }
     if (typeof item.id !== "number") {
       if (typeof item.count === "number") count = item.count;
-      // The new copy is arriving: the one shown before gives way.
-      giveWay();
       return true;
     }
+    // The new copy is arriving: the one shown before gives way.
     giveWay();
     const newest = !newestSeen;
     newestSeen = true;
@@ -958,7 +982,7 @@ async function streamHistory(convId, options) {
       return;
     }
     console.error("[CHAT] Fetch history error:", err);
-    chatbox.querySelectorAll(".error-state").forEach(function (node) { node.remove(); });
+    chatbox.querySelectorAll(".error-state:not(.history-partial)").forEach(function (node) { node.remove(); });
     if (oldest && oldest.isConnected) {
       // What arrived stays; the rest is read on from the oldest message received.
       const above = oldest;
@@ -968,8 +992,8 @@ async function streamHistory(convId, options) {
         function () { streamHistory(convId, { above: above, sources: sources }); },
       );
       chatbox.insertBefore(block, above);
-    } else if (replaced && replaced.some(function (node) { return node.isConnected; })) {
-      // The chat already on screen stays: the error and «Повторить» go under it, worded as a failed refresh.
+    } else if (settings.replace) {
+      // A refresh of a chat on screen: what is there stays, and the error and «Повторить» go under it.
       chatbox.appendChild(historyErrorBlock(convId, historyReloadErrorText(err)));
       chatbox.scrollTop = chatbox.scrollHeight;
     } else {
@@ -982,13 +1006,37 @@ async function streamHistory(convId, options) {
 // for an answer reads that answer, not the history again. Notes shown only on this page (a stopped turn, a lost answer,
 // the question as it was sent) give way to what the server stored, as a full reload did; what was added while this
 // was read stays.
+// Nodes a refresh leaves alone: the marker of a history stream still reading, and the block that loads older messages.
+function keptByRefresh(node) {
+  return Boolean(node.classList) && (node.classList.contains("history-end") || node.classList.contains("history-partial"));
+}
+
+function storedMessageId(node) {
+  const id = node.dataset && node.dataset.messageId ? Number(node.dataset.messageId) : NaN;
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 function refreshHistory(convId, shown) {
   const chatbox = document.getElementById("chatbox");
-  const storedIds = shown
-    .map(function (node) { return node.dataset && node.dataset.messageId ? Number(node.dataset.messageId) : NaN; })
-    .filter(function (id) { return Number.isInteger(id) && id > 0; });
-  if (!chatbox || !storedIds.length) return streamHistory(convId, { replace: shown });
-  const lastId = storedIds.reduce(function (max, id) { return id > max ? id : max; }, 0);
+  // The chat is read again from the last stored message before the first message shown only on this page (a question
+  // sent here before the server named it, a note, an error): everything from there is drawn again from what the server
+  // stored, as a full reload did, and nothing stored is skipped.
+  let lastId = null;
+  let mark = -1;
+  for (let index = 0; index < shown.length; index += 1) {
+    const node = shown[index];
+    const id = storedMessageId(node);
+    if (id !== null) {
+      if (lastId === null || id > lastId) {
+        lastId = id;
+        mark = index;
+      }
+    } else if (node.classList && node.classList.contains("msg")) {
+      break;
+    }
+  }
+  if (!chatbox || lastId === null) return streamHistory(convId, { replace: shown });
+  const tail = shown.slice(mark + 1).filter(function (node) { return !keptByRefresh(node); });
   const token = chatbox.dataset.historyLoad;
   const current = function () { return convId === currentConvId && chatbox.dataset.historyLoad === token; };
   return window.LogosDispatcher.request(`/api/conversations/${convId}/messages?after=${lastId}`)
@@ -1011,11 +1059,7 @@ function refreshHistory(convId, shown) {
         if (owner === undefined) return streamHistory(convId, { replace: shown });
       }
       try {
-        shown.forEach(function (node) {
-          // The marker of a history stream still reading stays: it places that stream's newest message.
-          if (node.classList && node.classList.contains("history-end")) return;
-          if (!(node.dataset && node.dataset.messageId)) node.remove();
-        });
+        tail.forEach(function (node) { node.remove(); });
         // A newer message makes the earlier errors stale: only the newest error keeps its «Повторить».
         if (newer.length) {
           shown.forEach(function (node) {
@@ -1043,7 +1087,7 @@ function refreshHistory(convId, shown) {
       }
       console.error("[CHAT] Fetch history error:", err);
       // The chat already on screen stays: the error and «Повторить» go under it, one block at a time.
-      chatbox.querySelectorAll(".error-state").forEach(function (node) { node.remove(); });
+      chatbox.querySelectorAll(".error-state:not(.history-partial)").forEach(function (node) { node.remove(); });
       chatbox.appendChild(historyErrorBlock(convId, historyReloadErrorText(err)));
       chatbox.scrollTop = chatbox.scrollHeight;
     });
@@ -1912,7 +1956,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function isPinned(chatbox) {
-    return chatbox.scrollHeight - chatbox.scrollTop - chatbox.clientHeight <= 80;
+    return chatbox.scrollHeight - chatbox.scrollTop - chatbox.clientHeight <= CHAT_PINNED_PX;
   }
 
   function responseType(response) {
@@ -2353,7 +2397,18 @@ document.addEventListener("DOMContentLoaded", function () {
     if (data && Number.isInteger(data.user_message_id) && data.user_message_id > 0) {
       turn.accepted = true;
       turn.serverUserMessageId = data.user_message_id;
+      stampQuestion(turn);
       ensureTurnBaseline(turn);
+    }
+  }
+
+  // The question bubble drawn at send gets the id the server stored it under, as a loaded one has: a refresh of the
+  // chat (refreshHistory) then knows it is stored and does not read it again.
+  function stampQuestion(turn) {
+    const node = turn.questionNode;
+    if (!node || !node.isConnected || node.dataset.messageId) return;
+    if (Number.isInteger(turn.serverUserMessageId) && turn.serverUserMessageId > 0) {
+      node.dataset.messageId = String(turn.serverUserMessageId);
     }
   }
 
@@ -2365,6 +2420,7 @@ document.addEventListener("DOMContentLoaded", function () {
       turn.accepted = true;
       if (Number.isInteger(event.user_message_id) && event.user_message_id > 0) {
         turn.serverUserMessageId = event.user_message_id;
+        stampQuestion(turn);
       }
       ensureTurnBaseline(turn);
       applyConversationTitle(turn.conversationId, event.title);
@@ -2676,7 +2732,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (input.value === rawText) input.value = "";
           // A newer question makes the earlier errors stale: only the newest error keeps its «Повторить».
           document.querySelectorAll("#chatbox .msg-retry-btn").forEach(function (button) { button.remove(); });
-          addMessage({
+          turn.questionNode = addMessage({
             text: sentImages.length
               ? (turn.text ? turn.text + " · фото: " : "Фото: ") + sentImages.length
               : turn.text,
@@ -2697,6 +2753,10 @@ document.addEventListener("DOMContentLoaded", function () {
       // message it added, or null.
       const renderTurnResult = function (data, httpStatus, opts) {
         const options = opts || {};
+        if (data && Number.isInteger(data.user_message_id) && data.user_message_id > 0 && !turn.serverUserMessageId) {
+          turn.serverUserMessageId = data.user_message_id;
+        }
+        stampQuestion(turn);
         const clientTotalMs = Math.round(performance.now() - t0);
         // The chat takes the conversation title the server stored, also when the turn then failed at the provider. A Problem
         // Details body (it has «type») is skipped: its «title» describes the error.

@@ -11,15 +11,36 @@ from pathlib import Path
 from typing import Any
 
 
+# The kinds of static files the UI fingerprint covers.
+_FINGERPRINTED_SUFFIXES = {".js", ".css", ".svg", ".png", ".woff", ".woff2"}
+
+
+def _fingerprinted_static_files(root):
+    return sorted(
+        path
+        for path in (root / "static").rglob("*")
+        if path.is_file() and path.suffix in _FINGERPRINTED_SUFFIXES
+    )
+
+
+def static_file_states(root=None) -> dict[str, tuple[int, int]]:
+    """Each fingerprinted static file as it is now: its path under static/, its mtime and size.
+
+    The fingerprint is taken once, at boot; a file that differs from this record later
+    was changed on disk after it and is no longer the file the fingerprint names.
+    """
+    root = Path(root) if root is not None else Path(__file__).resolve().parents[1]
+    states = {}
+    for path in _fingerprinted_static_files(root):
+        stat = path.stat()
+        states[path.relative_to(root / "static").as_posix()] = (stat.st_mtime_ns, stat.st_size)
+    return states
+
+
 def _static_asset_version(root=None):
     """Fingerprint the served UI bytes, independently of file timestamps or overrides."""
     root = Path(root) if root is not None else Path(__file__).resolve().parents[1]
-    paths = sorted(
-        path
-        for path in (root / "static").rglob("*")
-        if path.is_file()
-        and path.suffix in {".js", ".css", ".svg", ".png", ".woff", ".woff2"}
-    )
+    paths = _fingerprinted_static_files(root)
     paths.extend(sorted((root / "templates").rglob("*.html")))
     digest = hashlib.sha256()
     for path in paths:

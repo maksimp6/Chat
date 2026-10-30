@@ -86,10 +86,8 @@
     <script src="{{ static_root }}/model_view.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/execution_surface.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/chat.js?v={{ static_version }}" defer></script>
-    <!-- After chat.js, so a slow link does not hold the chat back: chat.js shows text until they arrive and
-         redraws it then. KaTeX loads only when a message has a formula (chat.js requestKatex). -->
-    <script src="{{ static_root }}/vendor/markdown-it-15.0.3/markdown-it.min.js?v={{ static_version }}" defer></script>
-    <script src="{{ static_root }}/vendor/markdown-it-texmath-1.0.0/texmath.js?v={{ static_version }}" defer></script>
+    <!-- markdown-it, texmath and KaTeX are loaded by chat.js (loadRendererScript), so no deferred script waits for
+         them on a slow link: chat.js shows text until they arrive and draws it again then. -->
     <script src="{{ static_root }}/trace_viewer.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/trace_viewer_timing.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/trace_viewer_error_ui.js?v={{ static_version }}" defer></script>

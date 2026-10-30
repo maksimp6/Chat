@@ -19,13 +19,15 @@ from web_shell.host import (
     problem,
 )
 from web_shell.compression import install as install_compression
-from web_shell.version import boot_version
+from web_shell.version import boot_version, static_file_states
 
 logger = logging.getLogger("logos.web_shell")
 
 # What this process serves, captured when the shell is installed (at boot).
 STATIC_ASSET_VERSION = ""
 APP_VERSION: dict[str, Any] = {}
+# Each fingerprinted static file as it was when STATIC_ASSET_VERSION was taken: path under static/ -> (mtime, size).
+STATIC_FILE_STATES: dict[str, tuple[int, int]] = {}
 
 
 _storage_ready = False
@@ -51,6 +53,19 @@ def _handle_unexpected_error(exc):
     )
 
 
+def _unchanged_since_boot(path: str) -> bool:
+    """Whether the static file at ``path`` (under /static/) is still the one the fingerprint was taken from."""
+    relative = path[len("/static/") :]
+    recorded = STATIC_FILE_STATES.get(relative)
+    if recorded is None or not current_app.static_folder:
+        return False
+    try:
+        stat = os.stat(os.path.join(current_app.static_folder, relative))
+    except OSError:
+        return False
+    return (stat.st_mtime_ns, stat.st_size) == recorded
+
+
 def _set_web_cache_headers(response):
     # The HTML shell must never pin an older JavaScript dependency graph across deploys.
     if request.path == "/":
@@ -58,11 +73,13 @@ def _set_web_cache_headers(response):
     elif request.path.startswith("/static/"):
         # The page asks for every file with ?v= set to the fingerprint of all served UI bytes (web_shell.version), so
         # a file at the current fingerprint never changes: the browser keeps it without asking again. On a 10 kb/s
-        # link a repeat visit then loads only the page itself. Any other request still revalidates.
+        # link a repeat visit then loads only the page itself. A file changed on disk after boot (the fingerprint is
+        # taken once) and any other request still revalidate.
         if (
             STATIC_ASSET_VERSION
             and request.args.get("v") == STATIC_ASSET_VERSION
             and response.status_code in (200, 304)
+            and _unchanged_since_boot(request.path)
         ):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         else:
@@ -140,6 +157,7 @@ def bootstrap_local_user():
 def install(app: Flask) -> None:
     """Install the shell: version, error and cache policy, storage start-up, shell routes."""
     global STATIC_ASSET_VERSION
+    STATIC_FILE_STATES.update(static_file_states(app.root_path))
     APP_VERSION.update(boot_version(app.root_path))
     STATIC_ASSET_VERSION = APP_VERSION["ui_version"]
     logger.info("[BOOT] hello: Logos backend module loaded")

@@ -170,10 +170,12 @@ def _proxy(environment_id, subpath=""):
     if item.get("status") != "RUNNING" or not item.get("runtime_thread_id"):
         return jsonify(_error("environment_not_running")), 503
 
+    # Accept-Encoding stays here: the inner app answers uncompressed and this response is compressed once, on the
+    # way out (web_shell.compression); the inner body is forwarded without its Content-Encoding.
     headers = [
         (key, value)
         for key, value in request.headers.items()
-        if key.lower() not in {"host", "content-length", "connection"}
+        if key.lower() not in {"host", "content-length", "connection", "accept-encoding"}
     ]
     try:
         upstream = dispatch_environment_http(

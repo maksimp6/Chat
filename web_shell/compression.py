@@ -9,10 +9,12 @@ each one, so every event still reaches the browser at once.
 from __future__ import annotations
 
 import gzip
+import re
 import zlib
 from typing import Any, Iterable, Iterator
 
 from flask import Flask, Response, request
+from flask.json.provider import DefaultJSONProvider
 
 # Media types worth compressing; everything else (pictures, audio, archives, fonts) is
 # already compressed or binary.
@@ -36,6 +38,14 @@ _SECRET_PATH_PREFIXES = (
     "/api/mcp-servers",
     "/api/mcp/oauth",
 )
+# An environment's own app is reached under /environments/<id>/…; its secret paths count too.
+_ENVIRONMENT_PATH = re.compile(r"^/environments/[^/]+(/.*)?$")
+
+
+def _secret_path(path: str) -> bool:
+    inner = _ENVIRONMENT_PATH.match(path)
+    candidates = (path, inner.group(1) or "/") if inner else (path,)
+    return any(candidate.startswith(_SECRET_PATH_PREFIXES) for candidate in candidates)
 
 
 def _compressible(response: Response) -> bool:
@@ -47,7 +57,7 @@ def _compressible(response: Response) -> bool:
         or mimetype.endswith("+xml")
     ):
         return False
-    if request.method == "HEAD" or request.path.startswith(_SECRET_PATH_PREFIXES):
+    if request.method == "HEAD" or _secret_path(request.path):
         return False
     if response.status_code < 200 or response.status_code in (204, 206, 304):
         return False
@@ -106,7 +116,25 @@ def compress_response(response: Response) -> Response:
     return response
 
 
+class Utf8JSONProvider(DefaultJSONProvider):
+    """JSON as UTF-8 text instead of ASCII escapes, so a Cyrillic letter costs 2 bytes, not 6.
+
+    A text that cannot be UTF-8 (a lone surrogate, as in a file name that was not UTF-8
+    on disk) is sent with escapes, as before, rather than failing the response.
+    """
+
+    ensure_ascii = False
+
+    def dumps(self, obj: Any, **kwargs: Any) -> str:
+        text = super().dumps(obj, **kwargs)
+        try:
+            text.encode("utf-8")
+        except UnicodeEncodeError:
+            text = super().dumps(obj, **{**kwargs, "ensure_ascii": True})
+        return text
+
+
 def install(app: Flask) -> None:
     """JSON without ASCII escapes, and gzip for every compressible response."""
-    app.json.ensure_ascii = False
+    app.json = Utf8JSONProvider(app)
     app.after_request(compress_response)
