@@ -74,8 +74,10 @@ def skill_registry():
         return _skill_registry
 
 
-# Per-response polling budget; it is not a deadline for the whole tool loop.
-CHAT_POLL_TIMEOUT_SECONDS = 240
+# Settings stand at their maximum (AGENTS.md): the longest wait for one response and the longest
+# read of one provider connection the transport accepts. Neither is a deadline for the whole tool loop.
+CHAT_POLL_TIMEOUT_SECONDS = 7200
+CHAT_REQUEST_TIMEOUT_SECONDS = 900
 
 
 def _tool_rounds(value: Any) -> int | None:
@@ -170,7 +172,7 @@ def _client_params(raw: dict[str, Any]) -> dict[str, Any]:
     params["max_rounds"] = _tool_rounds(params.get("max_rounds"))
     # Validate transport settings before storing a message or starting provider work.
     params["request_timeout"] = bound._transport_timeout(
-        params, "request_timeout", 90, 900
+        params, "request_timeout", CHAT_REQUEST_TIMEOUT_SECONDS, 900
     )
     params["poll_timeout"] = bound._transport_timeout(
         params, "poll_timeout", CHAT_POLL_TIMEOUT_SECONDS, 7200
