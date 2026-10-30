@@ -5,6 +5,24 @@
   var READ_ONLY_NOTE =
     "Настройки общие для всех диалогов и только для чтения: всё стоит на максимуме, изменить их здесь нельзя.";
 
+  // Every tool has its icon in static/icons/tools/<name>.svg (scripts/make_tool_icons.py).
+  var TOOL_ICON_BASE = (function () {
+    var src = document.currentScript && document.currentScript.src;
+    return src ? new URL("../icons/tools/", src).href : "/static/icons/tools/";
+  })();
+
+  // The icon is drawn as a mask in the text colour, so it reads in both colour schemes.
+  function toolChip(name) {
+    var url = "url('" + TOOL_ICON_BASE + encodeURIComponent(name) + ".svg') center / contain no-repeat";
+    return (
+      '<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 10px 2px 0;font-size:11px;color:var(--m-muted,#666);">' +
+      '<span aria-hidden="true" style="width:16px;height:16px;flex:none;background-color:currentColor;-webkit-mask:' +
+      url + ";mask:" + url + ';"></span>' +
+      window.SettingsUI.escapeHtml(name) +
+      "</span>"
+    );
+  }
+
   function disableControls(root) {
     root.querySelectorAll("input, select, textarea").forEach(function (control) {
       control.disabled = true;
@@ -200,7 +218,10 @@
               "</div>" +
               '<div style="font-size:11px;color:var(--m-muted,#666);">' +
               count +
-              " функций доступно</div></div></label>"
+              " функций доступно</div>" +
+              '<div style="display:flex;flex-wrap:wrap;margin-top:4px;">' +
+              (categories[cat] || []).map(toolChip).join("") +
+              "</div></div></label>"
             );
           })
           .join("");

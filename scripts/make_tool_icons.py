@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generate one 24px SVG icon per Logos tool, from a fixed set of glyphs.
 
-Tool names are read statically from tool_providers/*.py and the tool files of the
-units listed in UNIT_TOOL_FILES (the same keys the registry exposes). Each tool gets the first glyph whose keyword
+Tool names are read statically from tool_providers/*.py, the tool files of the
+units listed in UNIT_TOOL_FILES, every unit module composition/tool_sources.py imports
+and the bridge tools of mcp_server/tools.py (the same names the registry exposes). Each tool gets the first glyph whose keyword
 appears in its name; unmatched tools get the generic glyph. Output:
 static/icons/tools/<tool>.svg and static/icons/tools/index.json.
 
@@ -56,12 +57,14 @@ GLYPHS = {
     "pencil": '<path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/>',
     "trash": '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
     "target": '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+    "gear": '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
     "generic": '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',
 }
 
 # First match wins; keywords are matched against the tool name in lower case.
 RULES = [
     (("rootagent",), "server"),
+    (("settings", "config"), "gear"),
     (("clipboard",), "clipboard"),
     (("battery",), "battery"),
     (("torch", "brightness"), "bulb"),
@@ -88,6 +91,8 @@ RULES = [
     (("calendar",), "calendar"),
     (("sms", "mail", "notification"), "mail"),
     (("toast", "dialog", "conversation", "chat", "message"), "chat"),
+    (("partner", "contact", "followup"), "person"),
+    (("gov.", "tax", "requirement", "approval", "application"), "document"),
     (("tts", "voice", "audio", "speak", "sound", "volume", "speech"), "speaker"),
     (("location", "gps", "wifi"), "pin"),
     (
@@ -99,6 +104,7 @@ RULES = [
     (("3d", "print", "model", "stl"), "printer"),
     (("plugin", "skill", "mcp", "tool"), "plug"),
     (("folder", "directory", "dir", "list_files"), "folder"),
+    (("status", "session", "invocation", "execution", "agents", "trace"), "info"),
     (("file", "read", "write", "doc", "pdf", "text"), "document"),
 ]
 
@@ -113,11 +119,26 @@ UNIT_TOOL_FILES = (
 )
 
 
+def _registry_name(target: ast.expr) -> bool:
+    return isinstance(target, ast.Name) and (
+        target.id.endswith("_TOOLS") or target.id == "TOOL_REGISTRY"
+    )
+
+
 def _tool_dict_keys(tree: ast.Module) -> set[str]:
     """String keys of every module-level ``*_TOOLS = {...}`` or ``TOOL_REGISTRY = {...}``
-    dict: the names the registry exposes."""
+    dict, and of ``TOOL_REGISTRY["name"] = ...``: the names the registry exposes."""
     names: set[str] = set()
     for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if (
+                    isinstance(target, ast.Subscript)
+                    and _registry_name(target.value)
+                    and isinstance(target.slice, ast.Constant)
+                    and isinstance(target.slice.value, str)
+                ):
+                    names.add(target.slice.value)
         targets = (
             node.targets
             if isinstance(node, ast.Assign)
@@ -128,11 +149,7 @@ def _tool_dict_keys(tree: ast.Module) -> set[str]:
         value = getattr(node, "value", None)
         if not isinstance(value, ast.Dict):
             continue
-        if not any(
-            isinstance(t, ast.Name)
-            and (t.id.endswith("_TOOLS") or t.id == "TOOL_REGISTRY")
-            for t in targets
-        ):
+        if not any(_registry_name(t) for t in targets):
             continue
         for key in value.keys:
             if isinstance(key, ast.Constant) and isinstance(key.value, str):
@@ -140,17 +157,44 @@ def _tool_dict_keys(tree: ast.Module) -> set[str]:
     return names
 
 
+def _source_files() -> list[pathlib.Path]:
+    """The unit modules composition/tool_sources.py imports its tool dicts from."""
+    path = ROOT / "composition" / "tool_sources.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), str(path))
+    return [
+        ROOT / (node.module.replace(".", "/") + ".py")
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module
+    ]
+
+
+def _bridge_names(tree: ast.Module) -> set[str]:
+    """Bridge tools are tuples (name, title, description, input schema, handler)."""
+    return {
+        node.elts[0].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Tuple)
+        and len(node.elts) == 5
+        and isinstance(node.elts[0], ast.Constant)
+        and isinstance(node.elts[0].value, str)
+        and isinstance(node.elts[1], ast.Constant)
+        and isinstance(node.elts[3], ast.Dict)
+    }
+
+
 def tool_names() -> list[str]:
     names: set[str] = set()
     files = sorted((ROOT / "tool_providers").glob("*.py")) + [
         ROOT / rel for rel in UNIT_TOOL_FILES
-    ]
-    for path in files:
+    ] + _source_files()
+    for path in sorted(set(files)):
         if not path.exists():
             continue
         names.update(
             _tool_dict_keys(ast.parse(path.read_text(encoding="utf-8"), str(path)))
         )
+    bridge = ROOT / "mcp_server" / "tools.py"
+    names.update(_bridge_names(ast.parse(bridge.read_text(encoding="utf-8"), str(bridge))))
     return sorted(names)
 
 
