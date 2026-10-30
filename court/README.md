@@ -47,12 +47,9 @@ Other units reach it only through their own ports:
 | `POST /api/court/speak` | The Court's turn in the group chat of `conversation_id` (optional `crisis`): verdicts into the chat, the sitting opened or updated. |
 | `POST /api/court/judge` | The protocol alone, nothing kept: `conversation_id` or `messages`, optional `crisis`. |
 | `GET /api/court/hearings` | The sittings, newest first. |
-| `POST /api/court/hearings` | Open a sitting over `conversation_id` (optional `crisis`). |
-| `GET`, `DELETE /api/court/hearings/<id>` | One sitting; remove its record. |
-| `POST /api/court/hearings/<id>/rejudge` | Judge again (optional `crisis`). |
-| `POST /api/court/hearings/<id>/cases/<n>/decision` | The owner's `decision` with its `reason`. |
-| `POST /api/court/hearings/<id>/cases/<n>/file` | File the case to GitHub. |
-| `POST /api/court/hearings/<id>/close`, `/reopen` | With a `reason`. |
+| `GET /api/court/hearings/<id>` | One sitting. |
+
+The HTTP side only reads the hall, and a sitting's record is never removed. Opening, judging again, decisions, filing to GitHub, closing and reopening are said in the court chat: the ⚖️ window's «Подать в суд» opens a new dialog where the current model and the Court sit (`LogosGroupChat.seat`, participants kept for that dialog only), and the model does what is asked with the `court` tool.
 
 ## Tools
 

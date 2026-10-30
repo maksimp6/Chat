@@ -7,17 +7,6 @@
   var MODAL_ID = "court-hall-modal";
   var rulesCache = null;
 
-  var DECISION_LABELS = {
-    ALLEGED: "ALLEGED — предположение",
-    INVESTIGATING: "INVESTIGATING — расследуется",
-    CONFIRMED: "CONFIRMED — подтверждено",
-    REFUTED: "REFUTED — опровергнуто",
-    UNKNOWN: "UNKNOWN — данных недостаточно",
-    FIXED: "FIXED — исправлено",
-    VERIFIED: "VERIFIED — проверено",
-    ACCEPTED: "ACCEPTED — принято владельцем",
-  };
-
   var JUDGE_LABELS = {
     boundary: "S4 граница близости",
     demand: "S5 требования",
@@ -96,12 +85,12 @@
         { class: "logos-court-note" },
         "Суд идёт по записи, не по намерению: каждый вердикт опирается на цитату и номер правила. " +
           "Вспышка пользователя открывает окно вины; ТЯЖКОЕ или БЕСПОЛЕЗНОЕ в окне — черновик дела. " +
-          "Решение по делу выносит владелец; подача в GitHub — его отдельное действие. " +
-          "Суд заседает в групповом чате (👥 → «Суд Логоса»): после реплик моделей он пишет вердикты в чат, а заседание над этим диалогом ведётся здесь.",
+          "Здесь заседания только видны. «Подать в суд» открывает новый групповой чат с судом: " +
+          "там вы просто говорите, а пересмотр, решения, подача в GitHub и закрытие делаются сообщениями. Записи заседаний не удаляются.",
       ),
     );
 
-    // --- открыть заседание -------------------------------------------------
+    // --- подать в суд -------------------------------------------------------
     var form = h("form", { class: "logos-court-open" });
     var dialogSelect = h("select", { "aria-label": "Диалог" });
     dialogSelect.appendChild(h("option", { value: "" }, "Загрузка диалогов…"));
@@ -109,7 +98,7 @@
     var crisisLabel = h("label", { class: "logos-court-check" });
     crisisLabel.appendChild(crisis);
     crisisLabel.appendChild(h("span", {}, "кризисный режим (S4.5)"));
-    var openButton = h("button", { type: "submit" }, "Открыть заседание");
+    var openButton = h("button", { type: "submit" }, "Подать в суд");
     var dryButton = h("button", { type: "button" }, "Только протокол");
     form.appendChild(dialogSelect);
     form.appendChild(crisisLabel);
@@ -278,7 +267,7 @@
       return box;
     }
 
-    function renderCase(hearing, item, decisions) {
+    function renderCase(item) {
       var box = h("div", { class: "logos-court-case" });
       var title = h("h5", {});
       title.appendChild(document.createTextNode("Дело " + item.n + " · "));
@@ -299,60 +288,12 @@
 
       box.appendChild(h("div", { class: "logos-court-muted" }, "Причина решения: " + (item.decision_reason || "—") + " · " + (item.decision_by || "UNASSIGNED")));
 
-      var decideForm = h("form", { class: "logos-court-decide" });
-      var select = h("select", { "aria-label": "Решение по делу" });
-      decisions.forEach(function (value) {
-        var option = h("option", { value: value }, DECISION_LABELS[value] || value);
-        if (value === item.decision) option.selected = true;
-        select.appendChild(option);
-      });
-      var reason = h("input", { placeholder: "Основание решения (обязательно)", "aria-label": "Основание решения" });
-      var save = h("button", { type: "submit" }, "Записать решение");
-      decideForm.appendChild(select);
-      decideForm.appendChild(reason);
-      decideForm.appendChild(save);
-      decideForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        save.disabled = true;
-        api("/api/court/hearings/" + encodeURIComponent(hearing.id) + "/cases/" + item.n + "/decision", {
-          method: "POST",
-          body: { decision: select.value, reason: reason.value },
-        })
-          .then(function (data) {
-            load();
-            renderHearing(data.hearing);
-          })
-          .catch(function (err) {
-            LogosToast.error(window.LogosErrorText("Не удалось записать решение", err));
-          })
-          .finally(function () {
-            save.disabled = false;
-          });
-      });
-      box.appendChild(decideForm);
-
-      var fileLine = h("div", { class: "logos-court-actions" });
       if (item.filed && item.filed.url) {
-        var link = h("a", { href: item.filed.url, target: "_blank", rel: "noopener" }, "Дело в GitHub");
-        fileLine.appendChild(link);
+        var fileLine = h("div", { class: "logos-court-actions" });
+        fileLine.appendChild(h("a", { href: item.filed.url, target: "_blank", rel: "noopener" }, "Дело в GitHub"));
         fileLine.appendChild(h("span", { class: "logos-court-muted" }, " · подано " + when(item.filed.at)));
-      } else {
-        var fileButton = h("button", { type: "button" }, "Подать дело в GitHub");
-        fileButton.onclick = function () {
-          if (!window.confirm("Подать дело " + item.n + " в GitHub как issue «Суд Логоса»? Цитаты уйдут только в зашифрованную улику.")) return;
-          fileButton.disabled = true;
-          api("/api/court/hearings/" + encodeURIComponent(hearing.id) + "/cases/" + item.n + "/file", { method: "POST" })
-            .then(function (data) {
-              renderHearing(data.hearing);
-            })
-            .catch(function (err) {
-              fileButton.disabled = false;
-              LogosToast.error(window.LogosErrorText("Не удалось подать дело", err));
-            });
-        };
-        fileLine.appendChild(fileButton);
+        box.appendChild(fileLine);
       }
-      box.appendChild(fileLine);
 
       if ((item.history || []).length) {
         var history = h("details", {});
@@ -390,66 +331,13 @@
         ),
       );
 
-      var actions = h("div", { class: "logos-court-actions" });
-      var rejudge = h("button", { type: "button" }, "Пересмотреть");
-      rejudge.onclick = function () {
-        rejudge.disabled = true;
-        api("/api/court/hearings/" + encodeURIComponent(hearing.id) + "/rejudge", { method: "POST", body: {} })
-          .then(function (data) {
-            load();
-            renderHearing(data.hearing);
-          })
-          .catch(function (err) {
-            LogosToast.error(window.LogosErrorText("Не удалось пересмотреть", err));
-          })
-          .finally(function () {
-            rejudge.disabled = false;
-          });
-      };
-      actions.appendChild(rejudge);
-      var closure = h("button", { type: "button" }, hearing.closure === "CLOSED" ? "Возобновить" : "Закрыть заседание");
-      closure.onclick = function () {
-        var reason = window.prompt(hearing.closure === "CLOSED" ? "Причина возобновления" : "Причина закрытия");
-        if (!reason) return;
-        var action = hearing.closure === "CLOSED" ? "reopen" : "close";
-        api("/api/court/hearings/" + encodeURIComponent(hearing.id) + "/" + action, { method: "POST", body: { reason: reason } })
-          .then(function (data) {
-            load();
-            renderHearing(data.hearing);
-          })
-          .catch(function (err) {
-            LogosToast.error(window.LogosErrorText("Не удалось изменить заседание", err));
-          });
-      };
-      actions.appendChild(closure);
-      var remove = h("button", { type: "button" }, "Удалить запись");
-      remove.onclick = function () {
-        if (!window.confirm("Удалить запись заседания " + hearing.id + "? Поданные в GitHub дела останутся там.")) return;
-        api("/api/court/hearings/" + encodeURIComponent(hearing.id), { method: "DELETE" })
-          .then(function () {
-            detail.textContent = "";
-            return load();
-          })
-          .catch(function (err) {
-            LogosToast.error(window.LogosErrorText("Не удалось удалить", err));
-          });
-      };
-      actions.appendChild(remove);
-      detail.appendChild(actions);
-
       var cases = hearing.cases || [];
       detail.appendChild(h("h5", {}, "Дела (" + cases.length + ")"));
       if (!cases.length) detail.appendChild(h("div", { class: "logos-court-muted" }, "Дел нет: в окнах вины не было ТЯЖКОЕ и БЕСПОЛЕЗНОЕ."));
-      loadRules()
-        .catch(function () {
-          return { decisions: Object.keys(DECISION_LABELS) };
-        })
-        .then(function (rules) {
-          cases.forEach(function (item) {
-            detail.appendChild(renderCase(hearing, item, rules.decisions || Object.keys(DECISION_LABELS)));
-          });
-          detail.appendChild(renderProtocol(protocol));
-        });
+      cases.forEach(function (item) {
+        detail.appendChild(renderCase(item));
+      });
+      detail.appendChild(renderProtocol(protocol));
     }
 
     function renderDryProtocol(protocol, dialogTitle) {
@@ -470,18 +358,21 @@
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       if (!dialogSelect.value) return;
+      var subject = dialogSelect.value;
+      var title = selectedTitle();
+      var model = currentModel;
       openButton.disabled = true;
-      api("/api/court/hearings", {
-        method: "POST",
-        body: { conversation_id: dialogSelect.value, crisis: crisis.checked },
-      })
-        .then(function (data) {
-          return load().then(function () {
-            renderHearing(data.hearing);
-          });
-        })
-        .catch(function (err) {
-          LogosToast.error(window.LogosErrorText("Не удалось открыть заседание", err));
+      // A new dialog where the model and the Court sit together; everything else is said in it.
+      createConversation(model)
+        .then(function (id) {
+          if (!id) return;
+          window.LogosGroupChat.seat(id, [model, window.LogosGroupChat.COURT]);
+          closeModal();
+          document.getElementById("msg-input").value =
+            "Подаю в суд диалог «" + title + "» (conversation_id " + subject + ")" +
+            (crisis.checked ? ", кризисный режим (S4.5)" : "") +
+            ". Открой заседание над ним инструментом court и расскажи, что суд нашёл.";
+          document.getElementById("send-btn").click();
         })
         .finally(function () {
           openButton.disabled = false;

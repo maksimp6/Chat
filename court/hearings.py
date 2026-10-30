@@ -39,7 +39,6 @@ __all__ = [
     "close_hearing",
     "court_bp",
     "decide_case",
-    "delete_hearing",
     "file_hearing_case",
     "get_hearing",
     "list_hearings",
@@ -464,13 +463,7 @@ def speak(conversation_id: str, *, crisis: bool | None = None) -> dict[str, Any]
     return {"message_id": message_id, "text": text, "hearing": hearing}
 
 
-def delete_hearing(hearing_id: str) -> None:
-    hearing = _load(hearing_id)
-    with get_store().transaction() as tx:
-        tx.delete(_key(hearing["id"]))
-
-
-# --- HTTP --------------------------------------------------------------------
+# --- HTTP: the hall is read here; it is changed only by what is said in the court chat --------------------------------------------------------------------
 
 
 def _body() -> dict[str, Any]:
@@ -544,85 +537,9 @@ def api_hearings():
     return jsonify({"hearings": list_hearings()})
 
 
-@court_bp.post("/hearings")
-def api_open_hearing():
-    data = _body()
-    try:
-        hearing = open_hearing(
-            str(data.get("conversation_id") or ""), crisis=bool(data.get("crisis"))
-        )
-        return jsonify({"hearing": hearing}), 201
-    except Exception as exc:
-        return _error(exc)
-
-
 @court_bp.get("/hearings/<hearing_id>")
 def api_hearing(hearing_id: str):
     try:
         return jsonify({"hearing": get_hearing(hearing_id)})
-    except Exception as exc:
-        return _error(exc)
-
-
-@court_bp.delete("/hearings/<hearing_id>")
-def api_delete_hearing(hearing_id: str):
-    try:
-        delete_hearing(hearing_id)
-        return jsonify({"deleted": hearing_id})
-    except Exception as exc:
-        return _error(exc)
-
-
-@court_bp.post("/hearings/<hearing_id>/rejudge")
-def api_rejudge(hearing_id: str):
-    data = _body()
-    try:
-        crisis = data.get("crisis")
-        return jsonify(
-            {
-                "hearing": rejudge_hearing(
-                    hearing_id, crisis=None if crisis is None else bool(crisis)
-                )
-            }
-        )
-    except Exception as exc:
-        return _error(exc)
-
-
-@court_bp.post("/hearings/<hearing_id>/cases/<int:case_number>/decision")
-def api_decide(hearing_id: str, case_number: int):
-    data = _body()
-    try:
-        return jsonify(
-            {
-                "hearing": decide_case(
-                    hearing_id, case_number, data.get("decision"), data.get("reason")
-                )
-            }
-        )
-    except Exception as exc:
-        return _error(exc)
-
-
-@court_bp.post("/hearings/<hearing_id>/cases/<int:case_number>/file")
-def api_file_case(hearing_id: str, case_number: int):
-    try:
-        return jsonify({"hearing": file_hearing_case(hearing_id, case_number)})
-    except Exception as exc:
-        return _error(exc)
-
-
-@court_bp.post("/hearings/<hearing_id>/close")
-def api_close(hearing_id: str):
-    try:
-        return jsonify({"hearing": close_hearing(hearing_id, _body().get("reason"))})
-    except Exception as exc:
-        return _error(exc)
-
-
-@court_bp.post("/hearings/<hearing_id>/reopen")
-def api_reopen(hearing_id: str):
-    try:
-        return jsonify({"hearing": reopen_hearing(hearing_id, _body().get("reason"))})
     except Exception as exc:
         return _error(exc)
