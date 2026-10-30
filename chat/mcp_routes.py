@@ -1282,6 +1282,13 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
             provider_message = "Ответ провайдера не завершён: " + provider_status
         if provider_diagnostics.get("provider_reason") and not limit_explained:
             provider_message += " (" + provider_diagnostics["provider_reason"] + ")"
+        elif provider_diagnostics["provider_error_present"] and not limit_explained:
+            # No reason: name the provider's own code or type, so the text is not bare (#1712).
+            error_name = provider_diagnostics.get(
+                "provider_error_code"
+            ) or provider_diagnostics.get("provider_error_type")
+            if error_name:
+                provider_message += " (" + str(error_name) + ")"
         trace.record_error(
             "provider_response", provider_message, error_type=provider_error
         )
