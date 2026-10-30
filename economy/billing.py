@@ -223,10 +223,16 @@ def aggregate_billing(items, context: dict[str, Any] | None = None) -> dict[str,
     return result
 
 
+# The owner turned the treasury off (30.10.2026): turns are priced and shown, never charged.
+TREASURY_ENABLED = False
+
+
 def settle_billing_to_treasury(
     billing: dict[str, Any], owner_id: str | None
 ) -> dict[str, Any]:
     """Post a fully calculated trace billing aggregate exactly once."""
+    if not TREASURY_ENABLED:
+        return {"status": "skipped", "reason": "treasury_disabled"}
     if not isinstance(billing, dict) or billing.get("cost_status") != "calculated":
         return {"status": "skipped", "reason": "billing_not_fully_calculated"}
 

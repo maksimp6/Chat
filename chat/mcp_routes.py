@@ -893,10 +893,14 @@ def _turn_cost(billing: dict[str, Any]) -> float | None:
 
 
 def _file_unsettled(settlement: dict[str, Any], **ids: Any) -> None:
-    """Every turn the treasury did not charge, except at a zero price, is a Court
-    case for the owner (AGENTS.md, «Ошибки и дела Суда»); the user is not told."""
+    """Every turn the treasury did not charge, except at a zero price or with the
+    treasury turned off by the owner, is a Court case for the owner (AGENTS.md,
+    «Ошибки и дела Суда»); the user is not told."""
     status = settlement.get("status")
-    if status not in {"failed", "skipped"} or settlement.get("reason") == "zero_cost":
+    if status not in {"failed", "skipped"} or settlement.get("reason") in {
+        "zero_cost",
+        "treasury_disabled",
+    }:
         return
     try:
         file_court_case(
