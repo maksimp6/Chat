@@ -886,10 +886,13 @@ def run_command(args: dict) -> dict:
         return {
             "error": "Команда обращается к служебным или секретным файлам и не выполняется"
         }
+    # No app limit: without a timeout (or with 0) the command runs until it ends (#1722).
     try:
-        timeout = clamp_integer(1, int(args.get("timeout", 30)), 300)
+        timeout = int(args.get("timeout") or 0)
     except (TypeError, ValueError):
         return {"error": "Параметр 'timeout' должен быть целым числом"}
+    if timeout < 0:
+        return {"error": "Параметр 'timeout' не может быть отрицательным"}
     try:
         with subprocess.Popen(
             command,
@@ -911,7 +914,7 @@ def run_command(args: dict) -> dict:
             },
         ) as proc:
             try:
-                out, err = proc.communicate(timeout=timeout)
+                out, err = proc.communicate(timeout=timeout or None)
             except subprocess.TimeoutExpired:
                 # The shell leads its own session: kill its children too, or they outlive the timeout.
                 if os.name == "posix":
@@ -1211,7 +1214,7 @@ TOOL_REGISTRY = {
                 "command": {"type": "string", "description": "Команда для терминала"},
                 "timeout": {
                     "type": "integer",
-                    "description": "Таймаут выполнения в секундах (по умолчанию 30)",
+                    "description": "Таймаут выполнения в секундах; без параметра или 0 — без лимита",
                 },
             },
             "required": ["command"],
