@@ -25,6 +25,7 @@ from court.hearings import (
     rejudge_hearing,
     reopen_hearing,
     speak,
+    sue,
 )
 from court.host import check_access, get_current_owner_id, get_messages
 from court.judging import judge_dialog, rules_table
@@ -136,11 +137,19 @@ def _speak(args, cfg=None):
     }
 
 
+def _sue(args, cfg=None):
+    return {"success": True, **sue(str(args.get("conversation_id") or ""))}
+
+
 def _interrogate(args, cfg=None):
     return {
         "success": True,
         **interrogate(str(args.get("conversation_id") or ""), str(args.get("message") or "")),
     }
+
+
+def _sue(args, cfg=None):
+    return {"success": True, **sue(str(args.get("conversation_id") or ""))}
 
 
 def _conclude(args, cfg=None):
@@ -183,6 +192,11 @@ _ACTIONS: dict[str, dict[str, Any]] = {
                   "about": "подать дело заседания в GitHub"},
     "speak": {"fn": _speak, "required": ["conversation_id"], "write": True,
               "about": "слово суда в групповом чате диалога"},
+    "sue": {"fn": _sue, "required": ["conversation_id"], "write": True,
+            "about": "иск владельца по диалогу conversation_id: создаёт диалог «⚖️ Суд: …», где судья сразу начинает заседание; вердикт уже вынесен иском"},
+    "sue": {"fn": _sue, "required": ["conversation_id"], "write": True,
+            "about": "иск владельца по диалогу conversation_id: создаёт диалог «⚖️ Суд: …», где судья сразу "
+                     "ищет, в чём виноват ИИ, и выносит вердикты; пользователь всегда прав"},
     "interrogate": {"fn": _interrogate, "required": ["conversation_id", "message"], "write": True,
                     "about": "допрос обвиняемого: message уходит от лица пользователя в копию его диалога "
                              "conversation_id, оригинал не меняется и обвиняемый не знает о суде; ответ — его реплика"},

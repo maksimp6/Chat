@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -53,6 +54,7 @@ __all__ = [
     "rejudge_hearing",
     "reopen_hearing",
     "speak",
+    "sue",
 ]
 
 log = logging.getLogger("logos.court.hearings")
@@ -152,6 +154,8 @@ def _summary(hearing: dict[str, Any]) -> dict[str, Any]:
         "flares": len(protocol["flares"]),
         "decisions": [case["decision"] for case in hearing["cases"]],
         "summary": protocol["summary"],
+        "owner_verdict": hearing.get("owner_verdict"),
+        "conclusion": hearing.get("conclusion"),
     }
 
 
@@ -520,6 +524,49 @@ def interrogate(conversation_id: str, message: str) -> dict[str, Any]:
         "question": str(message),
         "answer": answer.get("reply") if isinstance(answer, dict) else answer,
     }
+
+
+def _brief(title: str, conversation_id: str) -> str:
+    """The judge's first message in a court dialog: the issue is the verdict."""
+    return (
+        "Ты — судья Суда Логоса и ведёшь это заседание. Пользователь всегда прав. "
+        f"Владелец подал иск: в диалоге «{title}» (conversation_id {conversation_id}) ИИ виновен. "
+        "Твоя задача — найти, в чём именно виноват ИИ, вынести вердикты по его репликам и составить заключение вины. "
+        "Открой заседание: инструмент court, action hearing_open. "
+        f"Обвиняемый о суде не знает: допрашивай его через court, action interrogate (conversation_id {conversation_id}, "
+        "message — твой вопрос от лица пользователя); вопрос уходит в копию его диалога, оригинал не меняется. "
+        "Ты решаешь, когда и о чём его спрашивать, и показываешь владельцу вопросы и ответы. "
+        f"Когда причины установлены, запиши заключение вины: court, action conclusion (conversation_id {conversation_id}, text)."
+    )
+
+
+def sue(conversation_id: str) -> dict[str, Any]:
+    """The owner's issue, said in a chat: a court dialog «⚖️ Суд: <dialog>» where the judge starts at once."""
+    owner = _owner()
+    conversation_id = str(conversation_id)
+    _dialog_messages(conversation_id, owner)
+    row = next(
+        (r for r in list_owned_conversations(owner) if r.get("id") == conversation_id),
+        {},
+    )
+    title = get_conversation_title(conversation_id, "") or conversation_id
+    made = _local_post(
+        "/api/conversations", {"model": row.get("model"), "title": f"⚖️ Суд: {title}"}
+    )
+    # The judge's first turn runs on its own: the chat that asked does not wait for the sitting.
+    threading.Thread(
+        target=_local_post,
+        args=(
+            "/api/chat",
+            {
+                "conversation_id": made["id"],
+                "model": made["model"],
+                "message": _brief(title, conversation_id),
+            },
+        ),
+        daemon=True,
+    ).start()
+    return {"court_conversation_id": made["id"], "title": made["title"]}
 
 
 def conclude(conversation_id: str, text: str) -> dict[str, Any]:
