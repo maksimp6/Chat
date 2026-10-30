@@ -2288,8 +2288,11 @@ body {
 
 /* Court: the judge's word (source court) and the user's words are set apart, and the proofs the court names are marked (the trace is not touched). */
 .msg.msg-court .bubble {
-  border-left: 3px solid #e0a030;
-  background: rgba(224, 160, 48, 0.08);
+  /* Rainbow frame: the tinted fill sits on the padding box, the gradient shows through the transparent border. */
+  border: 2px solid transparent;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)) padding-box,
+    linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe04d, #4dd96b, #4da6ff, #9b6bff, #ff4da6) border-box;
 }
 .msg.user .bubble {
   border-left: 3px solid #4aa3ff;
