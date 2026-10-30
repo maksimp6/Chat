@@ -1709,7 +1709,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const labelEl = document.createElement("span");
     const timeEl = document.createElement("span");
     timeEl.setAttribute("aria-hidden", "true");
-    el.append(labelEl, timeEl);
+    // The tools of the turn stay listed in their order; a new one never hides the one before.
+    const toolsEl = document.createElement("ol");
+    toolsEl.className = "typing-tools";
+    toolsEl.hidden = true;
+    el.append(toolsEl, labelEl, timeEl);
     let label = "Отправляем запрос";
     labelEl.textContent = label;
     function render() {
@@ -1725,6 +1729,14 @@ document.addEventListener("DOMContentLoaded", function () {
           labelEl.textContent = label;
         }
         render();
+      },
+      addTool: function (text) {
+        const last = toolsEl.lastElementChild;
+        if (last && last.textContent === text) return;
+        const item = document.createElement("li");
+        item.textContent = text;
+        toolsEl.appendChild(item);
+        toolsEl.hidden = false;
       },
       remove: function () { clearInterval(timer); el.remove(); },
       element: el,
@@ -2600,7 +2612,8 @@ document.addEventListener("DOMContentLoaded", function () {
       // Kept for a re-attachment: the server sends a status only when its phase changes, so the replay after a break
       // may hold none.
       if (typeof event.text === "string" && event.text) turn.liveLabel = event.text;
-      setTurnLabel(turn, event.text);
+      if (event.type === "tool" && turn.status && typeof event.text === "string" && event.text) turn.status.addTool(event.text);
+      else setTurnLabel(turn, event.text);
     } else {
       live.apply(event);
     }

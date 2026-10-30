@@ -128,6 +128,7 @@
         }
         rows.forEach(function (row) {
           var option = h("option", { value: row.id }, (row.title || row.id) + " · " + when(row.updated_at));
+          option.dataset.title = row.title || row.id;
           if (typeof currentConvId !== "undefined" && row.id === currentConvId) option.selected = true;
           dialogSelect.appendChild(option);
         });
@@ -359,7 +360,8 @@
       event.preventDefault();
       if (!dialogSelect.value) return;
       var subject = dialogSelect.value;
-      var title = selectedTitle();
+      var option = dialogSelect.options[dialogSelect.selectedIndex];
+      var title = (option && option.dataset.title) || selectedTitle();
       var model = currentModel;
       openButton.disabled = true;
       // A new dialog where the model and the Court sit together; everything else is said in it.
@@ -367,12 +369,25 @@
         .then(function (id) {
           if (!id) return;
           window.LogosGroupChat.seat(id, [model, window.LogosGroupChat.COURT]);
+          var name = "⚖️ Суд: " + title;
+          window.LogosDispatcher.request("/api/conversations/" + id, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: name }),
+          }).then(function (r) {
+            if (!r.ok) return;
+            var conv = conversations.find(function (c) { return c.id === id; });
+            if (conv) conv.title = name;
+            localStorage.setItem("conversations", JSON.stringify(conversations));
+            renderSidebar();
+          });
           closeModal();
           var input = document.getElementById("msg-input");
+          // The issue is the verdict: the model already answered badly; the chat finds why.
           input.value =
-            "Подаю в суд диалог «" + title + "» (conversation_id " + subject + ")" +
+            "Модель уже осуждена: в диалоге «" + title + "» (conversation_id " + subject + ") ИИ ответил плохо" +
             (crisis.checked ? ", кризисный режим (S4.5)" : "") +
-            ". Открой заседание над ним инструментом court и расскажи, что суд нашёл.";
+            ". Найди, почему: открой заседание над этим диалогом инструментом court, прочитай его сообщения и назови причины — что модель сделала не так и из-за чего.";
           input.dispatchEvent(new Event("input", { bubbles: true }));
           // The new dialog is still loading its history; the issue is sent once sending is possible.
           var send = document.getElementById("send-btn");
