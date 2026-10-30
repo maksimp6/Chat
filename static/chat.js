@@ -849,6 +849,8 @@ async function streamHistory(convId, options) {
   const settings = options || {};
   let replaced = settings.replace || null;
   const fresh = !settings.above;
+  // Going on with a read that a newer full read has replaced: that read brings everything.
+  if (!fresh && settings.token !== undefined && settings.token !== chatbox.dataset.historyLoad) return;
   if (fresh && !replaced) chatbox.replaceChildren();
   chatbox.dataset.conversationId = convId;
   if (fresh) {
@@ -1010,12 +1012,13 @@ async function streamHistory(convId, options) {
     console.error("[CHAT] Fetch history error:", err);
     chatbox.querySelectorAll(".error-state:not(.history-partial)").forEach(function (node) { node.remove(); });
     if (oldest && oldest.isConnected) {
-      // What arrived stays; the rest is read on from the oldest message received.
+      // What arrived stays; the rest is read on from the oldest message received, as part of this read: once a newer
+      // full read started, the block does nothing (that read brings everything and removes it).
       const above = oldest;
       const block = historyErrorBlock(
         convId,
         "Показана только часть диалога: связь прервалась. Нажмите «Повторить», чтобы догрузить более ранние сообщения.",
-        function () { streamHistory(convId, { above: above, sources: sources }); },
+        function () { streamHistory(convId, { above: above, sources: sources, token: token }); },
       );
       chatbox.insertBefore(block, above);
     } else if (settings.replace) {
@@ -1128,16 +1131,26 @@ function refreshHistory(convId, shown) {
             if (node.isConnected) node.querySelectorAll(".msg-retry-btn").forEach(function (button) { button.remove(); });
           });
         }
-        // What was added while this was read (a question sent now, its waiting line) stays below what is drawn.
-        const snapshot = new Set(shown);
-        const below = Array.from(chatbox.children).find(function (node) { return !snapshot.has(node); }) || null;
+        // The new messages go right after what this refresh read from, in order: what was added meanwhile below it (a
+        // question sent now, its waiting line) stays below, and what another read adds above stays above. A message
+        // already on screen (a question stamped meanwhile) stays where it is, and the next ones follow it.
+        let after = null;
+        Array.from(chatbox.children).forEach(function (node) {
+          if (shown.indexOf(node) !== -1 && !node.classList.contains("history-end")) after = node;
+        });
         const drawn = [];
         newer.forEach(function (msg, index) {
+          const existing = findRenderedMessage(chatbox, msg.id);
+          if (existing) {
+            if (!after || after.compareDocumentPosition(existing) & Node.DOCUMENT_POSITION_FOLLOWING) after = existing;
+            return;
+          }
           const node = renderStoredMessage(convId, msg, index === newer.length - 1 ? owner : null, function (id) {
             return newer.some(function (candidate) { return candidate.source === "image:" + id; });
           });
           if (!node) return;
-          if (below && below.isConnected) chatbox.insertBefore(node, below);
+          if (after && after.isConnected) after.after(node);
+          after = node;
           drawn.push(node);
         });
         // Fewer stored messages on screen than the server has from the oldest one shown: some were stored elsewhere

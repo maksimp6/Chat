@@ -205,12 +205,17 @@
     // completion_uncertain when Files may have stored the file, and any other answer is final. Once it is sent it is
     // not stopped: Files may be storing the file.
     const image = settings.kind === "image";
-    const completePath = path + "/complete" + (settings.force ? "?force=1" : "");
-    const unreachable = function (error) {
-      return Boolean(error) && error.status === 503 && Boolean(error.body) && error.body.error === "files_unreachable";
+    // An answer that says nothing was stored and asks to wait: Files not reached, or its 408 or 429.
+    const notStored = function (error) {
+      if (!error) return false;
+      if (error.status === 408 || error.status === 429) return true;
+      return error.status === 503 && Boolean(error.body) && error.body.error === "files_unreachable";
     };
     try {
       for (let tries = 1; ; tries += 1) {
+        // «Сохранить всё равно» is one send per press: a repeat after no answer goes without force, so the server
+        // answers the outcome of that send (or completion_uncertain again) instead of sending the file once more.
+        const completePath = path + "/complete" + (settings.force && tries === 1 ? "?force=1" : "");
         // A photo's completion only names it (nothing goes to Files), so it can always be stopped; a file's cannot
         // while it is sent, since Files may be storing it.
         if (typeof settings.onCompleting === "function") settings.onCompleting();
@@ -220,14 +225,16 @@
           return body;
         } catch (error) {
           if (image && signal && signal.aborted) throw stopped();
-          // Sent again only when no answer came, Files asked to wait (408, 429) or Files was not reached.
-          const again = noAnswer(error) || (Boolean(error) && (error.status === 408 || error.status === 429)) ||
-            unreachable(error);
-          if (!again) throw error;
-          // Files was not reached: nothing is being stored, so this wait can be stopped (the copy is dropped then).
-          const stoppable = image || unreachable(error);
-          if (stoppable && !image && typeof settings.onCompletionWaiting === "function") settings.onCompletionWaiting();
-          await pause(retryDelayMs(tries), stoppable ? signal : undefined);
+          if (!noAnswer(error) && !notStored(error)) throw error;
+          if (notStored(error) && !image) {
+            // Nothing is being stored now, so the wait can be stopped; a caller that cannot stop it gets the answer.
+            if (!signal) throw error;
+            if (typeof settings.onCompletionWaiting === "function") settings.onCompletionWaiting();
+            await pause(retryDelayMs(tries), signal);
+            continue;
+          }
+          // No answer: the send may still be running on the server, so a file's wait is not stopped.
+          await pause(retryDelayMs(tries), image ? signal : undefined);
         }
       }
     } catch (error) {
@@ -263,11 +270,19 @@
     }
   }
 
-  // Drops an upload the page no longer needs (a photo removed or already sent); a failure leaves it to the server.
+  // Drops an upload the page no longer needs (a photo removed, a stopped upload, «Убрать»). It is tried again until the
+  // server answers (an upload already gone counts as dropped), or while its completion is being sent.
   function discard(uploadId) {
     if (!uploadId) return Promise.resolve();
-    return window.LogosDispatcher.request("/api/uploads/" + encodeURIComponent(uploadId), { method: "DELETE" }, {
-      timeoutMs: BASE_WAIT_MS,
+    return persist(function () {
+      return request("/api/uploads/" + encodeURIComponent(uploadId), { method: "DELETE" }, BASE_WAIT_MS).catch(
+        function (error) {
+          if (error && error.status === 404) return null;
+          throw error;
+        },
+      );
+    }, function (error) {
+      return passes(error) || (Boolean(error) && error.status === 409);
     }).then(
       function () {},
       function () {},

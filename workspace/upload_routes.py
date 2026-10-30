@@ -59,6 +59,18 @@ _KINDS = ("file", "image")
 # How much of a piece is read from the connection at a time.
 _READ_BYTES = 64 * 1024
 _FILES_FAILED = "Внутренняя ошибка сервиса файлов"
+# What the person reads for each coded answer (the code stays in "error" for the browser).
+_TEXTS = {
+    "upload_storage_failed": "На сервере нет места или нельзя записать файл: загрузка остановлена.",
+    "upload_not_found": "Загрузка не найдена на сервере: отправьте файл заново.",
+    "upload_id_taken": "Этот номер загрузки уже занят другим файлом.",
+    "completion_in_progress": "Файл сейчас сохраняется в файлах, остановить это нельзя.",
+    "offset_mismatch": "Сервер принял другую часть файла: загрузка продолжится с неё.",
+    "piece_exceeds_size": "Часть файла выходит за его размер.",
+    "piece_incomplete": "Часть файла пришла не целиком: она будет отправлена снова.",
+    "completion_uncertain": "Файлы не ответили вовремя: файл мог сохраниться.",
+    "upload_incomplete": "Файл пришёл не весь: загрузка продолжится.",
+}
 # Pieces older than this process belong to requests that died with an earlier one.
 _BOOTED_AT = time.time()
 
@@ -82,7 +94,7 @@ def _lock(upload_id: str) -> threading.Lock:
 def _storage_failed(error: OSError):
     # A full or read-only disk does not pass by itself: the browser stops instead of trying again.
     logger.error("[UPLOADS] Storage failed: %s", error)
-    return jsonify({"error": "upload_storage_failed"}), 507
+    return jsonify({"error": "upload_storage_failed", "message": _TEXTS["upload_storage_failed"]}), 507
 
 
 def _drop_stale_pieces() -> None:
@@ -143,7 +155,7 @@ def _remove(upload_id: str) -> None:
 
 
 def _not_found():
-    return jsonify({"error": "upload_not_found"}), 404
+    return jsonify({"error": "upload_not_found", "message": _TEXTS["upload_not_found"]}), 404
 
 
 @upload_bp.route("/api/uploads", methods=["POST"])
@@ -182,7 +194,7 @@ def create_upload():
             # The same create sent again: the upload it made answers.
             if all(existing.get(key) == value for key, value in meta.items()):
                 return jsonify(_state(upload_id, existing))
-            return jsonify({"error": "upload_id_taken"}), 409
+            return jsonify({"error": "upload_id_taken", "message": _TEXTS["upload_id_taken"]}), 409
         try:
             upload_dir().mkdir(parents=True, exist_ok=True)
             _drop_stale_pieces()
@@ -212,7 +224,7 @@ def delete_upload(upload_id):
             sending = upload_id in _sending
         if sending:
             # Files is storing it right now: a deletion would not stop that.
-            return jsonify({"error": "completion_in_progress"}), 409
+            return jsonify({"error": "completion_in_progress", "message": _TEXTS["completion_in_progress"]}), 409
         try:
             _remove(upload_id)
         except OSError as error:
@@ -232,12 +244,12 @@ def append_upload(upload_id):
     # A piece for another place is refused before it is read: the browser asks again from the received size.
     if offset != meta["received"] or meta.get("completed") is not None:
         return jsonify(
-            {"error": "offset_mismatch", **_state(upload_id, meta)}
+            {"error": "offset_mismatch", "message": _TEXTS["offset_mismatch"], **_state(upload_id, meta)}
         ), 409
     remaining = meta["size"] - offset
     expected = request.content_length
     if expected is not None and expected > remaining:
-        return jsonify({"error": "piece_exceeds_size", **_state(upload_id, meta)}), 413
+        return jsonify({"error": "piece_exceeds_size", "message": _TEXTS["piece_exceeds_size"], **_state(upload_id, meta)}), 413
     _, part_path = _paths(upload_id)
     try:
         handle, piece_name = tempfile.mkstemp(
@@ -254,18 +266,18 @@ def append_upload(upload_id):
                 except Exception:
                     # The connection broke inside the piece: nothing of it is kept.
                     return jsonify(
-                        {"error": "piece_incomplete", **_state(upload_id, meta)}
+                        {"error": "piece_incomplete", "message": _TEXTS["piece_incomplete"], **_state(upload_id, meta)}
                     ), 400
                 if not block:
                     break
                 written += len(block)
                 if written > remaining:
                     return jsonify(
-                        {"error": "piece_exceeds_size", **_state(upload_id, meta)}
+                        {"error": "piece_exceeds_size", "message": _TEXTS["piece_exceeds_size"], **_state(upload_id, meta)}
                     ), 413
                 piece.write(block)
         if written == 0 or (expected is not None and written != expected):
-            return jsonify({"error": "piece_incomplete", **_state(upload_id, meta)}), 400
+            return jsonify({"error": "piece_incomplete", "message": _TEXTS["piece_incomplete"], **_state(upload_id, meta)}), 400
         with _lock(upload_id):
             current = _load(upload_id)
             if current is None:
@@ -273,7 +285,7 @@ def append_upload(upload_id):
             if current["received"] != offset or current.get("completed") is not None:
                 # Another copy of this piece got here first.
                 return jsonify(
-                    {"error": "offset_mismatch", **_state(upload_id, current)}
+                    {"error": "offset_mismatch", "message": _TEXTS["offset_mismatch"], **_state(upload_id, current)}
                 ), 409
             with open(piece_name, "rb") as piece, open(part_path, "ab") as part:
                 shutil.copyfileobj(piece, part)
@@ -290,7 +302,7 @@ def append_upload(upload_id):
 
 
 def _uncertain(upload_id: str, meta: dict[str, Any]):
-    return jsonify({"error": "completion_uncertain", **_state(upload_id, meta)}), 409
+    return jsonify({"error": "completion_uncertain", "message": _TEXTS["completion_uncertain"], **_state(upload_id, meta)}), 409
 
 
 # Completions this process is sending to Files, by upload id: a repeat waits for the one running instead of sending the
@@ -380,7 +392,7 @@ def complete_upload(upload_id):
                 return _uncertain(upload_id, meta)
             meta = {key: value for key, value in meta.items() if key not in ("uncertain", "completing")}
             if meta["received"] != meta["size"]:
-                return jsonify({"error": "upload_incomplete", **_state(upload_id, meta)}), 409
+                return jsonify({"error": "upload_incomplete", "message": _TEXTS["upload_incomplete"], **_state(upload_id, meta)}), 409
             if meta["kind"] == "image":
                 return jsonify({"upload_id": upload_id, "size": meta["size"]})
             _, part_path = _paths(upload_id)

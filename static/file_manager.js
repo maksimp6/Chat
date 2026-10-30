@@ -84,15 +84,23 @@ window.fetchVectorStores = function () {
     return (error && error.message) || "Неизвестная ошибка";
   }
 
-  // Uploads whose pieces all arrived but whose completion failed keep their copy on the server for «Повторить» or
-  // «Сохранить всё равно». The rows that offer them go with the window, so their copies go too when it opens again.
+  // The upload rows outlive the window: an upload goes on (for hours on a slow link) while the window is closed, and
+  // its row comes back, with its «Отменить», «Повторить» or «Сохранить всё равно», when the window opens again.
+  var uploadRows = new Set();
+  // Uploads whose pieces all arrived but whose completion failed keep their copy on the server for those buttons.
+  // When the page goes (a reload), nothing can use them any more, so they are dropped.
   var keptUploads = new Set();
+  window.addEventListener("pagehide", function () {
+    keptUploads.forEach(function (uploadId) {
+      try {
+        fetch("/api/uploads/" + encodeURIComponent(uploadId), { method: "DELETE", keepalive: true }).catch(function () {});
+      } catch (error) {
+        // The page is going: nothing more can be done for it.
+      }
+    });
+  });
 
   window.openFileManagerModal = function () {
-    keptUploads.forEach(function (uploadId) {
-      window.LogosUpload.discard(uploadId);
-    });
-    keptUploads.clear();
     var UI = window.SettingsUI;
     var existing = document.getElementById("file-manager-modal");
     if (existing) existing.remove();
@@ -633,6 +641,9 @@ window.fetchVectorStores = function () {
     // перечитывается целиком, и вместе с ним исчезли бы строки ошибок и незавершённых загрузок.
     var uploadStatusEl = document.getElementById("file-upload-status");
     var pendingUploads = 0;
+    uploadRows.forEach(function (row) {
+      uploadStatusEl.appendChild(row);
+    });
 
     // One file sent in pieces that survive a broken connection (static/upload.js): on a slow link a file of any size
     // arrives, and a drop costs at most the piece in flight. ``uploadId`` goes on with an upload whose pieces all
@@ -654,7 +665,12 @@ window.fetchVectorStores = function () {
         "</div>",
       ].join("");
       uploadStatusEl.appendChild(div);
+      uploadRows.add(div);
       pendingUploads += 1;
+      var forgetRow = function () {
+        uploadRows.delete(div);
+        div.remove();
+      };
 
       var progress = div.querySelector(".file-upload-progress");
       // On a slow link an upload can take hours and goes on through drops: «Отменить» stops it and drops the copy on
@@ -694,11 +710,11 @@ window.fetchVectorStores = function () {
           });
         })
         .then(function () {
-          div.remove();
+          forgetRow();
         })
         .catch(function (err) {
           if (err && err.name === "UploadStoppedError") {
-            div.remove();
+            forgetRow();
             return;
           }
           // Files may have stored a file whose completion got no answer in time, so the user is told to check the
@@ -731,7 +747,7 @@ window.fetchVectorStores = function () {
             again.className = "logos-btn";
             again.textContent = uncertain ? "Сохранить всё равно" : "Повторить";
             again.addEventListener("click", function () {
-              div.remove();
+              forgetRow();
               startUpload(file, err.uploadId, uncertain);
             });
             var drop = document.createElement("button");
@@ -741,9 +757,14 @@ window.fetchVectorStores = function () {
             drop.addEventListener("click", function () {
               keptUploads.delete(err.uploadId);
               window.LogosUpload.discard(err.uploadId);
-              div.remove();
+              forgetRow();
             });
             div.append(again, drop);
+            // The list is what the person checks before «Сохранить всё равно»: it is read again now.
+            if (uncertain) loadFiles();
+          } else {
+            // Nothing is kept for this row: it does not come back when the window opens again.
+            uploadRows.delete(div);
           }
         })
         .finally(function () {
