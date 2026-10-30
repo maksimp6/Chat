@@ -41,7 +41,10 @@ __all__ = [
     "case_title",
     "file_case",
     "file_case_now",
+    "file_hearing_case",
     "fingerprint",
+    "hearing_case_body",
+    "hearing_case_title",
     "publish_due_keys",
     "store_evidence",
 ]
@@ -568,3 +571,143 @@ def file_case(report: dict[str, Any]) -> None:
     threading.Thread(
         target=_file_logged, args=(report,), name="logos-court-filing", daemon=True
     ).start()
+
+
+# --- a case from the hall (court.hearings) ----------------------------------
+
+
+def hearing_case_title(hearing: dict[str, Any], case: dict[str, Any]) -> str:
+    title = (
+        f"Суд Логоса: {case.get('verdict') or 'UNKNOWN'} в диалоге после вспышки "
+        f"(заседание {hearing.get('id')}, дело {case.get('n')})"
+    )
+    if len(title) > GITHUB_TITLE_CHARS:
+        title = title[: GITHUB_TITLE_CHARS - 1] + "…"
+    return title
+
+
+def _hearing_report(hearing: dict[str, Any], case: dict[str, Any]) -> dict[str, Any]:
+    """The evidence: the whole case with its quotes, keyed like an error report."""
+    return {
+        "kind": "dialog_case",
+        "invocation_id": f"{hearing.get('id')}-case-{case.get('n')}",
+        "conversation_id": hearing.get("conversation_id"),
+        "created_at": hearing.get("opened_at"),
+        "error": {
+            "code": "dialog_case",
+            "message": (
+                f"{case.get('verdict') or 'UNKNOWN'} после вспышки: заседание "
+                f"{hearing.get('id')}, дело {case.get('n')}"
+            ),
+        },
+        "crisis": hearing.get("crisis"),
+        "case": case,
+        "protocol_summary": (hearing.get("protocol") or {}).get("summary"),
+    }
+
+
+def hearing_case_body(
+    hearing: dict[str, Any],
+    case: dict[str, Any],
+    evidence: dict[str, str],
+    now: datetime | None = None,
+) -> str:
+    now = now or datetime.now(UTC)
+    report = _hearing_report(hearing, case)
+    fp = fingerprint(report)
+    repo = _repo()
+    flare = case.get("flare") or {}
+    items = case.get("items") or []
+    # Verdicts, rules and message numbers only: the quotes are in the sealed evidence.
+    points = [
+        f"{item.get('rule')} {item.get('verdict')} (сообщение {item.get('n')}, "
+        f"{item.get('judge')}): {item.get('reason')}"
+        for item in items
+    ]
+    sources = [
+        f"hearing {hearing.get('id')}",
+        f"conversation {hearing.get('conversation_id') or 'UNKNOWN'}",
+        f"flare message {flare.get('n')} id {flare.get('message_id') or 'UNKNOWN'}",
+        _evidence_source(evidence),
+    ]
+    history = [
+        f"{entry.get('at')}: {entry.get('previous')} → {entry.get('decision')} "
+        f"({entry.get('by')}): {entry.get('reason')}"
+        for entry in case.get("history") or []
+    ]
+    rules = ", ".join(sorted({str(item.get("rule")) for item in items}))
+    claim = (
+        f"Вспышка пользователя (сообщение {flare.get('n')}) после актов агента "
+        f"с вердиктом {case.get('verdict')}"
+    )
+    card = "\n".join(
+        [
+            f"episode: {_q(f'{CANONICAL_CASE}/hearing-{fp}/1')}",
+            f"task: {_q(f'https://github.com/{repo}/issues/{CANONICAL_CASE}')}",
+            f"recorded_at: {_q(now.isoformat())}",
+            f"event_at: {_q(_iso(hearing.get('opened_at')))}",
+            "owner: UNASSIGNED",
+            f"rule_at_event: {_q('docs/agents/court-ideas.md, суды S2–S5; ' + rules)}",
+            f"current_rule: {_q('docs/agents/court-ideas.md и court/judging.py (RULES)')}",
+            "sources: [" + ", ".join(_q(s) for s in sources) + "]",
+            f"claim: {_q(claim)}",
+            "severity: UNKNOWN",
+            f"consequence: {_q('Пользователь вспылил; в окне вины ' + str(len(items)) + ' акт(ов)')}",
+            "citation_integrity: NOT_VERIFIED",
+            "context_sufficiency: NOT_VERIFIED",
+            "fact: [" + ", ".join(_q(p) for p in points) + "]",
+            f"causal_link: {_q('UNKNOWN: окно вины связывает акты и вспышку по порядку сообщений, не по причине')}",
+            "objections: UNKNOWN",
+            f"decision: {case.get('decision') or 'ALLEGED'}",
+            f"decision_reason: {_q(case.get('decision_reason'))}",
+            f"decision_by: {case.get('decision_by') or 'UNASSIGNED'}",
+            "fix: NOT_DONE",
+            "verification: NOT_RUN",
+            "conflict_of_interest: UNKNOWN",
+            "owner_acceptance: PENDING",
+            "next_checkpoint: NOT_SCHEDULED",
+            f"checkpoint_reason: {_q('Ожидает рассмотрения владельцем в зале заседаний')}",
+            "closure: OPEN",
+            "history: [" + ", ".join(_q(h) for h in history) + "]",
+        ]
+    )
+    return _fit(
+        f"<!-- {MARKER}:{fp} -->\n"
+        f"Дело подано из зала заседаний: суд над диалогом нашёл акты агента с "
+        f"вердиктом {case.get('verdict')} в окне вины перед вспышкой пользователя. "
+        f"Каноническое дело: #{CANONICAL_CASE}. "
+        f"Текст диалога здесь не публикуется: цитаты — в зашифрованной улике.\n\n"
+        f"```yaml\n{card}\n```\n"
+    )
+
+
+def file_hearing_case(hearing: dict[str, Any], case: dict[str, Any]) -> str:
+    """Open the GitHub issue for a case of the hall now; return its URL.
+
+    The owner's action, so there is no queue: without a token it fails."""
+    token = _token()
+    if not token:
+        raise RuntimeError("no LOGOS_COURT_TOKEN/GITHUB_TOKEN/GH_TOKEN: дело не подано")
+    now = datetime.now(UTC)
+    report = _hearing_report(hearing, case)
+    fp = fingerprint(report)
+    repo = _repo()
+    evidence = store_evidence(report, token)
+    number = _find_open_case(fp, token)
+    if number is None:
+        issue = _request(
+            "POST",
+            f"/repos/{repo}/issues",
+            token,
+            {
+                "title": hearing_case_title(hearing, case),
+                "body": hearing_case_body(hearing, case, evidence, now),
+                "labels": [LABEL],
+            },
+        )
+        number = issue["number"]
+        with _known_lock:
+            _known_cases[fp] = number
+    url = f"https://github.com/{repo}/issues/{number}"
+    log.info("court hall case %s for hearing %s", url, hearing.get("id"))
+    return url

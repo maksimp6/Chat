@@ -1,0 +1,180 @@
+/* Зал заседаний (static/court.js): поверх окна отделов (.logos-dept-*). */
+.logos-court-card {
+  width: min(880px, 100%);
+}
+.logos-pro-app .logos-court-card.modal-content {
+  width: min(880px, 100%);
+  max-width: 880px;
+}
+.logos-court-note,
+.logos-court-muted {
+  font-size: 12px;
+  opacity: 0.72;
+  margin: 8px 0;
+}
+.logos-court-open {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+.logos-court-open select {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.logos-court-check {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+}
+.logos-court-link {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  padding: 0;
+  font-size: 12px;
+  cursor: pointer;
+}
+.logos-court-rules {
+  margin: 8px 0;
+  max-height: 260px;
+  overflow: auto;
+  font-size: 12px;
+}
+.logos-court-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.logos-court-table td {
+  padding: 4px 6px;
+  border-top: 1px solid rgba(127, 127, 127, 0.18);
+  vertical-align: top;
+}
+.logos-court-row strong {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.logos-court-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.logos-court-badge-ok {
+  color: #1c7c3b;
+  background: rgba(46, 160, 67, 0.14);
+  border-color: rgba(46, 160, 67, 0.4);
+}
+.logos-court-badge-useless {
+  color: #5e6673;
+  background: rgba(110, 118, 129, 0.16);
+  border-color: rgba(110, 118, 129, 0.4);
+}
+.logos-court-badge-slippery {
+  color: #9a6700;
+  background: rgba(212, 167, 44, 0.18);
+  border-color: rgba(212, 167, 44, 0.5);
+}
+.logos-court-badge-grave {
+  color: #b42318;
+  background: rgba(248, 81, 73, 0.16);
+  border-color: rgba(248, 81, 73, 0.5);
+}
+.logos-court-badge-none {
+  color: inherit;
+  opacity: 0.6;
+  border-color: rgba(127, 127, 127, 0.3);
+}
+@media (prefers-color-scheme: dark) {
+  .logos-court-badge-ok {
+    color: #56d364;
+  }
+  .logos-court-badge-useless {
+    color: #b1bac4;
+  }
+  .logos-court-badge-slippery {
+    color: #e3b341;
+  }
+  .logos-court-badge-grave {
+    color: #ff7b72;
+  }
+}
+.logos-court-detail {
+  margin-top: 14px;
+}
+.logos-court-detail h4,
+.logos-court-detail h5 {
+  margin: 12px 0 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.logos-court-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  align-items: center;
+}
+.logos-court-case {
+  border: 1px solid rgba(127, 127, 127, 0.25);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.logos-court-points {
+  margin: 6px 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+.logos-court-decide {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 8px 0;
+}
+.logos-court-decide input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.logos-court-protocol blockquote,
+.logos-court-case blockquote {
+  margin: 4px 0 4px 8px;
+  padding-left: 8px;
+  border-left: 3px solid rgba(127, 127, 127, 0.4);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.logos-court-entry {
+  padding: 6px 0;
+  border-top: 1px solid rgba(127, 127, 127, 0.18);
+  font-size: 12px;
+}
+.logos-court-entry-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.logos-court-n {
+  font-family: monospace;
+  opacity: 0.7;
+}
+.logos-court-flare {
+  color: #b42318;
+  font-weight: 600;
+}
+.logos-court-finding {
+  margin: 4px 0 4px 12px;
+}

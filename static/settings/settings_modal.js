@@ -146,6 +146,7 @@
       system: "🔧 Системные драйверы Termux",
       wikipedia: "📚 Wikipedia Engine (поиск и сводка статей)",
       profiler: "⏱️ Профайлер и инспекция состояния",
+      court: "⚖️ Суд Логоса (суды над диалогом и зал заседаний)",
     };
 
     // fetch resolves for HTTP errors too, so a non-OK status must be turned into a failure here.

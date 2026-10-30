@@ -58,11 +58,13 @@ GLYPHS = {
     "trash": '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
     "target": '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
     "gear": '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+    "scales": '<path d="M12 3v18M8 21h8M4 8h16"/><path d="M6 8l-3 7a3 3 0 006 0zM18 8l-3 7a3 3 0 006 0z"/>',
     "generic": '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',
 }
 
 # First match wins; keywords are matched against the tool name in lower case.
 RULES = [
+    (("court",), "scales"),
     (("rootagent",), "server"),
     (("settings", "config"), "gear"),
     (("clipboard",), "clipboard"),

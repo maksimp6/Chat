@@ -51,6 +51,7 @@ entry-blocks = [
     "project_board/server.py",
     "agent_runtime/issue_runner.py",
     "agent_shell/__main__.py",
+    "court/judging.py",
     "scripts/logos_dialogue.py",
     "scripts/logos_tool_probe.py",
     "scripts/logos_narration.py",
@@ -224,6 +225,7 @@ canonical = "tool_providers/schema.py"
 copies = [
     "browser/_vendor/schema.py",
     "cloud/_vendor/schema.py",
+    "court/_vendor/schema.py",
     "forge/_vendor/schema.py",
     "model_editor/_vendor/schema.py",
     "organization/_vendor/schema.py",
@@ -239,6 +241,7 @@ copies = [
     "chat/_binding.py",
     "cloud/_binding.py",
     "conversations/_binding.py",
+    "court/_binding.py",
     "economy/_binding.py",
     "forge/_binding.py",
     "invocation/_binding.py",

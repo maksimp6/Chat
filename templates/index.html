@@ -98,6 +98,8 @@
     <script src="{{ static_root }}/departments.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/group_chat.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/partner_relations.js?v={{ static_version }}" defer></script>
+    <link rel="stylesheet" href="{{ static_root }}/court.css?v={{ static_version }}" />
+    <script src="{{ static_root }}/court.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/environments.js?v={{ static_version }}" defer></script>
   </head>
   <body>
@@ -235,6 +237,15 @@
               data-action="header.departments.open"
             >
               🏢</button
+            ><button
+              id="court-btn"
+              type="button"
+              class="header-btn logos-btn"
+              title="Зал заседаний"
+              aria-label="Зал заседаний"
+              data-action="header.court.open"
+            >
+              ⚖️</button
             ><button
               id="group-chat-btn"
               type="button"

@@ -105,6 +105,7 @@
 - [Агенты Logos](agents/overview.md) — runtime-агенты и адаптеры приложения (чат, голос, CLI, инструменты)
 - [Роли разработки в репозитории](agents/role-based-agent-office.md) — GitHub-роли (Team Lead, Backend, Docs Engineer и др.), не часть runtime Logos
 - [Процедура Суда Логоса](agents/logos-court-procedure.md) — эпизоды дела #1413, доказательства, независимое ревью и приёмка
+- [Суды Логоса над диалогом](agents/court-ideas.md) — суды S2, S4, S5, S3, зал заседаний и инструменты `court` (`court/README.md`)
 - [Native Logos: качество и контекст дела](agents/logos-native-quality.md) — текущие рамки работы и полный контекст дела
 - [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и первая read-only задача для запуска агентов в своём контейнере
 - [Logos как GitHub-агент](agents/github-agent.md) — работа Logos над GitHub issue в собственном коде

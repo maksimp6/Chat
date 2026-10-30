@@ -55,6 +55,12 @@ def _tty_tools():
     return TTY_TOOLS
 
 
+def _court_tools():
+    from court.tools import COURT_TOOLS
+
+    return COURT_TOOLS
+
+
 # (category, loader, log label, exception logged instead of raised)
 SOURCES = (
     ("government", _government_tools, "Government", Exception),
@@ -65,4 +71,5 @@ SOURCES = (
     ("browser", _browser_tools, "Browser", Exception),
     ("rootagent", _rootagent_tools, "Root agent", Exception),
     ("tty", _tty_tools, "TTY", Exception),
+    ("court", _court_tools, "Court", Exception),
 )

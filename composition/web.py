@@ -26,6 +26,7 @@ from chat.voice_routes import voice_bp
 from cloud.cloudru.iam_routes import cloudru_iam_bp
 from conversations.ownership import prepare_conversation_ownership_records
 from conversations.routes import install as install_conversation_routes
+from court.hearings import court_bp, prepare_court_records
 from economy.treasury import prepare_treasury_records
 from economy.treasury_routes import install as install_treasury_routes
 from forge import prepare_printing_records
@@ -83,6 +84,7 @@ BLUEPRINTS = (
     classification_bp,
     completion_bp,
     printing3d_bp,
+    court_bp,
 )
 
 # Turns opened before this process booted were killed with the previous one (#1710).
@@ -102,6 +104,7 @@ STORAGE_INITIALIZERS = (
     ensure_government_department,
     prepare_environment_records,
     ensure_rdc_server,
+    prepare_court_records,
     partial(fail_interrupted_invocations, before=_BOOTED_AT),
 )
 

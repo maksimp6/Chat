@@ -324,6 +324,27 @@ def _cloud():
     )
 
 
+def _court():
+    from court import host
+    from conversations.ownership import check_access
+    from economy.treasury_identity import TreasuryIdentityError
+    from economy.treasury_identity import get_current_owner_id
+    from storage.records import get_conversation_title
+    from storage.records import get_messages
+    from storage.records import get_store
+    from conversations.ownership import list_owned_conversations
+
+    return host.Host(
+        TreasuryIdentityError=TreasuryIdentityError,
+        check_access=check_access,
+        get_conversation_title=get_conversation_title,
+        get_current_owner_id=get_current_owner_id,
+        get_messages=get_messages,
+        get_store=get_store,
+        list_owned_conversations=list_owned_conversations,
+    )
+
+
 def _conversations():
     from conversations import host
     from agent_memory.conversation_ownership_store import ConversationOwnershipStore
@@ -942,6 +963,7 @@ _HOSTS = {
     "chat": ("chat.host", _chat),
     "cloud": ("cloud.host", _cloud),
     "conversations": ("conversations.host", _conversations),
+    "court": ("court.host", _court),
     "economy": ("economy.host", _economy),
     "forge": ("forge.host", _forge),
     "invocation": ("invocation.host", _invocation),
