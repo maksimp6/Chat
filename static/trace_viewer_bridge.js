@@ -71,7 +71,9 @@
 (function () {
   "use strict";
   var script = document.createElement("script");
-  script.src = (window.__LOGOS_STATIC_BASE || "/static") + "/trace_download.js";
+  // The fingerprint lets the browser keep the file (web_shell caches the current one as immutable).
+  script.src = (window.__LOGOS_STATIC_BASE || "/static") + "/trace_download.js?v=" +
+    encodeURIComponent(window.__LOGOS_STATIC_VERSION || "");
   script.defer = false;
   (document.head || document.documentElement).appendChild(script);
 })();

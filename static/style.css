@@ -1436,6 +1436,11 @@ body {
   max-width: 100%;
   box-sizing: border-box;
 }
+/* A message drawn again once its renderer arrives (chat.js renderPendingMarkdown); it adds no box of its own. */
+.logos-pro-app .md-pending {
+  display: contents;
+}
+
 .logos-pro-app .bubble .md-render-fallback {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

@@ -20,28 +20,36 @@ function flushApprovalOutputs(convId) {
 
 // The vendored parsers own Markdown/TeX syntax. Keep Logos-specific presentation
 // and the existing image-source policy at the renderer boundary.
+// On a slow link the chat does not wait for them: markdown-it and texmath load after this script, KaTeX (76 KB even
+// compressed) only when a message has a formula. Until they arrive a message is shown as plain text, or without its
+// formulas, and it is drawn again once they are here.
 var chatMarkdownRenderer = null;
+// Whether chatMarkdownRenderer renders formulas (texmath with KaTeX).
+var chatMarkdownMath = false;
 
 function getChatMarkdownRenderer() {
-  if (chatMarkdownRenderer) return chatMarkdownRenderer;
-  if (typeof window.markdownit !== "function" || typeof texmath !== "function" || !window.katex) {
+  var mathReady = typeof texmath === "function" && Boolean(window.katex);
+  if (chatMarkdownRenderer && (chatMarkdownMath || !mathReady)) return chatMarkdownRenderer;
+  if (typeof window.markdownit !== "function") {
     throw new Error("Markdown renderer is unavailable");
   }
   var md = window.markdownit({ html: false, breaks: true, linkify: false });
-  md.use(texmath, {
-    engine: {
-      renderToString: function (source, options) {
-        return window.katex.renderToString(source, Object.assign({}, options, {
-          output: "mathml",
-          trust: false,
-          throwOnError: false,
-          // A formula cannot redefine macros for another message.
-          macros: {},
-        }));
+  if (mathReady) {
+    md.use(texmath, {
+      engine: {
+        renderToString: function (source, options) {
+          return window.katex.renderToString(source, Object.assign({}, options, {
+            output: "mathml",
+            trust: false,
+            throwOnError: false,
+            // A formula cannot redefine macros for another message.
+            macros: {},
+          }));
+        },
       },
-    },
-    delimiters: ["dollars", "brackets"],
-  });
+      delimiters: ["dollars", "brackets"],
+    });
+  }
   md.renderer.rules.table_open = function (tokens, index, options, env, renderer) {
     tokens[index].attrJoin("class", "md-table");
     return renderer.renderToken(tokens, index, options);
@@ -67,16 +75,79 @@ function getChatMarkdownRenderer() {
     };
   });
   chatMarkdownRenderer = md;
+  chatMarkdownMath = mathReady;
   return md;
 }
+
+// TeX in the delimiters texmath reads: $$…$$, $…$, \(…\), \[…\].
+var CHAT_FORMULA_PATTERN = /\$\$[\s\S]+?\$\$|\$[^\s$][^$\n]*\$|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]/;
+var katexRequested = false;
+
+// KaTeX loads once, the first time a message has a formula; a failed load is tried again by the next formula.
+function requestKatex() {
+  if (katexRequested || window.katex) return;
+  katexRequested = true;
+  var script = document.createElement("script");
+  script.src = (window.__LOGOS_STATIC_BASE || "/static") + "/vendor/katex-0.19.1/katex.min.js?v=" +
+    encodeURIComponent(window.__LOGOS_STATIC_VERSION || "");
+  script.async = true;
+  script.onload = renderPendingMarkdown;
+  script.onerror = function () {
+    katexRequested = false;
+    script.remove();
+  };
+  (document.head || document.documentElement).appendChild(script);
+}
+
+// Messages drawn before their renderer arrived, by the id of the element that holds each one: its source text.
+var pendingMarkdown = new Map();
+var pendingMarkdownSeq = 0;
+
+function pendingMarkdownHtml(source, html) {
+  pendingMarkdownSeq += 1;
+  var id = String(pendingMarkdownSeq);
+  pendingMarkdown.set(id, source);
+  return '<div class="md-pending" data-md-pending="' + id + '">' + html + "</div>";
+}
+
+// Draws again every message shown before markdown-it or KaTeX arrived. A message whose element is gone is dropped;
+// one that still lacks its renderer is kept for the next arrival.
+function renderPendingMarkdown() {
+  var entries = Array.from(pendingMarkdown.entries());
+  pendingMarkdown.clear();
+  entries.forEach(function (entry) {
+    var el = document.querySelector('[data-md-pending="' + entry[0] + '"]');
+    if (!el) return;
+    var holder = document.createElement("div");
+    holder.innerHTML = parseMarkdown(entry[1]);
+    el.replaceWith.apply(el, Array.from(holder.childNodes));
+  });
+}
+
+// markdown-it and texmath come after this script; every deferred script has run before DOMContentLoaded.
+document.addEventListener("DOMContentLoaded", renderPendingMarkdown);
 
 function parseMarkdown(text) {
   if (text === null || text === undefined || text === "") return "";
   var source = typeof text === "string" ? text : JSON.stringify(text);
+  var formula = CHAT_FORMULA_PATTERN.test(source);
+  if (formula && !window.katex) requestKatex();
+  var renderer = null;
   try {
-    return getChatMarkdownRenderer().render(source);
+    renderer = getChatMarkdownRenderer();
   } catch (error) {
-    // A missing optional renderer must still leave the model's answer readable.
+    // markdown-it has not arrived yet: the answer is readable now and becomes Markdown when it does.
+    var waiting = document.createElement("pre");
+    waiting.className = "md-render-fallback";
+    waiting.textContent = source;
+    return pendingMarkdownHtml(source, waiting.outerHTML);
+  }
+  try {
+    var html = renderer.render(source);
+    // The formulas are drawn once KaTeX is here.
+    return formula && !chatMarkdownMath ? pendingMarkdownHtml(source, html) : html;
+  } catch (error) {
+    // A failed rendering must still leave the model's answer readable.
     var plain = document.createElement("pre");
     plain.className = "md-render-fallback";
     plain.textContent = source;
