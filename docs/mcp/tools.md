@@ -5,9 +5,10 @@
 с метаданными: risk_level, read_only, requires_approval, capabilities.
 
 Числа в таблице относятся к определениям в словарях источников, а не к сумме
-уникальных инструментов работающего приложения. При совпадении имён реестр
-оставляет последнее определение: например, `termux_battery_status` переходит из
-`termux` в `system`. Строка `system` актуализирована при интеграции PR #1621;
+уникальных инструментов работающего приложения. Повторы Termux:API в `termux`
+(уведомления, тосты, вибрация, батарея, фонарик, буфер обмена, речь, камера) и
+псевдонимы в `system` убраны 30.10.2026: эти действия есть только в `system`.
+Строка `system` актуализирована при интеграции PR #1621;
 доступность на физическом Android этим справочником не подтверждается.
 
 ## Категории реестра
@@ -15,8 +16,8 @@
 | Категория | Источник | Инструментов | Примеры |
 | --- | --- | --- | --- |
 | git | tool_providers/git.py | 10 | git_status, git_log, git_diff, git_branches (read, low); git_add, git_commit, git_remote, git_push, git_pull, git_fetch (write, high, requires_approval) |
-| termux | tool_providers/termux.py | 11 | termux_battery_status, termux_camera_photo, termux_clipboard_get/set, termux_notification, termux_open_app_settings, termux_toast, termux_torch, termux_tts_speak, termux_vibrate, remove_file |
-| system | tool_providers/termux_system.py | 19 (17 + 2 aliases) | get/set_clipboard, get_device_location, get/set_system_volume, get_wifi_status, list_contacts, list_sms, send_sms, send_notification, show_toast, set_screen_brightness, set_torch, take_camera_photo, trigger_vibration, tts_speak, get_system_battery; aliases: termux_battery_status, notification. Private operations retain requires_approval |
+| termux | tool_providers/termux.py | 2 | termux_open_app_settings, remove_file |
+| system | tool_providers/termux_system.py | 17 | get/set_clipboard, get_device_location, get/set_system_volume, get_wifi_status, list_contacts, list_sms, send_sms, send_notification, show_toast, set_screen_brightness, set_torch, take_camera_photo, trigger_vibration, tts_speak, get_system_battery. Private operations retain requires_approval |
 | filesystem | tool_providers/filesystem.py | 17 | read_file, write_file, apply_patch, list_directory, glob_search, grep_search, file_stat, calculate_hash, copy_or_move_file, delete_path, make_directory, run_command, http_fetch, get_system_info, python_ast_outline, zip_compress, zip_extract |
 | wikipedia | tool_providers/wikipedia.py | 2 | wikipedia_search, wikipedia_summary |
 | profiler | tool_providers/profiler.py | 2 | inspect_app_internals, profile_application_performance |

@@ -483,11 +483,6 @@ for _private_tool in (
 ):
     TOOL_REGISTRY[_private_tool]["requires_approval"] = True
 
-TOOL_REGISTRY["termux_battery_status"] = TOOL_REGISTRY["get_system_battery"]
-TOOL_REGISTRY["notification"] = TOOL_REGISTRY["send_notification"]
-# SYSTEM_TOOLS is built above, before the aliases exist, so the alias is added here too.
-SYSTEM_TOOLS["notification"] = TOOL_REGISTRY["notification"]
-
 TERMUX_TOOLS = TOOL_REGISTRY
 
 

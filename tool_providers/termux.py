@@ -1,4 +1,7 @@
-"""Termux:API tools: toasts, vibration, battery, torch, clipboard, speech, notifications, camera, app settings and file removal on the device."""
+"""Termux tools on the device: Android app settings screens and file removal by pattern.
+
+Toasts, vibration, battery, torch, clipboard, speech, notifications and the camera are
+the system category's tools (termux_system.py); they are not repeated here."""
 
 import os
 
@@ -38,66 +41,6 @@ def _run_termux_cmd(cmd: list, timeout: int = 10) -> dict:
     except Exception as e:
         logger.exception(f"Error executing {cmd[0]}: {e}")
         return {"success": False, "error": str(e)}
-
-
-def termux_toast(args: dict, cfg: dict) -> dict:
-    msg = args.get("message", "")
-    return _run_termux_cmd(["termux-toast", "-s", msg])
-
-
-def termux_vibrate(args: dict, cfg: dict) -> dict:
-    ms = str(args.get("duration_ms", 500))
-    return _run_termux_cmd(["termux-vibrate", "-d", ms])
-
-
-def termux_battery_status(args: dict, cfg: dict) -> dict:
-    return _run_termux_cmd(["termux-battery-status"])
-
-
-def termux_torch(args: dict, cfg: dict) -> dict:
-    state = "on" if args.get("enabled", True) else "off"
-    return _run_termux_cmd(["termux-torch", state])
-
-
-def termux_clipboard_get(args: dict, cfg: dict) -> dict:
-    return _run_termux_cmd(["termux-clipboard-get"])
-
-
-def termux_clipboard_set(args: dict, cfg: dict) -> dict:
-    text = args.get("text", "")
-    return _run_termux_cmd(["termux-clipboard-set", text])
-
-
-def termux_tts_speak(args: dict, cfg: dict) -> dict:
-    text = args.get("text", "")
-    return _run_termux_cmd(["termux-tts-speak", text])
-
-
-def termux_notification(args: dict, cfg: dict) -> dict:
-    title = args.get("title", "Logos")
-    content = args.get("content", "")
-    return _run_termux_cmd(
-        ["termux-notification", "--title", title, "--content", content]
-    )
-
-
-def termux_camera_photo(args: dict, cfg: dict) -> dict:
-    import time
-
-    camera_id = str(args.get("camera_id", 0))
-    file_name = args.get("file_name") or f"photo_{int(time.time())}.jpg"
-    file_path = os.path.abspath(file_name)
-    res = _run_termux_cmd(
-        ["termux-camera-photo", "-c", camera_id, file_path], timeout=25
-    )
-    if res.get("success"):
-        return {
-            "success": True,
-            "message": f"Фото успешно сохранено: {file_path}",
-            "file_path": file_path,
-            "camera_id": camera_id,
-        }
-    return res
 
 
 def termux_open_app_settings(args: dict, cfg: dict) -> dict:
@@ -195,137 +138,13 @@ TERMUX_TOOLS = {
             "required": [],
         },
     },
-    "termux_camera_photo": {
-        "func": termux_camera_photo,
-        "description": "Сделать снимок с камеры смартфона (0 — задняя/основная, 1 — фронтальная) и сохранить его в локальный файл.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "camera_id": {
-                    "type": "integer",
-                    "description": "ID камеры: 0 для задней камеры, 1 для селфи-камеры (по умолчанию 0)",
-                },
-                "file_name": {
-                    "type": "string",
-                    "description": "Имя файла для сохранения снимка (по умолчанию генерируется автоматически, например photo_1789211000.jpg)",
-                },
-            },
-            "required": [],
-        },
-    },
-    "termux_battery_status": {
-        "func": termux_battery_status,
-        "description": "Получить детальную информацию о батарее устройства (процент заряда, температура, статус зарядки).",
-        "parameters": {
-            "type": "object",
-            "properties": {"dummy": {"type": "string", "description": "unused"}},
-            "required": [],
-        },
-    },
-    "termux_toast": {
-        "func": termux_toast,
-        "description": "Показать системное всплывающее сообщение (Toast) на экране смартфона.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "description": "Текст всплывающего уведомления",
-                }
-            },
-            "required": ["message"],
-        },
-    },
-    "termux_vibrate": {
-        "func": termux_vibrate,
-        "description": "Включить вибрацию телефона на заданное количество миллисекунд.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "duration_ms": {
-                    "type": "integer",
-                    "description": "Длительность вибрации в миллисекундах (по умолчанию 500)",
-                }
-            },
-            "required": [],
-        },
-    },
-    "termux_torch": {
-        "func": termux_torch,
-        "description": "Управление фонариком/вспышкой телефона (включение/выключение).",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "enabled": {
-                    "type": "boolean",
-                    "description": "true — включить фонарик, false — выключить",
-                }
-            },
-            "required": ["enabled"],
-        },
-    },
-    "termux_clipboard_get": {
-        "func": termux_clipboard_get,
-        "description": "Прочитать текущий текст из буфера обмена Android.",
-        "parameters": {
-            "type": "object",
-            "properties": {"dummy": {"type": "string", "description": "unused"}},
-            "required": [],
-        },
-    },
-    "termux_clipboard_set": {
-        "func": termux_clipboard_set,
-        "description": "Скопировать текст в буфер обмена Android.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "description": "Текст для помещения в буфер"}
-            },
-            "required": ["text"],
-        },
-    },
-    "termux_tts_speak": {
-        "func": termux_tts_speak,
-        "description": "Озвучить текст голосом через системный движок Android TTS.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "description": "Текст для воспроизведения"}
-            },
-            "required": ["text"],
-        },
-    },
-    "termux_notification": {
-        "func": termux_notification,
-        "description": "Создать уведомление в шторке Android.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "title": {"type": "string", "description": "Заголовок уведомления"},
-                "content": {
-                    "type": "string",
-                    "description": "Основной текст уведомления",
-                },
-            },
-            "required": ["content"],
-        },
-    },
 }
 
 
-# Termux:API tools need their Android helper on PATH. Hosts without it (Ubuntu
-# runners, servers) do not offer them to the model; remove_file needs nothing.
+# A tool that needs an Android helper on PATH is not offered on hosts without it
+# (Ubuntu runners, servers); remove_file needs nothing.
 _REQUIRED_EXECUTABLES = {
     "termux_open_app_settings": "am",
-    "termux_camera_photo": "termux-camera-photo",
-    "termux_battery_status": "termux-battery-status",
-    "termux_toast": "termux-toast",
-    "termux_vibrate": "termux-vibrate",
-    "termux_torch": "termux-torch",
-    "termux_clipboard_get": "termux-clipboard-get",
-    "termux_clipboard_set": "termux-clipboard-set",
-    "termux_tts_speak": "termux-tts-speak",
-    "termux_notification": "termux-notification",
 }
 for _name, _executable in _REQUIRED_EXECUTABLES.items():
     TERMUX_TOOLS[_name]["metadata"] = {"requires_executables": [_executable]}
