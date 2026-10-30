@@ -108,8 +108,6 @@
 .logos-trace-main{display:flex;min-height:0;flex:1 1 0%;position:relative}.logos-trace-nav{width:280px;min-width:220px;border-right:1px solid var(--border-color,rgba(255,255,255,.08));overflow:auto;padding:8px}.logos-trace-inspector{min-width:0;flex:1;overflow:auto;-webkit-overflow-scrolling:touch}.logos-trace-section-title{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.55;padding:7px 8px}
 .logos-trace-item{width:100%;box-sizing:border-box;text-align:left;border:0;background:transparent;color:inherit;padding:8px;border-radius:8px;cursor:pointer;display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:center}.logos-trace-item:hover,.logos-trace-item.active{background:rgba(127,127,127,.1)}.logos-trace-icon{width:18px;text-align:center}.logos-trace-item-main{min-width:0}.logos-trace-item-name{display:block;font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.logos-trace-item-meta{display:block;font-size:10px;opacity:.55;margin-top:2px}.logos-trace-item-time{font:10px ui-monospace,monospace;opacity:.55;white-space:nowrap;text-align:right}
 .logos-trace-mobile-tabs,.logos-trace-mobile-list,.logos-trace-mobile-detail{display:none}.logos-trace-inspector-inner{padding:14px 16px}.logos-trace-inspector-title{font-size:18px;font-weight:750;margin-bottom:3px}.logos-trace-inspector-sub{font-size:11px;opacity:.58;margin-bottom:12px}.logos-trace-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}.logos-trace-tab{border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 8px;font-size:11px;cursor:pointer}.logos-trace-tab.active{background:rgba(127,127,127,.12);font-weight:700}.logos-trace-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px}.logos-trace-card{padding:9px;border:1px solid var(--border-color,rgba(255,255,255,.08));border-radius:8px;background:rgba(127,127,127,.035)}.logos-trace-card-label{font-size:10px;opacity:.55}.logos-trace-card-value{font-size:13px;font-weight:700;margin-top:2px;word-break:break-word}.logos-trace-pre{margin:0;padding:12px;border-radius:9px;background:var(--bg-input);color:var(--text-main,#eee);border:1px solid var(--border-color,rgba(127,127,127,.18));font:11px/1.5 ui-monospace,monospace;white-space:pre;overflow:auto;max-width:100%;max-height:min(55vh,520px);max-height:min(55dvh,520px);text-align:left;tab-size:2;-webkit-overflow-scrolling:touch}.logos-trace-json-wrap{min-width:0;max-width:100%;overflow:hidden}.logos-trace-json-toolbar{display:flex;align-items:center;gap:7px;margin:0 0 8px}.logos-trace-json-label{font-size:11px;font-weight:700;opacity:.72}.logos-trace-depth{border:1px solid var(--border-color,rgba(127,127,127,.22));background:var(--bg-input);color:var(--text-main,#eee);border-radius:7px;padding:5px 7px;font-size:11px}.logos-trace-notice{padding:10px 12px;border-radius:8px;background:rgba(127,127,127,.06);font-size:12px;opacity:.75}
-.logos-trace-item.logos-trace-hl-judge{box-shadow:inset 3px 0 0 #e0a030}.logos-trace-item.logos-trace-hl-user{box-shadow:inset 3px 0 0 #4aa3ff}.logos-trace-item.logos-trace-hl-proof{box-shadow:inset 3px 0 0 #3fb27f}
-.logos-trace-hl-list{display:grid;gap:7px;margin-bottom:12px}.logos-trace-hl-card{padding:9px 10px;border-radius:8px;border:1px solid rgba(127,127,127,.18);border-left-width:4px;background:rgba(127,127,127,.04)}.logos-trace-hl-card.logos-trace-hl-judge{border-left-color:#e0a030;background:rgba(224,160,48,.1)}.logos-trace-hl-card.logos-trace-hl-user{border-left-color:#4aa3ff;background:rgba(74,163,255,.1)}.logos-trace-hl-card.logos-trace-hl-proof{border-left-color:#3fb27f;background:rgba(63,178,127,.1)}.logos-trace-hl-text{font-size:12px;white-space:pre-wrap;word-break:break-word;margin-top:3px}
 .logos-trace-mobile-detail-head{display:none}
 @media(max-width:820px){
 .logos-trace-modal{padding:0;touch-action:auto}.logos-trace-window{border-radius:0}.logos-trace-nav{display:none}
@@ -393,52 +391,8 @@
       ? fmtMs((x.end - x.start) * 1000)
       : "instant";
   }
-  // Highlights: the judge's words (court source), the user's words and the proofs, found anywhere in the item.
-  var HIGHLIGHT_TITLES = { judge: "Судья", user: "Пользователь", proof: "Доказательство" };
-  function findHighlights(value, out, depth) {
-    if (!value || typeof value !== "object" || depth > 8) return out;
-    if (Array.isArray(value)) {
-      value.forEach(function (v) {
-        findHighlights(v, out, depth + 1);
-      });
-      return out;
-    }
-    var role = String(value.role || "").toLowerCase(),
-      source = String(value.source || "").toLowerCase(),
-      text = typeof value.text === "string" ? value.text : typeof value.content === "string" ? value.content : null;
-    if (text && (source === "court" || value.kind === "judge")) out.push({ tag: "judge", text: text });
-    else if (text && role === "user") out.push({ tag: "user", text: text });
-    if (value.proof !== undefined && value.proof !== null && value.proof !== "")
-      out.push({ tag: "proof", text: jsonText(value.proof) });
-    Object.keys(value).forEach(function (key) {
-      if (key !== "proof") findHighlights(value[key], out, depth + 1);
-    });
-    return out;
-  }
-  function highlightsOf(item) {
-    return findHighlights(item.data, [], 0);
-  }
-  function highlightBlock(marks) {
-    var box = el("div", { className: "logos-trace-hl-list" });
-    marks.forEach(function (m) {
-      var row = el("div", { className: "logos-trace-hl-card logos-trace-hl-" + m.tag });
-      row.appendChild(el("div", { className: "logos-trace-card-label" }, HIGHLIGHT_TITLES[m.tag]));
-      row.appendChild(
-        el(
-          "div",
-          { className: "logos-trace-hl-text" },
-          m.text.length > 400 ? m.text.slice(0, 400) + "…" : m.text,
-        ),
-      );
-      box.appendChild(row);
-    });
-    return box;
-  }
   function makeItemButton(item) {
     var b = el("button", { type: "button", className: "logos-btn logos-trace-item" });
-    highlightsOf(item).forEach(function (m) {
-      b.classList.add("logos-trace-hl-" + m.tag);
-    });
     b.appendChild(el("span", { className: "logos-trace-icon" }, icon(item)));
     var m = el("span", { className: "logos-trace-item-main" });
     m.appendChild(el("span", { className: "logos-trace-item-name" }, item.name));
@@ -610,8 +564,6 @@
       tabs.appendChild(b);
     });
     inner.appendChild(tabs);
-    var marks = highlightsOf(item);
-    if (marks.length) inner.appendChild(highlightBlock(marks));
     var content = document.createElement("div");
     function pre(value) {
       var wrap = el("div", { className: "logos-trace-json-wrap" });
