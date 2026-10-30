@@ -97,13 +97,15 @@ stop_app() {
     fi
     pid=
   fi
-  rm -f "$state/backend.pid"
+  rm -f "$state/backend.pid" "$state/draining.pid"
 }
 
 # A restart never cuts a reply the user is waiting for: it waits until the running server
 # reports no chat turn. A server without the report (older code) is not waited for.
 drain_turns() {
   [[ -n $pid ]] && alive "$pid" || return 0
+  # The process whose turns are awaited is recorded, so the state shows which one is draining.
+  echo "$pid" >"$state/draining.pid"
   local running waited=0
   while running=$(curl --noproxy '*' --fail --silent --max-time 5 "$base/api/chat/turns/running"       | "$python" -c 'import json,sys; print(int(json.load(sys.stdin)["running"]))' 2>/dev/null)       && [[ $running =~ ^[0-9]+$ && $running -gt 0 ]]; do
     (( waited % 60 == 0 )) && echo "DEPLOY_WAITING_FOR_TURNS running=$running waited_s=$waited"
