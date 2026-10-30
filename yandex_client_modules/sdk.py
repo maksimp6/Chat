@@ -41,7 +41,7 @@ class LogosSDK:
             "model": get_model_uri(self.project_id, model),
             "input": [{"role": "user", "content": message}],
             "instructions": "Ты — полезный ассистент.",
-            "background": True,
+            "background": False,
             "conversation": conv_id,
         }
         resp = self.session.post(f"{self.base_url}/responses", json=payload)

@@ -231,7 +231,7 @@ class YandexRequestMixin:
         on_stream_event = params.get("on_stream_event")
         if on_stream_event is not None and not callable(on_stream_event):
             raise ValueError("on_stream_event must be callable or None")
-        is_background = params.get("background", True)
+        is_background = params.get("background", False)
         if is_background:
             params["store"] = True
 

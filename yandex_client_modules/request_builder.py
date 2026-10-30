@@ -53,7 +53,7 @@ def validate_generation_params(params):
     for name in ("background", "store", "stream", "parallel_tool_calls"):
         if name in validated and not isinstance(validated[name], bool):
             raise ValueError(f"{name} must be a boolean")
-    if validated.get("background", True) and validated.get("store") is False:
+    if validated.get("background", False) and validated.get("store") is False:
         raise ValueError("background=true requires store=true")
     limit = validated.get("max_output_tokens")
     if limit is not None and (
@@ -405,7 +405,9 @@ def build_response_payload(
         if user_cap > 0:
             params["max_output_tokens"] = user_cap
         params.pop("reasoning", None)
-    is_background = params.get("background", True)
+    # Background mode is off unless asked for (owner, 30.10.2026, #1723): it queued every
+    # round at the provider for 1-3 minutes before the first event.
+    is_background = params.get("background", False)
 
     if is_background:
         params["store"] = True

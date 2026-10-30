@@ -698,7 +698,7 @@ def _define_logos_client(base: type) -> type:
                     )
                 continuation_params["input"] = input_items
                 continuation_params["background"] = base_params.get(
-                    "background", True
+                    "background", False
                 )
                 start_round(round_kind, part)
                 response = self._ask_provider(

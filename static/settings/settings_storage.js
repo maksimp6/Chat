@@ -9,7 +9,9 @@
     max_tool_calls: null,
     truncation: "disabled",
     store: true,
-    background: true,
+    // Off by the owner's decision (30.10.2026, #1723): background mode queued every round
+    // at the provider for 1-3 minutes; a chat answers synchronously and still streams.
+    background: false,
     // New dialogs stream the answer into the chat as the model writes it.
     stream: true,
     previous_response_id: "",

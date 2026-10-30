@@ -46,7 +46,7 @@
       max_output_tokens: numericSetting(s.max_output_tokens, 0, "max_output_tokens"),
       truncation: s.truncation || "disabled",
       store: booleanSetting(s.store, true, "store"),
-      background: booleanSetting(s.background, true, "background"),
+      background: booleanSetting(s.background, false, "background"),
       stream: booleanSetting(s.stream, true, "stream"),
       instructions: s.instructions || "",
       tool_choice: s.tool_choice || "auto",
