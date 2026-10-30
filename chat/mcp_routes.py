@@ -1786,6 +1786,33 @@ _LIVE_TURN_FAILED = (
 )
 
 
+def _live_done_body(status, body):
+    """The body of a live turn's done event.
+
+    A stored reply's trace goes as the reference its stored message keeps; the browser
+    reads the trace when it is opened. On a 10 kb/s link the inline trace of a turn
+    with tools could cost more than the answer itself. Every other body (a failed turn)
+    keeps its trace inline, as the JSON answer does.
+    """
+    if not isinstance(body, dict):
+        return {}
+    if (
+        status != 200
+        or body.get("message_id") is None
+        or not body.get("invocation_id")
+        or not isinstance(body.get("trace"), dict)
+    ):
+        return body
+    return {
+        **body,
+        "trace": {
+            "trace_id": body.get("trace_id"),
+            "invocation_id": body["invocation_id"],
+            "storage": "invocation",
+        },
+    }
+
+
 def _start_live_turn(t_start, admission):
     """Run the turn in a worker thread and relay it as server-sent events.
 
@@ -1829,7 +1856,7 @@ def _start_live_turn(t_start, admission):
             # live turn left the registry finds it done.
             if admission is not None:
                 admission.settle(status, body)
-            live.finish(status, body if isinstance(body, dict) else {})
+            live.finish(status, _live_done_body(status, body))
 
     try:
         threading.Thread(

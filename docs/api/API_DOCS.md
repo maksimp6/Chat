@@ -62,7 +62,7 @@ curl -X POST http://localhost:8080/api/chat \
 | `round_text` | `text`, `reasoning` | итоговый текст запроса заменяет показанный (например, после перехода на опрос) |
 | `tool` | `phase` (`requested`, `start`, `done`, `failed`), `kind`, `name`, `server_label`, `text` | ход инструмента |
 | `retry` | `operation` (`post`, `poll`, `stream`, `conversation`), `attempt`, `reason`, `status_code`, `delay_ms`, `text` | автоматический повтор запроса к провайдеру |
-| `done` | `http_status`, `body` | конец хода; `body` — ровно тот JSON, который вернул бы обычный запрос |
+| `done` | `http_status`, `body` | конец хода; `body` — тот JSON, который вернул бы обычный запрос, но у сохранённого ответа (`200` с `message_id`) поле `trace` — ссылка `{"trace_id", "invocation_id", "storage": "invocation"}`, как у сохранённого сообщения; полная трасса — `GET /api/invocations/<invocation_id>/trace` |
 
 Отключение браузера или «Стоп» не останавливает ход: сервер дожидается ответа модели, сохраняет его, проводит оплату и записывает итог.
 
