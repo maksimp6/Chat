@@ -2287,12 +2287,34 @@ body {
 }
 
 /* Court: the judge's word (source court) and the user's words are set apart, and the proofs the court names are marked (the trace is not touched). */
+/* The judge's words are rainbow: the text takes the gradient (the background clipped to the glyphs), and a rainbow frame sits behind the bubble. */
 .msg.msg-court .bubble {
-  /* Rainbow frame: the tinted fill sits on the padding box, the gradient shows through the transparent border. */
-  border: 2px solid transparent;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)) padding-box,
-    linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe04d, #4dd96b, #4da6ff, #9b6bff, #ff4da6) border-box;
+  position: relative;
+  isolation: isolate;
+}
+.msg.msg-court .bubble::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  z-index: -1;
+  background: linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe04d, #4dd96b, #4da6ff, #9b6bff, #ff4da6);
+}
+.msg.msg-court .bubble,
+.msg.msg-court .bubble *:not(.msg-proof):not(pre):not(code) {
+  background: linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe04d, #4dd96b, #4da6ff, #9b6bff, #ff4da6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.msg.msg-court .bubble pre,
+.msg.msg-court .bubble code {
+  background: var(--bg-input, rgba(127, 127, 127, 0.12));
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: var(--text-main, inherit);
+  -webkit-text-fill-color: currentColor;
 }
 .msg.user .bubble {
   border-left: 3px solid #4aa3ff;
