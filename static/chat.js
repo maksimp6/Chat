@@ -1022,7 +1022,8 @@ async function streamHistory(convId, options) {
       const block = historyErrorBlock(
         convId,
         "Показана только часть диалога: связь прервалась. Нажмите «Повторить», чтобы догрузить более ранние сообщения.",
-        function () { streamHistory(convId, { above: above, sources: sources, token: token }); },
+        // The block goes on with the copy it extends: a continuation keeps the token of the read it continues.
+        function () { streamHistory(convId, { above: above, sources: sources, token: fresh ? token : settings.token }); },
       );
       chatbox.insertBefore(block, above);
     } else if (settings.replace) {

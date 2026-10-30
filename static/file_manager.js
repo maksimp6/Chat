@@ -732,6 +732,8 @@ window.fetchVectorStores = function () {
           });
         })
         .then(function () {
+          // The stored file shows in the list at once, also while other uploads still run.
+          listNow = true;
           forgetRow();
         })
         .catch(function (err) {
@@ -794,7 +796,8 @@ window.fetchVectorStores = function () {
         })
         .finally(function () {
           pendingUploads -= 1;
-          // The list is rebuilt once, after the last upload settles, so no row disappears early.
+          // The list is read again when this upload stored its file or the person must check it, and after the last
+          // upload; the upload rows are apart from it, so none disappears early.
           if (pendingUploads === 0 || listNow) reloadFileList();
         });
     }
