@@ -666,6 +666,7 @@ window.fetchVectorStores = function () {
             purpose: "assistants",
             signal: controller.signal,
             uploadId: uploadId || undefined,
+            resumable: true,
             onProgress: function (received, size) {
               if (progress && size > 0) progress.textContent = "(загрузка " + Math.floor((received * 100) / size) + "%)";
             },
@@ -685,7 +686,10 @@ window.fetchVectorStores = function () {
           }
           // Files may have stored a file whose completion got no answer in time, so the user is told to check the
           // list first instead of sending it again.
-          var uncertain = isNoAnswer(err) || (err && err.body && err.body.error === "completion_uncertain");
+          // A completion that got an answer tells by its code: only completion_uncertain means it may be stored.
+          var uncertain = err && err.completion
+            ? Boolean(err.body && err.body.error === "completion_uncertain")
+            : isNoAnswer(err);
           var text = uncertain
             ? "Сервер не ответил вовремя: файл мог сохраниться. Проверьте список, прежде чем загружать его снова."
             : err.message;

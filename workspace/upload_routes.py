@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+import urllib3
 from flask import Blueprint, jsonify, request
 
 from workspace.file_routes import (
@@ -205,6 +206,11 @@ def get_upload(upload_id):
 def delete_upload(upload_id):
     if _load(upload_id) is None:
         return _not_found()
+    with _sending_guard:
+        sending = upload_id in _sending
+    if sending:
+        # Files is storing it right now: a deletion would not stop that.
+        return jsonify({"error": "completion_in_progress"}), 409
     with _lock(upload_id):
         try:
             _remove(upload_id)
@@ -292,23 +298,52 @@ _sending: dict[str, threading.Event] = {}
 _sending_guard = threading.Lock()
 
 
+def _never_sent(error: Exception) -> bool:
+    """Whether a send failure happened before the request could reach Files.
+
+    Raised before any request (a provider key that cannot be read, no project id), or a
+    connection that never opened (no route, refused, a DNS, TLS or proxy failure, a
+    connect timeout).
+    """
+    cause = error.__cause__
+    if not isinstance(cause, requests.exceptions.RequestException):
+        return True
+    if isinstance(
+        cause,
+        (
+            requests.exceptions.ConnectTimeout,
+            requests.exceptions.SSLError,
+            requests.exceptions.ProxyError,
+        ),
+    ):
+        return True
+    if isinstance(cause, requests.exceptions.ConnectionError):
+        reason = getattr(cause.args[0], "reason", None) if cause.args else None
+        return isinstance(reason, urllib3.exceptions.NewConnectionError)
+    return False
+
+
 def _maybe_stored(error: Exception) -> bool:
     """Whether Files may have stored the file although the send failed.
 
     Files answered that it did not store it (400, 404, 413, 429, an auth failure), or the
-    connection never opened: the file was not stored and the completion may be repeated.
-    No answer after the body may have gone, or a server error at Files: it may be stored.
+    request never reached it: the file was not stored and the completion may be repeated.
+    A server error at Files, or no answer after the body may have gone: it may be stored.
     """
     status = getattr(error, "status_code", None)
     if status in (400, 404, 413, 429):
         return False
-    if status == 502 and "Auth failed" in str(error):
-        return False
-    return not isinstance(error.__cause__, requests.exceptions.ConnectTimeout)
+    if status == 502:
+        return "Auth failed" not in str(error)
+    return not _never_sent(error)
 
 
 def _save_meta(upload_id: str, meta: dict[str, Any]) -> None:
-    """Writes the record after the send; a failure is logged, the answer to the browser stays right."""
+    """Writes the record after the send, unless the upload was deleted meanwhile; a failure is
+    logged, the answer to the browser stays right."""
+    meta_path, _ = _paths(upload_id)
+    if not meta_path.exists():
+        return
     try:
         _write_meta(upload_id, meta)
     except OSError as error:
@@ -369,8 +404,19 @@ def complete_upload(upload_id):
             logger.error("[UPLOADS] Completion not sent: %s", error)
             with _lock(upload_id):
                 _save_meta(upload_id, meta)
-            return jsonify({"error": _FILES_FAILED}), 503
+            return jsonify({"error": "files_key_unavailable", "message": _FILES_FAILED}), 503
         except Exception as error:
+            if isinstance(error, bound.YandexClientError) and _never_sent(error) and getattr(
+                error, "status_code", None
+            ) in (None, 504):
+                # The request never reached Files: nothing was stored. A connection that did not open is tried again
+                # by the browser by itself; a provider key that cannot be used waits until it is fixed.
+                logger.warning("[UPLOADS] Files not reached: %s", error)
+                with _lock(upload_id):
+                    _save_meta(upload_id, meta)
+                network = isinstance(error.__cause__, requests.exceptions.RequestException)
+                code = "files_unreachable" if network else "files_key_unavailable"
+                return jsonify({"error": code, "message": _FILES_FAILED}), 503
             if not isinstance(error, bound.YandexClientError) or _maybe_stored(error):
                 # Anything else may come after Files stored the file (an answer that could not be read).
                 if not isinstance(error, bound.YandexClientError):

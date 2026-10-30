@@ -1705,8 +1705,9 @@ def _chat_error_response(
 
     if invocation is not None:
         persist_invocation_trace(invocation.invocation_id, trace_data)
+    error_message_id = None
     if can_write:
-        add_message(
+        error_message_id = add_message(
             conv_id,
             "assistant",
             reply,
@@ -1730,6 +1731,8 @@ def _chat_error_response(
             "reply": reply,
             "cost": cost,
             "user_message_id": user_message_id,
+            # The stored error, so the chat draws it with its id as a loaded one (a refresh then knows it is stored).
+            "message_id": error_message_id,
             "partial_output": partial_output if partial_output else None,
             "invocation_id": invocation.invocation_id if invocation else None,
             "session_id": invocation.session_id if invocation else None,

@@ -861,7 +861,13 @@ async function streamHistory(convId, options) {
   const end = document.createElement("div");
   end.className = "history-end";
   end.hidden = true;
-  if (fresh) chatbox.appendChild(end);
+  if (fresh) {
+    // Replacing a copy on screen, the new one goes where it is: what was added after it (a question sent now) stays
+    // below.
+    const connected = replaced ? replaced.filter(function (node) { return node.isConnected; }) : [];
+    if (connected.length) connected[connected.length - 1].after(end);
+    else chatbox.appendChild(end);
+  }
   // The oldest history node on screen: older messages go above it.
   let oldest = settings.above || null;
   const sources = settings.sources || new Set();
@@ -1025,18 +1031,22 @@ function mayBeStored(node) {
   return Boolean(node.classList) && node.classList.contains("msg") && !node.classList.contains("error");
 }
 
-// The question of a new stored error, found on screen before ``mark``: undefined when the screen cannot tell.
+// The question of a new stored error, found on screen before ``mark``: undefined when the screen cannot tell (a
+// message without its record, or older messages not loaded yet).
 function ownerOnScreen(shown, mark) {
   for (let index = mark; index >= 0; index -= 1) {
-    const msg = shown[index].logosMessage;
+    const node = shown[index];
+    if (keptByRefresh(node)) return undefined;
+    const msg = node.logosMessage;
     if (!msg) {
-      if (mayBeStored(shown[index])) return undefined;
+      if (mayBeStored(node)) return undefined;
       continue;
     }
     if (msg.source === "error") continue;
     return msg.role === "user" ? msg : null;
   }
-  return null;
+  // The top of the chat: the history starts here only when no older part is still to be loaded.
+  return shown.some(keptByRefresh) ? undefined : null;
 }
 
 function storedMessageId(node) {
@@ -1106,22 +1116,26 @@ function refreshHistory(convId, shown) {
             if (node.isConnected) node.querySelectorAll(".msg-retry-btn").forEach(function (button) { button.remove(); });
           });
         }
+        const drawn = [];
         newer.forEach(function (msg, index) {
-          renderStoredMessage(convId, msg, index === newer.length - 1 ? owner : null, function (id) {
+          const node = renderStoredMessage(convId, msg, index === newer.length - 1 ? owner : null, function (id) {
             return newer.some(function (candidate) { return candidate.source === "image:" + id; });
           });
+          if (node) drawn.push(node);
         });
-        waitForOpenQuestion(convId, Number(data.count) || 0, data.last);
         // Fewer stored messages on screen than the server has from the oldest one shown: some were stored elsewhere
-        // meanwhile; only the whole history brings them in order.
+        // meanwhile; only the whole history brings them in order. It replaces only what this refresh owns: what was
+        // added meanwhile (a question sent now, its waiting line) stays.
         const onScreen = new Set();
         Array.from(chatbox.children).forEach(function (node) {
           const id = storedMessageId(node);
-          if (id !== null) onScreen.add(id);
+          if (id !== null && id >= since) onScreen.add(id);
         });
         if (typeof data.range_count === "number" && data.range_count > onScreen.size) {
-          return streamHistory(convId, { replace: Array.from(chatbox.children) });
+          const owned = shown.filter(function (node) { return node.isConnected && !keptByRefresh(node); }).concat(drawn);
+          return streamHistory(convId, { replace: owned });
         }
+        waitForOpenQuestion(convId, Number(data.count) || 0, data.last);
       } catch (renderErr) {
         console.error("[CHAT] Render history error:", renderErr);
         chatbox.appendChild(historyErrorBlock(convId, "Не удалось показать диалог. Нажмите «Повторить» или обновите страницу."));
@@ -1349,6 +1363,11 @@ document.addEventListener("DOMContentLoaded", function () {
         });
       })
       .then(function (done) {
+        // Removed from the tray while its completion was answered: the copy it got is dropped.
+        if (image.controller.signal.aborted) {
+          window.LogosUpload.discard(done.upload_id);
+          return;
+        }
         image.uploadId = done.upload_id;
         if (image.progressEl) image.progressEl.remove();
         image.progressEl = null;
@@ -2878,6 +2897,8 @@ document.addEventListener("DOMContentLoaded", function () {
           const errorNode = addMessage({
             text: data.reply || "⚠️ Ошибка: " + errorReasonText(data, httpStatus),
             role: "error",
+            // A stored error keeps its id, as a loaded one has: a refresh then knows it is stored.
+            id: Number.isInteger(data.message_id) && data.message_id > 0 ? data.message_id : undefined,
             // A text that did not go back to the field can be put there with «Изменить»; photos would not follow it.
             editText: textReturned || sentImages.length ? undefined : turn.text,
             cost: data.cost || 0,
