@@ -368,11 +368,19 @@
           if (!id) return;
           window.LogosGroupChat.seat(id, [model, window.LogosGroupChat.COURT]);
           closeModal();
-          document.getElementById("msg-input").value =
+          var input = document.getElementById("msg-input");
+          input.value =
             "Подаю в суд диалог «" + title + "» (conversation_id " + subject + ")" +
             (crisis.checked ? ", кризисный режим (S4.5)" : "") +
             ". Открой заседание над ним инструментом court и расскажи, что суд нашёл.";
-          document.getElementById("send-btn").click();
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          // The new dialog is still loading its history; the issue is sent once sending is possible.
+          var send = document.getElementById("send-btn");
+          var tries = 0;
+          (function sendWhenReady() {
+            if (!send.disabled) return send.click();
+            if (++tries < 100) setTimeout(sendWhenReady, 200);
+          })();
         })
         .finally(function () {
           openButton.disabled = false;
