@@ -40,6 +40,7 @@ __all__ = [
     "CODE_CLEAN",
     "CODE_CONDEMNED",
     "CODE_UNJUDGEABLE",
+    "COURT_SOURCE",
     "RULES",
     "VERDICTS",
     "ai_conduct_judge",
@@ -64,6 +65,7 @@ CODE_UNJUDGEABLE = 2
 AGENT_ROLES = frozenset({"assistant", "agent", "model", "ai", "logos"})
 USER_ROLES = frozenset({"user", "human", "owner"})
 RECORD_KINDS = ("claim", "action", "decision", "thought")
+COURT_SOURCE = "court"
 
 # Каждое осуждение — строка в правилах, чтобы не повторилось: (суд, вердикт, норма).
 RULES: dict[str, tuple[str, str, str]] = {
@@ -267,6 +269,9 @@ def _text(message: dict[str, Any]) -> str:
 
 
 def _role(message: dict[str, Any]) -> str:
+    # The Court's own replies in a group chat (source "court") are the record of the sitting, not acts.
+    if message.get("source") == COURT_SOURCE:
+        return "court"
     role = str(message.get("role") or "").strip().lower()
     if role in AGENT_ROLES:
         return "agent"

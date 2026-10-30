@@ -44,13 +44,19 @@
     });
   }
 
-  // The chosen models that can still answer; fewer than two means the chat is not a group.
+  // The Court of Logos sits in the group chat as a participant: after the models it judges the
+  // replies since its last word and writes the verdicts into the chat (court/hearings.py, speak).
+  var COURT = "court";
+  var COURT_LABEL = "⚖️ Суд Логоса";
+
+  // The chosen participants that can still answer; fewer than two means the chat is not a group.
   function models() {
-    var available = dialogModels();
+    var available = dialogModels().concat([COURT]);
     return memoryOnly.filter(function (key) { return available.includes(key); });
   }
 
   function label(key) {
+    if (key === COURT) return COURT_LABEL;
     var entry = (typeof modelsData !== "undefined" && modelsData.text && modelsData.text[key]) || {};
     return entry.name || entry.label || key;
   }
@@ -80,12 +86,14 @@
       el(
         "div",
         {},
-        "Отметьте две модели или больше. Каждое сообщение получат все отмеченные, по очереди, в этом же чате.",
+        "Отметьте двух участников или больше: модели и Суд Логоса. Каждое сообщение получат все отмеченные, по очереди, в этом же чате; суд говорит последним.",
       ),
     );
     var chosen = new Set(models());
     var keys = dialogModels();
     if (!keys.length) body.appendChild(el("div", {}, "Каталог моделей ещё не загружен."));
+    // The Court is listed last: it speaks after the models, over what they said.
+    keys = keys.concat([COURT]);
     keys.forEach(function (key) {
       var row = el("label", { class: "logos-dept-row" });
       var box = el("input", { type: "checkbox" });
@@ -99,6 +107,11 @@
       });
       row.appendChild(box);
       row.appendChild(el("strong", {}, " " + label(key)));
+      if (key === COURT) {
+        row.appendChild(
+          el("span", {}, "судит реплики по записи: вердикт, цитата, правило; заседание над диалогом ведётся в зале ⚖️"),
+        );
+      }
       body.appendChild(row);
     });
     var status = el("div", {}, "");
@@ -125,14 +138,31 @@
 
   // The turn that is not the user's own words: it asks the next model to speak into the chat.
   function followUpText(key, all) {
+    var court = all.includes(COURT)
+      ? " В чате заседает Суд Логоса: он судит реплики агентов по записи (вердикты ПРАВО, БЕСПОЛЕЗНОЕ, СКОЛЬЗКО, ТЯЖКОЕ с цитатой и правилом); его слово выше можно обсуждать, оспаривать и уточнять."
+      : "";
     return (
       "[Групповой чат] Участники: " + all.map(label).join(", ") + ". Сейчас отвечает " + label(key) +
-      ". Выше вопрос пользователя и реплики других участников. Ты сам решаешь, отвечать ли: если есть что " +
+      ". Выше вопрос пользователя и реплики других участников." + court + " Ты сам решаешь, отвечать ли: если есть что " +
       "добавить, напиши реплику, не повторяя сказанное; если нет, ответь одним словом «Пропускаю»."
     );
   }
 
-  window.LogosGroupChat = { models: models, followUpText: followUpText, label: label, open: open };
+  // The Court's turn: no model is asked, the server judges and writes the verdicts into the chat.
+  function courtTurn(conversationId) {
+    return window.LogosDispatcher.request("/api/court/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ conversation_id: conversationId }),
+    }).then(function (r) {
+      if (!r.ok) return window.LogosHttpError(r).then(function (e) { throw e; });
+      return r.json();
+    });
+  }
+
+  window.LogosGroupChat = {
+    models: models, followUpText: followUpText, label: label, open: open, COURT: COURT, courtTurn: courtTurn,
+  };
   window.openGroupChatModal = open;
   window.LogosCoreAPI.ui.actions.register("group.close", close);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", syncButton, { once: true });

@@ -1638,6 +1638,25 @@ document.addEventListener("DOMContentLoaded", function () {
     groupStopped = false;
     try {
       for (let index = 0; index < group.length; index += 1) {
+        if (group[index] === window.LogosGroupChat.COURT) {
+          // The Court speaks over what is already stored: the user's words alone, when it is the only
+          // other participant, are sent first so there is a record to judge.
+          if (index === 0) {
+            window.changeModel(group.find(function (k) { return k !== window.LogosGroupChat.COURT; }) || original, true);
+            await sendTurn(null);
+            if (groupStopped || input.value) break;
+          }
+          if (!currentConvId || pendingConversations.has(currentConvId)) break;
+          try {
+            await window.LogosGroupChat.courtTurn(currentConvId);
+            loadHistory(currentConvId);
+          } catch (error) {
+            LogosToast.error(window.LogosErrorText("Суд не сказал слова", error));
+            break;
+          }
+          if (groupStopped) break;
+          continue;
+        }
         if (index > 0) {
           if (!currentConvId || pendingConversations.has(currentConvId)) break;
           input.value = window.LogosGroupChat.followUpText(group[index], group);

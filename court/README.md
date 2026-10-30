@@ -17,6 +17,8 @@ The repository is public, so the issue carries no dialog text. The full error, p
 
 Verdicts, lightest first: ПРАВО, БЕСПОЛЕЗНОЕ, СКОЛЬЗКО, ТЯЖКОЕ (indelible). The protocol's code is `0` (no violation), `1` (condemned) or `2` (nothing to judge: no agent replies). The owner's values (swear roots, boundary phrases, request markers) are the constants of `court/judging.py`; the court guesses no category beyond them. From the command line: `python3 -m court.judging <export.json | folder> [--crisis]`, where an export is a JSON list of messages with `role`, `text` and `created_at`, and a folder is the batch mode (a `*.protocol.json` per dialog and a summary); the exit code is the court's code.
 
+**The Court in the group chat** (`court.hearings.speak`, `POST /api/court/speak`). The Court is a participant of the group chat (👥 → «Суд Логоса», `static/group_chat.js`): after the chosen models have answered, the server judges the replies since the Court's last word and writes the verdicts into the chat as a message with `source: court` (never judged itself); when the user's last message asks about the rules, the Court lists them. The models see the Court's word in the history and the follow-up tells them they may discuss, dispute and refine it, so the understanding deepens as the dialog goes. The first word opens the sitting over the dialog, every later word updates it.
+
 **The hall of hearings** (`court.hearings`, the ⚖️ button of the page, `static/court.js`). A hearing is one sitting over one dialog: the protocol, the case drafts the flares opened, and the owner's decisions in the states of the Court procedure (`ALLEGED` until the owner decides, then `INVESTIGATING`, `CONFIRMED`, `REFUTED`, `UNKNOWN`, `FIXED`, `VERIFIED`, `ACCEPTED`), each with a reason and a history. A sitting can be judged again (decisions on the cases that are still there are kept), closed and reopened with a reason. Filing a case to GitHub is the owner's action, never automatic: the issue carries verdicts, rules and message numbers, the quotes go to the encrypted evidence. Hearings are kept in the Kristall store under `court/hearing/<id>`.
 
 ## Public API
@@ -42,6 +44,7 @@ Other units reach it only through their own ports:
 | --- | --- |
 | `GET /api/court/rules` | The rule table and the decision states. |
 | `GET /api/court/dialogs` | The dialogs the hall can sit over. |
+| `POST /api/court/speak` | The Court's turn in the group chat of `conversation_id` (optional `crisis`): verdicts into the chat, the sitting opened or updated. |
 | `POST /api/court/judge` | The protocol alone, nothing kept: `conversation_id` or `messages`, optional `crisis`. |
 | `GET /api/court/hearings` | The sittings, newest first. |
 | `POST /api/court/hearings` | Open a sitting over `conversation_id` (optional `crisis`). |
@@ -53,7 +56,7 @@ Other units reach it only through their own ports:
 
 ## Tools
 
-Category `court`. Reading needs no approval: `court.rules`, `court.judge_dialog`, `court.hearings.list`, `court.hearing.get`. Changing the hall needs the owner's approval: `court.hearing.open`, `court.hearing.rejudge`, `court.hearing.decide` (recorded in the owner's name, because the approval is theirs; a decision by the executor would be S2.5), `court.case.file`, `court.hearing.close`, `court.hearing.reopen`.
+Category `court`. Reading needs no approval: `court.rules`, `court.judge_dialog`, `court.hearings.list`, `court.hearing.get`. Changing the hall needs the owner's approval: `court.speak` (the Court's word into the chat), `court.hearing.open`, `court.hearing.rejudge`, `court.hearing.decide` (recorded in the owner's name, because the approval is theirs; a decision by the executor would be S2.5), `court.case.file`, `court.hearing.close`, `court.hearing.reopen`.
 
 ## Ports
 
@@ -62,6 +65,7 @@ Everything `court` uses from other units is a field of `Host` in [`court/host.py
 | Port | Provided by |
 | --- | --- |
 | `TreasuryIdentityError` | `economy.treasury_identity.TreasuryIdentityError` |
+| `add_message` | `storage.records.add_message` |
 | `check_access` | `conversations.ownership.check_access` |
 | `get_conversation_title` | `storage.records.get_conversation_title` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |

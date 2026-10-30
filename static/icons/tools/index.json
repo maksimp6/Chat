@@ -46,6 +46,7 @@
   "court.hearings.list": "scales",
   "court.judge_dialog": "scales",
   "court.rules": "scales",
+  "court.speak": "scales",
   "delete_path": "trash",
   "file_stat": "document",
   "get_clipboard": "clipboard",

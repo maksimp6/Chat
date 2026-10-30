@@ -16,6 +16,7 @@ from court._binding import Binding, HostNotBound
 @dataclass(frozen=True, kw_only=True)
 class Host:
     TreasuryIdentityError: Any  # economy.treasury_identity.TreasuryIdentityError
+    add_message: Any  # storage.records.add_message
     check_access: Any  # conversations.ownership.check_access
     get_conversation_title: Any  # storage.records.get_conversation_title
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
@@ -37,6 +38,7 @@ __all__ = [
     "bound",
     "current",
     "provide",
+    "add_message",
     "check_access",
     "get_conversation_title",
     "get_current_owner_id",
@@ -44,6 +46,10 @@ __all__ = [
     "get_store",
     "list_owned_conversations",
 ]
+
+
+def add_message(*args: Any, **kwargs: Any) -> Any:
+    return current().add_message(*args, **kwargs)
 
 
 def check_access(*args: Any, **kwargs: Any) -> Any:

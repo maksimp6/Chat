@@ -326,6 +326,7 @@ def _cloud():
 
 def _court():
     from court import host
+    from storage.records import add_message
     from conversations.ownership import check_access
     from economy.treasury_identity import TreasuryIdentityError
     from economy.treasury_identity import get_current_owner_id
@@ -336,6 +337,7 @@ def _court():
 
     return host.Host(
         TreasuryIdentityError=TreasuryIdentityError,
+        add_message=add_message,
         check_access=check_access,
         get_conversation_title=get_conversation_title,
         get_current_owner_id=get_current_owner_id,

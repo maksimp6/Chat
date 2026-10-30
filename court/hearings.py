@@ -23,6 +23,7 @@ from flask import Blueprint, jsonify, request
 
 from court import filing
 from court.host import (
+    add_message,
     bound,
     check_access,
     get_conversation_title,
@@ -31,7 +32,7 @@ from court.host import (
     get_store,
     list_owned_conversations,
 )
-from court.judging import judge_dialog, rules_table
+from court.judging import COURT_SOURCE, judge_dialog, rules_table
 
 __all__ = [
     "DECISIONS",
@@ -46,6 +47,7 @@ __all__ = [
     "prepare_court_records",
     "rejudge_hearing",
     "reopen_hearing",
+    "speak",
 ]
 
 log = logging.getLogger("logos.court.hearings")
@@ -304,6 +306,164 @@ def reopen_hearing(hearing_id: str, reason: str) -> dict[str, Any]:
     return _save(hearing)
 
 
+# --- the Court as a participant of the group chat -----------------------------
+
+
+def _hearing_of(conversation_id: str) -> dict[str, Any] | None:
+    """The open sitting over this dialog: the group chat is the sitting."""
+    sittings = [
+        hearing
+        for hearing in get_store().items(prefix=PREFIX).values()
+        if isinstance(hearing, dict)
+        and hearing.get("conversation_id") == str(conversation_id)
+        and hearing.get("closure") == "OPEN"
+    ]
+    sittings.sort(key=lambda hearing: int(hearing.get("opened_at") or 0))
+    return sittings[-1] if sittings else None
+
+
+def _merge_cases(
+    hearing: dict[str, Any], protocol: dict[str, Any], by: str
+) -> list[dict[str, Any]]:
+    previous = {
+        (case["flare"].get("message_id"), case["flare"]["n"]): case
+        for case in hearing["cases"]
+    }
+    cases = []
+    for case in protocol["cases"]:
+        kept = previous.get((case["flare"].get("message_id"), case["flare"]["n"]))
+        if kept is None:
+            cases.append(_new_case(case))
+            continue
+        cases.append(
+            {
+                **case,
+                "decision": kept["decision"],
+                "decision_reason": kept["decision_reason"],
+                "decision_by": kept["decision_by"],
+                "history": kept["history"],
+                "filed": kept.get("filed"),
+            }
+        )
+    return cases
+
+
+def _speech(protocol: dict[str, Any], since: int, asked_rules: bool) -> str:
+    """What the Court says into the chat: the verdicts on the replies since its last word."""
+    entries = [
+        e
+        for e in protocol["entries"]
+        if e["n"] > since and e["role"] in ("agent", "user")
+    ]
+    lines = ["⚖️ **Суд Логоса**"]
+    judged = [e for e in entries if e["role"] == "agent"]
+    if not judged and not any(e.get("flare") for e in entries):
+        lines.append(
+            "С прошлого слова суда новых реплик агента не было; судить нечего (код 2)."
+        )
+    for entry in entries:
+        if entry.get("flare"):
+            lines.append(
+                f"- #{entry['n']} пользователь — **вспышка** (S3.1): «{entry['flare']}»"
+            )
+            continue
+        if entry["role"] != "agent":
+            continue
+        head = f"- #{entry['n']} агент — **{entry['verdict']}**"
+        if not entry["findings"]:
+            lines.append(head + ": нарушений по записи не найдено")
+            continue
+        lines.append(head)
+        for finding in entry["findings"]:
+            quote = f" — «{finding['quote']}»" if finding["quote"] else ""
+            lines.append(
+                f"  - {finding['verdict']} {finding['rule']}: {finding['reason']}{quote}"
+            )
+    new_cases = [c for c in protocol["cases"] if c["flare"]["n"] > since]
+    for case in new_cases:
+        lines.append(
+            f"- **Дело {case['n']}** ({case['verdict']}): вспышка в #{case['flare']['n']}, "
+            f"в окне вины {len(case['items'])} акт(ов): "
+            + ", ".join(f"#{i['n']} {i['rule']} {i['verdict']}" for i in case["items"])
+            + ". Решение — за владельцем (ALLEGED)."
+        )
+    for flare in protocol["flares"]:
+        if flare["n"] > since and flare["case"] is None:
+            lines.append(f"- Вспышка #{flare['n']}: {flare['decision']}.")
+    summary = protocol["summary"]
+    lines.append(
+        f"Итог по диалогу: **{protocol['verdict'] or '—'}**, код {protocol['code']}; "
+        + " · ".join(f"{k} {v}" for k, v in summary.items())
+        + f"; дел {len(protocol['cases'])}."
+    )
+    if asked_rules:
+        lines.append("")
+        lines.append("Правила суда:")
+        for rule in rules_table():
+            lines.append(
+                f"- {rule['rule']} ({rule['judge']}, {rule['verdict'] or '—'}): {rule['norm']}"
+            )
+    else:
+        lines.append(
+            "Суд судит по записи, не по намерению; каждый вердикт — цитата и номер правила. "
+            "Спросите суд о правилах, и он их перечислит."
+        )
+    return "\n".join(lines)
+
+
+def speak(conversation_id: str, *, crisis: bool | None = None) -> dict[str, Any]:
+    """The Court's turn in the group chat: judge what was said since its last word and say it.
+
+    The sitting over the dialog is opened on the first word and kept up to date after."""
+    owner = _owner()
+    messages = _dialog_messages(conversation_id, owner)
+    hearing = _hearing_of(conversation_id)
+    if crisis is None:
+        crisis = bool(hearing["crisis"]) if hearing else False
+    since = 0
+    for n, message in enumerate(messages, start=1):
+        if message.get("source") == COURT_SOURCE:
+            since = n
+    asked_rules = False
+    for message in reversed(messages):
+        if str(message.get("role") or "").lower() == "user":
+            asked_rules = "правил" in str(message.get("text") or "").lower()
+            break
+    protocol = judge_dialog(messages, crisis=crisis)
+    text = _speech(protocol, since, asked_rules)
+    message_id = add_message(
+        str(conversation_id), "assistant", text, source=COURT_SOURCE
+    )
+    if hearing is None:
+        now = int(time.time())
+        hearing = {
+            "id": "hearing-" + uuid4().hex[:16],
+            "conversation_id": str(conversation_id),
+            "title": str(get_conversation_title(conversation_id, "") or ""),
+            "opened_at": now,
+            "updated_at": now,
+            "opened_by": owner or "UNASSIGNED",
+            "crisis": bool(crisis),
+            "closure": "OPEN",
+            "closure_reason": "",
+            "protocol": protocol,
+            "cases": [_new_case(case) for case in protocol["cases"]],
+            "revision": 1,
+        }
+        with get_store().transaction() as tx:
+            tx.set(_key(hearing["id"]), hearing)
+    else:
+        hearing.update(
+            {
+                "protocol": protocol,
+                "cases": _merge_cases(hearing, protocol, owner or "UNASSIGNED"),
+                "crisis": bool(crisis),
+            }
+        )
+        hearing = _save(hearing)
+    return {"message_id": message_id, "text": text, "hearing": hearing}
+
+
 def delete_hearing(hearing_id: str) -> None:
     hearing = _load(hearing_id)
     with get_store().transaction() as tx:
@@ -358,6 +518,22 @@ def api_judge():
             )
         return jsonify(
             {"protocol": judge_dialog(messages, crisis=bool(data.get("crisis")))}
+        )
+    except Exception as exc:
+        return _error(exc)
+
+
+@court_bp.post("/speak")
+def api_speak():
+    """The Court's turn in the group chat of a dialog."""
+    data = _body()
+    try:
+        crisis = data.get("crisis")
+        return jsonify(
+            speak(
+                str(data.get("conversation_id") or ""),
+                crisis=None if crisis is None else bool(crisis),
+            )
         )
     except Exception as exc:
         return _error(exc)

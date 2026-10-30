@@ -22,6 +22,7 @@ from court.hearings import (
     open_hearing,
     rejudge_hearing,
     reopen_hearing,
+    speak,
 )
 from court.host import check_access, get_current_owner_id, get_messages
 from court.judging import judge_dialog, rules_table
@@ -120,6 +121,17 @@ def _file(args, cfg=None):
         str(args.get("hearing_id") or ""), int(args.get("case") or 0)
     )
     return {"success": True, "hearing": hearing}
+
+
+def _speak(args, cfg=None):
+    crisis = args.get("crisis")
+    return {
+        "success": True,
+        **speak(
+            str(args.get("conversation_id") or ""),
+            crisis=None if crisis is None else bool(crisis),
+        ),
+    }
 
 
 def _close(args, cfg=None):
@@ -225,6 +237,20 @@ COURT_TOOLS = {
         schema=object_schema({**_HEARING, **_CASE}, ["hearing_id", "case"]),
         title="Court Case File",
         description="Подать дело заседания в GitHub: issue «Суд Логоса» с меткой from-dialog, цитаты — в зашифрованной улике.",
+    ),
+    "court.speak": _tool(
+        _speak,
+        read_only=False,
+        requires_approval=True,
+        schema=object_schema(
+            {
+                "conversation_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                **_CRISIS,
+            },
+            ["conversation_id"],
+        ),
+        title="Court Speak",
+        description="Слово суда в групповом чате диалога: вердикты по репликам с прошлого слова суда записываются в чат, заседание над диалогом открывается или обновляется.",
     ),
     "court.hearing.close": _tool(
         _close,
