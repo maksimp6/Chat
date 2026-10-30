@@ -91,7 +91,38 @@ def main():
         stream.flush()
         os.fsync(stream.fileno())
     temporary.replace(state / "backend.pid")
+    start_watchdog(app, state, port)
     print(json.dumps({"pid": process.pid, "bind_host": host, "port": port}))
+
+
+def start_watchdog(app, state, port):
+    """Start the watchdog that restarts a server which stops answering, unless one runs."""
+    pid_file = state / "watchdog.pid"
+    try:
+        pid = int(pid_file.read_text().strip())
+        if b"redmi_watchdog.py" in Path(f"/proc/{pid}/cmdline").read_bytes():
+            return
+    except (OSError, ValueError):
+        pass
+    # No runner variables (the job ends) and no secrets: it only asks /healthz and restarts.
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if not k.startswith(("GITHUB_", "ACTIONS_", "RUNNER_", "GH_"))
+        and not any(word in k for word in ("TOKEN", "KEY", "SECRET", "PASSWORD"))
+    }
+    env.update(LOGOS_APP_DIR=str(app), LOGOS_STATE_DIR=str(state), LOGOS_PORT=str(port))
+    with (state / "watchdog.log").open("ab", buffering=0) as log:
+        watchdog = subprocess.Popen(
+            [str(app / ".venv/bin/python"), str(app / "scripts/redmi_watchdog.py")],
+            cwd=app,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=log,
+            start_new_session=True,
+        )
+    pid_file.write_text(str(watchdog.pid))
 
 
 if __name__ == "__main__":
