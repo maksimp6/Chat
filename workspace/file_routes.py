@@ -135,10 +135,17 @@ def download_file(file_id):
         meta = client.retrieve_file(file_id)
         filename = meta.get("filename", file_id)
         content = client.download_file(file_id)
-        return Response(
+        response = Response(
             content,
             mimetype="application/octet-stream",
             headers={"Content-Disposition": _content_disposition(filename)},
+        )
+        # A stored file never changes, so its id is its version: a download broken on a slow link (10 kb/s) goes
+        # on with a Range request from the byte it reached instead of starting over.
+        response.set_etag(file_id)
+        response.headers["Accept-Ranges"] = "bytes"
+        return response.make_conditional(
+            request, accept_ranges=True, complete_length=len(content)
         )
     except bound.YandexClientError as e:
         return _err_response(e)
