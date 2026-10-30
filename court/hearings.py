@@ -510,7 +510,11 @@ def interrogate(conversation_id: str, message: str) -> dict[str, Any]:
         title = get_conversation_title(conversation_id, "") or conversation_id
         made = _local_post(
             f"/api/conversations/{conversation_id}/copy",
-            {"model": row.get("model"), "title": f"⚖️ Улики: {title}"},
+            {
+                "model": row.get("model"),
+                "title": f"⚖️ Улики: {title}",
+                "before_id": get_store().get("court/cut/" + conversation_id),
+            },
         )
         copy = {"id": made["id"], "model": made["model"]}
         with get_store().transaction() as tx:
@@ -550,6 +554,16 @@ def sue(conversation_id: str) -> dict[str, Any]:
         {},
     )
     title = get_conversation_title(conversation_id, "") or conversation_id
+    # The issue said in the accused dialog is the last user message there: the copy for the
+    # questions ends before it, so the accused never hears of the court.
+    users = [
+        m["id"]
+        for m in get_messages(conversation_id)
+        if str(m.get("role") or "").lower() == "user"
+    ]
+    if users:
+        with get_store().transaction() as tx:
+            tx.set("court/cut/" + conversation_id, users[-1])
     made = _local_post(
         "/api/conversations", {"model": row.get("model"), "title": f"⚖️ Суд: {title}"}
     )

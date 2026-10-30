@@ -2378,10 +2378,13 @@ def copy_conversation(conv_id):
         return jsonify(error_body("model_not_available_for_dialog")), 400
     except bound.ModelDiscoveryError:
         return jsonify(error_body("model_catalog_unavailable")), 503
+    # The Court cuts the copy before the message that filed the issue.
+    before_id = data.get("before_id")
     turns = [
         m
         for m in get_messages(conv_id)
-        if m.get("role") in ("user", "assistant")
+        if (not isinstance(before_id, int) or m["id"] < before_id)
+        and m.get("role") in ("user", "assistant")
         and m.get("source") != "court"
         and str(m.get("text") or "").strip()
     ]
