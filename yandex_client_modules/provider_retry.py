@@ -314,6 +314,24 @@ OUTCOME_UNKNOWN = (
 )
 
 
+def silent_stream_text(silent, poll_timeout):
+    """The person's text for a stream that opened and then never named its response.
+
+    The connection was not broken: the provider kept it open and did not start its
+    answer, either until the wait ran out (idle) or until it closed the stream (eof).
+    """
+    head_state, elapsed = silent
+    if head_state == "idle":
+        when = f"за {_seconds(poll_timeout)} с"
+    else:
+        when = f"и закрыл соединение через {_seconds(elapsed)} с"
+    return (
+        f"Провайдер не начал ответ {when}: ответ не получен. "
+        "Неизвестно, принял ли он запрос; повторно платный запрос не отправлялся. "
+        "Нажмите «Повторить», чтобы спросить заново."
+    )
+
+
 def server_error_unknown_text(status_code):
     """The person's text for a POST answered with a server error: maybe accepted."""
     return (

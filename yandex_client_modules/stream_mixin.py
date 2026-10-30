@@ -32,6 +32,7 @@ from yandex_client_modules.provider_retry import (
     retry_after_seconds,
     retry_after_too_long_text,
     server_error_unknown_text,
+    silent_stream_text,
 )
 from yandex_client_modules.request_utils import sanitize_for_log
 from yandex_client_modules.sse import COMMENT_MARKER, iter_sse_events
@@ -334,10 +335,12 @@ class YandexStreamMixin:
             outcome = classify_post(exc, resp, stream_requested)
             error_event = None
             error_code = None
+            silent = None
             if outcome == "ok" and event_stream:
                 # The head gets its own window from when the stream opened: the retry
                 # budget may be almost spent by an attempt the provider just accepted.
                 head_deadline = time.monotonic() + poll_timeout
+                head_started = time.monotonic()
                 try:
                     events, head, head_state = _read_head(resp, head_deadline)
                 except STREAM_ERRORS as error:
@@ -360,6 +363,7 @@ class YandexStreamMixin:
                         # EOF, or only keep-alives until the deadline: the provider may
                         # have taken the request, so it is never sent again.
                         outcome = "ambiguous"
+                        silent = (head_state, time.monotonic() - head_started)
             elif outcome == "ok":
                 return resp
 
@@ -448,13 +452,19 @@ class YandexStreamMixin:
                             if exc is not None
                             else None,
                             "status_code": status_code,
+                            "head": silent[0] if silent is not None else None,
+                            "head_elapsed": round(silent[1], 1)
+                            if silent is not None
+                            else None,
                         },
                     )
                 # An HTTP error status is an answer, not a broken connection: say so.
                 self._raise_post_failure(
                     **failure,
                     outcome="ambiguous",
-                    user_text=server_error_unknown_text(status_code)
+                    user_text=silent_stream_text(silent, poll_timeout)
+                    if silent is not None
+                    else server_error_unknown_text(status_code)
                     if exc is None
                     and isinstance(status_code, int)
                     and status_code >= 500
