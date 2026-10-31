@@ -245,7 +245,10 @@ target=
 receipt() {
   local status=${1:-ready} revision run wifi_check=
   [[ $pid =~ ^[0-9]+$ ]] || return 2
-  revision=$(git -C "$app" rev-parse HEAD 2>/dev/null || printf unknown)
+  # The revision the running backend was started with, not the checkout HEAD: after a
+  # checkout change an old process would otherwise be recorded as the new commit (#1620 DEP-02).
+  revision=$(tr '\0' '\n' <"/proc/$pid/environ" 2>/dev/null | sed -n 's/^LOGOS_APP_REVISION=//p' | head -n 1)
+  [[ $revision =~ ^[0-9a-f]{40}$ ]] || revision=unknown
   run=${GITHUB_RUN_ID:-manual}
   [[ $run =~ ^[0-9]+$ || $run == manual ]] || return 2
   [[ $wifi_required == 0 ]] || wifi_check=',"wifi_address_http_and_assets"'
