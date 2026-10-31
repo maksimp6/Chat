@@ -50,10 +50,39 @@
     return value.length > max ? value.slice(0, max) + "…" : value;
   }
 
-  // Raw error types such as provider.http_500 are shown as readable text.
-  function errorLabel(type) {
-    var http = /^provider\.http_(\d{3})$/.exec(type);
-    return http ? "Ошибка провайдера, HTTP " + http[1] : "Ошибка";
+  // Raw error types such as provider.http_500 are shown as readable text; other errors by their own message.
+  function errorLabel(error) {
+    var http = /^provider\.http_(\d{3})$/.exec(text(error && error.type, 64));
+    if (http) return "Ошибка провайдера, HTTP " + http[1];
+    return text(error && error.error, 160) || text(error && error.message, 160) || "Ошибка";
+  }
+
+  // Errors of a turn that still completed: each message once, with how many times it was met.
+  function warningsOf(errors) {
+    var counts = {};
+    var order = [];
+    errors.forEach(function (error) {
+      var label = errorLabel(error);
+      if (!Object.prototype.hasOwnProperty.call(counts, label)) {
+        counts[label] = 0;
+        order.push(label);
+      }
+      counts[label] += 1;
+    });
+    return order.map(function (label) {
+      return { label: label, count: counts[label] };
+    });
+  }
+
+  // The server's own final record of the turn (chat/mcp_routes.py): "completed" or "failed", or "" without one.
+  function terminalStatus(events) {
+    for (var i = events.length - 1; i >= 0; i--) {
+      if (events[i] && events[i].type === "provider_terminal_state") {
+        var status = events[i].payload && events[i].payload.invocation_status;
+        return typeof status === "string" ? status : "";
+      }
+    }
+    return "";
   }
 
   function responseStatus(response) {
@@ -75,18 +104,23 @@
     if (last) {
       return {
         source: text(last.source) || "error",
-        label: errorLabel(text(last.type, 64)),
+        label: errorLabel(last),
       };
     }
     return null;
   }
 
-  function deriveState(trace, responses, errors, blocker) {
+  function deriveState(trace, responses, errors, blocker, terminal) {
     var statuses = responses.map(responseStatus);
     var finished = finite((trace.timings || {}).total_duration_ms) !== null;
+    var blocked = Boolean(blocker && BLOCKING_EVENTS[blocker.source]);
     if (statuses.indexOf("cancelled") >= 0) return "cancelled";
+    // A turn the server recorded as completed is done: errors met on the way are its warnings, not its outcome.
+    // A block on the way (quota, tool access, approval) is still named.
+    if (terminal === "completed" && !blocked) return "done";
     if (errors.some(isTimeout)) return "timeout";
-    if (blocker && BLOCKING_EVENTS[blocker.source]) return "blocked";
+    if (blocked) return "blocked";
+    if (terminal === "failed") return "error";
     var completed = statuses.indexOf("completed") >= 0;
     if (errors.length) return completed ? "partial" : "error";
     if (statuses.indexOf("incomplete") >= 0) return "partial";
@@ -194,7 +228,7 @@
     var errors = list(trace.errors);
     var events = list(trace.events);
     var blocker = findBlocker(events, errors);
-    var state = deriveState(trace, responses, errors, blocker);
+    var state = deriveState(trace, responses, errors, blocker, terminalStatus(events));
     return {
       schema: SCHEMA,
       trace_id: text(trace.trace_id, 64) || null,
@@ -202,6 +236,7 @@
       stages: stages(trace, responses, tools, state),
       latest_event: latestEvent(events),
       blocker: state === "done" ? null : blocker,
+      warnings: state === "done" ? warningsOf(errors) : [],
       models: models(responses),
       tool_calls: tools.length,
       model_calls: responses.length,
@@ -215,14 +250,22 @@
     return ms < 1000 ? Math.round(ms) + " мс" : (ms / 1000).toFixed(1) + " с";
   }
 
+  // A count with its Russian word form, digits grouped: 1 вызов, 4 инструмента, 1 960 065 токенов.
+  function countText(n, one, few, many) {
+    var mod10 = n % 10;
+    var mod100 = n % 100;
+    var word = mod10 === 1 && mod100 !== 11 ? one : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? few : many;
+    return n.toLocaleString("ru-RU") + " " + word;
+  }
+
   function summaryParts(surface) {
     var parts = [STATE_LABELS[surface.state]];
-    if (surface.model_calls) parts.push(surface.model_calls + " вызовов модели");
-    if (surface.tool_calls) parts.push(surface.tool_calls + " инструментов");
+    if (surface.model_calls) parts.push(countText(surface.model_calls, "вызов модели", "вызова модели", "вызовов модели"));
+    if (surface.tool_calls) parts.push(countText(surface.tool_calls, "инструмент", "инструмента", "инструментов"));
     if (surface.duration_ms !== null) parts.push(formatDuration(surface.duration_ms));
     if (surface.usage.status === "measured") {
-      var tokens = surface.usage.total + " токенов";
-      if (surface.usage.cached) tokens += " (кэш " + surface.usage.cached + ")";
+      var tokens = countText(surface.usage.total, "токен", "токена", "токенов");
+      if (surface.usage.cached) tokens += " (кэш " + surface.usage.cached.toLocaleString("ru-RU") + ")";
       parts.push(tokens);
     } else {
       parts.push("токены: неизвестно");
@@ -266,6 +309,18 @@
       blocker.className = "execution-surface-blocker";
       blocker.textContent = "Причина: " + surface.blocker.label;
       root.appendChild(blocker);
+    }
+    if (surface.warnings && surface.warnings.length) {
+      var warnings = doc.createElement("div");
+      warnings.className = "execution-surface-warnings";
+      warnings.textContent =
+        "⚠️ Предупреждения: " +
+        surface.warnings
+          .map(function (warning) {
+            return warning.label + (warning.count > 1 ? " (×" + warning.count + ")" : "");
+          })
+          .join("; ");
+      root.appendChild(warnings);
     }
     return root;
   }

@@ -415,28 +415,19 @@ body {
   font-size: 12px;
 }
 
-/* Copy and retry sit beside the answer; diagnostics fold into one line under it. */
+/* Copy sits outside the bubble, by its last line, on the free side of the chat: always visible (a phone has no
+   hover), it covers no text and takes no row of its own. A bubble is at most 85% wide, so the side has room. */
 .logos-pro-app .msg-actions {
   position: absolute;
-  top: -10px;
-  right: -6px;
-  opacity: 0;
+  bottom: 0;
+  left: 100%;
+  margin-left: 2px;
 }
-.logos-pro-app .msg:hover .msg-actions,
-.logos-pro-app .msg-actions:focus-within {
-  opacity: 1;
-}
-@media (hover: none) {
-  /* Touch screens have no hover, so the actions sit under the bubble instead of covering its text. */
-  .logos-pro-app .msg-actions {
-    opacity: 1;
-    position: static;
-    display: flex;
-    justify-content: flex-end;
-  }
-}
-.logos-pro-app .copy-btn {
+.logos-pro-app .msg.user .msg-actions {
+  left: auto;
+  right: 100%;
   margin-left: 0;
+  margin-right: 2px;
 }
 .logos-pro-app .msg-retry-btn {
   margin-top: 6px;
@@ -1195,7 +1186,9 @@ body {
 .logos-pro-app .copy-btn {
   min-width: 44px;
   min-height: 44px;
-  margin-left: 10px;
+  margin: 0;
+  padding: 0;
+  font-size: 18px;
   cursor: pointer;
   background: none;
   border: 0;
@@ -1244,7 +1237,6 @@ body {
   margin-left: 4px;
 }
 
-.logos-pro-app .msg-trace-details,
 .logos-pro-app .msg-technical-details {
   width: 100%;
   margin-top: 4px;
@@ -1286,8 +1278,8 @@ body {
   background: transparent;
   border: 0;
   padding: 2px 0;
-  margin-left: 8px;
   color: var(--accent-text);
+  text-align: left;
   cursor: pointer;
   font-weight: 600;
 }
@@ -1866,6 +1858,10 @@ body {
 .logos-pro-app .execution-surface[data-state="timeout"] .execution-surface-summary {
   color: var(--danger);
 }
+.logos-pro-app .execution-surface-warnings {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
 
 /* Кнопки окон настроек и основная кнопка (пункты 40, 90) */
 .settings-btn-accent {
@@ -2198,7 +2194,7 @@ body {
   margin: -12px -12px 0 8px;
   z-index: 1;
 }
-/* «Открыть трассу» is a text action with a full touch target. */
+/* «Трассировка» is a text action with a full touch target. */
 .logos-pro-app .logos-trace-open-viewer {
   min-height: 44px;
   padding: 0 8px;
@@ -2290,40 +2286,42 @@ body {
   }
 }
 
-/* Court: the judge's word (source court) and the user's words are set apart, and the proofs the court names are marked (the trace is not touched). */
-/* The judge's words are rainbow: the text takes the gradient (the background clipped to the glyphs), and a rainbow frame sits behind the bubble. */
-.msg.msg-court .bubble {
-  position: relative;
-  isolation: isolate;
+/* Court: the judge's word (source court) wears a rainbow frame and rainbow text, the user's words carry a side
+   mark, and the proofs the court names are marked. The frame is the bubble's own border; the text is one gradient
+   across the whole bubble, clipped to the glyphs, in shades that stay readable on the theme's bubble. */
+:root {
+  --court-rainbow-frame: linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe04d, #4dd96b, #4da6ff, #9b6bff, #ff4da6);
+  --court-rainbow-text: linear-gradient(90deg, #c62828, #a65200, #806600, #1e7d32, #1a5fb4, #6a3fc8, #b0246e);
 }
-.msg.msg-court .bubble::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  z-index: -1;
-  background: linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe04d, #4dd96b, #4da6ff, #9b6bff, #ff4da6);
+[data-theme="dark"],
+[data-theme="dim"] {
+  --court-rainbow-text: linear-gradient(90deg, #ff6b6b, #ffa64d, #ffe04d, #4dd96b, #4da6ff, #b38cff, #ff6bb5);
 }
-.msg.msg-court .bubble,
-.msg.msg-court .bubble *:not(.msg-proof):not(pre):not(code) {
-  background: linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe04d, #4dd96b, #4da6ff, #9b6bff, #ff4da6);
+.logos-pro-app .msg.msg-court {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--bg-bubble-bot), var(--bg-bubble-bot)) padding-box,
+    var(--court-rainbow-frame) border-box;
+}
+.logos-pro-app .msg.msg-court .bubble {
+  background: var(--court-rainbow-text);
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent;
   -webkit-text-fill-color: transparent;
 }
-.msg.msg-court .bubble pre,
-.msg.msg-court .bubble code {
-  background: var(--bg-input, rgba(127, 127, 127, 0.12));
-  -webkit-background-clip: border-box;
-  background-clip: border-box;
-  color: var(--text-main, inherit);
+/* Code, tables, formulas and proofs keep plain text: they paint their own boxes over the gradient. */
+.logos-pro-app .msg.msg-court .bubble pre,
+.logos-pro-app .msg.msg-court .bubble code,
+.logos-pro-app .msg.msg-court .bubble .md-table,
+.logos-pro-app .msg.msg-court .bubble math,
+.logos-pro-app .msg.msg-court .bubble .msg-proof {
   -webkit-text-fill-color: currentColor;
 }
-.msg.user .bubble {
+.logos-pro-app .msg.user .bubble {
   border-left: 3px solid #4aa3ff;
+  padding-left: 8px;
 }
-.msg-proof {
+.logos-pro-app .msg-proof {
   background: rgba(63, 178, 127, 0.25);
   color: inherit;
   border-radius: 3px;

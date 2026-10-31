@@ -223,12 +223,14 @@
       var source = error && error.source ? String(error.source) : "";
       if ((callId && failedToolCallIds[callId]) || (source && failedToolSources[source])) return;
       standaloneErrors.push(error);
+      // The error's own message names what went wrong; its type stands in when it has none.
+      var message = error && (error.error || error.message || error.type);
       timeline.push({
         item: {
           kind: "error",
           icon: "⚠️",
           label: source || "Ошибка",
-          detail: error && error.type ? String(error.type) : "",
+          detail: message ? String(message) : "",
           status: "ошибка",
         },
         timestamp: firstTimestamp(error && error.timestamp),

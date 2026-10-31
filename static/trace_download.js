@@ -5,6 +5,8 @@
   var currentTrace = null;
   var buttonId = "logos-trace-download-btn";
   var uploadButtonId = "logos-trace-upload-btn";
+  var DOWNLOAD_LABEL = "Скачать JSON";
+  var UPLOAD_LABEL = "В файлы";
 
   function safeName(value) {
     return (
@@ -36,7 +38,7 @@
   }
 
   function buildPayload() {
-    if (!currentTrace) throw new Error("Трейс недоступен");
+    if (!currentTrace) throw new Error("Трассировка недоступна");
     return JSON.stringify(redact(currentTrace), null, 2);
   }
 
@@ -63,7 +65,7 @@
 
   function download() {
     var button = document.getElementById(buttonId);
-    setButtonState(button, "⏳", true);
+    setButtonState(button, "Готовим…", true);
     var payload;
     try {
       payload = buildPayload();
@@ -79,16 +81,16 @@
       defer(function () {
         URL.revokeObjectURL(url);
       }, 1000);
-      setButtonState(button, "✓ JSON", true);
+      setButtonState(button, "Скачано", true);
       defer(function () {
-        setButtonState(button, "⇩ JSON", false);
+        setButtonState(button, DOWNLOAD_LABEL, false);
       }, 1200);
     } catch (error) {
-      setButtonState(button, "⚠ JSON", true);
+      setButtonState(button, "Не скачано", true);
       defer(function () {
-        setButtonState(button, "⇩ JSON", false);
+        setButtonState(button, DOWNLOAD_LABEL, false);
       }, 1600);
-      LogosToast.error("Не удалось подготовить трейс");
+      LogosToast.error("Не удалось подготовить трассировку");
     }
   }
 
@@ -97,7 +99,7 @@
     try {
       payload = buildPayload();
     } catch (error) {
-      LogosToast.error("Не удалось подготовить трейс");
+      LogosToast.error("Не удалось подготовить трассировку");
       return;
     }
 
@@ -106,7 +108,7 @@
     var button = document.getElementById(uploadButtonId);
     if (button) {
       button.disabled = true;
-      button.textContent = "⏳ Загрузка...";
+      button.textContent = "Загружаем…";
     }
 
     // Sent in pieces that survive a broken connection (static/upload.js): on a slow link a trace of any size arrives.
@@ -118,17 +120,19 @@
           purpose: "assistants",
           onProgress: function (received, size) {
             var currentButton = document.getElementById(uploadButtonId);
-            if (currentButton && size > 0) currentButton.textContent = "⏳ " + Math.floor((received * 100) / size) + "%";
+            if (currentButton && size > 0) {
+              currentButton.textContent = "Загружаем " + Math.floor((received * 100) / size) + "%";
+            }
           },
         });
       })
       .then(function () {
-        LogosToast.show("Трейс загружен в файловый менеджер.");
+        LogosToast.show("Трассировка загружена в файловый менеджер.");
       })
       .catch(function (error) {
         var code = error && error.body ? error.body.error : null;
         var reason = code === "completion_uncertain"
-          ? "сервер не ответил вовремя, трейс мог сохраниться: проверьте файловый менеджер"
+          ? "сервер не ответил вовремя, трассировка могла сохраниться: проверьте файловый менеджер"
           : code === "files_unreachable" || (error && (error.status === 429 || error.status === 408))
             ? "файлы временно недоступны, повторите позже"
             : error && error.body && error.body.message
@@ -136,47 +140,43 @@
               : error && error.status
                 ? "сервер отклонил файл (HTTP " + error.status + ")"
                 : "ошибка сервера";
-        LogosToast.error("Не удалось загрузить трейс: " + reason);
+        LogosToast.error("Не удалось загрузить трассировку: " + reason);
       })
       .finally(function () {
         var currentButton = document.getElementById(uploadButtonId);
         if (currentButton) {
           currentButton.disabled = false;
-          currentButton.textContent = "☁ Файлы";
+          currentButton.textContent = UPLOAD_LABEL;
         }
       });
   }
 
+  // The viewer's action row (trace_viewer.js) takes both buttons after its own copy button.
   function installButton() {
-    var header = document.querySelector(".logos-trace-header");
-    if (!header) return;
-    var close = header.querySelector("button");
-    if (!header.querySelector("#" + buttonId)) {
+    var actions = document.querySelector(".logos-trace-actions");
+    if (!actions) return;
+    if (!actions.querySelector("#" + buttonId)) {
       var button = document.createElement("button");
       button.id = buttonId;
       button.type = "button";
       button.className = "logos-btn logos-trace-btn";
-      button.title = "Скачать полный трейс в JSON";
-      button.setAttribute("aria-label", "Скачать трейс в JSON");
-      button.textContent = "⇩ JSON";
-      // Fixed width: the label changes to a spinner while the request runs, and the header must not jump.
+      button.title = "Скачать всю трассировку в JSON";
+      button.textContent = DOWNLOAD_LABEL;
+      // Fixed width: the label changes while the file is prepared, and the row must not jump.
       button.style.minWidth = "8.5em";
       button.addEventListener("click", download);
-      if (close) header.insertBefore(button, close);
-      else header.appendChild(button);
+      actions.appendChild(button);
     }
-    if (!header.querySelector("#" + uploadButtonId)) {
+    if (!actions.querySelector("#" + uploadButtonId)) {
       var uploadButton = document.createElement("button");
       uploadButton.id = uploadButtonId;
       uploadButton.type = "button";
       uploadButton.className = "logos-btn logos-trace-btn";
-      uploadButton.title = "Загрузить трейс в файловый менеджер";
-      uploadButton.setAttribute("aria-label", "Загрузить трейс в файловый менеджер");
-      uploadButton.textContent = "☁ Файлы";
+      uploadButton.title = "Загрузить трассировку в файловый менеджер";
+      uploadButton.textContent = UPLOAD_LABEL;
       uploadButton.style.minWidth = "8.5em";
       uploadButton.addEventListener("click", uploadToFileManager);
-      if (close) header.insertBefore(uploadButton, close);
-      else header.appendChild(uploadButton);
+      actions.appendChild(uploadButton);
     }
   }
 

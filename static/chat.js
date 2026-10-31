@@ -291,10 +291,23 @@ function findRenderedMessage(chatbox, messageId) {
   );
 }
 
+// The Russian word form for a count: 1 событие, 2 события, 5 событий.
+function russianPlural(count, one, few, many) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
 // Folds the per-message diagnostics into one line, so the answer keeps the focus.
 function buildDetails(content, usage, totalDurationMs, cost) {
   const parts = [];
-  if (usage && usage.total_tokens) parts.push(`${usage.total_tokens} токенов`);
+  if (usage && usage.total_tokens) {
+    parts.push(
+      `${usage.total_tokens.toLocaleString("ru-RU")} ${russianPlural(usage.total_tokens, "токен", "токена", "токенов")}`,
+    );
+  }
   if (cost && cost > 0) parts.push(`≈ ${cost.toFixed(2)} ₽`);
   if (totalDurationMs) parts.push(`${(totalDurationMs / 1000).toFixed(1)} с`);
   // The cost is shown once, in this line; with nothing else to unfold it is a plain line.
@@ -314,35 +327,9 @@ function buildDetails(content, usage, totalDurationMs, cost) {
   return details;
 }
 
-// The Clipboard API exists only in secure contexts (https or localhost), and the phone reaches the app over plain http on the LAN.
-// Without it the text goes through a selected textarea and execCommand, as the trace viewer does.
-function copyText(text) {
-  if (navigator.clipboard && window.isSecureContext) {
-    return navigator.clipboard.writeText(text).catch(() => copyThroughSelection(text));
-  }
-  return copyThroughSelection(text);
-}
-
-function copyThroughSelection(text) {
-  const field = document.createElement("textarea");
-  field.value = text;
-  field.setAttribute("readonly", "");
-  field.style.position = "fixed";
-  field.style.opacity = "0";
-  document.body.appendChild(field);
-  field.select();
-  let copied = false;
-  try {
-    copied = document.execCommand("copy");
-  } catch (_) {
-    copied = false;
-  }
-  field.remove();
-  return copied ? Promise.resolve() : Promise.reject(new Error("Copy was refused"));
-}
-
-// The proofs named in a court's word (доказательство, proof) are marked inside the bubble.
-const COURT_PROOF_PATTERN = /доказательств\w*|proof\w*/gi;
+// The proofs named in a court's word (доказательство, proof) are marked inside the bubble, the whole word with its
+// ending: \w alone stops at the first Cyrillic letter.
+const COURT_PROOF_PATTERN = /доказательств[\p{L}\p{N}_]*|proof[\p{L}\p{N}_]*/giu;
 function markCourtProofs(root) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes = [];
@@ -445,7 +432,7 @@ function addMessage({
     msg.appendChild(editBtn);
   }
 
-  // Copy sits over the bubble corner, so it takes no row of its own.
+  // Copy sits beside the bubble, by its last line, so it covers no text and takes no row of its own.
   const actions = document.createElement("div");
   actions.className = "msg-actions";
   const copyBtn = document.createElement("button");
@@ -455,12 +442,24 @@ function addMessage({
   copyBtn.title = "Копировать";
   copyBtn.setAttribute("aria-label", "Копировать сообщение");
 
+  let copyMarkTimer = null;
   copyBtn.addEventListener("click", function () {
-    // A denied or missing clipboard must show a result, not an unhandled rejection.
-    copyText(text).then(
-      () => window.LogosToast.show("Скопировано"),
-      () => window.LogosToast.error("Не удалось скопировать"),
-    );
+    // The result shows on the button, where the tap was, and in a toast; a refused copy says so.
+    window.LogosClipboard.copy(text).then(
+      function () {
+        copyBtn.textContent = "✓";
+        window.LogosToast.show("Скопировано");
+      },
+      function (error) {
+        copyBtn.textContent = "⚠";
+        window.LogosToast.error(window.LogosErrorText("Не удалось скопировать", error));
+      },
+    ).then(function () {
+      clearTimeout(copyMarkTimer);
+      copyMarkTimer = setTimeout(function () {
+        copyBtn.textContent = "📋";
+      }, 1500);
+    });
   });
   actions.appendChild(copyBtn);
   msg.appendChild(actions);
@@ -473,7 +472,8 @@ function addMessage({
     usageBadge.className = "msg-meta-details";
     const usageSummary = document.createElement("summary");
     usageSummary.className = "msg-meta-summary";
-    usageSummary.textContent = `📊 Токены: ${usage.total_tokens || 0} (вход: ${usage.input_tokens || 0}, выход: ${usage.output_tokens || 0})`;
+    const digits = (value) => Number(value || 0).toLocaleString("ru-RU");
+    usageSummary.textContent = `📊 Токены: ${digits(usage.total_tokens)} (вход: ${digits(usage.input_tokens)}, выход: ${digits(usage.output_tokens)})`;
     const usageDetails = document.createElement("div");
     usageDetails.className = "msg-meta-detail-list";
     // The provider counts its hosted tools (web search, file search, code) in the total but not
@@ -489,7 +489,7 @@ function addMessage({
       ["🧠 Рассуждения:", usage.reasoning_tokens || 0],
     ].forEach(function (item) {
       const row = document.createElement("div");
-      row.textContent = item[0] + " " + item[1];
+      row.textContent = item[0] + " " + digits(item[1]);
       usageDetails.appendChild(row);
     });
     if (usage.incomplete_details) {
@@ -602,41 +602,31 @@ function addMessage({
         }
       }
 
-      const traceEl = document.createElement("details");
-      traceEl.className = "msg-meta-details msg-trace-details";
-      const summary = document.createElement("summary");
-      summary.className = "msg-meta-summary";
-      const traceId = traceObj.trace_id ? String(traceObj.trace_id).substring(0, 8) : "local";
-      const eventsCount = Array.isArray(traceObj.events) ? traceObj.events.length : 0;
-      summary.textContent = Array.isArray(traceObj.events)
-        ? `🔍 Трасса [${traceId}...] (${eventsCount} соб.)`
-        : `🔍 Трасса [${traceId}...]`;
-      traceEl.appendChild(summary);
-
-      // The Trace Viewer is a first-class chat action. Do not rely only on
-      // trace_viewer_bridge.js parsing the generated HTML after the fact.
-      traceEl.dataset.traceViewerDirect = "1";
+      // One entry opens the trace viewer; it names how many events the trace holds when the message has them.
       const openTraceBtn = document.createElement("button");
       openTraceBtn.type = "button";
       openTraceBtn.className = "logos-btn logos-trace-open-viewer";
-      const openTraceLabel = "🔍 Открыть трассу";
-      const traceSummaryText = summary.textContent;
+      const eventsCount = Array.isArray(traceObj.events) ? traceObj.events.length : 0;
+      const openTraceLabel = eventsCount
+        ? `🔍 Трассировка · ${eventsCount} ${russianPlural(eventsCount, "событие", "события", "событий")}`
+        : "🔍 Трассировка";
+      const openTraceTitle = "Открыть трассировку хода" + (traceObj.trace_id ? " " + traceObj.trace_id : "");
       openTraceBtn.textContent = openTraceLabel;
-      openTraceBtn.title = "Открыть Execution Trace viewer";
+      openTraceBtn.title = openTraceTitle;
 
       openTraceBtn.addEventListener("click", async function (event) {
         event.preventDefault();
         event.stopPropagation();
         if (typeof window.openTraceViewer !== "function") {
-          console.error("[CHAT] Execution Trace Viewer is not loaded");
-          window.LogosToast.error("Просмотр трассы не загрузился. Обновите страницу.");
+          console.error("[CHAT] Trace viewer is not loaded");
+          window.LogosToast.error("Просмотр трассировки не загрузился. Обновите страницу.");
           return;
         }
         // A stored message keeps only a reference to its trace; the full trace is read from the invocation.
         if (traceObj.storage === "invocation" && traceObj.invocation_id) {
           let loaded = null;
           openTraceBtn.disabled = true;
-          openTraceBtn.textContent = "🔍 Загружаем трассу…";
+          openTraceBtn.textContent = "🔍 Загружаем трассировку…";
           try {
             const res = await window.LogosDispatcher.request(
               `/api/invocations/${encodeURIComponent(traceObj.invocation_id)}/trace`,
@@ -652,36 +642,33 @@ function addMessage({
           } catch (err) {
             // The reason is named (a missing trace, the server, the connection), and the same button loads it again.
             const reason = err && err.status === 404
-              ? "трасса не найдена на сервере"
+              ? "трассировка не найдена на сервере"
               : err && err.status
-                ? "сервер не отдал трассу"
+                ? "сервер не отдал трассировку"
                 : err && err.name === "TimeoutError"
                   ? "сервер долго не отвечает"
                   : err && err.name === "SyntaxError"
                     ? "ответ сервера не удалось прочитать"
                     : "нет связи с сервером";
-            summary.textContent = "🔍 Трасса не загрузилась: " + reason;
-            openTraceBtn.textContent = "🔍 Повторить загрузку трассы";
-            window.LogosToast.error("Трасса не загрузилась: " + reason + ". Нажмите «Повторить загрузку трассы».");
+            openTraceBtn.textContent = "🔍 Трассировка не загрузилась: " + reason + ". Повторить";
+            window.LogosToast.error("Трассировка не загрузилась: " + reason + ". Нажмите на неё ещё раз.");
             console.error("[CHAT] Trace load failed:", err && (err.status || err.name), err && err.message);
           } finally {
             openTraceBtn.disabled = false;
           }
           if (loaded) {
-            summary.textContent = traceSummaryText;
             openTraceBtn.textContent = openTraceLabel;
             try {
               window.openTraceViewer(loaded);
             } catch (viewerError) {
               console.error("[CHAT] Trace viewer failed:", viewerError);
-              window.LogosToast.error("Трасса загружена, но просмотр не открылся. Обновите страницу и нажмите «Открыть трассу» снова.");
+              window.LogosToast.error("Трассировка загружена, но просмотр не открылся. Обновите страницу и откройте её снова.");
             }
           }
           return;
         }
         window.openTraceViewer(traceObj);
       });
-      metaWrap.appendChild(traceEl);
       metaWrap.appendChild(openTraceBtn);
     }
   }

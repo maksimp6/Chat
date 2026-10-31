@@ -7,7 +7,8 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  z-index: 10000;
+  /* Above every window, the trace viewer's included: a message about an action taken there must be seen. */
+  z-index: 300000;
   width: max-content;
   max-width: min(420px, calc(100vw - 32px));
   pointer-events: none;

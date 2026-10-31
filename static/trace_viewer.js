@@ -1,905 +1,1319 @@
-/* Logos Execution Trace viewer. Mobile master-detail with readable JSON depth control. */
+/* Logos trace viewer: one turn's execution trace (трассировка) — how the turn ended and what it cost, a timeline,
+   the list of what happened (model requests, tools, errors, events) and the details of each part. The whole viewer
+   scrolls, so nothing is cut off; on a phone the list and the details are two screens. */
 (function () {
   "use strict";
 
-  var state = {
-    trace: null,
-    items: null,
-    selected: null,
-    modal: null,
-    body: null,
-    nav: null,
-    list: null,
-    detail: null,
-    detailTitle: null,
-    listScrollTop: 0,
-    jsonDepth: 4,
+  var PHONE_QUERY = "(max-width: 820px)";
+  var JSON_DEPTHS = [1, 2, 3, 4, 5, 6, null];
+  var MARK_MS = 1600;
+
+  var EVENT_ICONS = {
+    request_initialized: "🚀",
+    turn_limits: "⚙️",
+    tools_grouped_by_category: "🧰",
+    tool_choice_grouped: "🧰",
+    provider_key_selected: "🔑",
+    ultra_profile_assembled: "⚙️",
+    api_request_manifest: "📝",
+    model_view: "👁",
+    pre_api_pipeline_completed: "⏱️",
+    api_request_registered: "📤",
+    api_request_sent: "📤",
+    api_response_received: "📡",
+    api_request_completed: "📥",
+    provider_output_observed: "📄",
+    tool_group_call: "🔧",
+    tool_executed: "🛠️",
+    tool_call_started: "🔧",
+    tool_call_finished: "🛠️",
+    provider_terminal_state: "🏁",
+    trace_finalized: "🏁",
+    request_started: "▶️",
+    request_completed: "✅",
+    error_occurred: "⚠️",
+    error: "⚠️",
   };
 
-  function el(tag, attrs, text) {
+  var RESPONSE_STATUS = {
+    completed: "готово",
+    failed: "сбой",
+    incomplete: "не завершён",
+    in_progress: "выполняется",
+    queued: "в очереди",
+    cancelled: "отменён",
+  };
+
+  var state = {
+    trace: null,
+    model: null,
+    selected: null,
+    modal: null,
+    content: null,
+    inspector: null,
+    detail: null,
+    detailBody: null,
+    detailTitle: null,
+    detailBack: null,
+    listScrollTop: 0,
+    jsonDepth: 4,
+    returnFocus: null,
+    media: null,
+  };
+
+  function el(tag, className, text) {
     var node = document.createElement(tag);
-    attrs = attrs || {};
-    Object.keys(attrs).forEach(function (key) {
-      if (key === "className") node.className = attrs[key];
-      else if (key === "title") node.title = attrs[key];
-      else if (key === "textContent") node.textContent = attrs[key];
-      else node.setAttribute(key, attrs[key]);
-    });
-    if (text !== undefined) node.textContent = text;
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
     return node;
   }
-  function fmtMs(value) {
-    var n = Number(value);
-    if (!Number.isFinite(n)) return "—";
-    return n < 1000 ? Math.round(n) + " ms" : (n / 1000).toFixed(n < 10000 ? 2 : 1) + " s";
+
+  function button(className, text, onClick, title) {
+    var node = el("button", "logos-btn " + className, text);
+    node.type = "button";
+    if (title) node.title = title;
+    if (onClick) node.addEventListener("click", onClick);
+    return node;
   }
-  function fmtNumber(value) {
-    var n = Number(value);
-    return Number.isFinite(n) ? n.toLocaleString("ru-RU") : "0";
+
+  // Number(null) is 0, so a missing value is rejected before the conversion.
+  function finite(value) {
+    if (value === null || value === undefined || value === "") return null;
+    var number = Number(value);
+    return Number.isFinite(number) ? number : null;
   }
-  function normalizeTrace(input) {
-    var t = input;
-    if (typeof input === "string") {
-      try {
-        t = JSON.parse(input);
-      } catch (_) {
-        return null;
-      }
-    }
-    return t && typeof t === "object" ? t : null;
-  }
+
   function objectsOf(list) {
-    return (list || []).filter(function (x) {
-      return x !== null && typeof x === "object";
-    });
+    return Array.isArray(list)
+      ? list.filter(function (x) {
+          return x !== null && typeof x === "object";
+        })
+      : [];
   }
+
+  function objectOf(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  }
+
+  function plural(n, one, few, many) {
+    var mod10 = n % 10;
+    var mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return one;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+    return many;
+  }
+
+  function fmtNumber(value) {
+    var n = finite(value);
+    return n === null ? "—" : n.toLocaleString("ru-RU");
+  }
+
+  function count(n, one, few, many) {
+    return fmtNumber(n) + " " + plural(Math.abs(Math.round(n)), one, few, many);
+  }
+
+  function fmtMs(value) {
+    var ms = finite(value);
+    if (ms === null) return "—";
+    return ms < 1000 ? Math.round(ms) + " мс" : (ms / 1000).toFixed(ms < 10000 ? 2 : 1) + " с";
+  }
+
+  // The time since the start of the turn, for the timeline and the list.
+  function fmtOffset(seconds) {
+    var s = finite(seconds);
+    return s === null ? "" : "+" + fmtMs(Math.max(0, s) * 1000);
+  }
+
+  function fmtClock(seconds) {
+    var s = finite(seconds);
+    return s === null ? "—" : new Date(s * 1000).toLocaleString("ru-RU");
+  }
+
+  function sinceStart(seconds) {
+    return state.model && state.model.start !== null && finite(seconds) !== null
+      ? fmtOffset(seconds - state.model.start)
+      : "";
+  }
+
   function getTimestamp(obj) {
     if (!obj || typeof obj !== "object") return null;
-    var c = [obj.timestamp, obj.end_timestamp, obj.created_at];
-    for (var i = 0; i < c.length; i++) {
-      var n = Number(c[i]);
-      if (Number.isFinite(n)) return n;
-      if (typeof c[i] === "string") {
-        var p = Date.parse(c[i]);
-        if (Number.isFinite(p)) return p / 1000;
+    var candidates = [obj.timestamp, obj.end_timestamp, obj.created_at];
+    for (var i = 0; i < candidates.length; i++) {
+      var n = finite(candidates[i]);
+      if (n !== null) return n;
+      if (typeof candidates[i] === "string") {
+        var parsed = Date.parse(candidates[i]);
+        if (Number.isFinite(parsed)) return parsed / 1000;
       }
     }
     return null;
   }
 
+  function normalizeTrace(input) {
+    var trace = input;
+    if (typeof input === "string") {
+      try {
+        trace = JSON.parse(input);
+      } catch (_) {
+        return null;
+      }
+    }
+    return trace && typeof trace === "object" && !Array.isArray(trace) ? trace : null;
+  }
+
+  // Tool arguments and results often arrive as JSON text; they are shown as JSON when they parse.
+  function parsedJson(value) {
+    if (typeof value !== "string") return value;
+    var text = value.trim();
+    if (!text || (text[0] !== "{" && text[0] !== "[")) return value;
+    try {
+      return JSON.parse(text);
+    } catch (_) {
+      return value;
+    }
+  }
+
   function limitJson(value, depth, level) {
-    if (depth === null) return value;
-    if (value === null || typeof value !== "object") return value;
-    if (level >= depth)
+    if (depth === null || value === null || typeof value !== "object") return value;
+    if (level >= depth) {
       return Array.isArray(value)
-        ? "… " + value.length + " items"
-        : "… " + Object.keys(value).length + " keys";
-    if (Array.isArray(value))
+        ? "… " + count(value.length, "элемент", "элемента", "элементов")
+        : "… " + count(Object.keys(value).length, "ключ", "ключа", "ключей");
+    }
+    if (Array.isArray(value)) {
       return value.map(function (v) {
         return limitJson(v, depth, level + 1);
       });
+    }
     var out = {};
-    Object.keys(value).forEach(function (k) {
-      out[k] = limitJson(value[k], depth, level + 1);
+    Object.keys(value).forEach(function (key) {
+      out[key] = limitJson(value[key], depth, level + 1);
     });
     return out;
   }
-  function jsonText(value) {
-    if (value === undefined) return "undefined";
+
+  function jsonText(value, depth) {
+    if (value === undefined) return "нет данных";
     if (typeof value === "string") return value;
     try {
-      return JSON.stringify(limitJson(value, state.jsonDepth, 0), null, 2);
+      return JSON.stringify(limitJson(value, depth, 0), null, 2);
     } catch (_) {
       return String(value);
     }
   }
 
-  function injectStyles() {
-    if (document.getElementById("logos-trace-viewer-style")) return;
-    var s = document.createElement("style");
-    s.id = "logos-trace-viewer-style";
-    s.textContent = `
-.logos-trace-modal{position:fixed;inset:0;z-index:200000;background:rgba(0,0,0,.62);backdrop-filter:blur(8px);display:flex;align-items:stretch;justify-content:center;padding:18px;box-sizing:border-box;overscroll-behavior:contain}
-.logos-trace-window{width:min(1500px,100%);height:100%;background:var(--bg-app);color:var(--text-main,#eee);border:1px solid var(--border-color,rgba(255,255,255,.12));border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.42);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.logos-trace-header{display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.1));background:rgba(127,127,127,.06);flex:0 0 auto}.logos-trace-title{font-weight:750;min-width:0}.logos-trace-sub{font:11px ui-monospace,monospace;opacity:.62;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.logos-trace-spacer{flex:1}.logos-trace-btn{border:1px solid var(--border-color,rgba(255,255,255,.14));background:rgba(127,127,127,.08);color:inherit;border-radius:8px;padding:7px 10px;cursor:pointer}.logos-trace-btn:hover{background:rgba(127,127,127,.16)}
-.logos-trace-metrics{display:flex;flex-wrap:wrap;gap:7px;padding:8px 12px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));font-size:11px;flex:0 0 auto}.logos-trace-metric{padding:5px 8px;border-radius:7px;background:rgba(127,127,127,.07);white-space:nowrap}.logos-trace-metric b{font-weight:700}
-.logos-trace-waterfall{padding:10px 12px 12px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;flex:0 0 auto}.logos-trace-waterfall-head{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:11px;font-weight:750;text-transform:uppercase;opacity:.72}.logos-trace-waterfall-sub{font-size:10px;font-weight:500;text-transform:none;white-space:nowrap}.logos-trace-timeline{min-width:520px}.logos-trace-axis-labels{display:grid;grid-template-columns:108px 1fr;align-items:end;margin-bottom:4px;font:10px ui-monospace,monospace;opacity:.5}.logos-trace-axis-values{display:flex;justify-content:space-between;padding:0 2px}.logos-trace-timeline-body{position:relative}.logos-trace-gridline{position:absolute;top:0;bottom:0;width:1px;background:rgba(127,127,127,.12);pointer-events:none}.logos-trace-timeline-row{display:grid;grid-template-columns:108px 1fr;min-height:27px;align-items:center}.logos-trace-row-label{padding-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;opacity:.72}.logos-trace-row-track{position:relative;height:27px;border-bottom:1px solid rgba(127,127,127,.06)}
-.logos-trace-bar{position:absolute;top:7px;height:13px;border-radius:5px;min-width:5px;background:var(--accent,#7aa2ff);opacity:.92;cursor:pointer}.logos-trace-bar.response{background:#a794ff}.logos-trace-bar.pipeline{opacity:.78;background-image:repeating-linear-gradient(135deg,transparent 0,transparent 4px,rgba(255,255,255,.16) 4px,rgba(255,255,255,.16) 6px)}.logos-trace-point{position:absolute;top:9px;width:9px;height:9px;border-radius:50%;background:var(--accent);border:1px solid var(--bg-app);transform:translateX(-50%);cursor:pointer}.logos-trace-point.response{background:#a794ff}
-.logos-trace-main{display:flex;min-height:0;flex:1 1 0%;position:relative}.logos-trace-nav{width:280px;min-width:220px;border-right:1px solid var(--border-color,rgba(255,255,255,.08));overflow:auto;padding:8px}.logos-trace-inspector{min-width:0;flex:1;overflow:auto;-webkit-overflow-scrolling:touch}.logos-trace-section-title{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.55;padding:7px 8px}
-.logos-trace-item{width:100%;box-sizing:border-box;text-align:left;border:0;background:transparent;color:inherit;padding:8px;border-radius:8px;cursor:pointer;display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:center}.logos-trace-item:hover,.logos-trace-item.active{background:rgba(127,127,127,.1)}.logos-trace-icon{width:18px;text-align:center}.logos-trace-item-main{min-width:0}.logos-trace-item-name{display:block;font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.logos-trace-item-meta{display:block;font-size:10px;opacity:.55;margin-top:2px}.logos-trace-item-time{font:10px ui-monospace,monospace;opacity:.55;white-space:nowrap;text-align:right}
-.logos-trace-mobile-tabs,.logos-trace-mobile-list,.logos-trace-mobile-detail{display:none}.logos-trace-inspector-inner{padding:14px 16px}.logos-trace-inspector-title{font-size:18px;font-weight:750;margin-bottom:3px}.logos-trace-inspector-sub{font-size:11px;opacity:.58;margin-bottom:12px}.logos-trace-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}.logos-trace-tab{border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 8px;font-size:11px;cursor:pointer}.logos-trace-tab.active{background:rgba(127,127,127,.12);font-weight:700}.logos-trace-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px}.logos-trace-card{padding:9px;border:1px solid var(--border-color,rgba(255,255,255,.08));border-radius:8px;background:rgba(127,127,127,.035)}.logos-trace-card-label{font-size:10px;opacity:.55}.logos-trace-card-value{font-size:13px;font-weight:700;margin-top:2px;word-break:break-word}.logos-trace-pre{margin:0;padding:12px;border-radius:9px;background:var(--bg-input);color:var(--text-main,#eee);border:1px solid var(--border-color,rgba(127,127,127,.18));font:11px/1.5 ui-monospace,monospace;white-space:pre;overflow:auto;max-width:100%;max-height:min(55vh,520px);max-height:min(55dvh,520px);text-align:left;tab-size:2;-webkit-overflow-scrolling:touch}.logos-trace-json-wrap{min-width:0;max-width:100%;overflow:hidden}.logos-trace-json-toolbar{display:flex;align-items:center;gap:7px;margin:0 0 8px}.logos-trace-json-label{font-size:11px;font-weight:700;opacity:.72}.logos-trace-depth{border:1px solid var(--border-color,rgba(127,127,127,.22));background:var(--bg-input);color:var(--text-main,#eee);border-radius:7px;padding:5px 7px;font-size:11px}.logos-trace-notice{padding:10px 12px;border-radius:8px;background:rgba(127,127,127,.06);font-size:12px;opacity:.75}
-.logos-trace-mobile-detail-head{display:none}
-@media(max-width:820px){
-.logos-trace-modal{padding:0;touch-action:auto}.logos-trace-window{border-radius:0}.logos-trace-nav{display:none}
-.logos-trace-mobile-tabs{display:flex;gap:5px;width:100%;box-sizing:border-box;padding:7px 8px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;flex:0 0 auto}.logos-trace-mobile-tabs.detail-active{display:none}
-.logos-trace-mobile-tab{flex:0 0 auto;border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer}.logos-trace-mobile-tab.active{background:rgba(127,127,127,.12);font-weight:700}
-.logos-trace-main{display:block;min-height:0;flex:1 1 0%;overflow:hidden;position:relative}.logos-trace-main .logos-trace-inspector{display:none}.logos-trace-mobile-list{display:block;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}.logos-trace-mobile-list .logos-trace-item{padding:10px 12px;border-radius:0;grid-template-columns:22px minmax(0,1fr) auto}.logos-trace-mobile-detail{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg-app);z-index:10;min-height:0}.logos-trace-mobile-detail.active{display:flex}.logos-trace-mobile-detail-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.1));flex:0 0 auto}.logos-trace-mobile-back{border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 9px;cursor:pointer}.logos-trace-mobile-detail-title{min-width:0;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.logos-trace-mobile-detail-content{flex:1 1 0%;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:0}.logos-trace-mobile-detail-content .logos-trace-inspector{display:block;overflow:visible;max-height:none}.logos-trace-mobile-detail-content .logos-trace-inspector-inner{padding:12px}.logos-trace-mobile-detail-content .logos-trace-pre{max-height:none;overflow:auto;white-space:pre;word-break:normal}.logos-trace-mobile-detail-content .logos-trace-json-wrap{overflow:visible}.logos-trace-mobile-detail-content .logos-trace-json-toolbar{position:sticky;top:0;background:var(--bg-app);padding:4px 0;z-index:2}.logos-trace-header{padding:9px;flex-wrap:wrap}.logos-trace-waterfall{padding-left:8px;padding-right:8px}.logos-trace-timeline{min-width:460px}
-}
-@media(max-width:600px){.logos-trace-title{font-size:13px}.logos-trace-sub{max-width:120px}.logos-trace-btn{padding:6px 8px}.logos-trace-metrics{gap:5px;padding:7px}.logos-trace-metric{font-size:10px;padding:4px 6px}.logos-trace-waterfall-head{align-items:flex-start;flex-direction:column;gap:3px}.logos-trace-timeline{min-width:430px}.logos-trace-axis-labels{grid-template-columns:88px 1fr}.logos-trace-timeline-row{grid-template-columns:88px 1fr}.logos-trace-row-label{font-size:9px}.logos-trace-pre{font-size:10px;line-height:1.45}.logos-trace-inspector-title{font-size:16px}}
-`;
-    document.head.appendChild(s);
+  function fullJson(value) {
+    if (typeof value === "string") return value;
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (_) {
+      return String(value);
+    }
   }
 
-  function buildItems(trace) {
-    var items = [];
-    objectsOf(trace.events).forEach(function (ev, i) {
-      var payload = ev.payload || {};
-      items.push({
-        kind: "event",
-        index: i,
-        id: "event-" + i,
-        name: ev.type || "event",
-        timestamp: getTimestamp(ev),
-        correlation_id: payload.correlation_id || null,
-        data: ev,
-      });
-    });
-    objectsOf(trace.tool_calls).forEach(function (t, i) {
-      var st = Number(t.start_timestamp),
-        en = Number(t.end_timestamp),
-        span = Number.isFinite(st) && Number.isFinite(en) && en >= st;
-      items.push({
-        kind: "tool",
-        index: i,
-        id: "tool-" + i,
-        name: t.name || "tool",
-        timestamp: span ? en : getTimestamp(t),
-        start: st,
-        end: en,
-        data: t,
-      });
-    });
-    objectsOf(trace.responses).forEach(function (r, i) {
-      var st = Number(r.start_timestamp),
-        en = Number(r.end_timestamp),
-        ts = getTimestamp(r);
-      if (!Number.isFinite(en)) en = ts;
-      items.push({
-        kind: "response",
-        index: i,
-        id: "response-" + i,
-        name: "Responses API #" + (r.step || i + 1),
-        timestamp: ts,
-        start: Number.isFinite(st) ? st : null,
-        end: Number.isFinite(en) ? en : null,
-        correlation_id: r.correlation_id || null,
-        data: r,
-      });
-    });
-    var preApi = trace.timings && trace.timings.pre_api_pipeline;
-    if (preApi) {
-      var pst = Number(preApi.start_timestamp),
-        pen = Number(preApi.end_timestamp);
-      if (Number.isFinite(pst) && Number.isFinite(pen) && pen >= pst) {
-        items.push({
-          kind: "pipeline",
-          index: -1,
-          id: "pre-api-pipeline",
-          name: "Pre-API Pipeline",
-          timestamp: pen,
-          start: pst,
-          end: pen,
-          data: preApi,
-        });
+  function errorMessage(error) {
+    var exception = objectOf(error && error.python_exception);
+    var text = error && (error.error || error.message || exception.exception_message || error.type);
+    return typeof text === "string" && text ? text : "Ошибка без описания";
+  }
+
+  // Responses with no start or end of their own take them from the request record or the completion event of
+  // the same step, as older traces store them; failing that, the step starts where the previous one ended.
+  function responseInterval(response, trace, events) {
+    var start = finite(response.start_timestamp);
+    var end = finite(response.end_timestamp);
+    if (start !== null && end !== null && end >= start) return { start: start, end: end };
+    var step = finite(response.step);
+    if (step !== null) {
+      var requests = objectsOf(trace.api_requests);
+      for (var i = requests.length - 1; i >= 0; i--) {
+        if (finite(requests[i].step) === step) {
+          start = finite(requests[i].timestamp);
+          break;
+        }
+      }
+      for (var j = events.length - 1; j >= 0; j--) {
+        var payload = objectOf(events[j].payload);
+        if (events[j].type !== "api_request_completed" || finite(payload.step) !== step) continue;
+        if (start === null) start = finite(payload.start_timestamp);
+        end = finite(payload.end_timestamp);
+        break;
       }
     }
-    items.sort(function (a, b) {
-      return (
-        (a.timestamp == null ? Infinity : a.timestamp) -
-        (b.timestamp == null ? Infinity : b.timestamp)
-      );
+    if (end === null) end = finite(response.timestamp);
+    return start !== null && end !== null && end >= start ? { start: start, end: end } : null;
+  }
+
+  function toolFailed(call) {
+    var result = call.result;
+    return (
+      Boolean(call.error) ||
+      Boolean(result && typeof result === "object" && (result.error || result.success === false))
+    );
+  }
+
+  function buildModel(trace) {
+    var events = objectsOf(trace.events);
+    var times = [];
+    function note(value) {
+      var n = finite(value);
+      if (n !== null) times.push(n);
+    }
+    note(trace.created_at);
+
+    var model = {
+      overview: { kind: "overview", id: "overview", timestamp: null },
+      pipeline: null,
+      errors: [],
+      responses: [],
+      tools: [],
+      events: [],
+      start: null,
+      end: null,
+    };
+
+    var pre = objectOf(trace.timings && trace.timings.pre_api_pipeline);
+    var preStart = finite(pre.start_timestamp);
+    var preEnd = finite(pre.end_timestamp);
+    if (preStart !== null && preEnd !== null && preEnd >= preStart) {
+      note(preStart);
+      note(preEnd);
+      model.pipeline = { kind: "pipeline", id: "pipeline", start: preStart, end: preEnd, timestamp: preStart, data: pre };
+    }
+
+    objectsOf(trace.errors).forEach(function (error, index) {
+      var ts = finite(error.timestamp);
+      note(ts);
+      model.errors.push({ kind: "error", id: "error-" + index, name: errorMessage(error), timestamp: ts, data: error });
     });
-    var prev = Number(trace.created_at);
-    if (!Number.isFinite(prev))
-      prev = items.length && Number.isFinite(items[0].timestamp) ? items[0].timestamp : null;
-    items
-      .filter(function (x) {
-        return x.kind === "response" && (!Number.isFinite(x.start) || !Number.isFinite(x.end));
-      })
-      .sort(function (a, b) {
-        return a.index - b.index;
-      })
-      .forEach(function (x) {
-        x.start = prev;
-        if (Number.isFinite(x.end) && Number.isFinite(prev) && x.end >= prev) prev = x.end;
+
+    var previousEnd = finite(trace.created_at);
+    objectsOf(trace.responses).forEach(function (response, index) {
+      var step = finite(response.step);
+      var span = responseInterval(response, trace, events);
+      var inferred = false;
+      if (!span) {
+        var end = finite(response.end_timestamp);
+        if (end === null) end = finite(response.timestamp);
+        if (end !== null && previousEnd !== null && end >= previousEnd) {
+          span = { start: previousEnd, end: end };
+          inferred = true;
+        }
+      }
+      if (span) {
+        note(span.start);
+        note(span.end);
+        previousEnd = span.end;
+      }
+      var raw = objectOf(response.raw);
+      model.responses.push({
+        kind: "response",
+        id: "response-" + index,
+        step: step === null ? index + 1 : step,
+        start: span ? span.start : null,
+        end: span ? span.end : null,
+        inferred: inferred,
+        timestamp: span ? span.start : finite(response.timestamp),
+        status: typeof raw.status === "string" ? raw.status : "",
+        correlationId: response.correlation_id || null,
+        data: response,
       });
-    return items;
-  }
-  function duration(trace) {
-    if (trace.timings && Number.isFinite(Number(trace.timings.total_duration_ms)))
-      return Number(trace.timings.total_duration_ms);
-    var st = Number(trace.created_at),
-      en = null;
-    (trace.events || []).forEach(function (e) {
-      var t = getTimestamp(e);
-      if (t !== null) en = en === null ? t : Math.max(en, t);
     });
-    return Number.isFinite(st) && en !== null ? Math.max(0, (en - st) * 1000) : null;
-  }
-  function collectUsage(trace) {
-    var r = { input: 0, output: 0, total: 0 };
-    (trace.responses || []).forEach(function (x) {
-      var u = x.raw && x.raw.usage;
-      if (!u) return;
-      r.input += Number(u.input_tokens || 0);
-      r.output += Number(u.output_tokens || 0);
-      r.total += Number(u.total_tokens || 0);
+
+    objectsOf(trace.tool_calls).forEach(function (call, index) {
+      var start = finite(call.start_timestamp);
+      var end = finite(call.end_timestamp);
+      var span = start !== null && end !== null && end >= start;
+      var ts = span ? start : getTimestamp(call);
+      if (span) {
+        note(start);
+        note(end);
+      } else {
+        note(ts);
+      }
+      model.tools.push({
+        kind: "tool",
+        id: "tool-" + index,
+        name: String(call.name || call.tool_name || "инструмент"),
+        start: span ? start : null,
+        end: span ? end : null,
+        timestamp: ts,
+        failed: toolFailed(call),
+        callId: call.call_id || null,
+        data: call,
+      });
     });
-    return r;
-  }
-  function renderMetricRow(trace) {
-    var row = el("div", { className: "logos-trace-metrics" }),
-      u = collectUsage(trace),
-      m = [
-        ["Duration", fmtMs(duration(trace))],
-        ["Events", objectsOf(trace.events).length],
-        ["Responses", objectsOf(trace.responses).length],
-        ["Tools", objectsOf(trace.tool_calls).length],
-        ["Tokens", fmtNumber(u.total)],
-        ["Cost", trace.billing && trace.billing.total_cost != null ? "≈ " + trace.billing.total_cost + " ₽" : "—"],
-        ["Status", (trace.errors || []).length ? "⚠ " + trace.errors.length : "● completed"],
-      ];
-    m.forEach(function (x) {
-      var c = el("div", { className: "logos-trace-metric" });
-      c.appendChild(document.createTextNode(x[0] + ": "));
-      c.appendChild(el("b", {}, String(x[1])));
-      row.appendChild(c);
+
+    events.forEach(function (event, index) {
+      var ts = getTimestamp(event);
+      note(ts);
+      var payload = objectOf(event.payload);
+      var type = typeof event.type === "string" && event.type ? event.type : "событие";
+      model.events.push({
+        kind: "event",
+        id: "event-" + index,
+        name: type,
+        timestamp: ts,
+        isError: /error|fail/i.test(type),
+        correlationId: payload.correlation_id || null,
+        callId: payload.call_id || null,
+        data: event,
+      });
     });
+
+    if (times.length) {
+      model.start = Math.min.apply(Math, times);
+      model.end = Math.max.apply(Math, times);
+    }
+    return model;
+  }
+
+  function usageOf(model) {
+    var usage = { found: false, input: 0, output: 0, total: 0, cached: 0, reasoning: 0 };
+    model.responses.forEach(function (item) {
+      var u = objectOf(objectOf(item.data.raw).usage);
+      if (!Object.keys(u).length) return;
+      usage.found = true;
+      usage.input += finite(u.input_tokens) || 0;
+      usage.output += finite(u.output_tokens) || 0;
+      usage.total += finite(u.total_tokens) || 0;
+      usage.cached += finite(objectOf(u.input_tokens_details).cached_tokens) || 0;
+      usage.reasoning += finite(objectOf(u.output_tokens_details).reasoning_tokens) || 0;
+    });
+    return usage;
+  }
+
+  function durationMs(trace, model) {
+    var total = finite(objectOf(trace.timings).total_duration_ms);
+    if (total !== null) return total;
+    return model.start !== null && model.end !== null ? (model.end - model.start) * 1000 : null;
+  }
+
+  // How the turn ended: the server's own final record decides; older traces fall back to the last model answer.
+  function outcome(trace, model) {
+    var terminal = null;
+    model.events.forEach(function (item) {
+      if (item.name === "provider_terminal_state") terminal = objectOf(item.data.payload);
+    });
+    var status = terminal ? terminal.invocation_status : null;
+    if (status === "completed") return { mark: "✓", text: "Ход завершён", kind: "ok" };
+    if (status === "failed") return { mark: "✕", text: "Ход завершился сбоем", kind: "error" };
+    var last = model.responses.length ? model.responses[model.responses.length - 1].status : "";
+    if (last === "completed") return { mark: "✓", text: "Ход завершён", kind: "ok" };
+    if (last === "failed") return { mark: "✕", text: "Ход завершился сбоем", kind: "error" };
+    if (last === "incomplete") return { mark: "◐", text: "Ответ модели не завершён", kind: "warn" };
+    if (model.errors.length) return { mark: "✕", text: "Ход завершился сбоем", kind: "error" };
+    if (finite(objectOf(trace.timings).total_duration_ms) !== null) {
+      return { mark: "•", text: "Ход завершён без ответа модели", kind: "warn" };
+    }
+    return { mark: "…", text: "Ход не завершён", kind: "warn" };
+  }
+
+  function costText(trace) {
+    var billing = objectOf(trace.billing);
+    var amount = finite(billing.total_cost);
+    if (amount === null) return null;
+    var currency = !billing.currency || billing.currency === "RUB" ? "₽" : String(billing.currency);
+    return "≈ " + amount.toFixed(2) + " " + currency;
+  }
+
+  function modelName(trace, model) {
+    for (var i = model.responses.length - 1; i >= 0; i--) {
+      var name = objectOf(model.responses[i].data.raw).model;
+      if (typeof name === "string" && name) return name;
+    }
+    var requests = objectsOf(trace.api_requests);
+    for (var j = requests.length - 1; j >= 0; j--) {
+      var requested = objectOf(requests[j].payload).model;
+      if (typeof requested === "string" && requested) return requested;
+    }
+    var asked = objectOf(trace.request).model;
+    return typeof asked === "string" ? asked : "";
+  }
+
+  function statusText(status) {
+    return RESPONSE_STATUS[status] || status || "";
+  }
+
+  function iconOf(item) {
+    if (item.kind === "overview") return "📋";
+    if (item.kind === "pipeline") return "⏱️";
+    if (item.kind === "error") return "⚠️";
+    if (item.kind === "response") return "🤖";
+    if (item.kind === "tool") return item.failed ? "❌" : "🔧";
+    return EVENT_ICONS[item.name] || "•";
+  }
+
+  function labelOf(item) {
+    if (item.kind === "overview") return "Обзор хода";
+    if (item.kind === "pipeline") return "Подготовка запроса";
+    if (item.kind === "response") return "Модель · шаг " + item.step;
+    return item.name;
+  }
+
+  function metaOf(item) {
+    var parts = [];
+    if (item.kind === "overview") {
+      parts.push(outcome(state.trace, state.model).text);
+    } else if (item.kind === "error") {
+      if (item.data.source) parts.push(String(item.data.source));
+      parts.push(sinceStart(item.timestamp));
+    } else if (item.kind === "event") {
+      parts.push(sinceStart(item.timestamp));
+    } else {
+      parts.push(sinceStart(item.start !== null ? item.start : item.timestamp));
+      if (item.start !== null && item.end !== null) parts.push(fmtMs((item.end - item.start) * 1000));
+      if (item.kind === "response") parts.push(statusText(item.status));
+      if (item.kind === "tool") parts.push(item.failed ? "ошибка" : "готово");
+    }
+    return parts.filter(Boolean).join(" · ");
+  }
+
+  function isFailure(item) {
+    return (
+      item.kind === "error" ||
+      (item.kind === "tool" && item.failed) ||
+      (item.kind === "event" && item.isError) ||
+      (item.kind === "response" && item.status !== "" && item.status !== "completed")
+    );
+  }
+
+  // The result of a copy shows on the button that asked for it.
+  function copyButton(className, label, title, valueOf) {
+    var timer = null;
+    var node = button(className, label, null, title);
+    node.addEventListener("click", function () {
+      window.LogosClipboard.copy(valueOf()).then(
+        function () {
+          node.textContent = "Скопировано";
+        },
+        function () {
+          node.textContent = "Не скопировано";
+        },
+      ).then(function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          node.textContent = label;
+        }, MARK_MS);
+      });
+    });
+    return node;
+  }
+
+  function injectStyles() {
+    if (document.getElementById("logos-trace-viewer-style")) return;
+    var style = document.createElement("style");
+    style.id = "logos-trace-viewer-style";
+    style.textContent = `
+.logos-trace-modal{position:fixed;inset:0;z-index:200000;display:flex;justify-content:center;align-items:stretch;padding:16px;box-sizing:border-box;background:rgba(0,0,0,.55);overscroll-behavior:contain}
+.logos-trace-modal *{box-sizing:border-box}
+.logos-trace-window{position:relative;display:flex;flex-direction:column;width:min(1400px,100%);height:100%;overflow:hidden;background:var(--bg-app);color:var(--text-main);border:1px solid var(--border-color);border-radius:14px;box-shadow:0 24px 80px rgba(0,0,0,.4);font-size:14px;line-height:1.45}
+.logos-trace-header{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border-color)}
+.logos-trace-heading{flex:1 1 auto;min-width:0}
+.logos-trace-title{font-size:16px;font-weight:700}
+.logos-trace-sub{font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logos-trace-actions{flex:0 1 auto;display:flex;gap:6px;min-width:0;overflow-x:auto}
+.logos-trace-btn{flex:0 0 auto;min-height:36px;padding:0 12px;border:1px solid var(--border-color);border-radius:8px;background:var(--btn-bg);color:var(--text-main);font:inherit;font-size:13px;line-height:1;white-space:nowrap;cursor:pointer}
+.logos-trace-btn:hover{background:var(--bg-hover)}
+.logos-trace-btn:disabled{opacity:.6;cursor:default}
+.logos-trace-close{min-width:36px;padding:0;font-size:16px}
+.logos-trace-content{flex:1 1 0%;min-height:0;display:flex;flex-direction:column}
+.logos-trace-metrics{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border-color)}
+.logos-trace-chip{display:inline-flex;align-items:center;min-height:26px;padding:3px 9px;border:0;border-radius:13px;background:var(--chip-bg);color:var(--text-main);font:inherit;font-size:12px;line-height:1.2;white-space:nowrap}
+.logos-trace-chip-ok{color:var(--success-text)}
+.logos-trace-chip-error{color:var(--danger-text)}
+button.logos-trace-chip{cursor:pointer}
+.logos-trace-timeline-box{flex:0 0 auto;border-bottom:1px solid var(--border-color)}
+.logos-trace-timeline-summary{padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer}
+.logos-trace-timeline-scroll{max-height:32vh;overflow:auto;padding:0 12px 8px}
+.logos-trace-timeline{min-width:480px}
+.logos-trace-row{display:grid;grid-template-columns:150px minmax(0,1fr);align-items:center;min-height:22px}
+.logos-trace-row-label{padding-right:8px;font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logos-trace-axis-track{position:relative;height:16px;font:10px/16px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-secondary)}
+.logos-trace-axis-tick{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.logos-trace-axis-tick:first-child{transform:none}
+.logos-trace-axis-tick:last-child{transform:translateX(-100%)}
+.logos-trace-track{position:relative;height:22px;border-bottom:1px solid var(--border-color)}
+.logos-trace-grid{position:absolute;top:0;bottom:0;width:1px;background:var(--border-color)}
+.logos-trace-bar{position:absolute;top:5px;height:12px;min-width:3px;border-radius:4px;background:var(--accent);cursor:pointer}
+.logos-trace-bar.response{background:#8f7cf0}
+.logos-trace-bar.pipeline{background:var(--text-secondary)}
+.logos-trace-bar.failed{background:var(--danger)}
+.logos-trace-bar.inferred{opacity:.55}
+.logos-trace-dot{position:absolute;top:6px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--accent);cursor:pointer}
+.logos-trace-dot.failed{background:var(--danger)}
+.logos-trace-tick{position:absolute;top:4px;width:2px;height:14px;margin-left:-1px;background:var(--text-secondary);cursor:pointer}
+.logos-trace-tick.error{top:6px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--danger)}
+.logos-trace-main{flex:1 1 0%;min-height:0;display:grid;grid-template-columns:minmax(240px,320px) minmax(0,1fr)}
+.logos-trace-nav{min-height:0;overflow:auto;padding:6px;border-right:1px solid var(--border-color)}
+.logos-trace-section-title{padding:10px 8px 4px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-secondary)}
+.logos-trace-item{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:6px 8px;border:0;border-radius:8px;background:transparent;color:var(--text-main);font:inherit;text-align:left;cursor:pointer}
+.logos-trace-item:hover{background:var(--bg-hover)}
+.logos-trace-item.active{background:var(--accent-soft)}
+.logos-trace-item.is-failure .logos-trace-item-name{color:var(--danger-text)}
+.logos-trace-item-icon{flex:0 0 22px;text-align:center}
+.logos-trace-item-main{flex:1 1 auto;min-width:0}
+.logos-trace-item-name{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logos-trace-item-meta{display:block;margin-top:1px;font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logos-trace-inspector{min-height:0;min-width:0;overflow:auto}
+.logos-trace-inspector-inner{padding:14px 16px 24px}
+.logos-trace-inspector-title{margin:0 0 2px;font-size:17px;font-weight:700;overflow-wrap:anywhere}
+.logos-trace-inspector-sub{margin-bottom:10px;font-size:12px;color:var(--text-secondary)}
+.logos-trace-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.logos-trace-tab{min-height:34px;padding:0 10px;border:1px solid var(--border-color);border-radius:8px;background:transparent;color:var(--text-main);font:inherit;font-size:12px;cursor:pointer}
+.logos-trace-tab.active{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
+.logos-trace-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+.logos-trace-card{min-width:0;padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-sidebar)}
+.logos-trace-card-label{font-size:11px;color:var(--text-secondary)}
+.logos-trace-card-value{margin-top:2px;font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.logos-trace-block-title{margin:16px 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-secondary)}
+.logos-trace-notice{margin:0 0 10px;padding:9px 11px;border-radius:8px;background:var(--chip-bg);font-size:13px;overflow-wrap:anywhere}
+.logos-trace-notice.error{color:var(--danger-text)}
+.logos-trace-text{margin:0 0 10px;padding:10px 12px;max-height:60vh;overflow:auto;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-sidebar);font-size:14px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.logos-trace-error-card{display:block;width:100%;margin:0 0 8px;padding:9px 11px;border:1px solid var(--danger);border-radius:8px;background:transparent;color:var(--text-main);font:inherit;text-align:left}
+button.logos-trace-error-card{cursor:pointer}
+.logos-trace-error-message{font-size:13px;font-weight:600;color:var(--danger-text);overflow-wrap:anywhere}
+.logos-trace-error-meta{margin-top:3px;font-size:11px;color:var(--text-secondary);overflow-wrap:anywhere}
+.logos-trace-json{min-width:0;margin:0 0 12px}
+.logos-trace-json-bar{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;color:var(--text-secondary)}
+.logos-trace-depth{margin-left:4px;min-height:32px;padding:0 6px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-input);color:var(--text-main);font:inherit;font-size:12px}
+.logos-trace-pre{margin:0;padding:10px 12px;max-height:60vh;overflow:auto;border:1px solid var(--code-border);border-radius:8px;background:var(--code-bg);color:var(--text-main);font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;tab-size:2}
+.logos-trace-related{display:flex;flex-wrap:wrap;gap:6px}
+.logos-trace-detail{display:none}
+@media (max-width:820px){
+.logos-trace-modal{padding:0}
+.logos-trace-window{border:0;border-radius:0}
+.logos-trace-header{flex-wrap:wrap;gap:6px;padding:8px 10px}
+.logos-trace-close{order:2}
+.logos-trace-actions{order:3;flex:1 1 100%}
+.logos-trace-content{display:block;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.logos-trace-timeline-scroll{max-height:none;overflow-x:auto;overflow-y:visible}
+.logos-trace-timeline{min-width:440px}
+.logos-trace-row{grid-template-columns:104px minmax(0,1fr)}
+.logos-trace-main{display:block}
+.logos-trace-nav{overflow:visible;padding:4px 6px 16px;border-right:0}
+.logos-trace-main>.logos-trace-inspector{display:none}
+.logos-trace-detail{position:absolute;inset:0;z-index:2;display:none;flex-direction:column;background:var(--bg-app)}
+.logos-trace-detail.active{display:flex}
+.logos-trace-detail-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border-color)}
+.logos-trace-detail-title{min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logos-trace-detail-body{flex:1 1 0%;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.logos-trace-inspector-inner{padding:12px 12px 24px}
+.logos-trace-pre,.logos-trace-text{max-height:none}
+}
+`;
+    document.head.appendChild(style);
+  }
+
+  function renderHeader(trace) {
+    var header = el("div", "logos-trace-header");
+    var heading = el("div", "logos-trace-heading");
+    heading.appendChild(el("div", "logos-trace-title", "Трассировка"));
+    var id = trace.trace_id ? String(trace.trace_id) : "";
+    var sub = el("div", "logos-trace-sub", id || "без идентификатора");
+    if (id) sub.title = id;
+    heading.appendChild(sub);
+    header.appendChild(heading);
+    // trace_download.js adds its download and upload buttons to this row.
+    var actions = el("div", "logos-trace-actions");
+    actions.appendChild(
+      copyButton("logos-trace-btn logos-trace-copy", "Копировать JSON", "Скопировать всю трассировку в JSON", function () {
+        return fullJson(trace);
+      }),
+    );
+    header.appendChild(actions);
+    var close = button("logos-trace-btn logos-trace-close", "✕", closeViewer, "Закрыть");
+    close.setAttribute("aria-label", "Закрыть трассировку");
+    header.appendChild(close);
+    return header;
+  }
+
+  function renderMetrics(trace, model) {
+    var row = el("div", "logos-trace-metrics");
+    var result = outcome(trace, model);
+    row.appendChild(el("span", "logos-trace-chip logos-trace-chip-" + result.kind, result.mark + " " + result.text));
+    var duration = durationMs(trace, model);
+    if (duration !== null) row.appendChild(el("span", "logos-trace-chip", "⏱️ " + fmtMs(duration)));
+    row.appendChild(
+      el("span", "logos-trace-chip", count(model.responses.length, "запрос к модели", "запроса к модели", "запросов к модели")),
+    );
+    row.appendChild(el("span", "logos-trace-chip", count(model.tools.length, "инструмент", "инструмента", "инструментов")));
+    row.appendChild(el("span", "logos-trace-chip", count(model.events.length, "событие", "события", "событий")));
+    var usage = usageOf(model);
+    if (usage.found) row.appendChild(el("span", "logos-trace-chip", count(usage.total, "токен", "токена", "токенов")));
+    var cost = costText(trace);
+    if (cost) row.appendChild(el("span", "logos-trace-chip", cost));
+    if (model.errors.length) {
+      row.appendChild(
+        button(
+          "logos-trace-chip logos-trace-chip-error",
+          "⚠️ " + count(model.errors.length, "ошибка", "ошибки", "ошибок"),
+          function () {
+            selectItem(model.errors[0]);
+          },
+          "Показать первую ошибку",
+        ),
+      );
+    }
     return row;
   }
 
-  function renderWaterfall(trace, items) {
-    var wrap = el("div", { className: "logos-trace-waterfall" }),
-      head = el("div", { className: "logos-trace-waterfall-head" });
-    head.appendChild(el("span", {}, "Waterfall"));
-    head.appendChild(
-      el(
-        "span",
-        { className: "logos-trace-waterfall-sub" },
-        "pipeline = real interval · tools = real start/end · Responses = real request/response interval · events = instant",
-      ),
-    );
-    wrap.appendChild(head);
-    var timed = items.filter(function (x) {
-      return Number.isFinite(x.timestamp) || (Number.isFinite(x.start) && Number.isFinite(x.end));
-    });
-    if (!timed.length) {
-      wrap.appendChild(
-        el("div", { className: "logos-trace-notice" }, "Trace не содержит временных событий."),
-      );
-      return wrap;
+  function renderTimeline(model) {
+    var box = el("details", "logos-trace-timeline-box");
+    box.open = true;
+    box.appendChild(el("summary", "logos-trace-timeline-summary", "Шкала времени"));
+    var scroll = el("div", "logos-trace-timeline-scroll");
+    box.appendChild(scroll);
+    if (model.start === null || model.end === null) {
+      scroll.appendChild(el("div", "logos-trace-notice", "В трассировке нет отметок времени."));
+      return box;
     }
-    var times = [];
-    timed.forEach(function (x) {
-      if (Number.isFinite(x.start)) times.push(x.start);
-      if (Number.isFinite(x.end)) times.push(x.end);
-      if (Number.isFinite(x.timestamp)) times.push(x.timestamp);
-    });
-    if (Number.isFinite(Number(trace.created_at))) times.push(Number(trace.created_at));
-    var min = Math.min.apply(Math, times),
-      max = Math.max.apply(Math, times),
-      span = Math.max(0.001, max - min),
-      tl = el("div", { className: "logos-trace-timeline" }),
-      axis = el("div", { className: "logos-trace-axis-labels" });
-    axis.appendChild(el("div", {}, ""));
-    var av = el("div", { className: "logos-trace-axis-values" });
+    var span = Math.max(0.001, model.end - model.start);
+    function pct(t) {
+      return Math.max(0, Math.min(100, ((t - model.start) / span) * 100));
+    }
+    function track() {
+      var node = el("div", "logos-trace-track");
+      [25, 50, 75].forEach(function (p) {
+        var line = el("span", "logos-trace-grid");
+        line.style.left = p + "%";
+        node.appendChild(line);
+      });
+      return node;
+    }
+    function mark(className, item, title, left, width) {
+      var node = el("div", className);
+      node.title = title;
+      node.style.left = left + "%";
+      if (width !== undefined) node.style.width = width + "%";
+      node.addEventListener("click", function () {
+        selectItem(item);
+      });
+      return node;
+    }
+
+    var timeline = el("div", "logos-trace-timeline");
+    var axis = el("div", "logos-trace-row");
+    axis.appendChild(el("div", "logos-trace-row-label"));
+    var axisTrack = el("div", "logos-trace-axis-track");
     [0, 0.25, 0.5, 0.75, 1].forEach(function (p) {
-      av.appendChild(el("span", {}, fmtMs(p * span * 1000)));
+      var tick = el("span", "logos-trace-axis-tick", fmtMs(p * span * 1000));
+      tick.style.left = p * 100 + "%";
+      axisTrack.appendChild(tick);
     });
-    axis.appendChild(av);
-    tl.appendChild(axis);
-    var body = el("div", { className: "logos-trace-timeline-body" });
-    [0, 0.25, 0.5, 0.75, 1].forEach(function (p) {
-      var l = el("div", { className: "logos-trace-gridline" });
-      l.style.left = "calc(108px + (100% - 108px) * " + p + ")";
-      body.appendChild(l);
-    });
-    function row(label, it, st, en, inferred) {
-      var r = el("div", { className: "logos-trace-timeline-row" });
-      r.appendChild(el("div", { className: "logos-trace-row-label", title: label }, label));
-      var tr = el("div", { className: "logos-trace-row-track" });
-      if (Number.isFinite(st) && Number.isFinite(en) && en >= st) {
-        var left = Math.max(0, Math.min(100, ((st - min) / span) * 100)),
-          w = Math.max(0.9, Math.min(100 - left, ((en - st) / span) * 100)),
-          b = el("div", {
-            className: "logos-trace-bar " + it.kind + (inferred ? " inferred" : ""),
-            title:
-              it.name + " · " + fmtMs((en - st) * 1000) + (inferred ? " · start inferred" : ""),
-          });
-        b.style.left = left + "%";
-        b.style.width = w + "%";
-        b.onclick = function () {
-          selectItem(it);
-        };
-        tr.appendChild(b);
-      } else if (Number.isFinite(it.timestamp)) {
-        var p = el("div", {
-          className: "logos-trace-point " + it.kind,
-          title: it.name + " · instant",
-        });
-        p.style.left = Math.max(0, Math.min(100, ((it.timestamp - min) / span) * 100)) + "%";
-        p.onclick = function () {
-          selectItem(it);
-        };
-        tr.appendChild(p);
+    axis.appendChild(axisTrack);
+    timeline.appendChild(axis);
+
+    function spanRow(item) {
+      var label = labelOf(item);
+      var row = el("div", "logos-trace-row");
+      var name = el("div", "logos-trace-row-label", label);
+      name.title = label;
+      row.appendChild(name);
+      var lane = track();
+      var kind = item.kind + (isFailure(item) ? " failed" : "");
+      if (item.start !== null && item.end !== null) {
+        var left = pct(item.start);
+        lane.appendChild(
+          mark(
+            "logos-trace-bar " + kind + (item.inferred ? " inferred" : ""),
+            item,
+            label + " · " + fmtMs((item.end - item.start) * 1000) + (item.inferred ? " · начало вычислено" : ""),
+            left,
+            Math.max(0.6, pct(item.end) - left),
+          ),
+        );
+      } else if (item.timestamp !== null) {
+        lane.appendChild(mark("logos-trace-dot " + kind, item, label + " · " + sinceStart(item.timestamp), pct(item.timestamp)));
       }
-      r.appendChild(tr);
-      body.appendChild(r);
+      row.appendChild(lane);
+      timeline.appendChild(row);
     }
-    timed
-      .filter(function (x) {
-        return x.kind === "pipeline";
+
+    if (model.pipeline) spanRow(model.pipeline);
+    // Model requests and tools in the order they ran.
+    model.responses
+      .concat(model.tools)
+      .filter(function (item) {
+        return item.timestamp !== null;
       })
-      .forEach(function (x) {
-        row("⏱️ " + x.name, x, x.start, x.end, false);
-      });
-    timed
-      .filter(function (x) {
-        return x.kind === "tool";
+      .sort(function (a, b) {
+        return a.timestamp - b.timestamp;
       })
-      .forEach(function (x) {
-        row("🔧 " + x.name, x, x.start, x.end, false);
-      });
-    timed
-      .filter(function (x) {
-        return x.kind === "response";
-      })
-      .forEach(function (x) {
-        row("🤖 " + x.name, x, x.start, x.end, false);
-      });
-    timed
-      .filter(function (x) {
-        return x.kind === "event";
-      })
-      .forEach(function (x) {
-        row(eventIcon(x.data.type) + " " + x.name, x, null, null, false);
-      });
-    tl.appendChild(body);
-    wrap.appendChild(tl);
-    return wrap;
+      .forEach(spanRow);
+
+    // Every instant event on one lane; errors stand out.
+    var events = el("div", "logos-trace-row");
+    events.appendChild(el("div", "logos-trace-row-label", "События"));
+    var eventLane = track();
+    model.events.forEach(function (item) {
+      if (item.timestamp === null) return;
+      eventLane.appendChild(
+        mark("logos-trace-tick" + (item.isError ? " error" : ""), item, item.name + " · " + sinceStart(item.timestamp), pct(item.timestamp)),
+      );
+    });
+    events.appendChild(eventLane);
+    timeline.appendChild(events);
+    scroll.appendChild(timeline);
+    return box;
   }
 
-  function eventIcon(type) {
-    var icons = {
-      request_initialized: "🚀",
-      api_request_registered: "📤",
-      api_response_received: "📡",
-      pre_api_pipeline_completed: "⏱️",
-      tool_executed: "⚙️",
-      trace_finalized: "🏁",
-      request_started: "▶️",
-      request_completed: "✅",
-      error: "❌",
-      tool_call_started: "🔧",
-      tool_call_finished: "🛠️",
-    };
-    return icons[type] || "•";
-  }
-  function icon(x) {
-    return x.kind === "pipeline"
-      ? "⏱️"
-      : x.kind === "tool"
-        ? "🔧"
-        : x.kind === "response"
-          ? "🤖"
-          : eventIcon(x.data && x.data.type);
-  }
-  function meta(x) {
-    return (x.kind === "tool" || x.kind === "response" || x.kind === "pipeline") &&
-      Number.isFinite(x.start) &&
-      Number.isFinite(x.end)
-      ? fmtMs((x.end - x.start) * 1000)
-      : "instant";
-  }
-  function makeItemButton(item) {
-    var b = el("button", { type: "button", className: "logos-btn logos-trace-item" });
-    b.appendChild(el("span", { className: "logos-trace-icon" }, icon(item)));
-    var m = el("span", { className: "logos-trace-item-main" });
-    m.appendChild(el("span", { className: "logos-trace-item-name" }, item.name));
-    m.appendChild(el("span", { className: "logos-trace-item-meta" }, meta(item)));
-    b.appendChild(m);
-    b.appendChild(
-      el(
-        "span",
-        { className: "logos-trace-item-time" },
-        Number.isFinite(item.timestamp)
-          ? new Date(item.timestamp * 1000).toLocaleTimeString("ru-RU")
-          : "",
-      ),
-    );
-    b.onclick = function () {
+  function itemButton(item) {
+    var node = button("logos-trace-item" + (isFailure(item) ? " is-failure" : ""), null, function () {
       selectItem(item);
-    };
-    return b;
+    });
+    node.appendChild(el("span", "logos-trace-item-icon", iconOf(item)));
+    var main = el("span", "logos-trace-item-main");
+    main.appendChild(el("span", "logos-trace-item-name", labelOf(item)));
+    var meta = metaOf(item);
+    if (meta) main.appendChild(el("span", "logos-trace-item-meta", meta));
+    node.appendChild(main);
+    item.button = node;
+    return node;
   }
-  function renderMobileTabs(items) {
-    var nav = el("div", { className: "logos-trace-mobile-tabs" });
+
+  function renderNav(model) {
+    var nav = el("div", "logos-trace-nav");
+    nav.setAttribute("aria-label", "Состав хода");
+    nav.appendChild(itemButton(model.overview));
+    if (model.pipeline) nav.appendChild(itemButton(model.pipeline));
     [
-      ["All", items],
-      [
-        "Tools",
-        items.filter(function (x) {
-          return x.kind === "tool";
-        }),
-      ],
-      [
-        "Responses",
-        items.filter(function (x) {
-          return x.kind === "response";
-        }),
-      ],
-      [
-        "Events",
-        items.filter(function (x) {
-          return x.kind === "event";
-        }),
-      ],
-    ].forEach(function (pair, i) {
-      var b = el(
-        "button",
-        { type: "button", className: "logos-btn logos-trace-mobile-tab" },
-        pair[0],
-      );
-      if (i === 0) b.classList.add("active");
-      b.onclick = function () {
-        nav.querySelectorAll(".logos-trace-mobile-tab").forEach(function (x) {
-          x.classList.remove("active");
-        });
-        b.classList.add("active");
-        renderMobileList(pair[1]);
-      };
-      nav.appendChild(b);
+      ["Ошибки", model.errors],
+      ["Запросы к модели", model.responses],
+      ["Инструменты", model.tools],
+      ["События", model.events],
+    ].forEach(function (section) {
+      if (!section[1].length) return;
+      nav.appendChild(el("div", "logos-trace-section-title", section[0] + " · " + section[1].length));
+      section[1].forEach(function (item) {
+        nav.appendChild(itemButton(item));
+      });
     });
     return nav;
   }
-  function renderMobileList(items) {
-    if (!state.list) return;
-    state.list.textContent = "";
-    if (!items.length) {
-      state.list.appendChild(
-        el("div", { className: "logos-trace-notice" }, "Нет элементов в этом фильтре."),
-      );
-      return;
-    }
-    items.forEach(function (x) {
-      var b = makeItemButton(x);
-      x._mobileButton = b;
-      state.list.appendChild(b);
+
+  function cards(content, pairs) {
+    var grid = el("div", "logos-trace-cards");
+    pairs.forEach(function (pair) {
+      if (pair[1] === null || pair[1] === undefined || pair[1] === "") return;
+      var card = el("div", "logos-trace-card");
+      card.appendChild(el("div", "logos-trace-card-label", pair[0]));
+      card.appendChild(el("div", "logos-trace-card-value", pair[1]));
+      grid.appendChild(card);
     });
+    if (grid.children.length) content.appendChild(grid);
   }
-  function renderSidebar(items) {
-    var side = el("div", { className: "logos-trace-nav" });
-    side.appendChild(el("div", { className: "logos-trace-section-title" }, "EVENTS / TRACE"));
-    items.forEach(function (x) {
-      var b = makeItemButton(x);
-      x._button = b;
-      side.appendChild(b);
+
+  function notice(content, text, isError) {
+    content.appendChild(el("div", "logos-trace-notice" + (isError ? " error" : ""), text));
+  }
+
+  function blockTitle(content, text) {
+    content.appendChild(el("div", "logos-trace-block-title", text));
+  }
+
+  function jsonBlock(content, value, rerender) {
+    var wrap = el("div", "logos-trace-json");
+    var bar = el("div", "logos-trace-json-bar");
+    var label = el("label", "", "Глубина");
+    var select = el("select", "logos-trace-depth");
+    JSON_DEPTHS.forEach(function (depth) {
+      var option = el("option", "", depth === null ? "вся" : String(depth));
+      option.value = depth === null ? "all" : String(depth);
+      option.selected = depth === state.jsonDepth;
+      select.appendChild(option);
     });
-    return side;
+    select.addEventListener("change", function () {
+      state.jsonDepth = select.value === "all" ? null : Number(select.value);
+      rerender();
+    });
+    label.appendChild(select);
+    bar.appendChild(label);
+    bar.appendChild(
+      copyButton("logos-trace-btn", "Копировать", "Скопировать этот JSON целиком", function () {
+        return fullJson(value);
+      }),
+    );
+    wrap.appendChild(bar);
+    wrap.appendChild(el("pre", "logos-trace-pre", jsonText(value, state.jsonDepth)));
+    content.appendChild(wrap);
   }
-  function tabsFor(item) {
-    if (item.kind === "response")
-      return [
-        "Overview",
-        "Text",
-        "Request",
-        "Raw Response",
-        "Output",
-        "Usage",
-        "Tools",
-        "Reasoning",
-        "Metadata",
-      ];
-    if (item.kind === "tool") return ["Overview", "Arguments", "Result", "Metadata", "Raw"];
-    if (item.kind === "pipeline") return ["Overview", "Raw"];
-    return ["Overview", "Payload", "Raw"];
+
+  function errorCard(item, clickable) {
+    var card = clickable
+      ? button("logos-trace-error-card", null, function () {
+          selectItem(item);
+        })
+      : el("div", "logos-trace-error-card");
+    card.appendChild(el("div", "logos-trace-error-message", item.name));
+    var error = item.data;
+    var meta = [
+      error.source ? "источник: " + error.source : "",
+      error.type ? "тип: " + error.type : "",
+      finite(error.step) !== null ? "шаг " + error.step : "",
+      sinceStart(item.timestamp),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    if (meta) card.appendChild(el("div", "logos-trace-error-meta", meta));
+    return card;
   }
-  function rawFor(item) {
-    return item.kind === "response" ? item.data.raw || item.data : item.data;
+
+  // A Python exception kept with an error: its type and message, and the traceback with locals as JSON.
+  function pythonException(content, error, rerender) {
+    var exception = error.python_exception;
+    if (!exception || typeof exception !== "object") return;
+    blockTitle(content, "Исключение Python");
+    var card = el("div", "logos-trace-error-card");
+    card.appendChild(
+      el(
+        "div",
+        "logos-trace-error-message",
+        (exception.exception_type || "Exception") + ": " + (exception.exception_message || errorMessage(error)),
+      ),
+    );
+    var frames = Array.isArray(exception.frames) ? exception.frames.length : 0;
+    card.appendChild(el("div", "logos-trace-error-meta", count(frames, "кадр", "кадра", "кадров") + " стека"));
+    content.appendChild(card);
+    jsonBlock(content, exception, rerender);
   }
-  function responseText(item) {
-    var raw = item && item.data && item.data.raw;
-    if (!raw || typeof raw !== "object") return "";
-    if (typeof raw.output_text === "string") return raw.output_text;
-    var out = Array.isArray(raw.output) ? raw.output : [];
+
+  function responseText(raw) {
+    if (typeof raw.output_text === "string" && raw.output_text) return raw.output_text;
     var parts = [];
-    out.forEach(function (x) {
-      if (!x || typeof x !== "object") return;
-      if (typeof x.text === "string") parts.push(x.text);
-      (Array.isArray(x.content) ? x.content : []).forEach(function (c) {
-        if (c && typeof c.text === "string") parts.push(c.text);
-        if (c && c.type === "output_text" && typeof c.text === "string") parts.push(c.text);
+    objectsOf(raw.output).forEach(function (out) {
+      if (out.type === "reasoning" || out.type === "function_call") return;
+      if (typeof out.text === "string") parts.push(out.text);
+      objectsOf(out.content).forEach(function (part) {
+        if (typeof part.text === "string") parts.push(part.text);
       });
     });
     return parts.join("\n").trim();
   }
 
-  function addJsonToolbar(content, rerender) {
-    var bar = el("div", { className: "logos-trace-json-toolbar" });
-    bar.appendChild(el("span", { className: "logos-trace-json-label" }, "JSON depth"));
-    var sel = el("select", { className: "logos-trace-depth", title: "Глубина отображения JSON" });
-    [
-      [1, "1"],
-      [2, "2"],
-      [3, "3"],
-      [4, "4"],
-      [5, "5"],
-      [6, "6"],
-      [null, "Full"],
-    ].forEach(function (x) {
-      var o = el("option", { value: x[0] === null ? "full" : String(x[0]) }, x[1]);
-      if ((state.jsonDepth === null && x[0] === null) || state.jsonDepth === x[0])
-        o.selected = true;
-      sel.appendChild(o);
+  function reasoningText(raw) {
+    var parts = [];
+    objectsOf(raw.output).forEach(function (out) {
+      if (out.type !== "reasoning") return;
+      objectsOf(out.summary)
+        .concat(objectsOf(out.content))
+        .forEach(function (part) {
+          if (typeof part.text === "string" && part.text) parts.push(part.text);
+        });
     });
-    sel.onchange = function () {
-      state.jsonDepth = this.value === "full" ? null : Number(this.value);
-      rerender();
-    };
-    bar.appendChild(sel);
-    content.appendChild(bar);
+    return parts.join("\n\n").trim();
   }
 
-  function renderInspector(trace, item, tab, target) {
-    var area = target || state.body.querySelector(".logos-trace-inspector");
-    area.textContent = "";
-    if (!item) return;
-    var inner = el("div", { className: "logos-trace-inspector-inner" });
-    inner.appendChild(el("div", { className: "logos-trace-inspector-title" }, item.name));
-    inner.appendChild(
-      el(
-        "div",
-        { className: "logos-trace-inspector-sub" },
-        item.kind.toUpperCase() + (item.data.step ? " · step " + item.data.step : ""),
-      ),
-    );
-    var tabs = el("div", { className: "logos-trace-tabs" }),
-      selected = tab || tabsFor(item)[0];
-    tabsFor(item).forEach(function (t) {
-      var b = el("button", { type: "button", className: "logos-btn logos-trace-tab" }, t);
-      if (t === selected) b.classList.add("active");
-      b.onclick = function () {
-        renderInspector(trace, item, t, target);
-      };
-      tabs.appendChild(b);
+  // The tool calls a model answer asked for: its function_call items name them by call_id.
+  function stepCalls(item) {
+    var ids = {};
+    objectsOf(objectOf(item.data.raw).output).forEach(function (out) {
+      if (out.type === "function_call" && out.call_id) ids[out.call_id] = true;
     });
-    inner.appendChild(tabs);
-    var content = document.createElement("div");
-    function pre(value) {
-      var wrap = el("div", { className: "logos-trace-json-wrap" });
-      addJsonToolbar(wrap, function () {
-        renderInspector(trace, item, selected, target);
-      });
-      wrap.appendChild(el("pre", { className: "logos-trace-pre" }, jsonText(value)));
-      content.appendChild(wrap);
-    }
-    if (selected === "Overview") {
-      var grid = el("div", { className: "logos-trace-grid" }),
-        pairs = [];
-      if (item.kind === "tool")
-        pairs = [
-          ["Name", item.data.name],
-          ["Server", item.data.server || "Local Registry"],
-          ["Duration", fmtMs(item.data.timing_ms)],
-          ["Status", item.data.error ? "error" : "success"],
-          ["Call ID", item.data.call_id || "—"],
-          ["Step", item.data.step || "—"],
-        ];
-      else if (item.kind === "response")
-        pairs = [
-          ["Step", item.data.step || "—"],
-          [
-            "Timestamp",
-            item.data.timestamp
-              ? new Date(item.data.timestamp * 1000).toLocaleString("ru-RU")
-              : "—",
-          ],
-          ["Model", (item.data.raw && item.data.raw.model) || "—"],
-          ["Response ID", (item.data.raw && item.data.raw.id) || "—"],
-          [
-            "Output items",
-            item.data.raw && Array.isArray(item.data.raw.output)
-              ? item.data.raw.output.length
-              : "—",
-          ],
-          [
-            "Step interval",
-            Number.isFinite(item.start) && Number.isFinite(item.end)
-              ? fmtMs((item.end - item.start) * 1000)
-              : "—",
-          ],
-        ];
-      else if (item.kind === "pipeline")
-        pairs = [
-          [
-            "Start",
-            item.data.start_timestamp
-              ? new Date(item.data.start_timestamp * 1000).toLocaleString("ru-RU")
-              : "—",
-          ],
-          [
-            "End",
-            item.data.end_timestamp
-              ? new Date(item.data.end_timestamp * 1000).toLocaleString("ru-RU")
-              : "—",
-          ],
-          ["Duration", fmtMs(item.data.duration_ms)],
-        ];
-      else
-        pairs = [
-          ["Type", item.data.type || "event"],
-          [
-            "Timestamp",
-            item.data.timestamp
-              ? new Date(item.data.timestamp * 1000).toLocaleString("ru-RU")
-              : "—",
-          ],
-        ];
-      pairs.forEach(function (p) {
-        var c = el("div", { className: "logos-trace-card" });
-        c.appendChild(el("div", { className: "logos-trace-card-label" }, p[0]));
-        c.appendChild(el("div", { className: "logos-trace-card-value" }, String(p[1])));
-        grid.appendChild(c);
-      });
-      content.appendChild(grid);
-      if (item.kind === "tool" && item.data.error)
-        content.appendChild(
-          el("div", { className: "logos-trace-notice" }, "⚠ " + String(item.data.error)),
-        );
-      if (item.kind === "event")
-        pre(item.data.payload !== undefined ? item.data.payload : item.data);
-    } else if (selected === "Text") {
-      var responseBodyText = responseText(item);
-      if (responseBodyText) {
-        content.appendChild(
-          el(
-            "div",
-            {
-              style:
-                "white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.55;color:var(--text-main,#1c1c1e);background:var(--bg-sidebar,#fff);padding:12px;border:1px solid var(--border-color,#e5e5ea);border-radius:9px;",
-            },
-            responseBodyText,
-          ),
-        );
-      } else {
-        content.appendChild(
-          el(
-            "div",
-            { className: "logos-trace-notice" },
-            "Ответ с текстом в этом response не найден.",
-          ),
-        );
-      }
-    } else if (selected === "Request") {
-      pre(
-        item.kind === "response" ? item.data.request || trace.request || {} : trace.request || {},
-      );
-    } else if (selected === "Raw Response") {
-      pre(rawFor(item));
-    } else if (selected === "Payload") {
-      pre(item.data.payload !== undefined ? item.data.payload : item.data);
-    } else if (selected === "Raw") {
-      pre(rawFor(item));
-    } else if (selected === "Arguments") {
-      pre(item.data.arguments || {});
-    } else if (selected === "Result") {
-      pre(
-        item.data.error ? { error: item.data.error, result: item.data.result } : item.data.result,
-      );
-    } else if (selected === "Metadata") {
-      pre(
-        item.kind === "response"
-          ? item.data.raw && item.data.raw.metadata
-          : {
-              call_id: item.data.call_id,
-              server: item.data.server,
-              step: item.data.step,
-              start_timestamp: item.data.start_timestamp,
-              end_timestamp: item.data.end_timestamp,
-            },
-      );
-    } else if (selected === "Output") {
-      pre((item.data.raw && item.data.raw.output) || []);
-    } else if (selected === "Usage") {
-      pre((item.data.raw && item.data.raw.usage) || {});
-    } else if (selected === "Tools") {
-      var declaredTools = item.data.raw && item.data.raw.tools;
-      if (declaredTools) {
-        content.appendChild(
-          el(
-            "div",
-            { className: "logos-trace-notice" },
-            "Объявленные инструменты запроса (определения, не вызовы)",
-          ),
-        );
-        pre(declaredTools);
-      }
-      var stepCalls = objectsOf(trace.tool_calls).filter(function (call) {
-        return item.data.step != null && call.step === item.data.step;
-      });
-      if (stepCalls.length) pre(stepCalls);
-      else
-        content.appendChild(
-          el("div", { className: "logos-trace-notice" }, "Вызовы этого шага в трассе не найдены."),
-        );
-    } else if (selected === "Reasoning") {
-      pre((item.data.raw && item.data.raw.reasoning) || null);
-    }
-    inner.appendChild(content);
-    if (item.correlation_id && state.items) {
-      var related = state.items.filter(function (other) {
-        return other.id !== item.id && other.correlation_id === item.correlation_id;
-      });
-      if (related.length) {
-        var relatedWrap = el("div", {
-          className: "logos-trace-related",
-          style:
-            "margin-top:12px;padding:10px;border:1px solid var(--border-color,rgba(127,127,127,.14));border-radius:8px;",
-        });
-        relatedWrap.appendChild(
-          el(
-            "div",
-            { style: "font-size:11px;font-weight:700;opacity:.7;margin-bottom:6px;" },
-            "Связанные события",
-          ),
-        );
-        related.forEach(function (other) {
-          var link = el(
-            "button",
-            { type: "button", className: "logos-trace-tab", title: "Перейти к связанному событию" },
-            other.name,
-          );
-          link.onclick = function () {
-            selectItem(other);
-          };
-          relatedWrap.appendChild(link);
-        });
-        inner.appendChild(relatedWrap);
-      }
-    }
-    area.appendChild(inner);
+    return state.model.tools.filter(function (tool) {
+      var step = finite(tool.data.step);
+      return (tool.callId && ids[tool.callId]) || (step !== null && step === item.step);
+    });
   }
 
-  function showMobileDetail(item) {
-    if (!state.detail) return;
-    state.listScrollTop = state.list ? state.list.scrollTop : 0;
-    state.selected = item;
-    state.detail.classList.add("active");
-    state.nav.classList.add("detail-active");
-    state.detailTitle.textContent = item.name;
-    renderInspector(state.trace, item, null, state.detail.querySelector(".logos-trace-inspector"));
+  function toolGroup(item) {
+    var group = "";
+    state.model.events.forEach(function (event) {
+      var payload = objectOf(event.data.payload);
+      if (event.name === "tool_group_call" && item.callId && payload.call_id === item.callId && payload.group) {
+        group = String(payload.group);
+      }
+    });
+    return group;
   }
-  function hideMobileDetail() {
-    if (!state.detail) return;
-    state.detail.classList.remove("active");
-    state.nav.classList.remove("detail-active");
-    if (state.list)
-      requestAnimationFrame(function () {
-        state.list.scrollTop = state.listScrollTop;
-      });
+
+  function apiRequestPayload(step) {
+    var requests = objectsOf(state.trace.api_requests);
+    for (var i = requests.length - 1; i >= 0; i--) {
+      if (finite(requests[i].step) === step) return requests[i].payload;
+    }
+    return undefined;
   }
-  function selectItem(item) {
-    state.selected = item;
-    if (state.modal)
-      state.modal.querySelectorAll(".logos-trace-item").forEach(function (b) {
-        b.classList.remove("active");
+
+  function relatedOf(item) {
+    if (item.kind === "overview" || item.kind === "pipeline") return [];
+    var model = state.model;
+    var related = [];
+    function linked(other) {
+      return (
+        other !== item &&
+        ((item.correlationId && other.correlationId === item.correlationId) || (item.callId && other.callId === item.callId))
+      );
+    }
+    model.responses.concat(model.tools, model.events).forEach(function (other) {
+      if (linked(other)) related.push(other);
+    });
+    return related;
+  }
+
+  function tabsOf(item) {
+    if (item.kind === "overview") return ["Обзор", "Вопрос и параметры", "Трассировка целиком"];
+    if (item.kind === "response") {
+      return ["Обзор", "Текст ответа", "Рассуждения", "Инструменты", "Токены", "Вывод", "Запрос", "Ответ целиком"];
+    }
+    if (item.kind === "tool") return ["Обзор", "Аргументы", "Результат", "Целиком"];
+    return ["Обзор", "Целиком"];
+  }
+
+  function subtitleOf(item) {
+    if (item.kind === "overview") return modelName(state.trace, state.model);
+    if (item.kind === "pipeline") return "Сборка запроса до первого обращения к модели";
+    if (item.kind === "response") return "Запрос к модели и её ответ" + (item.status ? " · " + statusText(item.status) : "");
+    if (item.kind === "tool") return "Вызов инструмента · " + (item.failed ? "ошибка" : "готово");
+    if (item.kind === "error") return "Ошибка, записанная в ходе";
+    return "Событие трассировки";
+  }
+
+  function renderOverviewTab(content) {
+    var trace = state.trace;
+    var model = state.model;
+    var usage = usageOf(model);
+    var result = outcome(trace, model);
+    cards(content, [
+      ["Итог", result.mark + " " + result.text],
+      ["Длительность", fmtMs(durationMs(trace, model))],
+      ["Запросов к модели", fmtNumber(model.responses.length)],
+      ["Инструментов", fmtNumber(model.tools.length)],
+      ["Событий", fmtNumber(model.events.length)],
+      ["Ошибок", fmtNumber(model.errors.length)],
+      ["Токенов всего", usage.found ? fmtNumber(usage.total) : null],
+      ["На входе", usage.found ? fmtNumber(usage.input) : null],
+      ["Из кэша", usage.found ? fmtNumber(usage.cached) : null],
+      ["На выходе", usage.found ? fmtNumber(usage.output) : null],
+      ["Рассуждения", usage.found ? fmtNumber(usage.reasoning) : null],
+      ["Стоимость", costText(trace)],
+      ["Начало", model.start !== null ? fmtClock(model.start) : null],
+      ["Модель", modelName(trace, model)],
+    ]);
+    if (model.errors.length) {
+      blockTitle(content, "Ошибки · " + model.errors.length);
+      model.errors.forEach(function (item) {
+        content.appendChild(errorCard(item, true));
       });
-    if (item._button) item._button.classList.add("active");
-    if (item._mobileButton) item._mobileButton.classList.add("active");
-    if (window.matchMedia && window.matchMedia("(max-width:820px)").matches) {
-      showMobileDetail(item);
+    }
+    var question = objectOf(trace.request).message;
+    if (typeof question === "string" && question) {
+      blockTitle(content, "Вопрос");
+      content.appendChild(el("div", "logos-trace-text", question));
+    }
+    if (!model.responses.length && !model.tools.length && !model.events.length) {
+      notice(content, "В трассировке нет ни запросов к модели, ни событий.");
+    }
+  }
+
+  function renderResponseTab(item, tab, content, rerender) {
+    var raw = objectOf(item.data.raw);
+    var usage = objectOf(raw.usage);
+    if (tab === "Обзор") {
+      cards(content, [
+        ["Шаг", String(item.step)],
+        ["Статус", statusText(item.status) || "—"],
+        [
+          "Длительность",
+          item.start !== null && item.end !== null
+            ? fmtMs((item.end - item.start) * 1000) + (item.inferred ? " (начало вычислено)" : "")
+            : fmtMs(item.data.timing_ms),
+        ],
+        ["Начало", item.start !== null ? sinceStart(item.start) : null],
+        ["Модель", raw.model],
+        ["ID ответа", raw.id || item.data.response_id],
+        ["Элементов вывода", Array.isArray(raw.output) ? fmtNumber(raw.output.length) : null],
+        ["Токенов", finite(usage.total_tokens) !== null ? fmtNumber(usage.total_tokens) : null],
+        ["На входе", finite(usage.input_tokens) !== null ? fmtNumber(usage.input_tokens) : null],
+        ["На выходе", finite(usage.output_tokens) !== null ? fmtNumber(usage.output_tokens) : null],
+      ]);
+      if (raw.incomplete_details) notice(content, "Ответ не завершён: " + fullJson(raw.incomplete_details), true);
+      if (raw.error) {
+        var providerError = objectOf(raw.error);
+        notice(content, "Ошибка провайдера: " + (providerError.message || fullJson(raw.error)), true);
+      }
+      var calls = stepCalls(item);
+      if (calls.length) {
+        blockTitle(content, "Вызванные инструменты · " + calls.length);
+        content.appendChild(relatedButtons(calls));
+      }
+    } else if (tab === "Текст ответа") {
+      var text = responseText(raw);
+      if (text) content.appendChild(el("div", "logos-trace-text", text));
+      else notice(content, stepCalls(item).length ? "Текста нет: в этом шаге модель вызвала инструменты." : "В этом ответе нет текста.");
+    } else if (tab === "Рассуждения") {
+      var reasoning = reasoningText(raw);
+      if (reasoning) content.appendChild(el("div", "logos-trace-text", reasoning));
+      else notice(content, "Модель не вернула текст рассуждений.");
+      if (raw.reasoning) {
+        blockTitle(content, "Настройки рассуждений");
+        jsonBlock(content, raw.reasoning, rerender);
+      }
+    } else if (tab === "Инструменты") {
+      var stepToolCalls = stepCalls(item);
+      blockTitle(content, "Вызванные в этом шаге · " + stepToolCalls.length);
+      if (stepToolCalls.length) content.appendChild(relatedButtons(stepToolCalls));
+      else notice(content, "В этом шаге инструменты не вызывались.");
+      blockTitle(content, "Объявленные инструменты (определения, не вызовы)");
+      if (raw.tools) jsonBlock(content, raw.tools, rerender);
+      else notice(content, "Ответ не перечисляет объявленные инструменты.");
+    } else if (tab === "Токены") {
+      jsonBlock(content, raw.usage || {}, rerender);
+    } else if (tab === "Вывод") {
+      jsonBlock(content, raw.output || [], rerender);
+    } else if (tab === "Запрос") {
+      var request = item.data.request || apiRequestPayload(item.step);
+      if (request) jsonBlock(content, request, rerender);
+      else notice(content, "Тело запроса в трассировке не сохранено.");
+    } else {
+      jsonBlock(content, item.data.raw || item.data, rerender);
+    }
+  }
+
+  function renderToolTab(item, tab, content, rerender) {
+    var call = item.data;
+    if (tab === "Обзор") {
+      cards(content, [
+        ["Инструмент", item.name],
+        ["Группа", toolGroup(item)],
+        ["Итог", item.failed ? "✕ ошибка" : "✓ готово"],
+        ["Длительность", item.start !== null && item.end !== null ? fmtMs((item.end - item.start) * 1000) : fmtMs(call.timing_ms)],
+        ["Начало", sinceStart(item.start !== null ? item.start : item.timestamp)],
+        ["Процессор", finite(call.cpu_ms) !== null ? fmtMs(call.cpu_ms) : null],
+        ["Сервер", call.server],
+        ["ID вызова", item.callId],
+      ]);
+      if (call.error) notice(content, "Ошибка: " + (typeof call.error === "string" ? call.error : fullJson(call.error)), true);
+    } else if (tab === "Аргументы") {
+      jsonBlock(content, parsedJson(call.arguments !== undefined ? call.arguments : {}), rerender);
+    } else if (tab === "Результат") {
+      if (call.error) jsonBlock(content, { error: call.error, result: parsedJson(call.result) }, rerender);
+      else if (call.result === undefined) notice(content, "Результат в трассировке не сохранён.");
+      else jsonBlock(content, parsedJson(call.result), rerender);
+    } else {
+      jsonBlock(content, call, rerender);
+    }
+  }
+
+  function renderOtherTab(item, tab, content, rerender) {
+    if (tab !== "Обзор") {
+      jsonBlock(content, item.data, rerender);
       return;
     }
-    renderInspector(state.trace, item);
-  }
-  function copyTrace() {
-    var text = JSON.stringify(state.trace, null, 2);
-    if (navigator.clipboard && navigator.clipboard.writeText)
-      navigator.clipboard.writeText(text).catch(function () {
-        fallbackCopy(text);
-      });
-    else fallbackCopy(text);
-  }
-  function fallbackCopy(text) {
-    var ta = document.createElement("textarea");
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    try {
-      document.execCommand("copy");
-    } catch (_) {}
-    ta.remove();
-  }
-  function close() {
-    if (state.modal) {
-      state.modal.remove();
-      state.modal = null;
-      state.trace = null;
-      state.items = null;
-      state.selected = null;
-      state.body = null;
-      state.nav = null;
-      state.list = null;
-      state.detail = null;
-      state.detailTitle = null;
+    if (item.kind === "pipeline") {
+      cards(content, [
+        ["Начало", sinceStart(item.start)],
+        ["Конец", sinceStart(item.end)],
+        ["Длительность", fmtMs((item.end - item.start) * 1000)],
+      ]);
+      return;
     }
-    document.removeEventListener("keydown", onKey);
+    if (item.kind === "error") {
+      content.appendChild(errorCard(item, false));
+      cards(content, [["Время", item.timestamp !== null ? fmtClock(item.timestamp) : null]]);
+      pythonException(content, item.data, rerender);
+      return;
+    }
+    cards(content, [
+      ["Тип", item.name],
+      ["От начала хода", sinceStart(item.timestamp)],
+      ["Время", item.timestamp !== null ? fmtClock(item.timestamp) : null],
+    ]);
+    if (item.data.payload !== undefined) {
+      blockTitle(content, "Данные события");
+      jsonBlock(content, item.data.payload, rerender);
+    }
   }
-  function onKey(e) {
-    if (e.key === "Escape") close();
+
+  function relatedButtons(items) {
+    var row = el("div", "logos-trace-related");
+    items.forEach(function (other) {
+      row.appendChild(
+        button("logos-trace-tab", iconOf(other) + " " + labelOf(other), function () {
+          selectItem(other);
+        }, metaOf(other)),
+      );
+    });
+    return row;
+  }
+
+  function renderInspector(item, target, tab) {
+    target.textContent = "";
+    var tabs = tabsOf(item);
+    var selected = tab && tabs.indexOf(tab) >= 0 ? tab : tabs[0];
+    function rerender() {
+      var scrollTop = target.scrollTop;
+      renderInspector(item, target, selected);
+      target.scrollTop = scrollTop;
+    }
+    var inner = el("div", "logos-trace-inspector-inner");
+    inner.appendChild(el("div", "logos-trace-inspector-title", labelOf(item)));
+    var sub = subtitleOf(item);
+    if (sub) inner.appendChild(el("div", "logos-trace-inspector-sub", sub));
+    var tabBar = el("div", "logos-trace-tabs");
+    tabBar.setAttribute("role", "tablist");
+    tabs.forEach(function (name) {
+      var node = button("logos-trace-tab" + (name === selected ? " active" : ""), name, function () {
+        renderInspector(item, target, name);
+      });
+      node.setAttribute("role", "tab");
+      node.setAttribute("aria-selected", name === selected ? "true" : "false");
+      tabBar.appendChild(node);
+    });
+    inner.appendChild(tabBar);
+    var content = el("div", "logos-trace-tab-content");
+    if (item.kind === "overview") {
+      if (selected === "Обзор") renderOverviewTab(content);
+      else if (selected === "Вопрос и параметры") {
+        if (state.trace.request) jsonBlock(content, state.trace.request, rerender);
+        else notice(content, "Вопрос и параметры в трассировке не сохранены.");
+      } else jsonBlock(content, state.trace, rerender);
+    } else if (item.kind === "response") {
+      renderResponseTab(item, selected, content, rerender);
+    } else if (item.kind === "tool") {
+      renderToolTab(item, selected, content, rerender);
+    } else {
+      renderOtherTab(item, selected, content, rerender);
+    }
+    inner.appendChild(content);
+    var related = relatedOf(item);
+    if (related.length) {
+      blockTitle(inner, "Связанные записи · " + related.length);
+      inner.appendChild(relatedButtons(related));
+    }
+    target.appendChild(inner);
+    target.scrollTop = 0;
+  }
+
+  function isPhone() {
+    return Boolean(window.matchMedia && window.matchMedia(PHONE_QUERY).matches);
+  }
+
+  function selectItem(item) {
+    if (!item || !state.modal) return;
+    state.selected = item;
+    state.modal.querySelectorAll(".logos-trace-item.active").forEach(function (node) {
+      node.classList.remove("active");
+      node.removeAttribute("aria-current");
+    });
+    if (item.button) {
+      item.button.classList.add("active");
+      item.button.setAttribute("aria-current", "true");
+    }
+    if (isPhone()) {
+      showDetail(item);
+      return;
+    }
+    renderInspector(item, state.inspector);
+    if (item.button) item.button.scrollIntoView({ block: "nearest" });
+  }
+
+  function showDetail(item) {
+    if (!state.detail.classList.contains("active")) state.listScrollTop = state.content.scrollTop;
+    state.detailTitle.textContent = labelOf(item);
+    state.detail.classList.add("active");
+    renderInspector(item, state.detailBody);
+    state.detailBack.focus({ preventScroll: true });
+  }
+
+  function hideDetail() {
+    if (!state.detail || !state.detail.classList.contains("active")) return;
+    state.detail.classList.remove("active");
+    state.content.scrollTop = state.listScrollTop;
+    if (state.selected && state.selected.button) state.selected.button.focus({ preventScroll: true });
+  }
+
+  // Turning the phone or resizing the window moves the details between the side panel and their own screen.
+  function onMediaChange() {
+    if (!state.modal || !state.selected) return;
+    if (isPhone()) return;
+    state.detail.classList.remove("active");
+    renderInspector(state.selected, state.inspector);
+  }
+
+  function onKey(event) {
+    if (event.key !== "Escape") return;
+    if (state.detail && state.detail.classList.contains("active")) hideDetail();
+    else closeViewer();
+  }
+
+  function closeViewer() {
+    var focus = state.returnFocus;
+    if (state.modal) state.modal.remove();
+    document.removeEventListener("keydown", onKey);
+    if (state.media) state.media.removeEventListener("change", onMediaChange);
+    state.trace = null;
+    state.model = null;
+    state.selected = null;
+    state.modal = null;
+    state.content = null;
+    state.inspector = null;
+    state.detail = null;
+    state.detailBody = null;
+    state.detailTitle = null;
+    state.detailBack = null;
+    state.returnFocus = null;
+    state.media = null;
+    if (focus && focus.isConnected && typeof focus.focus === "function") focus.focus({ preventScroll: true });
   }
 
   function open(input) {
     var trace = normalizeTrace(input);
     if (!trace) return;
     injectStyles();
-    close();
+    closeViewer();
     state.trace = trace;
     state.jsonDepth = 4;
-    var items = buildItems(trace);
-    state.items = items;
-    var modal = el("div", { className: "logos-trace-modal" }),
-      win = el("div", {
-        className: "logos-trace-window",
-        role: "dialog",
-        "aria-modal": "true",
-        "aria-label": "Execution Trace",
-      });
-    var header = el("div", { className: "logos-trace-header" });
-    header.appendChild(el("span", {}, "⚡"));
-    header.appendChild(el("div", { className: "logos-trace-title" }, "Execution Trace"));
-    header.appendChild(
-      el(
-        "div",
-        { className: "logos-trace-sub" },
-        trace.trace_id ? String(trace.trace_id) : "local",
-      ),
-    );
-    header.appendChild(el("div", { className: "logos-trace-spacer" }));
-    var copy = el(
-      "button",
-      { type: "button", className: "logos-btn logos-trace-btn", title: "Copy raw JSON" },
-      "Copy JSON",
-    );
-    copy.onclick = copyTrace;
-    header.appendChild(copy);
-    var cb = el("button", { type: "button", className: "logos-trace-btn", title: "Close" }, "×");
-    cb.onclick = close;
-    header.appendChild(cb);
-    win.appendChild(header);
-    win.appendChild(renderMetricRow(trace));
-    win.appendChild(renderWaterfall(trace, items));
-    state.nav = renderMobileTabs(items);
-    win.appendChild(state.nav);
-    var main = el("div", { className: "logos-trace-main" });
-    state.body = main;
-    state.list = el("div", { className: "logos-trace-mobile-list" });
-    main.appendChild(state.list);
-    renderMobileList(items);
-    main.appendChild(renderSidebar(items));
-    main.appendChild(el("div", { className: "logos-trace-inspector" }));
-    state.detail = el("div", { className: "logos-trace-mobile-detail" });
-    var dh = el("div", { className: "logos-trace-mobile-detail-head" }),
-      back = el(
-        "button",
-        { type: "button", className: "logos-btn logos-trace-mobile-back" },
-        "← Events",
-      );
-    back.onclick = hideMobileDetail;
-    state.detailTitle = el("div", { className: "logos-trace-mobile-detail-title" }, "");
-    dh.appendChild(back);
-    dh.appendChild(state.detailTitle);
-    state.detail.appendChild(dh);
-    var dc = el("div", { className: "logos-trace-mobile-detail-content" });
-    dc.appendChild(el("div", { className: "logos-trace-inspector" }));
-    state.detail.appendChild(dc);
-    main.appendChild(state.detail);
-    win.appendChild(main);
+    state.model = buildModel(trace);
+    state.returnFocus = document.activeElement;
+
+    var modal = el("div", "logos-trace-modal");
+    var win = el("div", "logos-trace-window");
+    win.setAttribute("role", "dialog");
+    win.setAttribute("aria-modal", "true");
+    win.setAttribute("aria-label", "Трассировка");
+    win.appendChild(renderHeader(trace));
+
+    var content = el("div", "logos-trace-content");
+    content.appendChild(renderMetrics(trace, state.model));
+    content.appendChild(renderTimeline(state.model));
+    var main = el("div", "logos-trace-main");
+    main.appendChild(renderNav(state.model));
+    state.inspector = el("div", "logos-trace-inspector");
+    main.appendChild(state.inspector);
+    content.appendChild(main);
+    win.appendChild(content);
+    state.content = content;
+
+    var detail = el("div", "logos-trace-detail");
+    var head = el("div", "logos-trace-detail-head");
+    state.detailBack = button("logos-trace-btn logos-trace-back", "← Назад", hideDetail, "Вернуться к списку");
+    head.appendChild(state.detailBack);
+    state.detailTitle = el("div", "logos-trace-detail-title");
+    head.appendChild(state.detailTitle);
+    detail.appendChild(head);
+    state.detailBody = el("div", "logos-trace-detail-body");
+    detail.appendChild(state.detailBody);
+    win.appendChild(detail);
+    state.detail = detail;
+
     modal.appendChild(win);
+    modal.addEventListener("click", function (event) {
+      if (event.target === modal) closeViewer();
+    });
     document.body.appendChild(modal);
     state.modal = modal;
     document.addEventListener("keydown", onKey);
+    if (window.matchMedia) {
+      state.media = window.matchMedia(PHONE_QUERY);
+      state.media.addEventListener("change", onMediaChange);
+    }
+    // A wide screen opens on the overview; a phone opens on the list.
+    if (!isPhone()) selectItem(state.model.overview);
+    var close = modal.querySelector(".logos-trace-close");
+    if (close) close.focus({ preventScroll: true });
   }
+
   window.openTraceViewer = open;
   window.dispatchEvent(new CustomEvent("logos:trace-viewer-ready"));
 })();
