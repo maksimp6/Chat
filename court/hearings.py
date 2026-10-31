@@ -508,6 +508,9 @@ def interrogate(conversation_id: str, message: str) -> dict[str, Any]:
             {},
         )
         title = get_conversation_title(conversation_id, "") or conversation_id
+        for prefix in ("⚖️ Суд: ", "⚖️ Улики: "):
+            while title.startswith(prefix):
+                title = title[len(prefix):]
         made = _local_post(
             f"/api/conversations/{conversation_id}/copy",
             {
