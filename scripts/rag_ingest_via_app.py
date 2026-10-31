@@ -120,7 +120,8 @@ def pages(path, params=None, key=None):
     while url:
         body, link = github(url)
         if body is None:
-            return
+            # A refused listing must not read as an empty one: stale packs are removed by absence.
+            raise RuntimeError(f"GitHub refused {path}")
         yield from (body[key] if key else body)
         url = None
         for part in link.split(","):
@@ -228,7 +229,9 @@ def render_export(entry):
 def collect_exports():
     # Dialog archives (GigaChat exports, Logos memory module) live as files in exports/.
     listing, _ = github(f"{GITHUB}/repos/{REPO}/contents/exports?ref={REF}")
-    for entry in listing or []:
+    if listing is None:
+        raise RuntimeError("GitHub refused the exports listing")
+    for entry in listing:
         if entry.get("type") != "file" or not entry["name"].endswith(".md"):
             continue
         yield "exports", f"{entry['name']}:{entry['sha']}", lambda entry=entry: render_export(entry)
@@ -312,14 +315,17 @@ def main():
         for window, version, render in collector():
             windows.setdefault(window, []).append((version, render))
             totals["chunks"] += 1
+        # Packs of this kind outside this set are stale: their window was rebuilt or emptied, or the item is gone.
+        kept = set()
         for window in sorted(windows):
             items = windows[window]
             signature = hashlib.sha256("\n".join(sorted(v for v, _ in items)).encode()).hexdigest()[:12]
             current = window_set(stored, kind, window, signature)
             if current is not None and all(stored[name] in attached for name in current):
                 totals["windows_unchanged"] += 1
-                keep = set(current)
+                kept.update(current)
             else:
+                previous = [n for n in stored if n.startswith(f"gh-{kind}-{window}-")]
                 keep, window_failed = set(), False
                 for name, body in build_packs(kind, window, signature, (render() for _, render in items)):
                     totals["packs"] += 1
@@ -344,19 +350,21 @@ def main():
                         window_failed = True
                         print(f"pack {name} failed: {type(error).__name__}", file=sys.stderr)
                 if window_failed:
+                    # The previous packs stay until the window's replacement is complete.
+                    kept.update(previous)
                     continue
-            # Older versions of this window's packs are replaced by the current set.
-            for name in [n for n in stored if n.startswith(f"gh-{kind}-{window}-") and n not in keep]:
-                file_id = stored.pop(name)
-                try:
-                    if file_id in attached:
-                        app("DELETE", f"/api/vector-stores/{STORE_ID}/files/{file_id}")
-                        attached.discard(file_id)
-                    app("DELETE", f"/api/files/{file_id}")
-                    totals["removed"] += 1
-                except (urllib.error.URLError, OSError, ValueError) as error:
-                    totals["failed"] += 1
-                    print(f"stale pack {name} not removed: {type(error).__name__}", file=sys.stderr)
+                kept.update(keep)
+        for name in [n for n in stored if n.startswith(f"gh-{kind}-") and n not in kept]:
+            file_id = stored.pop(name)
+            try:
+                if file_id in attached:
+                    app("DELETE", f"/api/vector-stores/{STORE_ID}/files/{file_id}")
+                    attached.discard(file_id)
+                app("DELETE", f"/api/files/{file_id}")
+                totals["removed"] += 1
+            except (urllib.error.URLError, OSError, ValueError) as error:
+                totals["failed"] += 1
+                print(f"stale pack {name} not removed: {type(error).__name__}", file=sys.stderr)
         print(f"{kind}: {sum(len(v) for v in windows.values())} items in {len(windows)} windows", flush=True)
     totals["redactions"] = REDACTIONS["count"]
     print(json.dumps(totals, sort_keys=True), flush=True)
