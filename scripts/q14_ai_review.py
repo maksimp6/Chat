@@ -15,7 +15,7 @@ from typing import Callable
 from scripts.q14_simulation import BASELINE_HEAD, CASES, run_cases
 
 HOST = "ai.api.cloud.yandex.net"
-MODEL = "qwen3.6-35b-a3b"
+MODEL = "deepseek-v4.1-flash"
 STAGES = ("accusation", "defence", "decision_draft")
 MAX_CALLS = 3
 MAX_OUTPUT_TOKENS = 4096

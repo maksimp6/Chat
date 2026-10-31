@@ -138,9 +138,9 @@ TEXT_MODELS: dict[str, dict[str, Any]] = {
     },
 }
 
-# The one text model of every Logos dialog: the cheapest model Yandex serves.
+# The one text model of every Logos dialog.
 # A dialog has no text model of its own; image and voice dialogs keep their model.
-CHAT_MODEL = "qwen3.6-35b-a3b"
+CHAT_MODEL = "deepseek-v4.1-flash"
 
 VOICE_MODELS = {
     "speech-realtime-deepseek-v4-flash": {
