@@ -517,6 +517,8 @@ def file_case_now(report: dict[str, Any]) -> str | None:
     token = _token()
     if not token:
         _queue(report, "no LOGOS_COURT_TOKEN/GITHUB_TOKEN/GH_TOKEN")
+        # Queued, not filed: say so in the process log, not only in the pending file (#1701).
+        log.warning("court case queued, not filed (no GitHub token): %s", _message(report))
         return None
     _file_pending(token)
     return _file_one(report, token)
