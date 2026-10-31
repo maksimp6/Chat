@@ -120,7 +120,8 @@ def pages(path, params=None, key=None):
     while url:
         body, link = github(url)
         if body is None:
-            return
+            # A refused listing must never look like an empty collection before cleanup.
+            raise RuntimeError(f"GitHub refused {path}")
         yield from (body[key] if key else body)
         url = None
         for part in link.split(","):
@@ -228,7 +229,9 @@ def render_export(entry):
 def collect_exports():
     # Dialog archives (GigaChat exports, Logos memory module) live as files in exports/.
     listing, _ = github(f"{GITHUB}/repos/{REPO}/contents/exports?ref={REF}")
-    for entry in listing or []:
+    if listing is None:
+        raise RuntimeError("GitHub refused the exports listing")
+    for entry in listing:
         if entry.get("type") != "file" or not entry["name"].endswith(".md"):
             continue
         yield "exports", f"{entry['name']}:{entry['sha']}", lambda entry=entry: render_export(entry)
@@ -312,51 +315,62 @@ def main():
         for window, version, render in collector():
             windows.setdefault(window, []).append((version, render))
             totals["chunks"] += 1
+        # Keep the names of every current pack across the complete collection. This also
+        # finds months that no longer contain any items.
+        kept = set()
         for window in sorted(windows):
             items = windows[window]
             signature = hashlib.sha256("\n".join(sorted(v for v, _ in items)).encode()).hexdigest()[:12]
             current = window_set(stored, kind, window, signature)
             if current is not None and all(stored[name] in attached for name in current):
                 totals["windows_unchanged"] += 1
-                keep = set(current)
-            else:
-                keep, window_failed = set(), False
-                for name, body in build_packs(kind, window, signature, (render() for _, render in items)):
-                    totals["packs"] += 1
-                    keep.add(name)
-                    try:
-                        file_id = stored.get(name)
-                        if file_id is None:
-                            file_id = upload(name, body)["id"]
-                            stored[name] = file_id
-                            totals["uploaded"] += 1
-                        if file_id not in attached:
-                            app(
-                                "POST",
-                                f"/api/vector-stores/{STORE_ID}/files",
-                                json.dumps({"file_id": file_id}).encode(),
-                                {"Content-Type": "application/json"},
-                            )
-                            attached.add(file_id)
-                            totals["attached"] += 1
-                    except (urllib.error.URLError, OSError, KeyError, ValueError) as error:
-                        totals["failed"] += 1
-                        window_failed = True
-                        print(f"pack {name} failed: {type(error).__name__}", file=sys.stderr)
-                if window_failed:
-                    continue
-            # Older versions of this window's packs are replaced by the current set.
-            for name in [n for n in stored if n.startswith(f"gh-{kind}-{window}-") and n not in keep]:
-                file_id = stored.pop(name)
+                kept.update(current)
+                continue
+
+            previous = [n for n in stored if n.startswith(f"gh-{kind}-{window}-")]
+            keep, window_failed = set(), False
+            for name, body in build_packs(kind, window, signature, (render() for _, render in items)):
+                totals["packs"] += 1
+                keep.add(name)
                 try:
-                    if file_id in attached:
-                        app("DELETE", f"/api/vector-stores/{STORE_ID}/files/{file_id}")
-                        attached.discard(file_id)
-                    app("DELETE", f"/api/files/{file_id}")
-                    totals["removed"] += 1
-                except (urllib.error.URLError, OSError, ValueError) as error:
+                    file_id = stored.get(name)
+                    if file_id is None:
+                        file_id = upload(name, body)["id"]
+                        stored[name] = file_id
+                        totals["uploaded"] += 1
+                    if file_id not in attached:
+                        app(
+                            "POST",
+                            f"/api/vector-stores/{STORE_ID}/files",
+                            json.dumps({"file_id": file_id}).encode(),
+                            {"Content-Type": "application/json"},
+                        )
+                        attached.add(file_id)
+                        totals["attached"] += 1
+                except (urllib.error.URLError, OSError, KeyError, ValueError) as error:
                     totals["failed"] += 1
-                    print(f"stale pack {name} not removed: {type(error).__name__}", file=sys.stderr)
+                    window_failed = True
+                    print(f"pack {name} failed: {type(error).__name__}", file=sys.stderr)
+            if window_failed:
+                # Do not retire the previous complete window until its replacement is complete.
+                kept.update(previous)
+            else:
+                kept.update(keep)
+
+        # Only forget an old pack after both detach and file deletion succeeded. If either
+        # operation fails, the ID remains discoverable and the next ingest retries it.
+        for name in [n for n in stored if n.startswith(f"gh-{kind}-") and n not in kept]:
+            file_id = stored[name]
+            try:
+                if file_id in attached:
+                    app("DELETE", f"/api/vector-stores/{STORE_ID}/files/{file_id}")
+                    attached.discard(file_id)
+                app("DELETE", f"/api/files/{file_id}")
+                stored.pop(name, None)
+                totals["removed"] += 1
+            except (urllib.error.URLError, OSError, ValueError) as error:
+                totals["failed"] += 1
+                print(f"stale pack {name} not removed: {type(error).__name__}", file=sys.stderr)
         print(f"{kind}: {sum(len(v) for v in windows.values())} items in {len(windows)} windows", flush=True)
     totals["redactions"] = REDACTIONS["count"]
     print(json.dumps(totals, sort_keys=True), flush=True)
