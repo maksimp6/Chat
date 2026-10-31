@@ -1,18 +1,3 @@
-name: redmi9-rag-ingest
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  issues: read
-  pull-requests: read
-  actions: read
-
-concurrency:
-  group: redmi9-rag-ingest
-  cancel-in-progress: false
-
 jobs:
   ingest:
     runs-on: redmi9
