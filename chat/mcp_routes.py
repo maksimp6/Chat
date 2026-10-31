@@ -2364,29 +2364,82 @@ def conversations():
     return jsonify({"conversations": list_owned_conversations(owner_id)})
 
 
-@mcp_bp.route("/api/conversations/<conv_id>/copy", methods=["POST"])
-def copy_conversation(conv_id):
-    """A copy of a dialog for the Court: its messages in a new dialog with its own provider
-    conversation, so what is asked in the copy never reaches the original."""
-    owner_id = get_current_owner_id()
+class ForkError(Exception):
+    """A branch that was not made: ``code`` is the error the answer names, ``status`` its HTTP status."""
+
+    def __init__(self, code: str, status: int, **fields: Any):
+        super().__init__(code)
+        self.code = code
+        self.status = status
+        self.fields = fields
+
+
+# Messages that a branch does not copy: errors and notices of the chat, and the Court's own words.
+_SERVICE_SOURCES = frozenset({"error", "court", "voice_transcription_unavailable"})
+
+
+def _is_service_message(message: dict[str, Any]) -> bool:
+    source = message.get("source")
+    return isinstance(source, str) and (
+        source in _SERVICE_SOURCES or source.startswith("interrupted:")
+    )
+
+
+def fork_dialog(
+    owner_id: str,
+    conv_id: str,
+    *,
+    model: Any = None,
+    title: Any = None,
+    before_id: Any = None,
+    edits: dict[int, str] | None = None,
+    drop_ids: Any = None,
+) -> dict[str, Any]:
+    """A new dialog with a copy of what was said in ``conv_id``: its own provider conversation.
+
+    The copy keeps the messages before ``before_id``, applies ``edits`` (message id -> new
+    text) and leaves out ``drop_ids``. Errors, notices and the Court's words are not copied,
+    and a dialog with a running turn is not branched, so the copy holds only what was said.
+    Raises ForkError; the original dialog is never changed."""
     if not check_access(conv_id, owner_id):
-        return jsonify(error_body("conversation_not_found")), 404
-    data = request.get_json(silent=True) or {}
+        raise ForkError("conversation_not_found", 404)
     try:
-        model = validate_dialog_model(data.get("model"))
+        model = validate_dialog_model(model)
     except ValueError:
-        return jsonify(error_body("model_not_available_for_dialog")), 400
+        raise ForkError("model_not_available_for_dialog", 400)
     except bound.ModelDiscoveryError:
-        return jsonify(error_body("model_catalog_unavailable")), 503
-    # The Court cuts the copy before the message that filed the issue.
-    before_id = data.get("before_id")
-    turns = [
+        raise ForkError("model_catalog_unavailable", 503)
+    if bound.conversation_turn_running(conv_id):
+        raise ForkError("conversation_turn_running", 409)
+    said = [
         m
         for m in get_messages(conv_id)
         if (not isinstance(before_id, int) or m["id"] < before_id)
         and m.get("role") in ("user", "assistant")
-        and m.get("source") != "court"
+        and not _is_service_message(m)
         and str(m.get("text") or "").strip()
+    ]
+    eligible = {m["id"] for m in said}
+    drops = set()
+    for message_id in drop_ids or ():
+        if not isinstance(message_id, int) or message_id not in eligible:
+            raise ForkError("invalid_branch_message", 400, message_id=message_id)
+        drops.add(message_id)
+    new_texts: dict[int, str] = {}
+    for message_id, text in (edits or {}).items():
+        if (
+            not isinstance(message_id, int)
+            or message_id not in eligible
+            or message_id in drops
+            or not isinstance(text, str)
+            or not text.strip()
+        ):
+            raise ForkError("invalid_branch_edit", 400, message_id=message_id)
+        new_texts[message_id] = text
+    turns = [
+        {**m, "text": new_texts.get(m["id"], m["text"])}
+        for m in said
+        if m["id"] not in drops
     ]
     items = [
         {
@@ -2409,19 +2462,52 @@ def copy_conversation(conv_id):
             client.add_conversation_items(provider_id, items, trace)
     except Exception as exc:
         logger.exception("[COPY] Provider copy of %s failed", conv_id)
-        return jsonify(error_body("provider_copy_failed", message=str(exc))), 502
+        raise ForkError("provider_copy_failed", 502, message=str(exc))
     copy_id = str(uuid.uuid4())
-    title = normalize_conversation_title(
-        data.get("title") or get_conversation_title(conv_id)
-    )
+    branch_title = normalize_conversation_title(title or get_conversation_title(conv_id))
     set_owner(copy_id, owner_id)
-    create_conversation(copy_id, title, model)
+    create_conversation(copy_id, branch_title, model)
     set_yandex_conversation(copy_id, provider_id)
     for m in turns:
         add_message(copy_id, m["role"], m["text"])
-    return jsonify(
-        {"id": copy_id, "title": title, "model": model, "messages": len(turns)}
-    ), 201
+    return {"id": copy_id, "title": branch_title, "model": model, "messages": len(turns)}
+
+
+def call_yandex_operation(
+    operation: str,
+    *,
+    path_params: dict[str, Any] | None = None,
+    query: dict[str, Any] | None = None,
+    body: Any = None,
+) -> dict[str, Any]:
+    """One catalog operation of the Court, with the chat's provider client (yandex_client_modules.operations)."""
+    client = logos_client_type()(bound.Config)
+    return client.call_operation(
+        operation,
+        path_params=path_params,
+        query=query,
+        body=body,
+        execution_trace=bound.ExecutionTrace(),
+    )
+
+
+@mcp_bp.route("/api/conversations/<conv_id>/copy", methods=["POST"])
+def copy_conversation(conv_id):
+    """A copy of a dialog for the Court: its messages in a new dialog with its own provider
+    conversation, so what is asked in the copy never reaches the original."""
+    owner_id = get_current_owner_id()
+    data = request.get_json(silent=True) or {}
+    try:
+        made = fork_dialog(
+            owner_id,
+            conv_id,
+            model=data.get("model"),
+            title=data.get("title"),
+            before_id=data.get("before_id"),
+        )
+    except ForkError as error:
+        return jsonify(error_body(error.code, **error.fields)), error.status
+    return jsonify(made), 201
 
 
 def _message_id_arg(name):

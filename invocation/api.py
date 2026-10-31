@@ -73,3 +73,59 @@ def get_invocation_trace(invocation_id: str) -> dict[str, Any] | None:
         "events": [],
         "errors": [],
     }
+
+
+def _message_by_id(conversation_id: str, message_id: int) -> dict[str, Any] | None:
+    for message in get_messages(conversation_id):
+        if message.get("id") == message_id:
+            return message
+    return None
+
+
+def get_message_trace(conversation_id: str, message_id: int) -> dict[str, Any] | None:
+    """The trace of one stored message, sanitized the same way as every trace API.
+
+    A message written by a turn keeps a reference to its invocation, and the trace is read
+    from there; a message that keeps its trace inline (older records) is returned as stored.
+    None when the message is not in the conversation."""
+    message = _message_by_id(str(conversation_id), int(message_id))
+    if message is None:
+        return None
+    trace = message.get("trace") or {}
+    if trace.get("storage") == "invocation" and trace.get("invocation_id"):
+        invocation_id = str(trace["invocation_id"])
+        status = get_invocation_status(invocation_id)
+        return {
+            "message_id": message.get("id"),
+            "invocation_id": invocation_id,
+            "status": status.get("status") if status else None,
+            "trace": get_invocation_trace(invocation_id),
+        }
+    return {
+        "message_id": message.get("id"),
+        "invocation_id": None,
+        "status": None,
+        "trace": _sanitize_trace(trace) if trace else None,
+    }
+
+
+def list_message_traces(conversation_id: str) -> list[dict[str, Any]]:
+    """The messages of a conversation that carry a trace, oldest first, without trace bodies."""
+    rows = []
+    for message in get_messages(str(conversation_id)):
+        trace = message.get("trace") or {}
+        if not trace:
+            continue
+        rows.append(
+            {
+                "message_id": message.get("id"),
+                "role": message.get("role"),
+                "source": message.get("source"),
+                "created_at": message.get("created_at"),
+                "invocation_id": trace.get("invocation_id")
+                if trace.get("storage") == "invocation"
+                else None,
+                "inline": trace.get("storage") != "invocation",
+            }
+        )
+    return rows

@@ -15,14 +15,25 @@ from court._binding import Binding, HostNotBound
 
 @dataclass(frozen=True, kw_only=True)
 class Host:
+    ContractViolation: Any  # api.contracts.ContractViolation
+    ForkError: Any  # chat.mcp_routes.ForkError
+    OperationRefused: Any  # yandex_client_modules.operations.OperationRefused
     TreasuryIdentityError: Any  # economy.treasury_identity.TreasuryIdentityError
+    YandexClientError: Any  # yandex_client_modules.errors.YandexClientError
     add_message: Any  # storage.records.add_message
+    call_yandex_operation: Any  # chat.mcp_routes.call_yandex_operation
     check_access: Any  # conversations.ownership.check_access
+    fork_dialog: Any  # chat.mcp_routes.fork_dialog
     get_conversation_title: Any  # storage.records.get_conversation_title
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
+    get_invocation_status: Any  # invocation.api.get_invocation_status
+    get_invocation_trace: Any  # invocation.api.get_invocation_trace
+    get_message_trace: Any  # invocation.api.get_message_trace
     get_messages: Any  # storage.records.get_messages
     get_store: Any  # storage.records.get_store
+    list_message_traces: Any  # invocation.api.list_message_traces
     list_owned_conversations: Any  # conversations.ownership.list_owned_conversations
+    list_yandex_operations: Any  # yandex_client_modules.operations.list_operations
 
 
 _binding: Binding[Host] = Binding("court")
@@ -39,12 +50,19 @@ __all__ = [
     "current",
     "provide",
     "add_message",
+    "call_yandex_operation",
     "check_access",
+    "fork_dialog",
     "get_conversation_title",
     "get_current_owner_id",
+    "get_invocation_status",
+    "get_invocation_trace",
+    "get_message_trace",
     "get_messages",
     "get_store",
+    "list_message_traces",
     "list_owned_conversations",
+    "list_yandex_operations",
 ]
 
 
@@ -52,8 +70,16 @@ def add_message(*args: Any, **kwargs: Any) -> Any:
     return current().add_message(*args, **kwargs)
 
 
+def call_yandex_operation(*args: Any, **kwargs: Any) -> Any:
+    return current().call_yandex_operation(*args, **kwargs)
+
+
 def check_access(*args: Any, **kwargs: Any) -> Any:
     return current().check_access(*args, **kwargs)
+
+
+def fork_dialog(*args: Any, **kwargs: Any) -> Any:
+    return current().fork_dialog(*args, **kwargs)
 
 
 def get_conversation_title(*args: Any, **kwargs: Any) -> Any:
@@ -64,6 +90,18 @@ def get_current_owner_id(*args: Any, **kwargs: Any) -> Any:
     return current().get_current_owner_id(*args, **kwargs)
 
 
+def get_invocation_status(*args: Any, **kwargs: Any) -> Any:
+    return current().get_invocation_status(*args, **kwargs)
+
+
+def get_invocation_trace(*args: Any, **kwargs: Any) -> Any:
+    return current().get_invocation_trace(*args, **kwargs)
+
+
+def get_message_trace(*args: Any, **kwargs: Any) -> Any:
+    return current().get_message_trace(*args, **kwargs)
+
+
 def get_messages(*args: Any, **kwargs: Any) -> Any:
     return current().get_messages(*args, **kwargs)
 
@@ -72,5 +110,13 @@ def get_store(*args: Any, **kwargs: Any) -> Any:
     return current().get_store(*args, **kwargs)
 
 
+def list_message_traces(*args: Any, **kwargs: Any) -> Any:
+    return current().list_message_traces(*args, **kwargs)
+
+
 def list_owned_conversations(*args: Any, **kwargs: Any) -> Any:
     return current().list_owned_conversations(*args, **kwargs)
+
+
+def list_yandex_operations(*args: Any, **kwargs: Any) -> Any:
+    return current().list_yandex_operations(*args, **kwargs)

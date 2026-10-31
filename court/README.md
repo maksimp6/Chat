@@ -49,12 +49,22 @@ Other units reach it only through their own ports:
 | `GET /api/court/hearings` | The sittings, newest first. |
 | `GET /api/court/hearings/<id>` | One sitting. |
 
-The HTTP side only reads the hall, and a sitting's record is never removed. The ⚖️ window has nothing to click or fill: it lists the sittings with the owner's verdict and the conclusion. Everything else is said in chats. The owner files an issue in words; the model calls `court` action `sue`, which creates the dialog «⚖️ Суд: <dialog>» and starts the judge there. The user is always right: the issue is the verdict (`owner_verdict: ВИНОВЕН`), so the judge finds what the AI is to blame for and gives the verdicts, never whether. The judge questions the accused with `court` action `interrogate`: the question goes as the user into a copy of the accused dialog (`POST /api/conversations/<id>/copy`, a new provider conversation holding the same messages, «⚖️ Улики: <dialog>»), so the original dialog never hears of the court. The judge writes the conclusion of guilt with action `conclusion`; the window shows it with the sitting.
+The HTTP side only reads the hall, and a sitting's record is never removed. The ⚖️ window has nothing to click or fill: it lists the sittings with the owner's verdict and the conclusion. Everything else is said in chats. The owner files an issue in words; the model calls `court` action `sue`, which creates the dialog «⚖️ Суд: <dialog>» and starts the judge there. The user is always right: the issue is the verdict (`owner_verdict: ВИНОВЕН`), so the judge finds what the AI is to blame for and gives the verdicts, never whether. The judge questions the accused with `court` action `interrogate`: the question goes as the user into a branch of the accused dialog (`court.hearings.interrogate` → `chat.mcp_routes.fork_dialog`, a new provider conversation, «⚖️ Улики: <dialog>»), so the original dialog never hears of the court. The judge writes the conclusion of guilt with action `conclusion`; the window shows it with the sitting.
+
+**Branches** (`POST /api/conversations/<id>/copy` and the court's `branch`). A branch is a new dialog with the said messages of a dialog, its own provider conversation, optionally cut before a message (`before_id`), with messages edited or left out. Errors, notices and the Court's own words are not copied, and a dialog with a running turn is not branched (`409 conversation_turn_running`). The original dialog is never edited.
 
 
 ## Tools
 
-Category `court`, one function `court`: the field `action` picks the action. Reading needs no approval: `rules`, `judge_dialog`, `hearings_list`, `hearing_get`. Changing the hall needs the owner's approval (`metadata.approval_actions`): `speak` (the Court's word into the chat), `hearing_open`, `hearing_rejudge`, `hearing_decide` (recorded in the owner's name, because the approval is theirs; a decision by the executor would be S2.5), `case_file`, `hearing_close`, `hearing_reopen`. Each action checks its own required fields and answers with the missing names.
+Category `court`, one function `court`: the field `action` picks the action. The tool is offered to chat models (`responses_api`) and to local agents (`local_agent`), not to anonymous MCP clients.
+
+Reading: `rules`, `judge_dialog`, `hearings_list`, `hearing_get`, `trace_get` (the trace of an invocation, or of the message that carries it, with the invocation's state: `running`, `completed`, `failed`), `trace_refs` (the messages of a dialog that carry a trace), `yandex_operations` (the Yandex operations the Court may call).
+
+Changing: `speak` (the Court's word into the chat), `hearing_open`, `hearing_rejudge`, `hearing_decide` (recorded in the owner's name, because the approval is theirs; a decision by the executor would be S2.5), `case_file`, `hearing_close`, `hearing_reopen`, `branch` (a new dialog only; `before_message_id`, `edits` and `drop_message_ids` shape it), `yandex_call` (one operation of the Yandex API by name, with `path_params`, `query` and `body` as its contract states).
+
+`yandex_call` opens only the catalog's HTTP operations with a JSON body that are GET or POST and are neither a cancel, a delete, an update nor marked unsupported in the snapshot (`yandex_client_modules/operations.py`). The request is validated by `api/yandex_transport.py` before it is sent, and it uses the deployment's Yandex key. Not covered: gRPC and realtime operations, multipart and audio bodies, and IAM-token-only calls.
+
+The approval flag is recorded in the tool's metadata (`metadata.approval_actions`); the executor does not enforce it, because `restrictions_lifted()` is true. Each action checks its own required fields and answers with the missing names.
 
 ## Ports
 
@@ -67,6 +77,17 @@ Everything `court` uses from other units is a field of `Host` in [`court/host.py
 | `check_access` | `conversations.ownership.check_access` |
 | `get_conversation_title` | `storage.records.get_conversation_title` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
+| `ContractViolation` | `api.contracts.ContractViolation` |
+| `ForkError` | `chat.mcp_routes.ForkError` |
+| `OperationRefused` | `yandex_client_modules.operations.OperationRefused` |
+| `YandexClientError` | `yandex_client_modules.errors.YandexClientError` |
+| `call_yandex_operation` | `chat.mcp_routes.call_yandex_operation` |
+| `fork_dialog` | `chat.mcp_routes.fork_dialog` |
+| `get_invocation_status` | `invocation.api.get_invocation_status` |
+| `get_invocation_trace` | `invocation.api.get_invocation_trace` |
+| `get_message_trace` | `invocation.api.get_message_trace` |
+| `list_message_traces` | `invocation.api.list_message_traces` |
+| `list_yandex_operations` | `yandex_client_modules.operations.list_operations` |
 | `get_messages` | `storage.records.get_messages` |
 | `get_store` | `storage.records.get_store` |
 | `list_owned_conversations` | `conversations.ownership.list_owned_conversations` |

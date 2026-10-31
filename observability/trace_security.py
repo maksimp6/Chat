@@ -30,7 +30,20 @@ SENSITIVE_KEYS: set[str] = {
 }
 MAX_REPR = 4000
 MAX_DEPTH = 12
-MAX_ITEMS = 50
+# Owner's value: 0 means no application cap on how many items of a list or dict are kept.
+MAX_ITEMS = 0
+
+
+def _kept_count(length: int) -> int:
+    return length if MAX_ITEMS <= 0 else min(length, MAX_ITEMS)
+
+
+def _cut(length: int) -> bool:
+    return MAX_ITEMS > 0 and length > MAX_ITEMS
+
+
+def _kept(items: list) -> list:
+    return items if MAX_ITEMS <= 0 else items[:MAX_ITEMS]
 # Matches credential words as whole underscore-separated parts, so "input_tokens" is not a secret.
 _SENSITIVE_KEY_RE = re.compile(
     r"(?:^|_)(?:token|secret|password|passwd|api_?key|authorization|cookie|credentials?|private_?key)(?:_|$)"
@@ -132,23 +145,25 @@ def sanitize_trace_value(value: Any, depth: int = 0) -> Any:
         return value
     if isinstance(value, dict):
         result = {}
-        for key, item in list(value.items())[:MAX_ITEMS]:
+        for key, item in _kept(list(value.items())):
             key_text = str(key)
             result[_distinct_key_text(key, key_text, result)] = (
                 "<redacted>"
                 if _is_sensitive_key(key_text)
                 else sanitize_trace_value(item, depth + 1)
             )
-        if len(value) > MAX_ITEMS:
-            result["<truncated>"] = f"{len(value) - MAX_ITEMS} more items"
+        if _cut(len(value)):
+            result["<truncated>"] = f"{len(value) - _kept_count(len(value))} more items"
         return result
     if isinstance(value, (list, tuple, set)):
         items = list(value)
         sanitized = [
-            sanitize_trace_value(item, depth + 1) for item in items[:MAX_ITEMS]
+            sanitize_trace_value(item, depth + 1) for item in _kept(items)
         ]
-        if len(items) > MAX_ITEMS:
-            sanitized.append(f"<truncated: {len(items) - MAX_ITEMS} more items>")
+        if _cut(len(items)):
+            sanitized.append(
+                f"<truncated: {len(items) - _kept_count(len(items))} more items>"
+            )
         return sanitized
     try:
         text = repr(value)

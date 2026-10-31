@@ -29,6 +29,7 @@ from court.hearings import (
 )
 from court.host import check_access, get_current_owner_id, get_messages
 from court.judging import judge_dialog, rules_table
+from court.ops import branch, trace_get, trace_refs, yandex_call, yandex_operations
 
 __all__ = ["COURT_TOOLS"]
 
@@ -50,7 +51,8 @@ def _tool(
         "risk_level": "low" if read_only else "high",
         "read_only": read_only,
         "requires_approval": requires_approval,
-        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        # Not on the anonymous MCP transport: traces and branches reach the owner's dialogs.
+        "supported_transports": ["responses_api", "local_agent"],
         "executor": {"type": "local"},
         "func": fn,
     }
@@ -200,6 +202,18 @@ _ACTIONS: dict[str, dict[str, Any]] = {
                       "about": "закрыть заседание с причиной"},
     "hearing_reopen": {"fn": _reopen, "required": ["hearing_id", "reason"], "write": True,
                        "about": "возобновить закрытое заседание с причиной"},
+    "trace_get": {"fn": trace_get, "required": [], "write": False,
+                  "about": "трасса вызова: invocation_id, либо conversation_id и message_id сообщения; "
+                           "с состоянием вызова (running, completed, failed)"},
+    "trace_refs": {"fn": trace_refs, "required": ["conversation_id"], "write": False,
+                   "about": "сообщения диалога conversation_id с трассами и их invocation_id"},
+    "branch": {"fn": branch, "required": ["conversation_id"], "write": True,
+               "about": "ветка диалога conversation_id: новый диалог из сказанного; before_message_id обрезает, "
+                        "edits [{message_id, text}] правят сообщения, drop_message_ids убирают; оригинал не меняется"},
+    "yandex_operations": {"fn": yandex_operations, "required": [], "write": False,
+                          "about": "операции API Yandex, которые суд может вызвать (только чтение и создание)"},
+    "yandex_call": {"fn": yandex_call, "required": ["operation"], "write": True,
+                    "about": "вызов операции API Yandex по имени operation: path_params, query и body по её контракту"},
 }
 
 
@@ -229,6 +243,28 @@ _FIELDS = {
     },
     "decision": {"type": "string", "enum": list(DECISIONS)},
     "reason": {"type": "string", "minLength": 1},
+    "invocation_id": {"type": "string", "minLength": 1, "maxLength": 128, "description": "trace_get: вызов, чья трасса нужна"},
+    "message_id": {"type": "integer", "minimum": 1, "description": "trace_get: сообщение диалога с трассой"},
+    "before_message_id": {"type": "integer", "minimum": 1, "description": "branch: ветка до этого сообщения (не включая его)"},
+    "edits": {
+        "type": "array",
+        "description": "branch: правки сообщений ветки",
+        "items": {
+            "type": "object",
+            "properties": {
+                "message_id": {"type": "integer", "minimum": 1},
+                "text": {"type": "string", "minLength": 1},
+            },
+            "required": ["message_id", "text"],
+        },
+    },
+    "drop_message_ids": {"type": "array", "description": "branch: сообщения, которых не будет в ветке", "items": {"type": "integer", "minimum": 1}},
+    "model": {"type": "string", "minLength": 1, "description": "branch: модель ветки; по умолчанию модель диалога"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 200, "description": "branch: название ветки"},
+    "operation": {"type": "string", "minLength": 1, "maxLength": 200, "description": "yandex_call: имя операции из yandex_operations"},
+    "path_params": {"type": "object", "description": "yandex_call: параметры пути из URL операции"},
+    "query": {"type": "object", "description": "yandex_call: параметры строки запроса"},
+    "body": {"description": "yandex_call: тело запроса (JSON) по контракту операции"},
     "message": {"type": "string", "minLength": 1, "description": "interrogate: вопрос обвиняемому от лица пользователя"},
     "text": {"type": "string", "minLength": 1, "description": "conclusion: текст заключения вины"},
     **_HEARING,

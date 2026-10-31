@@ -196,6 +196,7 @@ def _chat():
     from storage.records import set_yandex_conversation
     from economy.billing import settle_billing_to_treasury
     from invocation.manager import start_invocation
+    from invocation.manager import conversation_turn_running
     from observability.trace_manager import traced_operation
     from api.contracts import validate_api_contract
     from provider_accounts.model_discovery import validate_dialog_model
@@ -286,6 +287,7 @@ def _chat():
         set_yandex_conversation=set_yandex_conversation,
         settle_billing_to_treasury=settle_billing_to_treasury,
         start_invocation=start_invocation,
+        conversation_turn_running=conversation_turn_running,
         traced_operation=traced_operation,
         validate_api_contract=validate_api_contract,
         validate_dialog_model=validate_dialog_model,
@@ -334,16 +336,37 @@ def _court():
     from storage.records import get_messages
     from storage.records import get_store
     from conversations.ownership import list_owned_conversations
+    from api.contracts import ContractViolation
+    from chat.mcp_routes import ForkError, call_yandex_operation, fork_dialog
+    from invocation.api import (
+        get_invocation_status,
+        get_invocation_trace,
+        get_message_trace,
+        list_message_traces,
+    )
+    from yandex_client_modules.errors import YandexClientError
+    from yandex_client_modules.operations import OperationRefused, list_operations
 
     return host.Host(
+        ContractViolation=ContractViolation,
+        ForkError=ForkError,
+        OperationRefused=OperationRefused,
         TreasuryIdentityError=TreasuryIdentityError,
+        YandexClientError=YandexClientError,
         add_message=add_message,
+        call_yandex_operation=call_yandex_operation,
         check_access=check_access,
+        fork_dialog=fork_dialog,
         get_conversation_title=get_conversation_title,
         get_current_owner_id=get_current_owner_id,
+        get_invocation_status=get_invocation_status,
+        get_invocation_trace=get_invocation_trace,
+        get_message_trace=get_message_trace,
         get_messages=get_messages,
         get_store=get_store,
+        list_message_traces=list_message_traces,
         list_owned_conversations=list_owned_conversations,
+        list_yandex_operations=list_operations,
     )
 
 

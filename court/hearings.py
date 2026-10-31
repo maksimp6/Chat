@@ -511,14 +511,18 @@ def interrogate(conversation_id: str, message: str) -> dict[str, Any]:
         for prefix in ("⚖️ Суд: ", "⚖️ Улики: "):
             while title.startswith(prefix):
                 title = title[len(prefix):]
-        made = _local_post(
-            f"/api/conversations/{conversation_id}/copy",
-            {
-                "model": row.get("model"),
-                "title": f"⚖️ Улики: {title}",
-                "before_id": get_store().get("court/cut/" + conversation_id),
-            },
-        )
+        if owner is None:
+            raise LookupError("owner_unavailable")
+        try:
+            made = bound.fork_dialog(
+                owner,
+                conversation_id,
+                model=row.get("model"),
+                title=f"⚖️ Улики: {title}",
+                before_id=get_store().get("court/cut/" + conversation_id),
+            )
+        except bound.ForkError as error:
+            raise ValueError(f"copy of the dialog was refused: {error.code}") from error
         copy = {"id": made["id"], "model": made["model"]}
         with get_store().transaction() as tx:
             tx.set(key, copy)

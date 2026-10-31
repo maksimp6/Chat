@@ -450,6 +450,18 @@ def get_invocation_owner(invocation_id: str) -> str | None:
     return value.get("user_id")
 
 
+def conversation_turn_running(conversation_id: str) -> bool:
+    """True while an invocation of this conversation is created or running."""
+    for record in get_memory_client(memory_file_path()).items(_INVOCATION_PREFIX).values():
+        if (
+            isinstance(record, dict)
+            and record.get("conversation_id") == str(conversation_id)
+            and record.get("status") in {"created", "running"}
+        ):
+            return True
+    return False
+
+
 def get_invocation(invocation_id: str) -> dict[str, Any] | None:
     value = get_memory_client(memory_file_path()).get(_key(invocation_id))
     if value is None:

@@ -73,6 +73,7 @@ class Host:
     compose_skill_instructions: Any  # agent_skills.registry.compose_skill_instructions
     create_conversation: Any  # storage.records.create_conversation
     create_invocation: Any  # invocation.manager.create_invocation
+    conversation_turn_running: Any  # invocation.manager.conversation_turn_running
     create_invocation_trace: Any  # invocation.trace.create_invocation_trace
     embed_texts: Any  # yandex_client_modules.embeddings.embed_texts
     embedding_cost: Any  # economy.knowledge_economics.embedding_cost
@@ -234,6 +235,10 @@ def create_conversation(*args: Any, **kwargs: Any) -> Any:
 
 def create_invocation(*args: Any, **kwargs: Any) -> Any:
     return current().create_invocation(*args, **kwargs)
+
+
+def conversation_turn_running(*args: Any, **kwargs: Any) -> Any:
+    return current().conversation_turn_running(*args, **kwargs)
 
 
 def create_invocation_trace(*args: Any, **kwargs: Any) -> Any:

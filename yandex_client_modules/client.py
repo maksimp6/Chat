@@ -12,6 +12,7 @@ from yandex_client_modules.stream_mixin import YandexStreamMixin
 from yandex_client_modules.mcp_mixin import YandexMcpMixin
 
 from yandex_client_modules.files import YandexFileManagerMixin
+from yandex_client_modules.operations import YandexOperationMixin
 
 
 class YandexResponsesClient(
@@ -21,6 +22,7 @@ class YandexResponsesClient(
     YandexConversationMixin,
     YandexMcpMixin,
     YandexFileManagerMixin,
+    YandexOperationMixin,
 ):
     def __init__(self, config):
         self._config = config
