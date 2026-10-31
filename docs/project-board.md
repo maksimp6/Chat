@@ -82,6 +82,8 @@ python3 -m project_board.seed --db /data/project-board/board.memory
 
 ## Тесты и ограничения приёмки
 
+Файлы `tests/test_project_board.py` и `tests/` в целом в репозитории пока не существуют: команды ниже описывают проверку, которая ещё не подключена.
+
 ```bash
 python3 -m pytest -q tests/test_project_board.py
 python3 -m ruff check project_board tests/test_project_board.py

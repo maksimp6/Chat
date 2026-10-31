@@ -11,8 +11,9 @@ enhancement work tracked by #227; this is scoped to bundle size only.
 
 ## What "critical" means here
 
-The repository already has a critical-vs-optional script contract, enforced
-by `tests/test_frontend_script_contract.py`: `templates/index.html` loads a
+The repository has a critical-vs-optional script contract; the test meant to
+enforce it (`tests/test_frontend_script_contract.py`) is not in the repository
+yet. `templates/index.html` loads a
 synchronous `id="logos-boot"` script first, then a chain of scripts marked
 `data-critical-script="core-api|ui-runtime|dispatcher|core"`, before any
 other application module. That chain is the fetch/dispatcher/startup glue
@@ -167,7 +168,8 @@ HTML/CSS/critical-script chain (~89 KiB) has arrived but the remaining
 - `android_diagnostics.js` and `eruda_init.js` are already explicitly
   marked `data-optional-script="true"` and are debug/diagnostic tooling,
   not user-facing functionality — their absence is expected and already
-  covered by `tests/test_frontend_optional_scripts.py`.
+  meant to be covered by `tests/test_frontend_optional_scripts.py`, which is not
+  in the repository yet.
 
 In practice, on any connection fast enough to load ~89 KiB at all, the
 remaining ~243 KiB of deferred scripts finish within the same page load and

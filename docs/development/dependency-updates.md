@@ -1,7 +1,8 @@
 # Обновления зависимостей (Dependabot)
 
 Конфигурация: [`.github/dependabot.yml`](../../.github/dependabot.yml). Её
-инварианты проверяет `tests/test_dependabot_policy.py`.
+инварианты должен проверять `tests/test_dependabot_policy.py`, которого в
+репозитории пока нет.
 
 ## Version updates
 
