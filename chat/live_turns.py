@@ -186,11 +186,29 @@ class LiveTurn:
         self._round_reasoning = ""
         self._reasoning_part: Any = None
         self._phase: str | None = None
+        # The reply text across all rounds, kept in the store while it streams: a restart keeps what was written.
+        self._partial_text = ""
+        self._partial_saved_at = 0.0
 
     def emit(self, event: dict[str, Any]) -> None:
         with self.condition:
             self.events.append(event)
             self.condition.notify_all()
+
+    def _save_partial(self) -> None:
+        """Store the reply text so far, at most once a second; never raises."""
+        now = time.monotonic()
+        if now - self._partial_saved_at < 1.0:
+            return
+        self._partial_saved_at = now
+        try:
+            with get_store().transaction() as tx:
+                tx.set(
+                    f"live_partial/{self.conversation_id}/{self.request_id}",
+                    self._partial_text,
+                )
+        except Exception:
+            logger.exception("Partial reply of turn %s was not stored", self.request_id)
 
     def _status(self, phase: str, text: str, *, force: bool = False) -> None:
         if not force and phase == self._phase:
@@ -268,6 +286,8 @@ class LiveTurn:
                 return
             self._status("writing", _STATUS_TEXTS["writing"])
             self._round_text += text
+            self._partial_text += text
+            self._save_partial()
             self.emit({"type": "delta", "text": text})
             return
         if kind == "reasoning_delta":
