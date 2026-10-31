@@ -1,4 +1,4 @@
-"""Alice Cloud provider package."""
+"""Self-hosted cloud provider package."""
 
 from cloud.alice.provider import AliceCloudProvider
 
