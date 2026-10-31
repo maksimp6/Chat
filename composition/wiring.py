@@ -102,6 +102,7 @@ def _browser():
 
 def _chat():
     from chat import host
+    from core.config import CHAT_MODEL
     from core.config import CLASSIFIER_MODELS
     from core.config import Config
     from core.config import EMBEDDING_MODELS
@@ -203,6 +204,7 @@ def _chat():
     from yandex_client_modules.request_builder import validate_generation_params
 
     return host.Host(
+        CHAT_MODEL=CHAT_MODEL,
         CLASSIFIER_MODELS=CLASSIFIER_MODELS,
         Config=Config,
         EMBEDDING_MODELS=EMBEDDING_MODELS,
@@ -664,6 +666,7 @@ def _project_board():
 
 def _provider_accounts():
     from provider_accounts import host
+    from core.config import CHAT_MODEL
     from core.config import CLASSIFIER_MODELS
     from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
     from cloud.cloudru.iam import CloudRuIamClient
@@ -694,6 +697,7 @@ def _provider_accounts():
     from observability.trace_manager import traced_operation
 
     return host.Host(
+        CHAT_MODEL=CHAT_MODEL,
         CLASSIFIER_MODELS=CLASSIFIER_MODELS,
         CloudRuApiKeyProvider=CloudRuApiKeyProvider,
         CloudRuIamClient=CloudRuIamClient,

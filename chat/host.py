@@ -16,6 +16,7 @@ from chat._binding import Binding, HostNotBound
 
 @dataclass(frozen=True, kw_only=True)
 class Host:
+    CHAT_MODEL: Any  # core.config.CHAT_MODEL
     CLASSIFIER_MODELS: Any  # core.config.CLASSIFIER_MODELS
     Config: Any  # core.config.Config
     EMBEDDING_MODELS: Any  # core.config.EMBEDDING_MODELS

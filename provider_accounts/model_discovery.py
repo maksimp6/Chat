@@ -18,7 +18,6 @@ import requests
 from provider_accounts.host import (
     bound,
     canonical_model_key,
-    get_model_uri,
     provider_request_headers,
     registry_key_for_upstream,
 )
@@ -284,9 +283,10 @@ class ModelDiscovery:
                 # adapter for it. Keep it visible without advertising execution.
                 result["available"] = False
                 result["availability_reason"] = "runtime_adapter_not_registered"
+        # Of the text models only the one chat model is a dialog model.
         result["dialog_selectable"] = (
-            kind in {"text", "voice", "image"} and result["available"]
-        )
+            kind in {"voice", "image"} or registry_key == bound.CHAT_MODEL
+        ) and result["available"]
         return result
 
     @staticmethod
@@ -343,7 +343,9 @@ def static_model_catalog() -> dict[str, Any]:
         kind: {
             key: {
                 **deepcopy(value),
-                "dialog_selectable": kind in {"text", "voice", "image"}
+                "dialog_selectable": (
+                    kind in {"voice", "image"} or key == bound.CHAT_MODEL
+                )
                 and value.get("available") is not False,
             }
             for key, value in registry.items()
@@ -353,45 +355,20 @@ def static_model_catalog() -> dict[str, Any]:
 
 
 def validate_dialog_model(model_key: str) -> str:
-    """Accept dialog models without removing service models from the inventory.
+    """Accept the one chat model and the registered voice and image models.
 
-    Registered dialog models work during catalog outages. Private/tuned models
-    require an available text entry in the active credential's provider catalog.
-    This function only reads credentials/catalogs; it never changes storage.
+    A text dialog has no model of its own: it always uses the chat model. Image
+    and voice dialogs keep their registered model. This function only reads the
+    registry; it never changes storage.
     """
     if not isinstance(model_key, str) or not model_key.strip():
         raise ValueError("model is required")
     model_key = canonical_model_key(model_key.strip())
-    if model_key in bound.EMBEDDING_MODELS or model_key in bound.CLASSIFIER_MODELS:
-        raise ValueError("service models cannot be used for dialogs")
-    for registry in (bound.TEXT_MODELS, bound.VOICE_MODELS, bound.IMAGE_MODELS):
+    if model_key == bound.CHAT_MODEL:
+        return model_key
+    for registry in (bound.VOICE_MODELS, bound.IMAGE_MODELS):
         if model_key in registry:
             if registry[model_key].get("available") is False:
                 raise ValueError("model is unavailable for dialogs")
             return model_key
-
-    normalized = ModelDiscovery._normalize_model({"id": model_key})
-    if normalized is None or normalized["type"] != "text":
-        raise ValueError("model is not a text dialog model")
-    catalog = get_model_discovery().get_models()
-    text_models = catalog.get("text") or {}
-    entry = text_models.get(model_key)
-    if entry is None:
-        entry = next(
-            (
-                item
-                for item in text_models.values()
-                if item.get("provider_model_id") == model_key
-            ),
-            None,
-        )
-    if not isinstance(entry, dict) or entry.get("available") is not True:
-        raise ValueError("model is not available in the text catalog")
-    try:
-        credential = _active_provider_credential()
-    except Exception as exc:
-        raise ModelDiscoveryError("provider credential is unavailable") from exc
-    # get_model_uri checks full URI syntax and binds a tuned/versioned URI to
-    # the currently active folder without replacing or stripping its version.
-    get_model_uri(credential.project_id, model_key)
-    return model_key
+    raise ValueError("model is not a dialog model")

@@ -16,6 +16,7 @@ from provider_accounts._binding import Binding, HostNotBound
 
 @dataclass(frozen=True, kw_only=True)
 class Host:
+    CHAT_MODEL: Any  # core.config.CHAT_MODEL
     CLASSIFIER_MODELS: Any  # core.config.CLASSIFIER_MODELS
     CloudRuApiKeyProvider: Any  # cloud.cloudru.api_key_provider.CloudRuApiKeyProvider
     CloudRuIamClient: Any  # cloud.cloudru.iam.CloudRuIamClient

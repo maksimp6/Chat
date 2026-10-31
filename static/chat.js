@@ -3114,7 +3114,6 @@ document.addEventListener("DOMContentLoaded", function () {
           // Replaying the local bubble does not prove the server stored its user message.
           retry: turn.userMessageId !== null,
           retry_message_id: turn.userMessageId === null ? undefined : turn.userMessageId,
-          model: turn.model,
           params: turn.params,
           // The photos were uploaded in pieces when they were attached; the message names them.
           attachments: sentImages.map(function (image) {

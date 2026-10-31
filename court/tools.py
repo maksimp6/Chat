@@ -259,7 +259,6 @@ _FIELDS = {
         },
     },
     "drop_message_ids": {"type": "array", "description": "branch: сообщения, которых не будет в ветке", "items": {"type": "integer", "minimum": 1}},
-    "model": {"type": "string", "minLength": 1, "description": "branch: модель ветки; по умолчанию модель диалога"},
     "title": {"type": "string", "minLength": 1, "maxLength": 200, "description": "branch: название ветки"},
     "operation": {"type": "string", "minLength": 1, "maxLength": 200, "description": "yandex_call: имя операции из yandex_operations"},
     "path_params": {"type": "object", "description": "yandex_call: параметры пути из URL операции"},

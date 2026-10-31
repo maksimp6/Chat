@@ -51,23 +51,6 @@ def set_conv_title(conv_id):
     )
 
 
-def set_conv_model(conv_id):
-    owner_id = get_current_owner_id(required=False)
-    if not owner_id or not check_access(conv_id, owner_id):
-        return jsonify({"error": "conversation_not_found"}), 404
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return jsonify({"error": "json_body_required"}), 400
-    try:
-        model = validate_dialog_model(data.get("model"))
-    except ValueError:
-        return jsonify({"error": "model_not_available_for_dialog"}), 400
-    except bound.ModelDiscoveryError:
-        return jsonify({"error": "model_catalog_unavailable"}), 503
-    update_conversation_model(conv_id, model)
-    return jsonify({"status": "ok", "model": model})
-
-
 def remove_conv(conv_id):
     owner_id = get_current_owner_id(required=False)
     if not owner_id or not check_access(conv_id, owner_id):
@@ -91,9 +74,6 @@ def install(app: Flask) -> None:
     )
     app.add_url_rule(
         "/api/conversations/<conv_id>/title", view_func=set_conv_title, methods=["PUT"]
-    )
-    app.add_url_rule(
-        "/api/conversations/<conv_id>/model", view_func=set_conv_model, methods=["PUT"]
     )
     app.add_url_rule(
         "/api/conversations/<conv_id>", view_func=remove_conv, methods=["DELETE"]

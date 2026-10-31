@@ -121,13 +121,12 @@ def branch(args: dict[str, Any], cfg=None) -> dict[str, Any]:
         drops = _int_list(args.get("drop_message_ids"), "drop_message_ids")
     except ValueError as error:
         return {"success": False, "error": str(error)}
-    model = args.get("model")
-    if not model:
-        row = next(
-            (r for r in bound.list_owned_conversations(owner) if r.get("id") == conversation_id),
-            {},
-        )
-        model = row.get("model")
+    # A branch has no model parameter: it keeps the model of the dialog it copies.
+    row = next(
+        (r for r in bound.list_owned_conversations(owner) if r.get("id") == conversation_id),
+        {},
+    )
+    model = row.get("model")
     title = str(args.get("title") or "").strip() or (
         "Ветка: " + (get_conversation_title(conversation_id, "") or conversation_id)
     )

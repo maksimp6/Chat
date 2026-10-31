@@ -469,14 +469,12 @@ def _stored_message_id(conversation_id: str, role: str, request_id: str) -> int 
 
 
 def fingerprint(data: dict[str, Any]) -> str:
-    """What makes a re-sent turn the same turn: its text, model, photos and retry target."""
-    params = data.get("params") if isinstance(data.get("params"), dict) else {}
+    """What makes a re-sent turn the same turn: its text, photos and retry target."""
     attachments = data.get("attachments")
     return hashlib.sha256(
         json.dumps(
             [
                 data.get("message"),
-                data.get("model") or params.get("model"),
                 # The photos themselves (their data URLs or upload ids), so a different photo is a different turn.
                 attachments if isinstance(attachments, list) else [],
                 data.get("retry_message_id"),
