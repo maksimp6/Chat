@@ -107,19 +107,24 @@ def read_file(args: dict) -> dict:
 
         file_size = os.path.getsize(abs_path)
         raw_whence = args.get("whence", 0)
+        # An unknown whence is refused, not read from the start (#1667).
         if isinstance(raw_whence, str):
             w_norm = raw_whence.lower().strip()
             if w_norm in ("end", "seek_end", "2"):
                 whence = os.SEEK_END
             elif w_norm in ("cur", "current", "seek_cur", "1"):
                 whence = os.SEEK_CUR
-            else:
+            elif w_norm in ("", "set", "start", "seek_set", "0"):
                 whence = os.SEEK_SET
+            else:
+                return {"error": "Параметр 'whence' должен быть set, cur или end"}
         else:
             try:
                 whence = int(raw_whence)
             except (ValueError, TypeError):
-                whence = os.SEEK_SET
+                return {"error": "Параметр 'whence' должен быть set, cur или end"}
+            if whence not in (os.SEEK_SET, os.SEEK_CUR, os.SEEK_END):
+                return {"error": "Параметр 'whence' должен быть set, cur или end"}
 
         try:
             offset = int(args.get("offset", 0))

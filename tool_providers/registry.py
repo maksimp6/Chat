@@ -348,7 +348,8 @@ class ToolRegistry:
             if context and "_universal_context" in cfg:
                 raise
             logger.exception(f"[REGISTRY] Ошибка выполнения {tool_name}: {e}")
-            return {"error": "Ошибка выполнения инструмента"}
+            # The exception type reaches the answer; its text stays in the log (#1667).
+            return {"error": f"Ошибка выполнения инструмента ({type(e).__name__})"}
 
     def get_tool_meta(self, tool_name: str):
         # A copy, so a caller cannot change the registry; functions are shared.
