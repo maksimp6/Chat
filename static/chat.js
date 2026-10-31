@@ -1723,7 +1723,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // A lost connection does not lose a turn: the server keeps it and stores the answer. The number of
   // stored messages before the send tells a turn the server kept from one it never received.
-  const TURN_RECOVERY_MS = 600000;
   const TURN_RECOVERY_POLL_MS = 3000;
   const TURN_MISSING_POLLS = 3;
 
@@ -1928,9 +1927,8 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function recoverTurn(turn, recovery, onMissing) {
-    const started = Date.now();
     let missing = 0;
-    while (!recovery.cancelled && Date.now() - started < TURN_RECOVERY_MS) {
+    while (!recovery.cancelled) {
       await recoveryPause(recovery);
       if (recovery.cancelled) break;
       if (needsTurnReceipt(turn)) {
@@ -1992,11 +1990,6 @@ document.addEventListener("DOMContentLoaded", function () {
         missing = 0;
       }
     }
-    if (!recovery.cancelled) {
-      deliverApprovalOutput(turn.conversationId, function () {
-        addMessage({ text: "Ответ не пришёл вовремя. Откройте диалог заново: если ответ сохранён на сервере, он появится. Если нет, отправьте вопрос ещё раз.", role: "error" });
-      });
-    }
   }
 
   // «Стоп» ends only the wait: the server still finishes the turn and stores its answer. While this chat stays open and no
@@ -2007,9 +2000,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (typeof turn.baselineCount !== "number" && !turn.accepted) return;
     const convId = turn.conversationId;
     const startMark = turnStarts.get(convId) || 0;
-    const started = Date.now();
     let missing = 0;
-    while (Date.now() - started < TURN_RECOVERY_MS) {
+    for (;;) {
       await new Promise(function (resolve) { setTimeout(resolve, TURN_RECOVERY_POLL_MS); });
       if (currentConvId !== convId || pendingConversations.has(convId) || (turnStarts.get(convId) || 0) !== startMark) return;
       if (needsTurnReceipt(turn)) {
@@ -2108,7 +2100,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // The live bubble is redrawn at most this often; a slow redraw (a long Markdown reply on a phone) spaces them further.
   const LIVE_RENDER_MS = 250;
   // Automatic re-sends and re-attachments pause for a random time within a window that doubles from the base up to the
-  // cap (full jitter). They go on for TURN_RECOVERY_MS after the last contact with the server.
+  // cap (full jitter). They go on until the answer comes or the send is stopped.
   const RESEND_BASE_MS = 1000;
   const RESEND_WINDOW_CAP_MS = 15000;
 
@@ -2228,7 +2220,6 @@ document.addEventListener("DOMContentLoaded", function () {
   // connection, a gateway page, no headers in time on the live path) is sent again with the same request_id: the server
   // runs that turn once and answers a repeat with its live replay, «running» or «stored».
   async function postChatTurn(turn, body, live, stopSignal) {
-    const started = Date.now();
     const headers = { "Content-Type": "application/json" };
     if (live) headers.Accept = "text/event-stream";
     const idleMs = live && LIVE_IDLE_MS > 0 ? LIVE_IDLE_MS + Math.ceil(body.length / LIVE_UPLOAD_BYTES_PER_MS) : 0;
@@ -2240,7 +2231,7 @@ document.addEventListener("DOMContentLoaded", function () {
           { method: "POST", headers: headers, body: body },
           stopSignal,
           idleMs,
-          live ? 0 : 300000,
+          0,
         );
       } catch (error) {
         if (stopSignal.aborted) throw stoppedError();
@@ -2249,7 +2240,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (response && !isGatewayFailure(response)) return response;
       if (response) discardBody(response);
-      if (Date.now() - started > TURN_RECOVERY_MS) throw new TypeError("No server answer to the chat request");
       const delay = retryDelayMs(attempt);
       setTurnLabel(turn, "Нет связи с сервером: повтор через " + formatSeconds(delay) + " с (попытка " + attempt + ")");
       await pauseFor(delay, stopSignal);
@@ -2321,14 +2311,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Reads a live answer. It resolves {done: event} at the `done` frame, and {done: null} when the stream ends without
   // it or nothing (not even a keep-alive) came for idleMs: the connection broke, the turn goes on. «Стоп» throws an
-  // AbortError. lastActivity is when the server was last heard from.
+  // AbortError.
   async function readLiveStream(response, options) {
     const signal = options.signal;
     const idleMs = Number(options.idleMs) > 0 ? Number(options.idleMs) : 0;
     // The reading of this response can be ended from outside (the tab came back): then it reports a broken stream.
     const onRelease = typeof options.onRelease === "function" ? options.onRelease : null;
     const parser = createSseParser(options.onEvent);
-    let lastActivity = Date.now();
     if (signal && signal.aborted) throw stoppedError();
     if (!response.body || typeof response.body.getReader !== "function") {
       // Without a streamed body the answer is read whole; it ends with the turn.
@@ -2337,10 +2326,10 @@ document.addEventListener("DOMContentLoaded", function () {
         whole = await response.text();
       } catch (error) {
         if (signal && signal.aborted) throw stoppedError();
-        return { done: null, lastActivity: lastActivity };
+        return { done: null };
       }
       if (signal && signal.aborted) throw stoppedError();
-      return { done: parser.push(whole), lastActivity: Date.now() };
+      return { done: parser.push(whole) };
     }
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
@@ -2371,18 +2360,17 @@ document.addEventListener("DOMContentLoaded", function () {
           chunk = await reader.read();
         } catch (error) {
           if (signal && signal.aborted) throw stoppedError();
-          return { done: null, lastActivity: lastActivity };
+          return { done: null };
         }
         if (signal && signal.aborted) throw stoppedError();
-        if (released) return { done: null, lastActivity: lastActivity };
+        if (released) return { done: null };
         // A partial event at the end is dropped: without `done` the stream was interrupted.
-        if (chunk.done) return { done: parser.push(decoder.decode()), lastActivity: lastActivity };
-        lastActivity = Date.now();
+        if (chunk.done) return { done: parser.push(decoder.decode()) };
         armIdle();
         const done = parser.push(decoder.decode(chunk.value, { stream: true }));
         if (done) {
           cancel();
-          return { done: done, lastActivity: lastActivity };
+          return { done: done };
         }
       }
     } finally {
@@ -2652,14 +2640,13 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // After a broken live stream: reads the turn again from the event after the last one applied. Returns the new stream,
-  // or null when the turn's outcome was shown from a JSON answer. Throws LiveStreamLost when the server was not reached
-  // for TURN_RECOVERY_MS or no longer knows the request, and TurnRunningError when it runs but cannot be relayed: the
+  // or null when the turn's outcome was shown from a JSON answer. Throws LiveStreamLost when the server no longer
+  // knows the request, and TurnRunningError when it runs but cannot be relayed: the
   // stored history is then awaited instead.
-  async function reattachLiveTurn(turn, live, stopSignal, lastContact, outcome) {
+  async function reattachLiveTurn(turn, live, stopSignal, outcome) {
     const path = "/api/chat/turns/" + encodeURIComponent(turn.chatRequestId) +
       "/events?conversation_id=" + encodeURIComponent(turn.conversationId);
     for (let attempt = 1; ; attempt += 1) {
-      if (Date.now() - lastContact > TURN_RECOVERY_MS) throw namedError("LiveStreamLost", "Live answer stream lost");
       const delay = retryDelayMs(attempt);
       setTurnLabel(turn, "Связь с сервером прервалась: переподключаюсь через " + formatSeconds(delay) + " с (попытка " + attempt + ")");
       await pauseFor(delay, stopSignal);
@@ -2744,7 +2731,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (keepTop !== null) box.scrollTop = keepTop;
           return;
         }
-        response = await reattachLiveTurn(turn, live, stopSignal, result.lastActivity, outcome);
+        response = await reattachLiveTurn(turn, live, stopSignal, outcome);
       }
     } finally {
       // Also on «Стоп» and a lost turn, which leave the loop by a throw.
