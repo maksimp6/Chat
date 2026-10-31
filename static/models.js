@@ -5,7 +5,6 @@ function initModels() {
   document.addEventListener("logos:modal:before-open", function (event) {
     var detail = event && event.detail;
     if (!detail || detail.modalId !== "model-modal") return;
-    window.isCreatingNewChat = false;
     renderModelModal();
   });
 }
@@ -109,16 +108,10 @@ function renderModelModal() {
     }
     div.addEventListener("click", function () {
       if (unavailable) return;
-      var creatingNewChat = window.isCreatingNewChat === true;
-      // A new chat sets its model only once the conversation exists (selectConv applies it), so a failed creation changes nothing.
-      if (!creatingNewChat && typeof window.changeModel === "function") {
+      if (typeof window.changeModel === "function") {
         if (window.changeModel(key, false) === false) return;
       }
       if (modelModal) window.LogosCoreAPI.ui.modal.close(modelModal);
-      if (creatingNewChat) {
-        createConversation(key);
-        window.isCreatingNewChat = false;
-      }
     });
     modelList.appendChild(div);
   });
@@ -126,7 +119,7 @@ function renderModelModal() {
 
 function createConversation(modelKey, options) {
   options = options || {};
-  if (typeof window.isDialogModel === "function" && !window.isDialogModel(modelKey)) {
+  if (modelKey !== undefined && typeof window.isDialogModel === "function" && !window.isDialogModel(modelKey)) {
     if (window.LogosToast) window.LogosToast.error("Эта модель не предназначена для диалога");
     return Promise.resolve(null);
   }
@@ -134,7 +127,8 @@ function createConversation(modelKey, options) {
   return window.LogosDispatcher.request("/api/conversations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: modelKey }),
+    // Without a model the server gives a text dialog the chat model.
+    body: JSON.stringify(modelKey === undefined ? {} : { model: modelKey }),
   })
     .then(async function (r) {
       var data = await r.json().catch(function () { return {}; });
@@ -150,7 +144,7 @@ function createConversation(modelKey, options) {
       var conversation = {
         id: data.id,
         title: data.title || "\u041D\u043E\u0432\u044B\u0439 \u0447\u0430\u0442",
-        model: modelKey,
+        model: data.model || modelKey,
       };
       var existing = conversations.findIndex(function (item) { return item.id === data.id; });
       if (existing >= 0) conversations[existing] = conversation;

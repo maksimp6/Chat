@@ -34,10 +34,7 @@ function initSidebar() {
   if (overlay) overlay.addEventListener("click", closeSidebar);
   if (newChatBtn)
     newChatBtn.addEventListener("click", function () {
-      window.isCreatingNewChat = true;
-      if (typeof renderModelModal === "function") renderModelModal();
-      var modal = document.getElementById("model-modal");
-      if (modal) window.LogosCoreAPI.ui.modal.open(modal);
+      createConversation();
     });
   if (typeof renderSidebar === "function") renderSidebar();
   if (window.__logosSidebarHistoryBound !== true) {

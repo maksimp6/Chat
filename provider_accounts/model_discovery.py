@@ -130,8 +130,9 @@ class ModelDiscovery:
         if not isinstance(models, list):
             raise ModelDiscoveryError("provider returned an invalid model catalog")
 
+        # Every registered model stays listed; the Models API only adds what it
+        # reports about them.
         catalog = static_model_catalog()
-        catalog["text"] = {}
         for item in models:
             normalized = self._normalize_model(item, project_id=project_id)
             if normalized is None:
