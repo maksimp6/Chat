@@ -3,8 +3,9 @@
 Logos runs tools, spends money and changes cloud infrastructure on the user's
 behalf, so its code follows flight-software discipline: NASA/JPL "Power of
 Ten" adapted to Python and browser JavaScript, plus an explicit idempotency
-contract. `tests/test_reliability_rules.py` enforces the mechanical rules as a
-ratchet: violation counts may only go down.
+contract. The mechanical rules are meant to be enforced as a ratchet (the
+`tests/test_reliability_rules.py` check is not in the repository yet): violation
+counts may only go down.
 
 ## Idempotency
 
@@ -58,8 +59,9 @@ it is not obvious from the name.
 
 ## Working with the ratchet
 
-`tests/test_reliability_rules.py` runs the pinned `ruff` with the rules above
-and compares each rule's violation count with `RATCHET_BASELINE`.
+The planned check (`tests/test_reliability_rules.py`, not in the repository
+yet) runs the pinned `ruff` with the rules above and compares each rule's
+violation count with `RATCHET_BASELINE`.
 
 - A new violation fails the test. Fix it, don't raise the baseline.
 - Fixing violations also fails the test until you lower the baseline to the

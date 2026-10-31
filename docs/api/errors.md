@@ -33,7 +33,8 @@ not override the members above.
 
 ## Ratchet
 
-`tests/test_api_problem_details.py` counts, over production code:
+The planned ratchet (`tests/test_api_problem_details.py`, not in the repository
+yet) counts, over production code:
 
 - legacy `jsonify({"error": ...})` bodies;
 - responses built inside `except ... as exc` that pass the exception to the
