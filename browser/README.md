@@ -62,7 +62,7 @@ Everything `browser` uses from other units is a field of `Host` in [`browser/hos
   - Termux: `pkg install x11-repo && pkg install chromium` (≈300–400 MB, more than the Redmi 9 has free, so on the phone Chrome is effectively unavailable and the http engine does the work);
   - Debian/Ubuntu: `sudo apt install chromium`;
   - any other binary: set `LOGOS_BROWSER_CHROME=/path/to/chrome` in `core/.env` (the phone starts the app with `env -i`, so a shell `export` does not reach it) and restart Logos.
-- Chrome discovery, evaluated on every launch: `LOGOS_BROWSER_CHROME` (an absolute path or a name on `PATH`; a bad value is reported, with no fallback), then `chromium`, `chromium-browser`, `google-chrome`, `google-chrome-stable`, `chrome` on `PATH`, then Playwright's browsers under `PLAYWRIGHT_BROWSERS_PATH` and `/opt/pw-browsers` (newest Chromium, then the headless shell; never chromedriver). `browser_session(action='status')` shows what was found.
+- Chrome discovery, evaluated on every launch: `LOGOS_BROWSER_CHROME` (an absolute path or a name on `PATH`; a bad value is reported, with no fallback), then `chromium`, `chromium-browser`, `google-chrome`, `google-chrome-stable`, `chrome` on `PATH`. `browser_session(action='status')` shows what was found.
 
 ## How the model uses the browser
 
