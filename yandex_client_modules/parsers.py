@@ -60,6 +60,14 @@ def extract_reasoning_and_text(data):
         "",
     )
     final_text = "".join(text_parts) or fallback
+    # Some models write their reasoning into the answer and close it with </think>,
+    # with or without the opening tag: that part is reasoning, not the reply (#1645).
+    head, marker, tail = str(final_text).rpartition("</think>")
+    if marker:
+        thought = head.replace("<think>", "").strip()
+        if thought:
+            reasoning_parts.append(thought)
+        final_text = tail.lstrip()
     final_reasoning = "\n\n".join(reasoning_parts)
 
     return final_reasoning, str(final_text)

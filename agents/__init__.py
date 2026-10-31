@@ -1,4 +1,4 @@
-"""Alice Pro agent transports and adapters."""
+"""Logos agent transports and adapters."""
 
 from __future__ import annotations
 

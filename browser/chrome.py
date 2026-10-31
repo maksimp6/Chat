@@ -201,7 +201,7 @@ _SELECTOR_STATES = {
     "hidden": "скрыт или отсутствует",
     "detached": "отсутствует",
 }
-_SOURCE_WORDS = {"env": chrome_launch.CHROME_ENV, "path": "PATH", "playwright": "Playwright"}
+_SOURCE_WORDS = {"env": chrome_launch.CHROME_ENV, "path": "PATH"}
 _EMULATION_WORDS = {
     "Network.setExtraHTTPHeaders": "дополнительные заголовки",
     "Emulation.setUserAgentOverride": "User-Agent и язык",

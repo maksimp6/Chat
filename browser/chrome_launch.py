@@ -1,8 +1,8 @@
 """Chrome discovery, launch with a fresh profile, shutdown and orphan cleanup.
 
 Chrome is optional. ``find_chrome`` looks for it on every call (never cached):
-the ``LOGOS_BROWSER_CHROME`` setting first, then ``PATH``, then Playwright's
-browser folders. Every launch gets a fresh profile inside the session's
+the ``LOGOS_BROWSER_CHROME`` setting first, then ``PATH``.
+Every launch gets a fresh profile inside the session's
 temporary directory, a minimal environment (``HOME`` points into the profile,
 so the owner's real browser profile, cookies and logins are never read) and a
 process group of its own, so ``terminate`` stops Chrome together with its
@@ -18,7 +18,6 @@ import importlib.util
 import json
 import logging
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -46,8 +45,6 @@ logger = logging.getLogger("logos.browser.chrome")
 
 CHROME_ENV = "LOGOS_BROWSER_CHROME"
 PATH_NAMES = ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "chrome")
-PLAYWRIGHT_ENV = "PLAYWRIGHT_BROWSERS_PATH"
-PLAYWRIGHT_DEFAULT_ROOT = "/opt/pw-browsers"
 WORKDIR_PREFIX = "logos-browser-"
 PROFILE_DIRNAME = "chrome-profile"
 OWNER_FILE = "owner.json"
@@ -104,13 +101,13 @@ _CHROME_FLAGS = (
     "--mute-audio",
 )
 
-_SOURCE_WORDS = {"env": CHROME_ENV, "path": "PATH", "playwright": "Playwright"}
+_SOURCE_WORDS = {"env": CHROME_ENV, "path": "PATH"}
 
 
 @dataclass
 class ChromeBinary:
     path: str
-    source: str  # "env" | "path" | "playwright"
+    source: str  # "env" | "path"
     headless_shell: bool
 
     def describe(self) -> str:
@@ -142,40 +139,6 @@ def _looks_headless_shell(path: str) -> bool:
     return "headless-shell" in name or "headless_shell" in name
 
 
-def _revision(name: str, prefix: str) -> int | None:
-    match = re.fullmatch(re.escape(prefix) + r"(\d+)", name)
-    return int(match.group(1)) if match else None
-
-
-def _playwright_binary(root: str) -> ChromeBinary | None:
-    """Chromium of a Playwright browsers folder (never chromedriver)."""
-    direct = os.path.join(root, "chromium")
-    if _is_executable(direct):
-        return ChromeBinary(path=direct, source="playwright", headless_shell=False)
-    try:
-        names = os.listdir(root)
-    except OSError:
-        return None
-    for prefix, pattern, executable, shell in (
-        ("chromium-", "chrome-linux*", "chrome", False),
-        ("chromium_headless_shell-", "chrome-headless-shell-linux*", "chrome-headless-shell", True),
-    ):
-        revisions = sorted(
-            (
-                (revision, name)
-                for name in names
-                if (revision := _revision(name, prefix)) is not None
-            ),
-            reverse=True,
-        )
-        for _revision_number, name in revisions:
-            for folder in sorted(glob.glob(os.path.join(root, name, pattern))):
-                candidate = os.path.join(folder, executable)
-                if _is_executable(candidate):
-                    return ChromeBinary(path=candidate, source="playwright", headless_shell=shell)
-    return None
-
-
 def find_chrome() -> tuple[ChromeBinary | None, str | None]:
     """The Chrome to use, or (None, problem); evaluated on every call."""
     configured = os.environ.get(CHROME_ENV, "").strip()
@@ -195,17 +158,6 @@ def find_chrome() -> tuple[ChromeBinary | None, str | None]:
                 ChromeBinary(path=found, source="path", headless_shell=_looks_headless_shell(found)),
                 None,
             )
-    roots: list[str] = []
-    configured_root = os.environ.get(PLAYWRIGHT_ENV, "").strip()
-    if configured_root:
-        roots.append(configured_root)
-    roots.append(PLAYWRIGHT_DEFAULT_ROOT)
-    for root in roots:
-        if not os.path.isdir(root):
-            continue
-        binary = _playwright_binary(root)
-        if binary is not None:
-            return binary, None
     return None, None
 
 

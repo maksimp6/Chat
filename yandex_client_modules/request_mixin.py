@@ -258,8 +258,10 @@ class YandexRequestMixin:
         url = self.responses_url
         # Photos share Responses input and the existing conversation/tool loop.
         if isinstance(execution_trace, bound.ExecutionTrace):
+            # "assembled", not "applied": the profile adapter is not integrated, and
+            # the event shows only what the request carries (#1657).
             execution_trace.add_event(
-                "ultra_profile_applied", ultra_applied_event(model_key, params, payload)
+                "ultra_profile_assembled", ultra_applied_event(model_key, params, payload)
             )
 
         # Reserved after the payload is built, so a request rejected for its parameters uses no quota.

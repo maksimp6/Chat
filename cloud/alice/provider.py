@@ -1,4 +1,7 @@
-"""Alice Cloud: self-hosted control plane for Alice Pro infrastructure."""
+"""Self-hosted cloud: control plane for Logos infrastructure.
+
+The package, the provider name "alice" and the Docker labels keep their old
+identifiers for compatibility with existing nodes and containers (#1316)."""
 
 from __future__ import annotations
 
@@ -9,7 +12,7 @@ from cloud.base import CloudProviderError
 
 
 class AliceCloudProvider:
-    """Provider implementation backed by Alice-owned compute nodes."""
+    """Provider implementation backed by self-owned compute nodes."""
 
     name = "alice"
 
@@ -147,7 +150,8 @@ class AliceCloudProvider:
         options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         raise CloudProviderError(
-            "Backups are not implemented in Alice Cloud MVP", code="not_implemented"
+            "Backups are not implemented in the self-hosted cloud MVP",
+            code="not_implemented",
         )
 
     def costs_summary(

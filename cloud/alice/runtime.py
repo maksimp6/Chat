@@ -1,4 +1,4 @@
-"""Docker runtime used by the Alice Cloud control plane."""
+"""Docker runtime used by the self-hosted cloud control plane."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ def _segment(value: str, field: str) -> str:
 
 
 class DockerRuntime:
-    """Own and reconcile Alice-managed Docker containers on one node."""
+    """Own and reconcile self-managed Docker containers on one node."""
 
     def __init__(self, *, binary: str = "docker", runner: Runner | None = None) -> None:
         self.binary = binary
@@ -89,7 +89,8 @@ class DockerRuntime:
             ) from exc
         if not isinstance(labels, dict) or labels.get(_MANAGED_LABEL) != "1":
             raise CloudProviderError(
-                "Resource is not owned by Alice Cloud", code="resource_not_owned"
+                "Resource is not owned by the self-hosted cloud",
+                code="resource_not_owned",
             )
         return {str(key): str(value) for key, value in labels.items()}
 
@@ -141,7 +142,7 @@ class DockerRuntime:
         scale = int(config.get("scale", 1))
         if scale not in {0, 1}:
             raise CloudProviderError(
-                "Alice Cloud MVP supports scale 0 or 1", code="invalid_scale"
+                "The self-hosted cloud MVP supports scale 0 or 1", code="invalid_scale"
             )
         name = self.container_name(lane, service)
         self._run(
@@ -166,7 +167,7 @@ class DockerRuntime:
         scale = int(config.get("scale", 1))
         if scale not in {0, 1}:
             raise CloudProviderError(
-                "Alice Cloud MVP supports scale 0 or 1", code="invalid_scale"
+                "The self-hosted cloud MVP supports scale 0 or 1", code="invalid_scale"
             )
         self._run("start" if scale else "stop", name)
         return {

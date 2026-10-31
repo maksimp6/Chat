@@ -78,7 +78,9 @@
         var title = document.createElement("strong");
         title.textContent = moduleId;
         var detail = document.createElement("span");
-        detail.textContent = labels[item.status] + (item.message ? ": " + item.message : "");
+        // A status the panel has no label for is shown as unknown, never as "undefined" (#1300).
+        var label = labels[item.status] || "Неизвестное состояние";
+        detail.textContent = label + (item.message ? ": " + item.message : "");
 
         text.appendChild(title);
         text.appendChild(detail);

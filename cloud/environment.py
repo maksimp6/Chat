@@ -1,4 +1,4 @@
-"""Provider-neutral lifecycle contract for Alice sandbox environments.
+"""Provider-neutral lifecycle contract for Logos sandbox environments.
 
 `environment_manager.py` owns environment metadata and selects one adapter per
 environment (`local` or `cloudru` today). Adapters isolate the backend that
