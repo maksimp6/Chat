@@ -25,12 +25,13 @@ recorded on the caller's execution trace.
 The whole text is in the index: after every append it is uploaded as one file
 (``logos-cache.md``) to each knowledge vector store (``knowledge_vector_store_ids``),
 the store the dialog's File Search searches, and the previous upload is taken out of
-the stores and deleted, so the index holds the current text once. A failure is
-returned in ``index_errors``; the append is kept either way.
+the stores and deleted, so the index holds the current text once. A removal or deletion
+that fails stays listed in ``logos.cache.index.json`` and is retried at the next append.
+A failure is returned in ``index_errors``; the append is kept either way.
 
 Files beside the memory file: ``logos.cache.md`` (the text),
 ``logos.cache.vectors.jsonl`` (one record per piece) and ``logos.cache.index.json``
-(the uploaded file). Writers hold an exclusive file lock. There is no limit on the
+(the uploaded file and older uploads still to be removed). Writers hold an exclusive file lock. There is no limit on the
 size of the text (0 means no application limit).
 """
 
@@ -204,6 +205,11 @@ def _refresh_index() -> tuple[dict[str, Any], dict[str, Any]]:
             except (OSError, ValueError):
                 # A damaged state file must not block the index forever: the upload replaces it.
                 logger.warning("[CACHE] index state unreadable; starting from none")
+        pending = [
+            entry
+            for entry in previous.get("pending") or []
+            if isinstance(entry, dict) and entry.get("file_id")
+        ]
         text = _read_text()
         try:
             client = bound.YandexResponsesClient(bound.Config)
@@ -236,15 +242,28 @@ def _refresh_index() -> tuple[dict[str, Any], dict[str, Any]]:
         old_id = previous.get("file_id")
         if old_id and old_id != file_id:
             # The previous upload holds an older copy of the same text.
-            for store_id in previous.get("vector_stores") or {}:
+            pending.append(
+                {"file_id": old_id, "vector_stores": list(previous.get("vector_stores") or {})}
+            )
+        still_pending: list[dict[str, Any]] = []
+        for entry in pending:
+            # A copy leaves every store it is in before its file is deleted; failures remain retryable.
+            stores = []
+            for store_id in entry.get("vector_stores") or []:
                 try:
-                    client.remove_file_from_vs(store_id, old_id)
+                    client.remove_file_from_vs(store_id, entry["file_id"])
                 except failures as exc:
                     errors[f"remove:{store_id}"] = _failure_record(exc)
+                    stores.append(store_id)
+            if stores:
+                still_pending.append({"file_id": entry["file_id"], "vector_stores": stores})
+                continue
             try:
-                client.delete_file(old_id)
+                client.delete_file(entry["file_id"])
             except failures as exc:
                 errors["delete"] = _failure_record(exc)
+                still_pending.append({"file_id": entry["file_id"], "vector_stores": []})
+        state["pending"] = still_pending
         state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
         return state, errors
 
