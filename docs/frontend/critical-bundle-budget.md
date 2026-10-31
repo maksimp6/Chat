@@ -53,21 +53,24 @@ Jinja-rendered response. The only runtime substitutions are the
 a `preview_base_path` prefix; both add at most a few dozen bytes and do not
 change the conclusion below.
 
-## Measured result (2026-09-28, commit 4c718ea)
+## Measured result (2026-10-31, commit 04bb54a)
+
+Measured with `wc -c` (#1728). The first measurement (2026-09-28, commit
+4c718ea) was 91,065 B for the critical set and 334,259 B for the full page.
 
 | File | Raw bytes |
 |---|---:|
-| `templates/index.html` | 15,961 |
-| `static/style.css` | 36,036 |
-| `static/boot.js` | 6,404 |
-| `static/core_api.js` | 17,907 |
-| `static/ui_runtime.js` | 560 |
-| `static/dispatcher.js` | 2,746 |
-| `static/core.js` | 11,451 |
-| **Critical set total** | **91,065 (≈88.9 KiB)** |
+| `templates/index.html` | 18,152 |
+| `static/style.css` | 54,495 |
+| `static/boot.js` | 11,937 |
+| `static/core_api.js` | 19,886 |
+| `static/ui_runtime.js` | 491 |
+| `static/dispatcher.js` | 7,583 |
+| `static/core.js` | 16,198 |
+| **Critical set total** | **128,742 (≈125.7 KiB)** |
 
 Full page (every local script/stylesheet the shell references, critical or
-not): **334,259 bytes (≈326.4 KiB)**, i.e. the ~243 KB outside the critical
+not): **612,453 bytes (≈598.1 KiB)**, i.e. the ~484 KB outside the critical
 set is `chat.js`, `sidebar.js`, `models.js`, `settings*.js`, the trace
 viewer, voice, treasury, file manager, departments/environments/partner
 relations, memory panel, provider credentials, and similar modules — the
@@ -80,19 +83,19 @@ below.
 
 ## Conclusion: 50 KB is not reachable today
 
-The critical set alone is **91,065 bytes raw, ~78% over the 50 KB (51,200
+The critical set alone is **128,742 bytes raw, ~151% over the 50 KB (51,200
 byte) target**, before any chat, sidebar, model-selection, or settings
 functionality is added. It is already minimal by the repository's own
 existing contract — nothing "non-essential" is loaded ahead of first render
 today, so there is no script to move later as a small change. The overshoot
 comes from three things that cannot be trimmed without a real redesign:
 
-- `static/style.css` (36,036 B) is the single largest contributor and is
+- `static/style.css` (54,495 B) is the single largest contributor and is
   not split into a critical/deferred subset;
-- `static/core_api.js` (17,907 B) is the fetch/response-handling layer the
+- `static/core_api.js` (19,886 B) is the fetch/response-handling layer the
   shell needs to make any request, not something that can be deferred past
   first interaction;
-- `templates/index.html` (15,961 B) is the server-rendered shell markup
+- `templates/index.html` (18,152 B) is the server-rendered shell markup
   itself (header, sidebar skeleton, modals, no-JS fallback), not a script.
 
 Reaching 50 KB would require splitting `style.css` into a small
@@ -109,14 +112,18 @@ revised.
 Since 50 KB is not reachable today, CI enforces a **regression** budget
 instead of the aspirational target: **98,304 bytes (96 KiB) raw** for the
 critical set, defined as `DEFAULT_LIMIT_BYTES` in
-`scripts/measure_critical_bundle.py`. That is the measured 91,065 B plus
-headroom for incidental growth (version query strings, small copy changes),
-while still failing the build if the critical set grows materially — for
-example if a future change adds another script to the critical chain, or
+`scripts/measure_critical_bundle.py`. It was set as the 91,065 B measured on
+2026-09-28 plus headroom for incidental growth (version query strings, small
+copy changes), to fail if the critical set grows materially — for example if
+a future change adds another script to the critical chain, or
 `style.css`/`core_api.js` grow without a matching justification here.
-`tests/test_critical_bundle_budget.py` runs `scripts/measure_critical_bundle.py
---check` as part of the existing Python test suite (`pytest -q`, already run
-in CI), so no `.github/workflows` change was needed to add this gate.
+
+The critical set has since grown to 128,742 B, above this budget, so
+`--check` fails at commit 04bb54a. The budget is not raised here: AGENTS.md
+does not allow changing checks without a separate command from the owner.
+The `tests/test_critical_bundle_budget.py` that was meant to run `--check`
+is not in the repository, and no workflow runs `--check`, so the gate is not
+enforced anywhere today.
 
 If the critical set shrinks in a future change (e.g. after a `style.css`
 split), lower `DEFAULT_LIMIT_BYTES` in the same change and update the
