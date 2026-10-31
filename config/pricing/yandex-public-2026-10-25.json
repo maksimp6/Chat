@@ -49,12 +49,6 @@
       "tool": 0.13,
       "output": 1.2
     },
-    "logos-runtime-flash": {
-      "input": 0.1,
-      "cached": 0.025,
-      "tool": 0.025,
-      "output": 0.2
-    },
     "deepseek-v4.1-flash": {
       "input": 0.3,
       "cached": 0.075,

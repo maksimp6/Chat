@@ -27,7 +27,6 @@ runtime-профили и не доказательство поддержки �
 | `yandexgpt-5.1` | 32768 | 32768 candidate | unsupported |
 | `yandexgpt-5-pro` | 32768 | ceiling UNKNOWN | UNKNOWN |
 | `yandexgpt-5-lite` | 32768 | ceiling UNKNOWN | UNKNOWN |
-| `logos-runtime-flash` | 65536 | ceiling UNKNOWN | UNKNOWN |
 | `deepseek-v4.1-flash` | 1048576 | ceiling UNKNOWN | UNKNOWN |
 | `deepseek-v4-flash` | 1048576 | ceiling UNKNOWN | UNKNOWN |
 | `qwen3-235b-a22b-fp8` | UNKNOWN | retired | UNKNOWN |

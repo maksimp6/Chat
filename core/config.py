@@ -125,16 +125,6 @@ TEXT_MODELS: dict[str, dict[str, Any]] = {
         "tool": 0.13,
         "output": 1.20,
     },
-    "logos-runtime-flash": {
-        "name": "Alice AI LLM Flash",
-        "upstream": "aliceai-llm-flash",
-        "type": "text",
-        "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
-        "input": 0.10,
-        "cached": 0.025,
-        "tool": 0.025,
-        "output": 0.20,
-    },
     "deepseek-v4.1-flash": {
         "name": "DeepSeek V4.1 Flash",
         "type": "text",

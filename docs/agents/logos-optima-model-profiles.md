@@ -31,7 +31,6 @@ non-retired text entries routed through the Responses chat path:
 | Registry model | Optima reasoning | Published context, tokens |
 | --- | --- | ---: |
 | `logos-runtime` | Provider default | 131072 |
-| `logos-runtime-flash` | Provider default | 65536 |
 | `yandexgpt-5-pro` | Provider default | 32768 |
 | `yandexgpt-5-lite` | Provider default | 32768 |
 | `deepseek-v4.1-flash` | Provider default | 1048576 |

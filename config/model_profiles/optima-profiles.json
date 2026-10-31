@@ -51,17 +51,6 @@
         "truncation": "disabled"
       }
     },
-    "logos-runtime-flash": {
-      "profile_id": "optima-logos-runtime-flash",
-      "model_key": "logos-runtime-flash",
-      "transport": "responses",
-      "context_window_tokens": 65536,
-      "stop_and_recheck_on": null,
-      "reasoning_basis": "provider_default",
-      "wire_parameters": {
-        "truncation": "disabled"
-      }
-    },
     "deepseek-v4.1-flash": {
       "profile_id": "optima-deepseek-v4.1-flash",
       "model_key": "deepseek-v4.1-flash",
