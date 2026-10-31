@@ -2026,7 +2026,7 @@ def _chat_turn(*, t_start, admission=None, live=None):
     conv_id = None
     session_id = None
     message = None
-    model_key = "deepseek-v4.1-flash"
+    model_key = "qwen3.6-35b-a3b"
     error_message = None
     user_message_id = None
     # The turn request id: the question, the reply and an error reply store it.
@@ -2075,7 +2075,7 @@ def _chat_turn(*, t_start, admission=None, live=None):
         params = dict(raw_params or {})
         params_role = params.pop("role", None)
         role = data.get("role") or params_role
-        params_model = params.pop("model", "deepseek-v4.1-flash")
+        params_model = params.pop("model", "qwen3.6-35b-a3b")
         model_key = data.get("model") or params_model
         try:
             requested_skills = _normalize_requested_skills(data, params)
@@ -2406,7 +2406,7 @@ def conversations():
         if not isinstance(data, dict):
             return jsonify(error_body("JSON object is required")), 400
         try:
-            model = validate_dialog_model(data.get("model", "deepseek-v4.1-flash"))
+            model = validate_dialog_model(data.get("model", "qwen3.6-35b-a3b"))
         except ValueError:
             return jsonify(error_body("model_not_available_for_dialog")), 400
         except bound.ModelDiscoveryError:
@@ -2689,7 +2689,7 @@ def execute_approved():
         conv_id = data.get("conversation_id")
         func_name = data.get("name")
         arguments = data.get("arguments", {})
-        model_key = data.get("model", "deepseek-v4.1-flash")
+        model_key = data.get("model", "qwen3.6-35b-a3b")
 
         tool_config = bound.registry.get_tool_meta(func_name)
         if not tool_config:

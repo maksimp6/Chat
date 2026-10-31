@@ -17,7 +17,7 @@ URI each came from, so the version of every embedding model is recorded. A model
 that fails is listed in the piece's ``embedding_errors``; the text is appended either
 way.
 
-The search is a helper model (``SEARCH_MODEL``, DeepSeek V4.1 Flash): it gets
+The search is a helper model (``SEARCH_MODEL``, Qwen3.6 35B): it gets
 the whole cache text and the question in one provider request without tools, and its
 answer is returned with the request's status, errors and usage. The request is
 recorded on the caller's execution trace.
@@ -61,8 +61,8 @@ CACHE_FILE_NAME = "logos.cache.md"
 VECTORS_FILE_NAME = "logos.cache.vectors.jsonl"
 INDEX_STATE_FILE_NAME = "logos.cache.index.json"
 INDEX_FILE_NAME = "logos-cache.md"
-# The search model: the text model with the largest context window (1M tokens).
-SEARCH_MODEL = "deepseek-v4.1-flash"
+# The search model: the cheapest text model (262144-token context window).
+SEARCH_MODEL = "qwen3.6-35b-a3b"
 # Reading the whole cache at high effort can run for minutes; the client's 180 s default
 # failed real searches (#1710), so the wait is the transport's own maximum, no app cap.
 SEARCH_POLL_TIMEOUT_SECONDS = 7200

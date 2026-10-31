@@ -24,7 +24,7 @@ window.LogosErrorText = function (prefix, error) {
 
 let currentConvId = null;
 let conversations = [];
-let currentModel = "deepseek-v4.1-flash";
+let currentModel = "qwen3.6-35b-a3b";
 let currentModelType = "text";
 let modelsData = { text: {}, voice: {}, image: {} };
 let modelSelectionSequence = 0;

@@ -35,7 +35,7 @@ class LogosSDK:
         resp.raise_for_status()
         return resp.json()
 
-    def send_message(self, conv_id, message, model="deepseek-v4.1-flash"):
+    def send_message(self, conv_id, message, model="qwen3.6-35b-a3b"):
         """Отправить сообщение в диалог"""
         payload = {
             "model": get_model_uri(self.project_id, model),
@@ -67,5 +67,5 @@ if __name__ == "__main__":
     print(f"Создан диалог: {conv['id']}")
 
     # Отправить сообщение
-    resp = sdk.send_message(conv["id"], "Привет!", model="deepseek-v4.1-flash")
+    resp = sdk.send_message(conv["id"], "Привет!", model="qwen3.6-35b-a3b")
     print(f"Ответ: {resp}")
