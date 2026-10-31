@@ -8,7 +8,7 @@ from typing import Any
 import requests
 
 DEFAULT_BASE_URL = "http://127.0.0.1:5000"
-DEFAULT_MODEL = "yandexgpt-5-pro"
+DEFAULT_MODEL = "deepseek-v4.1-flash"
 DEFAULT_TIMEOUT = 60.0
 
 

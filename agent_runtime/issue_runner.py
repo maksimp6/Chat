@@ -52,7 +52,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # core/.env: the review store must be named by the caller (see
 # require_external_review_store), never only by core/.env.
 _CALLER_MEMORY_PATH = os.environ.get("LOGOS_MEMORY_PATH")
-DEFAULT_MODEL = "yandexgpt-5-pro"
+DEFAULT_MODEL = "deepseek-v4.1-flash"
 TOOL_CATEGORIES = ["filesystem"]
 MAX_SUMMARY_CHARS = 4000
 
