@@ -1,3 +1,19 @@
+name: Redmi 9 candidate tool evidence
+
+on:
+  push:
+    branches: [fix/tools-execution-evidence]
+    paths-ignore:
+      - 'docs/screenshots/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: redmi9-app-server
+  cancel-in-progress: false
+
 jobs:
   candidate_tools:
     if: github.ref == 'refs/heads/fix/tools-execution-evidence'

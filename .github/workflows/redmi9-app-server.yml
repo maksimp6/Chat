@@ -1,3 +1,32 @@
+name: Redmi 9 application server
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Operation on the existing Redmi 9 runner
+        required: true
+        default: deploy
+        type: choice
+        options: [deploy, screenshots, tools_self_check, verify_screenshots, rootagent_native_check, art_generate, rootagent_command]
+      rootagent_command:
+        description: "RootAgent command, used only with action rootagent_command"
+        required: false
+        type: choice
+        options: [status, probe, capture, move, click, tap, swipe, text, key, browse, batch]
+      rootagent_args:
+        description: "Args for rootagent_command: tap 'X Y'; swipe 'X Y X2 Y2 [DUR]'; text 'STRING'; key 'KEYCODE'; move/click 'DX DY [PACKAGE]'; capture 'PACKAGE' optional; status/probe none"
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: redmi9-app-server
+  cancel-in-progress: false
+
 jobs:
   server:
     if: github.event_name == 'push' || inputs.action == 'deploy'
