@@ -21,8 +21,6 @@ from yandex_client_modules.errors import YandexClientError
 
 ALLOWED_METHODS = ("GET", "POST")
 API_HOST = "api.cloud.yandex.net"
-# The socket timeout of one catalog request; it bounds a dead connection, not the work of the operation.
-REQUEST_TIMEOUT_SECONDS = 120
 _REFUSED_NAME = re.compile(r"(?i)cancel|delete|remove|revoke|destroy|purge|update|modify|rename")
 _PLACEHOLDER = re.compile(r"\{([^{}]+)\}")
 
@@ -121,7 +119,8 @@ class YandexOperationMixin:
                 json=body,
                 params=query,
                 headers=headers,
-                timeout=REQUEST_TIMEOUT_SECONDS,
+                # No time limit (owner): a synchronous generation answers only when it is done.
+                timeout=None,
                 allow_redirects=False,
             )
         except (ContractViolation, OSError, ValueError) as exc:

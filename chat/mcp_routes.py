@@ -19,7 +19,7 @@ from chat._error_details import (
     error_body,
 )
 from chat._vendor.partial_output import (
-    extract_last_response_text,
+    extract_response_text,
     format_partial_output_message,
 )
 from chat._vendor.provider_receipt import capture_provider_diagnostics
@@ -316,6 +316,77 @@ def _join_continued_parts(parts, last):
     return joined
 
 
+def _round_break():
+    """The blank line between the text of two requests of one turn."""
+    return {
+        "type": "message",
+        "role": "assistant",
+        "content": [{"type": "output_text", "text": "\n\n"}],
+    }
+
+
+def _item_has_text(item) -> bool:
+    if not isinstance(item, dict):
+        return False
+    if item.get("type") == "output_text" and item.get("text"):
+        return True
+    content = item.get("content")
+    return isinstance(content, list) and any(
+        isinstance(piece, dict)
+        and piece.get("type") in ("output_text", "text")
+        and piece.get("text")
+        for piece in content
+    )
+
+
+def _join_turn_rounds(received, final):
+    """The turn's final response carrying the text and reasoning of every request of the turn.
+
+    A turn can take several requests: tool rounds, parts of a reply cut by the output
+    limit, a re-asked reply. Nothing a request said is dropped: the reply keeps each
+    one's text and reasoning in order. Function calls of earlier requests were already
+    answered and are left out. A part continues where the cut part stopped; any other
+    request's text starts after a blank line."""
+    responses = [r for r in received if isinstance(r, dict)]
+    if len(responses) < 2:
+        return final
+    output = []
+    said = False
+    after_cut = False
+    for index, response in enumerate(responses):
+        items = list(response.get("output") or [])
+        if index < len(responses) - 1:
+            items = _without_function_calls(items)
+        has_text = any(_item_has_text(item) for item in items)
+        if has_text and said and not after_cut:
+            output.append(_round_break())
+        output.extend(items)
+        said = said or has_text
+        after_cut = _cut_by_output_limit(response)
+    joined = dict(final) if isinstance(final, dict) else {}
+    joined["output"] = output
+    joined["turn_response_ids"] = [r.get("id") for r in responses]
+    return joined
+
+
+def _turn_output_from_trace(responses):
+    """(reasoning, text) of every response the trace holds, in order.
+
+    A failed turn keeps what each request said, not only the last one: earlier rounds
+    and earlier parts of a reply cut by the output limit are part of the answer."""
+    reasonings, texts = [], []
+    for entry in responses or []:
+        raw = entry.get("raw") if isinstance(entry, dict) else None
+        if not isinstance(raw, dict):
+            continue
+        reasoning, text = extract_response_text(raw)
+        if reasoning:
+            reasonings.append(reasoning)
+        if text:
+            texts.append(text)
+    return "\n\n".join(reasonings), "\n\n".join(texts)
+
+
 def _record_provider_output(trace, response):
     """What the provider returned for one request: the status, the output kinds and the calls it asked for."""
     if not isinstance(trace, bound.ExecutionTrace) or not isinstance(response, dict):
@@ -575,11 +646,15 @@ def _define_logos_client(base: type) -> type:
 
             def round_result(response):
                 """The round's final text, the same extraction the stored reply uses."""
+                if isinstance(response, dict):
+                    received.append(response)
                 if sink is None or not isinstance(response, dict):
                     return
                 reasoning, text = self.extract_reasoning_and_text(response)
                 emit({"kind": "round_result", "text": text, "reasoning": reasoning})
 
+            # Every provider response of this turn, in order: the reply keeps what each one said.
+            received = []
             # Owner's rule: the first request of every turn requires a tool call
             # (the provider gets "auto" when the turn has no tool at all); follow_up
             # releases it, so the model can answer once it has used a tool.
@@ -888,6 +963,7 @@ def _define_logos_client(base: type) -> type:
                         follow_up(list(continuation_history), "empty_reply")
                     )
 
+            response = _join_turn_rounds(received, response)
             if trace is not None:
                 record_yandex_mcp_activity(trace)
             return response
@@ -1343,13 +1419,14 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
     )
     partial_output = reply if provider_failed else None
     if provider_failed:
-        if not partial_output:
-            # Only this request's trace is consulted. The final raw response
-            # and its status remain untouched even when an earlier tool round
-            # supplied the last available assistant text.
-            partial_output, _ = extract_last_response_text(
+        if not partial_output or not reasoning:
+            # Only this request's trace is consulted, every response of it. The final
+            # raw response and its status remain untouched.
+            trace_reasoning, trace_text = _turn_output_from_trace(
                 trace.trace.get("responses", [])
             )
+            partial_output = partial_output or trace_text
+            reasoning = reasoning or trace_reasoning
         reply = format_partial_output_message(partial_output, provider_message)
     elif not reply:
         raise _EmptyModelReply(EMPTY_MODEL_REPLY)
@@ -1530,6 +1607,7 @@ def _finalize_chat_turn(
         },
         total_duration_ms=total_ms,
         source="error" if provider_failed else None,
+        reasoning=reasoning,
         request_id=request_id,
     )
     outcome = {
@@ -1677,7 +1755,7 @@ def _chat_error_response(
             }
         ), 429
     responses = trace_data.get("responses", [])
-    partial_output, _ = extract_last_response_text(responses)
+    partial_reasoning, partial_output = _turn_output_from_trace(responses)
     reply = format_partial_output_message(partial_output, error_message)
 
     # Tokens the provider billed before the failure are a cost of this turn: it is
@@ -1720,6 +1798,7 @@ def _chat_error_response(
             if invocation
             else {},
             source="error",
+            reasoning=partial_reasoning,
             request_id=request_id,
         )
     if invocation is not None:

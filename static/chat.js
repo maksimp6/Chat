@@ -2403,7 +2403,7 @@ document.addEventListener("DOMContentLoaded", function () {
     bubble.append(details, textEl);
     el.appendChild(bubble);
 
-    // Committed: earlier parts of a reply cut by the provider's output limit. Round: the provider request in progress.
+    // Committed: what the earlier requests of the turn said. Round: the provider request in progress.
     let committedText = "";
     let roundText = "";
     let committedReasoning = "";
@@ -2514,12 +2514,12 @@ document.addEventListener("DOMContentLoaded", function () {
         if (event.kind === "initial") {
           committedText = "";
           committedReasoning = "";
-        } else if (event.kind === "output_limit") {
-          // A continuation goes on from where the cut part stopped.
-          committedText += roundText;
+        } else {
+          // Every request of the turn is part of the stored reply: a continuation goes on from where the cut
+          // part stopped, any other round starts after a blank line (chat/mcp_routes.py _join_turn_rounds).
+          committedText = event.kind === "output_limit" ? committedText + roundText : joinReasoning(committedText, roundText);
           committedReasoning = joinReasoning(committedReasoning, roundReasoning);
         }
-        // The text of a round that called tools is not part of the stored reply.
         roundText = "";
         roundReasoning = "";
       } else if (event.type === "delta") {

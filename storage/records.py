@@ -179,6 +179,7 @@ def get_messages(conv_id: str) -> list[dict[str, Any]]:
             "trace": item["trace"],
             "source": item.get("source"),
             "attachments": item.get("attachments") or {},
+            "reasoning": item.get("reasoning") or "",
         }
         for item in sorted(records, key=lambda item: item["id"])
     ]
@@ -203,6 +204,7 @@ def add_message(
     total_duration_ms: Any = None,
     deduplicate_source: bool = False,
     request_id: str | None = None,
+    reasoning: Any = None,
 ) -> int | None:
     """Return the message ID only after its transaction has committed.
 
@@ -250,6 +252,8 @@ def add_message(
                 "trace": trace or {},
                 "source": source,
                 "attachments": attachments or {},
+                # The model's reasoning stays with its reply, so a reload shows it again.
+                **({"reasoning": str(reasoning)} if reasoning else {}),
                 **({"request_id": request_id} if request_id is not None else {}),
             },
         )

@@ -204,7 +204,8 @@ CHAT_MESSAGE = _object(
         "trace": ANY_JSON,
         "source": ANY_JSON,
         "attachments": ANY_JSON,
-    }
+    },
+    {"reasoning": ANY_JSON},
 )
 
 CONTRACTS = {
