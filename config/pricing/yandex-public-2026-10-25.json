@@ -7,18 +7,6 @@
   "status": "reference_only_not_runtime_billing",
   "note": "Official public price rows; account-specific discounts and hosted tool/session charges excluded. Model IDs are normalized catalog keys, not guaranteed provider URIs. Unlisted pricing must remain UNKNOWN. Do not use batch pricing for synchronous calls.",
   "sync_rub_per_1000_tokens": {
-    "gpt-oss-120b": {
-      "input": 0.3,
-      "cached": 0.3,
-      "tool": 0.3,
-      "output": 0.3
-    },
-    "gpt-oss-20b": {
-      "input": 0.1,
-      "cached": 0.1,
-      "tool": 0.1,
-      "output": 0.1
-    },
     "yandexgpt-5.1": {
       "input": 0.8,
       "cached": 0.8,

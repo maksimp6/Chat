@@ -12,7 +12,7 @@ from pathlib import Path
 
 REPO = "maksimp6/Chat"
 BASELINE = "a553e4c998297052596b5b82b6f83bd577adc638"
-MODEL = "gpt-oss-20b"
+MODEL = "qwen3.6-35b-a3b"
 MAX_CALLS = 3
 MAX_INPUT = 48000
 MAX_OUTPUT = 4096

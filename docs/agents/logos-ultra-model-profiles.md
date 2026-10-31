@@ -30,8 +30,6 @@ runtime-профили и не доказательство поддержки �
 | `deepseek-v4.1-flash` | 1048576 | ceiling UNKNOWN | UNKNOWN |
 | `deepseek-v4-flash` | 1048576 | ceiling UNKNOWN | UNKNOWN |
 | `qwen3-235b-a22b-fp8` | UNKNOWN | retired | UNKNOWN |
-| `gpt-oss-120b` | 131072 | ceiling UNKNOWN | high |
-| `gpt-oss-20b` | 131072 | ceiling UNKNOWN | high |
 | `qwen3.6-35b-a3b` | 262144 | ceiling UNKNOWN | enable wire UNKNOWN |
 | `speech-realtime-260528` | UNKNOWN | retired | UNKNOWN |
 | `speech-realtime-250923` | UNKNOWN | retired | UNKNOWN |
@@ -101,7 +99,7 @@ accepted и effective/UNKNOWN; estimate не выдаётся за счёт пр
 
 ```bash
 python3 scripts/validate_ultra_profiles.py
-python3 scripts/validate_ultra_profiles.py --model gpt-oss-120b
+python3 scripts/validate_ultra_profiles.py --model qwen3.6-35b-a3b
 ```
 
 Утилита разбирает literals из `core/config.py` через AST: не импортирует этот

@@ -35,8 +35,6 @@ non-retired text entries routed through the Responses chat path:
 | `yandexgpt-5-lite` | Provider default | 32768 |
 | `deepseek-v4.1-flash` | Provider default | 1048576 |
 | `deepseek-v4-flash` | Provider default | 1048576 |
-| `gpt-oss-120b` | `medium` | 131072 |
-| `gpt-oss-20b` | `medium` | 131072 |
 | `qwen3.6-35b-a3b` | Provider default | 262144 |
 
 The two Logos registry names map to the official upstream IDs `aliceai-llm` and

@@ -73,34 +73,6 @@
         "truncation": "disabled"
       }
     },
-    "gpt-oss-120b": {
-      "profile_id": "optima-gpt-oss-120b",
-      "model_key": "gpt-oss-120b",
-      "transport": "responses",
-      "context_window_tokens": 131072,
-      "stop_and_recheck_on": "2026-10-30",
-      "reasoning_basis": "documented_depth_control",
-      "wire_parameters": {
-        "truncation": "disabled",
-        "reasoning": {
-          "effort": "medium"
-        }
-      }
-    },
-    "gpt-oss-20b": {
-      "profile_id": "optima-gpt-oss-20b",
-      "model_key": "gpt-oss-20b",
-      "transport": "responses",
-      "context_window_tokens": 131072,
-      "stop_and_recheck_on": "2026-10-30",
-      "reasoning_basis": "documented_depth_control",
-      "wire_parameters": {
-        "truncation": "disabled",
-        "reasoning": {
-          "effort": "medium"
-        }
-      }
-    },
     "qwen3.6-35b-a3b": {
       "profile_id": "optima-qwen3.6-35b-a3b",
       "model_key": "qwen3.6-35b-a3b",

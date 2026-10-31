@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-MODEL = "gpt-oss-20b"
+MODEL = "qwen3.6-35b-a3b"
 CONTEXT_WINDOW = 131_072
 REQUESTED_OUTPUT_TOKENS = 131_072
 OWNER_DIRECTIVE = (

@@ -136,10 +136,7 @@ def validate_catalog(catalog, registry, root):
             _require(profile["transport"] == "responses", key)
             _require(wire["truncation"] == "disabled", key)
             _require("max_output_tokens" not in wire, f"{key}: guessed output ceiling")
-            if key in {"gpt-oss-120b", "gpt-oss-20b"}:
-                _require(wire.get("reasoning") == {"effort": "high"}, key)
-            else:
-                _require("reasoning" not in wire, f"{key}: unsupported reasoning claim")
+            _require("reasoning" not in wire, f"{key}: unsupported reasoning claim")
             if key == "qwen3-235b-a22b-fp8":
                 _require(profile["reasoning"]["depth_control"] is False, key)
                 _require("reasoning_enable_wire_unverified" in profile["blockers"], key)
