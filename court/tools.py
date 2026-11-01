@@ -217,24 +217,19 @@ _ACTIONS: dict[str, dict[str, Any]] = {
 }
 
 
-def court(args, cfg=None):
-    """One function for the hall: ``action`` picks the action, the other fields are its input."""
-    action = args.get("action")
-    entry = _ACTIONS.get(action) if isinstance(action, str) else None
-    if entry is None:
-        return {"success": False, "error": "action must be one of: " + ", ".join(_ACTIONS)}
-    missing = [name for name in entry["required"] if args.get(name) in (None, "")]
-    if missing:
-        return {"success": False, "error": f"{action}: missing {', '.join(missing)}"}
-    return entry["fn"](args, cfg)
+def _action_fn(action, entry):
+    """The one function of one action; its required fields are checked and named in the answer."""
+
+    def run(args, cfg=None):
+        missing = [name for name in entry["required"] if args.get(name) in (None, "")]
+        if missing:
+            return {"success": False, "error": f"{action}: missing {', '.join(missing)}"}
+        return entry["fn"](args, cfg)
+
+    return run
 
 
 _FIELDS = {
-    "action": {
-        "type": "string",
-        "enum": list(_ACTIONS),
-        "description": "Что сделать: " + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items()),
-    },
     "conversation_id": {"type": "string", "minLength": 1, "maxLength": 128},
     "messages": {
         "type": "array",
@@ -271,20 +266,15 @@ _FIELDS = {
     **_CRISIS,
 }
 
-_WRITE_ACTIONS = [name for name, entry in _ACTIONS.items() if entry["write"]]
-
+# One tool per action: court_<action> does one function, its required fields come from the action.
 COURT_TOOLS = {
-    "court": {
-        **_tool(
-            court,
-            read_only=False,
-            requires_approval=True,
-            schema=object_schema(_FIELDS, ["action"]),
-            title="Court",
-            description="Зал суда Логоса одной функцией: поле action выбирает действие. "
-            + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items())
-            + ". Действия, которые меняют зал, требуют подтверждения владельца.",
-        ),
-        "metadata": {"approval_actions": _WRITE_ACTIONS},
-    },
+    f"court_{action}": _tool(
+        _action_fn(action, entry),
+        read_only=not entry["write"],
+        requires_approval=entry["write"],
+        schema=object_schema(_FIELDS, entry["required"]),
+        title=f"Court: {action}",
+        description=entry["about"],
+    )
+    for action, entry in _ACTIONS.items()
 }
