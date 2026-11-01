@@ -19,9 +19,9 @@ DEFAULT_VECTOR_STORE_IDS = ("fvtvp6t2su0g5q4ft2ev",)
 # are read as the maximal ones. Later explicit choices carry the revision and stay.
 # Revision 2 raised every setting to its maximum; revision 3 turns live answers on
 # for a record that has no stream key yet. A stream key already stored is kept.
-# Revision 4 adds the cache category to a stored tool selection; revision 5 added a
-# helper category that no longer exists, and revision 6 takes it out again.
-SETTINGS_REVISION = 6
+# Revisions 4 and 5 added the cache and helper categories, which no longer exist;
+# revision 7 takes both out of a stored tool selection.
+SETTINGS_REVISION = 7
 
 
 def file_search_max_results(value: Any) -> int:
@@ -55,8 +55,8 @@ def upgrade_dialog_settings(settings: Any) -> Any:
     that nobody chose: every hosted tool is switched on and every capacity is raised
     to its maximum. Before revision 3, live (streamed) answers are switched on only when
     the record has no stream key: a stream value already stored, true or false, is kept.
-    Before revision 4, a stored tool selection gets the cache category; before
-    revision 6, the removed helper category is taken out of it.
+    Before revision 7, the removed cache and helper categories are taken out of a
+    stored tool selection.
     The record is stamped with the revision, so choices made after it are kept; a record
     already at revision 2 keeps its tool selection and later choices.
     """
@@ -98,14 +98,11 @@ def upgrade_dialog_settings(settings: Any) -> Any:
     # Only a missing key takes the new default: a stored stream value is a choice and stays.
     if revision < 3 and "stream" not in upgraded:
         upgraded["stream"] = False
-    # A selection saved before the cache category existed could not have chosen it.
+    # The cache and helper categories no longer exist; a stored one names no tool.
     categories = upgraded.get("active_tool_categories")
-    if revision < 4 and isinstance(categories, list) and "cache" not in categories:
-        categories = upgraded["active_tool_categories"] = [*categories, "cache"]
-    if revision < 6 and isinstance(categories, list) and "helper" in categories:
-        # The helper became the cache search; a stored "helper" names no category.
+    if revision < 7 and isinstance(categories, list):
         upgraded["active_tool_categories"] = [
-            category for category in categories if category != "helper"
+            category for category in categories if category not in ("cache", "helper")
         ]
     upgraded["settings_revision"] = SETTINGS_REVISION
     return upgraded

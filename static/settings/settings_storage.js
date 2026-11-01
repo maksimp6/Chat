@@ -45,7 +45,7 @@
       defer_loading: { eager_categories: [] },
     },
     // Matches yandex_client_modules.tool_config.SETTINGS_REVISION.
-    settings_revision: 6,
+    settings_revision: 7,
     conv_metadata: "",
     voice: "kirill",
     response_mode: "audio",
@@ -55,7 +55,7 @@
     vad_prefix_padding_ms: 300,
   };
 
-  var SETTINGS_REVISION = 6;
+  var SETTINGS_REVISION = 7;
 
   // Copies saved before SETTINGS_REVISION are upgraded one revision at a time, as the server upgrades them
   // (yandex_client_modules.tool_config.upgrade_dialog_settings); a missing or non-integer revision counts as 0.
@@ -63,6 +63,7 @@
   // Revision 3: live answers (stream) are on for a copy with no stream key; a stored stream value, true or false, is kept.
   // Revision 4: the server adds the cache category to a stored tool selection; a local copy keeps none.
   // Revisions 5 and 6: the server added a helper category and took it out again; a local copy keeps none.
+  // Revision 7: the server takes the removed cache and helper categories out of a stored tool selection.
   function upgradeLegacySettings(settings) {
     if (!settings || typeof settings !== "object") return settings;
     var revision = Number.isInteger(settings.settings_revision) ? settings.settings_revision : 0;
