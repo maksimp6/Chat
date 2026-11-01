@@ -7,7 +7,7 @@ from copy import deepcopy
 from typing import Any
 
 from agent_memory.client import get_memory_client
-from agent_memory.extractor import list_global_memory_facts, names_removed_tool
+from agent_memory.extractor import list_global_memory_facts
 from agent_memory.host import memory_file_path
 
 _MEMORY_CONFIG_KEY = "global_memory_config"
@@ -108,8 +108,7 @@ def get_controlled_memory_summary() -> str:
     facts = [
         item
         for item in list_global_memory_facts()
-        if not names_removed_tool(item["fact"])
-        and (not restricted or item["category"] in allowed)
+        if not restricted or item["category"] in allowed
     ][:limit]
     if not facts:
         return ""

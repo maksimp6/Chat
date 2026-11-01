@@ -44,7 +44,9 @@ MEMORY_SCHEMA = {
 
 
 # The cache tools were deleted (05a79dd1). A fact that names one tells the model to call a
-# tool that does not exist, so such a fact is kept out of the prompt and out of the store.
+# tool that does not exist ("Model called unexpected tool tools_cache", #1746), so such a
+# fact is not stored, and one already stored is deleted from the journal when the facts
+# are listed (owner's command: taken off the list).
 _REMOVED_TOOL_NAMES = ("cache_append", "cache_read", "cache_search", "tools_cache")
 
 
@@ -59,9 +61,14 @@ def init_global_memory() -> None:
 
 
 def list_global_memory_facts() -> list[dict[str, Any]]:
-    """Return detached facts, most recent first, with stable tie ordering."""
-    raw = get_memory_client(memory_file_path()).items(prefix=_FACT_PREFIX)
+    """Return detached facts, most recent first, with stable tie ordering.
+
+    A fact that names a removed tool is deleted from the journal on the way, so it
+    is neither listed nor shown to the model again."""
+    store = get_memory_client(memory_file_path())
+    raw = store.items(prefix=_FACT_PREFIX)
     facts = []
+    stale = []
     for name, value in raw.items():
         if (
             not isinstance(value, dict)
@@ -71,7 +78,15 @@ def list_global_memory_facts() -> list[dict[str, Any]]:
         ):
             logger.warning("skipping invalid native memory fact: %s", name)
             continue
+        if names_removed_tool(value["fact"]):
+            stale.append(name)
+            continue
         facts.append({"id": name[len(_FACT_PREFIX) :], **value})
+    if stale:
+        with store.transaction() as tx:
+            for name in stale:
+                tx.delete(name)
+        logger.info("deleted %d native memory facts naming removed tools", len(stale))
     return sorted(facts, key=lambda row: (-row["updated_at"], row["id"]))
 
 
@@ -167,12 +182,7 @@ def extract_and_save_facts(dialog_messages: list) -> int:
 def get_global_memory_summary() -> str:
     """Format current native memory facts for the system prompt."""
     records = sorted(
-        (
-            row
-            for row in list_global_memory_facts()
-            if not names_removed_tool(row["fact"])
-        ),
-        key=lambda row: (row["category"], row["fact"]),
+        list_global_memory_facts(), key=lambda row: (row["category"], row["fact"])
     )
     if not records:
         return ""
