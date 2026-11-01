@@ -289,7 +289,11 @@ function deleteConv(id) {
   localStorage.removeItem("messages_" + id);
 
   if (currentConvId === id) {
-    currentConvId = conversations.length ? conversations[0].id : null;
+    // The next dialog opens, never the Court's own.
+    var next = conversations.find(function (c) {
+      return c.court !== true;
+    });
+    currentConvId = next ? next.id : null;
     if (currentConvId) {
       localStorage.setItem("current_conv_id", currentConvId);
       selectConv(currentConvId);
