@@ -137,18 +137,7 @@ class ModelDiscovery:
             normalized = self._normalize_model(item, project_id=project_id)
             if normalized is None:
                 continue
-            # The catalog lists exactly the models documented by Yandex AI Studio
-            # (docs/models/yandex-models.md). Tuned, deprecated or duplicate URIs
-            # returned by the Models API are not listed.
-            documented = {
-                "text": bound.TEXT_MODELS,
-                "voice": bound.VOICE_MODELS,
-                "image": bound.IMAGE_MODELS,
-                "embedding": bound.EMBEDDING_MODELS,
-                "classifier": bound.CLASSIFIER_MODELS,
-            }
-            if normalized["id"] not in documented[normalized["type"]]:
-                continue
+            # Every model the provider's index returns is listed, the documented ones and the rest.
             catalog[normalized["type"]][normalized["id"]] = normalized
 
         return catalog
