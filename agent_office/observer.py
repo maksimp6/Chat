@@ -330,9 +330,9 @@ def timeline_event(raw: dict[str, Any]) -> Event | None:
         action = kind.replace("_", " ")
     elif kind.startswith("copilot_work"):
         action = (
-            "Copilot начал работу" if "started" in kind else "Copilot закончил работу"
+            "агент начал работу" if "started" in kind else "агент закончил работу"
         )
-        actor = actor or "Copilot"
+        actor = actor or "агент"
     else:
         return None
     return Event(at, actor, classify_actor(actor, body), action, url, kind)
@@ -704,7 +704,7 @@ def detect_findings(
             waiting = now - _ready_since(thread)
             if not _has_copilot_review(thread) and waiting > limits.review_wait:
                 found.append(
-                    finding("medium", "no_copilot_review", "нет ревью Copilot")
+                    finding("medium", "no_copilot_review", "нет ревью от ревьюера")
                 )
             if (
                 state == "passed"
