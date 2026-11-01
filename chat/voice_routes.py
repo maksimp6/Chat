@@ -24,7 +24,12 @@ from flask import (
 )
 
 from chat._error_details import error_body
-from chat.mcp_routes import _provider_conversation_id, logos_client_type
+from chat.mcp_routes import (
+    _court_censor,
+    _court_record,
+    _provider_conversation_id,
+    logos_client_type,
+)
 from chat.host import (
     add_message,
     bound,
@@ -434,10 +439,15 @@ def _process(session: VoiceSession) -> None:
             session.model, result.usage or None, step=1, response_id=result.response_id
         ).get("total_cost")
         if result.reply:
-            add_message(
+            # The Court judges the spoken reply's text like any other reply; the audio is already played.
+            judged = _court_censor(
+                session.conversation_id, result.reply, voice_session_id=session.session_id
+            )
+            reply_text = judged["text"] if judged is not None else result.reply
+            voice_message_id = add_message(
                 session.conversation_id,
                 "assistant",
-                result.reply,
+                reply_text,
                 cost=voice_cost,
                 usage=result.usage,
                 source="voice" if final_status == "completed" else "voice_partial",
@@ -450,10 +460,17 @@ def _process(session: VoiceSession) -> None:
                     "transcription_status": result.transcription_status,
                 },
             )
+            _court_record(
+                session.conversation_id,
+                voice_message_id,
+                judged,
+                session.owner_id,
+                voice_session_id=session.session_id,
+            )
             _emit(
                 session,
                 "response.output_text.done",
-                text=result.reply,
+                text=reply_text,
                 response_id=result.response_id,
             )
         elif result.audio:

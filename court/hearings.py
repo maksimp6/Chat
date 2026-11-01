@@ -14,6 +14,7 @@ The HTTP API is the blueprint ``court_bp`` (``/api/court``), the hall itself is
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -445,9 +446,9 @@ def speak(conversation_id: str, *, crisis: bool | None = None) -> dict[str, Any]
         if str(message.get("role") or "").lower() == "user":
             asked_rules = "правил" in str(message.get("text") or "").lower()
             break
-    # The Court speaks over what the chat shows; the sitting keeps the words as they were said.
-    text = _speech(judge_dialog(messages, crisis=crisis), since, asked_rules)
+    # The Court speaks over the words as they were said, like the sitting it keeps.
     protocol = judge_dialog(_with_originals(conversation_id, messages), crisis=crisis)
+    text = _speech(protocol, since, asked_rules)
     message_id = add_message(
         str(conversation_id), "assistant", text, source=COURT_SOURCE
     )
@@ -538,13 +539,35 @@ def record_reply(
                 },
             )
     messages = _with_originals(conversation_id, _dialog_messages(conversation_id, owner))
-    hearing = _hearing_of(conversation_id)
+    for _attempt in range(3):
+        try:
+            return _sit(conversation_id, messages, owner)
+        except ValueError:
+            continue  # a concurrent turn saved the sitting first: judge over its revision
+    return _sit(conversation_id, messages, owner)
+
+
+def _sit(
+    conversation_id: str, messages: list[dict[str, Any]], owner: str | None
+) -> dict[str, Any] | None:
+    """Open the dialog's sitting or judge it again; a sitting the owner closed stays closed."""
+    sittings = [
+        hearing
+        for hearing in get_store().items(prefix=PREFIX).values()
+        if isinstance(hearing, dict) and hearing.get("conversation_id") == conversation_id
+    ]
+    sittings.sort(key=lambda hearing: int(hearing.get("opened_at") or 0))
+    if sittings and sittings[-1].get("closure") != "OPEN":
+        return None
+    hearing = sittings[-1] if sittings else None
     crisis = bool(hearing["crisis"]) if hearing else False
     protocol = judge_dialog(messages, crisis=crisis)
     if hearing is None:
         now = int(time.time())
+        # One id per dialog: two replies stored at once open one sitting, not two.
+        key = _key("hearing-censor-" + hashlib.sha256(conversation_id.encode()).hexdigest()[:16])
         hearing = {
-            "id": "hearing-" + uuid4().hex[:16],
+            "id": key[len(PREFIX):],
             "conversation_id": conversation_id,
             "title": str(get_conversation_title(conversation_id, "") or ""),
             "opened_at": now,
@@ -558,7 +581,9 @@ def record_reply(
             "revision": 1,
         }
         with get_store().transaction() as tx:
-            tx.set(_key(hearing["id"]), hearing)
+            if tx.get(key) is not None:
+                raise ValueError("заседание открыто одновременно; повторите")
+            tx.set(key, hearing)
         return hearing
     hearing.update(
         {
