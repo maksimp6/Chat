@@ -1,13 +1,13 @@
 """One tool, one function that picks the action (owner's command).
 
-Each local category goes to the model as one tool ``tools_<category>``; its function
+Each local category goes to the model as one tool ``<category>``; its function
 picks the action by the ``tool`` field and takes the action's parameters in
 ``arguments``. The description lists every action with its description and parameters.
 
 Yandex AI Studio refuses a request with more than 100 tools ("The number of tools
 exceeds the maximum allowed limit of 100"), deferred tools included (#1703). When
 the turn's tools do not fit, each local category is sent as one function
-``tools_<category>`` whose description lists every tool of the category by name and
+``<category>`` whose description lists every tool of the category by name and
 synonyms (not its full description or parameters); the model calls it with ``tool``
 and ``arguments`` and the executor runs that tool. Parameters and usage examples are
 not inlined — the model looks them up in the index (file_search).
@@ -22,7 +22,7 @@ from typing import Any
 
 # The provider's documented maximum: a platform limit, not an application one.
 PROVIDER_TOOL_LIMIT = 100
-GROUP_PREFIX = "tools_"
+GROUP_PREFIX = ""
 
 # Short words carry no search signal; dropped when synonyms are mined from a description.
 _STOPWORDS = frozenset(
@@ -104,7 +104,7 @@ def fit_tools(
 ) -> tuple[list[dict[str, Any]], dict[str, str]]:
     """The local tools to send, and which action sits in which tool.
 
-    Each category is one tool, ``tools_<category>``, with one function that picks
+    Each category is one tool, ``<category>``, with one function that picks
     the action by its ``tool`` field (owner's command). ``other_count`` is kept
     for the caller's signature."""
     grouped: list[dict[str, Any]] = []
@@ -119,7 +119,7 @@ def fit_tools(
 
 
 def unwrap_call(name: str, args: Any, category_tools: Any) -> tuple[str, Any]:
-    """The real tool and arguments behind a ``tools_<category>`` call.
+    """The real tool and arguments behind a ``<category>`` call.
 
     ``category_tools(category)`` returns that category's tools. A name that is not
     a group function is returned unchanged. A ``tool`` outside the category raises

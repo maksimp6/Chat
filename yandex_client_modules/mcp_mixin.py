@@ -98,7 +98,7 @@ class YandexMcpMixin:
                         ) from None
                 if not isinstance(args, dict):
                     raise ValueError("Invalid tool arguments: expected a JSON object")
-                # A tools_all call stands for one tool of any category.
+                # A call named after a category stands for one action of that category.
                 inner_name, args = unwrap_call(
                     name,
                     args,
