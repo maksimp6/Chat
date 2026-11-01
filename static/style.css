@@ -2686,3 +2686,87 @@ body {
 .logos-pro-app #close-sidebar-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M6 6l12 12M18 6 6 18'/></svg>");}
 .logos-pro-app .rename-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19zM14 7l3 3'/></svg>");}
 .logos-pro-app .delete-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M6 6l12 12M18 6 6 18'/></svg>");}
+
+/* Composer: one floating capsule, the field sits inside it with the send button, no separate bar. */
+.logos-pro-app #text-ui {
+  margin: 6px max(12px, env(safe-area-inset-left, 0px)) calc(12px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 6px 6px 8px;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  border: 1px solid transparent;
+  border-image: none;
+  border-radius: 30px;
+  background:
+    linear-gradient(180deg, #121620, #0b0d12) padding-box,
+    linear-gradient(135deg, rgba(217, 184, 119, 0.55), rgba(255, 255, 255, 0.06) 40%, rgba(217, 184, 119, 0.25)) border-box;
+  backdrop-filter: none;
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  transition: box-shadow 0.2s ease;
+}
+.logos-pro-app #text-ui:focus-within {
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 4px rgba(217, 184, 119, 0.14),
+    0 0 28px rgba(217, 184, 119, 0.12);
+}
+.logos-pro-app #text-ui #image-previews:not([hidden]) {
+  flex: 1 1 100%;
+}
+.logos-pro-app #text-ui #msg-input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 40px;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--text-main);
+}
+.logos-pro-app #text-ui #msg-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.75;
+}
+.logos-pro-app #text-ui #msg-input:focus-visible {
+  border: none;
+  box-shadow: none;
+}
+.logos-pro-app #text-ui #send-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--lux-gold-grad);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 4px 14px rgba(217, 184, 119, 0.35);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    filter 0.15s ease;
+}
+.logos-pro-app #text-ui #send-btn:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.05);
+  filter: brightness(1.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 8px 22px rgba(217, 184, 119, 0.5);
+}
+.logos-pro-app #text-ui #send-btn:disabled {
+  opacity: 0.45;
+  filter: saturate(0.5);
+}
+.logos-pro-app #text-ui #attach-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
