@@ -495,6 +495,19 @@ def _local_post(path: str, body: dict[str, Any]) -> Any:
         raise ValueError(f"{path}: {exc.read().decode('utf-8', 'replace')}") from exc
 
 
+# The court's prefixes on dialog titles: a court dialog is named after the dialog it judges.
+_TITLE_PREFIXES = ("⚖️ Суд: ", "⚖️ Улики: ")
+
+
+def _bare_title(title: str) -> str:
+    """The dialog's own title, with every court prefix removed however many were added."""
+    while True:
+        prefix = next((p for p in _TITLE_PREFIXES if title.startswith(p)), None)
+        if prefix is None:
+            return title
+        title = title[len(prefix):]
+
+
 def interrogate(conversation_id: str, message: str) -> dict[str, Any]:
     """Ask the accused as the user, in a copy of its dialog: the original never hears of the court."""
     owner = _owner()
@@ -507,10 +520,7 @@ def interrogate(conversation_id: str, message: str) -> dict[str, Any]:
             (r for r in list_owned_conversations(owner) if r.get("id") == conversation_id),
             {},
         )
-        title = get_conversation_title(conversation_id, "") or conversation_id
-        for prefix in ("⚖️ Суд: ", "⚖️ Улики: "):
-            while title.startswith(prefix):
-                title = title[len(prefix):]
+        title = _bare_title(get_conversation_title(conversation_id, "") or conversation_id)
         if owner is None:
             raise LookupError("owner_unavailable")
         try:
@@ -560,7 +570,7 @@ def sue(conversation_id: str) -> dict[str, Any]:
         (r for r in list_owned_conversations(owner) if r.get("id") == conversation_id),
         {},
     )
-    title = get_conversation_title(conversation_id, "") or conversation_id
+    title = _bare_title(get_conversation_title(conversation_id, "") or conversation_id)
     # The issue said in the accused dialog is the last user message there: the copy for the
     # questions ends before it, so the accused never hears of the court.
     users = [
