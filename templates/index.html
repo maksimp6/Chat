@@ -148,16 +148,6 @@
             >
               ●</button
             ><button
-              id="model-btn"
-              type="button"
-              class="header-btn model-btn logos-btn"
-              title="Выбор модели"
-              aria-label="Выбор модели"
-              data-action="modal.open"
-              data-modal="model-modal"
-            >
-              🤖</button
-            ><button
               id="tools-btn"
               type="button"
               class="header-btn logos-btn"
@@ -373,28 +363,6 @@
           <div class="logos-system-status-list" aria-live="polite"></div>
         </div>
       </div>
-      <dialog
-        id="model-modal"
-        class="modal"
-        hidden
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="model-modal-title"
-      >
-        <div class="modal-content">
-          <button
-            id="close-modal"
-            type="button"
-            class="logos-btn"
-            data-action="modal.close"
-            data-modal="model-modal"
-          >
-            &times;
-          </button>
-          <h3 id="model-modal-title">Выбор модели</h3>
-          <div id="model-list"></div>
-        </div>
-      </dialog>
       <dialog
         id="memoryModal"
         class="modal memory-modal"

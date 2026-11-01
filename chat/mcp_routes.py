@@ -44,7 +44,6 @@ from chat.host import (
     get_current_owner_id,
     get_message,
     get_messages,
-    get_store,
     get_yandex_conversation,
     is_provider_pending,
     list_owned_conversations,
@@ -2017,13 +2016,6 @@ def chat_turn_events(request_id):
     return live_turns.receipt_response(conv_id, request_id)
 
 
-def _dialog_model(conv_id: Any) -> str:
-    """The model stored with the dialog; the chat model for a dialog that names none."""
-    record = get_store().get("chat/conversation/" + str(conv_id)) if conv_id else None
-    model = record.get("model") if isinstance(record, dict) else None
-    return model if isinstance(model, str) and model else bound.CHAT_MODEL
-
-
 def _chat_turn(*, t_start, admission=None, live=None):
     """One chat turn, from the request body to the stored reply (the former body of chat())."""
     import time as _time
@@ -2034,6 +2026,7 @@ def _chat_turn(*, t_start, admission=None, live=None):
     conv_id = None
     session_id = None
     message = None
+    # A text turn has no model parameter: every dialog answers with the one chat model.
     model_key = bound.CHAT_MODEL
     error_message = None
     user_message_id = None
@@ -2090,8 +2083,6 @@ def _chat_turn(*, t_start, admission=None, live=None):
         except (ValueError, bound.SkillRegistryError) as exc:
             return jsonify(error_body("invalid_params", message=str(exc))), 400
 
-        # Every dialog answers with its own model, chosen in the model list.
-        model_key = _dialog_model(conv_id)
         message, images, invalid_payload = _validate_chat_payload(
             conv_id, model_key, message, data.get("attachments")
         )
@@ -2432,6 +2423,7 @@ def conversations():
         if not isinstance(data, dict):
             return jsonify(error_body("JSON object is required")), 400
         try:
+            # Only an image or a voice dialog names its model; a text dialog has the chat model.
             model = validate_dialog_model(data.get("model") or bound.CHAT_MODEL)
         except ValueError:
             return jsonify(error_body("model_not_available_for_dialog")), 400
@@ -2721,7 +2713,7 @@ def execute_approved():
         conv_id = data.get("conversation_id")
         func_name = data.get("name")
         arguments = data.get("arguments", {})
-        model_key = _dialog_model(conv_id)
+        model_key = bound.CHAT_MODEL
 
         tool_config = bound.registry.get_tool_meta(func_name)
         if not tool_config:
