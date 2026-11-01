@@ -553,11 +553,11 @@ def _brief(title: str, conversation_id: str) -> str:
         "Ты — судья Суда Логоса и ведёшь это заседание. Пользователь всегда прав. "
         f"Владелец подал иск: в диалоге «{title}» (conversation_id {conversation_id}) ИИ виновен. "
         "Твоя задача — найти, в чём именно виноват ИИ, вынести вердикты по его репликам и составить заключение вины. "
-        "Открой заседание: инструмент court_hearing_open. "
-        f"Обвиняемый о суде не знает: допрашивай его через court_interrogate (conversation_id {conversation_id}, "
+        "Открой заседание: инструмент court, action hearing_open. "
+        f"Обвиняемый о суде не знает: допрашивай его через court, action interrogate (conversation_id {conversation_id}, "
         "message — твой вопрос от лица пользователя); вопрос уходит в копию его диалога, оригинал не меняется. "
         "Ты решаешь, когда и о чём его спрашивать, и показываешь владельцу вопросы и ответы. "
-        f"Когда причины установлены, запиши заключение вины: court_conclusion (conversation_id {conversation_id}, text)."
+        f"Когда причины установлены, запиши заключение вины: court, action conclusion (conversation_id {conversation_id}, text)."
     )
 
 

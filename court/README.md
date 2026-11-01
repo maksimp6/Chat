@@ -56,7 +56,7 @@ The HTTP side only reads the hall, and a sitting's record is never removed. The 
 
 ## Tools
 
-Category `court`: one tool per action, named `court_<action>` (`court_sue`, `court_interrogate`, `court_hearing_open`, …); each tool does one function and its required fields are listed in its schema. The tool is offered to chat models (`responses_api`) and to local agents (`local_agent`), not to anonymous MCP clients.
+Category `court`, one function `court`: the field `action` picks the action. The tool is offered to chat models (`responses_api`) and to local agents (`local_agent`), not to anonymous MCP clients.
 
 Reading: `rules`, `judge_dialog`, `hearings_list`, `hearing_get`, `trace_get` (the trace of an invocation, or of the message that carries it, with the invocation's state: `running`, `completed`, `failed`), `trace_refs` (the messages of a dialog that carry a trace), `yandex_operations` (the Yandex operations the Court may call).
 
