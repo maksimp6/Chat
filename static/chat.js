@@ -1294,6 +1294,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const pending = currentConvId ? pendingConversations.has(currentConvId) : creatingConversation;
     const waiting = !running && (pending || imagesInFlight > 0);
     sendBtn.textContent = running ? "■" : "➤";
+    sendBtn.classList.toggle("is-stop", Boolean(running));
     const label = running
       ? "Остановить ответ"
       : pending
