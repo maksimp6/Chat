@@ -2652,7 +2652,7 @@ body {
   content: "";
   width: 22px;
   height: 22px;
-  background: var(--lux-gold-grad);
+  background: var(--ico-bg, var(--lux-gold-grad));
   -webkit-mask: var(--ico) center / contain no-repeat;
   mask: var(--ico) center / contain no-repeat;
   transition: transform 0.15s ease, filter 0.15s ease;
@@ -2769,4 +2769,56 @@ body {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+/* Each icon has its own colour; the tile carries a faint tint of it. */
+.logos-pro-app #menu-btn{--c1:#e5e9f5;--c2:#a3adc8;--ico-bg:linear-gradient(135deg,#e5e9f5,#a3adc8);}
+.logos-pro-app #model-btn{--c1:#b9a4ff;--c2:#6f6cf5;--ico-bg:linear-gradient(135deg,#b9a4ff,#6f6cf5);}
+.logos-pro-app #tools-btn{--c1:#ffb067;--c2:#f4476b;--ico-bg:linear-gradient(135deg,#ffb067,#f4476b);}
+.logos-pro-app #ssh-runtime-btn{--c1:#7df0a0;--c2:#22c55e;--ico-bg:linear-gradient(135deg,#7df0a0,#22c55e);}
+.logos-pro-app #environments-btn{--c1:#5eead4;--c2:#14b8a6;--ico-bg:linear-gradient(135deg,#5eead4,#14b8a6);}
+.logos-pro-app #mcp-btn{--c1:#6dd0ff;--c2:#3b82f6;--ico-bg:linear-gradient(135deg,#6dd0ff,#3b82f6);}
+.logos-pro-app #settings-btn{--c1:#ffd166;--c2:#f59e0b;--ico-bg:linear-gradient(135deg,#ffd166,#f59e0b);}
+.logos-pro-app #file-manager-btn{--c1:#ffe27a;--c2:#f5a30b;--ico-bg:linear-gradient(135deg,#ffe27a,#f5a30b);}
+.logos-pro-app #treasury-btn{--c1:#4ade80;--c2:#0fb981;--ico-bg:linear-gradient(135deg,#4ade80,#0fb981);}
+.logos-pro-app #dozzle-btn{--c1:#7cb8ff;--c2:#06c2d9;--ico-bg:linear-gradient(135deg,#7cb8ff,#06c2d9);}
+.logos-pro-app #project-tree-btn{--c1:#bef264;--c2:#65c21d;--ico-bg:linear-gradient(135deg,#bef264,#65c21d);}
+.logos-pro-app #departments-btn{--c1:#9ba4ff;--c2:#5b4fe6;--ico-bg:linear-gradient(135deg,#9ba4ff,#5b4fe6);}
+.logos-pro-app button#court-btn{--c1:#f5b5ff;--c2:#c63bdc;--ico-bg:linear-gradient(135deg,#f5b5ff,#c63bdc);}
+.logos-pro-app a#court-btn{--c1:#ffe9a0;--c2:#e08a1e;--ico-bg:linear-gradient(135deg,#ffe9a0,#e08a1e);}
+.logos-pro-app #group-chat-btn{--c1:#ff8ac1;--c2:#ec4899;--ico-bg:linear-gradient(135deg,#ff8ac1,#ec4899);}
+.logos-pro-app #provider-credentials-btn{--c1:#ffc247;--c2:#f0541e;--ico-bg:linear-gradient(135deg,#ffc247,#f0541e);}
+.logos-pro-app #memory-btn{--c1:#d4a5ff;--c2:#9a3ff0;--ico-bg:linear-gradient(135deg,#d4a5ff,#9a3ff0);}
+.logos-pro-app #theme-toggle{--c1:#ffe66d;--c2:#ff8a3d;--ico-bg:linear-gradient(135deg,#ffe66d,#ff8a3d);}
+.logos-pro-app .rename-btn{--c1:#7cc4ff;--c2:#3b82f6;--ico-bg:linear-gradient(135deg,#7cc4ff,#3b82f6);}
+.logos-pro-app .delete-btn{--c1:#ff8f8f;--c2:#ef4444;--ico-bg:linear-gradient(135deg,#ff8f8f,#ef4444);}
+.logos-pro-app #mic-btn{--c1:#ff9a9a;--c2:#ef4444;--ico-bg:linear-gradient(135deg,#ff9a9a,#ef4444);}
+.logos-pro-app #attach-btn{--c1:#7cd8ff;--c2:#3b9cf0;--ico-bg:linear-gradient(135deg,#7cd8ff,#3b9cf0);}
+.logos-pro-app #close-sidebar-btn{--c1:#e5e9f5;--c2:#a3adc8;--ico-bg:linear-gradient(135deg,#e5e9f5,#a3adc8);}
+.logos-pro-app #header .header-btn:not(#system-status-btn):not(.donate-btn) {
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--c1) 20%, transparent), color-mix(in srgb, var(--c2) 7%, transparent)) !important;
+  border-color: color-mix(in srgb, var(--c1) 30%, transparent) !important;
+}
+.logos-pro-app #header .header-btn:not(#system-status-btn):not(.donate-btn):hover {
+  border-color: var(--c1) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c1) 16%, transparent), 0 8px 22px rgba(0, 0, 0, 0.5) !important;
+}
+.logos-pro-app #header .header-btn:not(#system-status-btn):not(.donate-btn):hover::before {
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--c1) 70%, transparent));
+}
+.logos-pro-app #system-status-btn {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.35) !important;
+  background-image: linear-gradient(180deg, rgba(74, 222, 128, 0.2), rgba(74, 222, 128, 0.06)) !important;
+}
+.logos-pro-app #attach-btn,
+.logos-pro-app #mic-btn {
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--c1) 20%, transparent), color-mix(in srgb, var(--c2) 7%, transparent));
+}
+.logos-pro-app #text-ui {
+  background:
+    linear-gradient(180deg, #131824, #0b0d13) padding-box,
+    linear-gradient(135deg, #6dd0ff, #b9a4ff 35%, #ff8ac1 70%, #ffd166) border-box;
+}
+.logos-pro-app #text-ui:focus-within {
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(185, 164, 255, 0.16), 0 0 30px rgba(109, 208, 255, 0.14);
 }
