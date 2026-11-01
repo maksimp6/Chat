@@ -1,7 +1,8 @@
-"""One tool, one function: every local tool goes to the model as its own function.
+"""One tool, one function that picks the action (owner's command).
 
-Grouping (``tools_<category>``, ``tools_all``) is no longer sent; unwrap_call still
-reads such a call if a stored conversation replays one.
+Each local category goes to the model as one tool ``tools_<category>``; its function
+picks the action by the ``tool`` field and takes the action's parameters in
+``arguments``. The description lists every action with its description and parameters.
 
 Yandex AI Studio refuses a request with more than 100 tools ("The number of tools
 exceeds the maximum allowed limit of 100"), deferred tools included (#1703). When
@@ -65,13 +66,15 @@ def _tool_line(tool: dict[str, Any]) -> str:
 def group_tool(category: str, tools: list[dict[str, Any]]) -> dict[str, Any]:
     """The single function that stands for every tool of ``category``."""
     names = [tool["name"] for tool in tools]
+    listing = "\n\n".join(
+        f"### {tool['name']}\n{tool.get('description') or ''}\n"
+        f"Параметры: {json.dumps(tool.get('parameters') or {}, ensure_ascii=False)}"
+        for tool in tools
+    )
     description = (
-        f"Категория инструментов «{category}». Вызови эту функцию с полем tool — имя "
-        "нужного инструмента — и полем arguments — объект его параметров.\n"
-        "Ниже только имена и синонимы (для узнавания), без параметров и примеров. "
-        "Чтобы узнать параметры и увидеть примеры вызова инструмента, найди их в индексе: "
-        "встроенным file_search (индекс, в котором архив диалогов) по имени инструмента.\n"
-        "Инструменты (имя и синонимы):\n" + "\n".join(_tool_line(tool) for tool in tools)
+        f"Инструмент «{category}». Одна функция выбирает действие: поле tool — имя "
+        "действия, поле arguments — объект его параметров.\n"
+        "Действия:\n\n" + listing
     )
     grouped = {
         "type": "function",
@@ -99,8 +102,20 @@ ALL_CATEGORY = "all"
 def fit_tools(
     categories: list[tuple[str, list[dict[str, Any]]]], other_count: int
 ) -> tuple[list[dict[str, Any]], dict[str, str]]:
-    """The local tools to send: one tool, one function, never grouped (owner's command)."""
-    return [tool for _, tools in categories for tool in tools], {}
+    """The local tools to send, and which action sits in which tool.
+
+    Each category is one tool, ``tools_<category>``, with one function that picks
+    the action by its ``tool`` field (owner's command). ``other_count`` is kept
+    for the caller's signature."""
+    grouped: list[dict[str, Any]] = []
+    membership: dict[str, str] = {}
+    for category, tools in categories:
+        if not tools:
+            continue
+        grouped.append(group_tool(category, tools))
+        for tool in tools:
+            membership[tool["name"]] = group_name(category)
+    return grouped, membership
 
 
 def unwrap_call(name: str, args: Any, category_tools: Any) -> tuple[str, Any]:
