@@ -201,6 +201,9 @@ response_input = _response_input
 
 # Every request parameter is named the way an Ultra profile names each setting: the value that
 # was sent, or the reason it was left to the provider. Nothing is silently absent.
+# The one prompt-cache bucket of the whole application: every dialog, every request.
+PROMPT_CACHE_KEY = "logos"
+
 _RESPONSES_PARAMETERS = (
     "input",
     "instructions",
@@ -445,15 +448,15 @@ def build_response_payload(
     if params.get("service_tier"):
         payload["service_tier"] = params["service_tier"]
 
-    cache_key = params.get("prompt_cache_key") or conversation_id
-    if cache_key:
-        payload["prompt_cache_key"] = str(cache_key)
-        # Yandex AI Studio caches a prompt automatically when its beginning repeats an
-        # earlier request's, and lists prompt_cache_key as "currently not supported";
-        # the supported field that "boosts cache hit rates by better bucketing similar
-        # requests" is user (createResponse reference). The same stable id goes there,
-        # so every request of a dialog lands where its cache is (#1742).
-        payload["user"] = str(cache_key)
+    # One cache for everything (owner's command, #1742): the settings are global, so the
+    # instructions and tools, the beginning of every request, are the same in every
+    # dialog, and every request of the application is bucketed under one key. Yandex AI
+    # Studio caches a prompt automatically when its beginning repeats an earlier
+    # request's; it lists prompt_cache_key as "currently not supported", and the field it
+    # documents as boosting cache hit rates "by better bucketing similar requests" is user.
+    cache_key = str(params.get("prompt_cache_key") or PROMPT_CACHE_KEY)
+    payload["prompt_cache_key"] = cache_key
+    payload["user"] = cache_key
 
     if params.get("reasoning"):
         payload["reasoning"] = params["reasoning"]
