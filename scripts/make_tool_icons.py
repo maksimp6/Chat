@@ -111,6 +111,30 @@ RULES = [
 ]
 
 
+# One tool, one function: a category is a tool with its own icon, drawn with the
+# glyph named here (the action icons above keep their keyword rules).
+CATEGORY_GLYPHS = {
+    "git": "branch",
+    "termux": "chip",
+    "system": "gear",
+    "filesystem": "folder",
+    "wikipedia": "search",
+    "profiler": "clock",
+    "theme": "palette",
+    "runtime": "server",
+    "government": "document",
+    "partner": "person",
+    "3d": "printer",
+    "cloud": "cloud",
+    "browser": "globe",
+    "rootagent": "server",
+    "tty": "terminal",
+    "court": "scales",
+    "chatgpt_project": "chat",
+    "chatgpt_conversation": "chat",
+    "chatgpt_bridge": "chat",
+}
+
 # Tool files of the other units that contribute categories through composition/tool_sources.py.
 UNIT_TOOL_FILES = (
     "browser/tools.py",
@@ -184,8 +208,38 @@ def _bridge_names(tree: ast.Module) -> set[str]:
     }
 
 
-def tool_names() -> list[str]:
+def _category_names() -> set[str]:
+    """The categories (tools) of the registry's own sources, the units' sources and the MCP server."""
     names: set[str] = set()
+    for rel, variable in (
+        ("tool_providers/registry.py", "_TOOL_SOURCES"),
+        ("composition/tool_sources.py", "SOURCES"),
+    ):
+        tree = ast.parse((ROOT / rel).read_text(encoding="utf-8"), rel)
+        for node in tree.body:
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+            if not any(isinstance(t, ast.Name) and t.id == variable for t in targets):
+                continue
+            value = getattr(node, "value", None)
+            for entry in getattr(value, "elts", []):
+                if isinstance(entry, ast.Tuple) and entry.elts and isinstance(entry.elts[0], ast.Constant) and isinstance(entry.elts[0].value, str):
+                    names.add(entry.elts[0].value)
+    bridge = ROOT / "mcp_server" / "tools.py"
+    for node in ast.walk(ast.parse(bridge.read_text(encoding="utf-8"), str(bridge))):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "register"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            names.add(node.args[0].value)
+    return names
+
+
+def tool_names() -> list[str]:
+    names: set[str] = set(_category_names())
     files = sorted((ROOT / "tool_providers").glob("*.py")) + [
         ROOT / rel for rel in UNIT_TOOL_FILES
     ] + _source_files()
@@ -201,6 +255,8 @@ def tool_names() -> list[str]:
 
 
 def glyph_for(name: str) -> str:
+    if name in CATEGORY_GLYPHS:
+        return CATEGORY_GLYPHS[name]
     lowered = name.lower()
     for keywords, glyph in RULES:
         if any(word in lowered for word in keywords):

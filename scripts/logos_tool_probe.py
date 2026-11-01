@@ -69,7 +69,8 @@ def main() -> int:
 
         check(Path(bound.filesystem.BASE_DIR).resolve() == ROOT)
         executor = bound.UniversalToolExecutor(bound.registry)
-        categories = bound.registry.get_available_categories()
+        # One tool, one function: a category is a tool; its actions are counted here.
+        categories = bound.registry.get_tool_actions()
         report["categories"] = {
             name: len(names) for name, names in sorted(categories.items())
         }
@@ -77,12 +78,17 @@ def main() -> int:
         native_definitions = bound.registry.get_definitions(
             set(native["active_tool_categories"])
         )
-        offered_names = {tool["name"] for tool in native_definitions}
+        offered_names = {
+            action
+            for tool in native_definitions
+            for action in bound.registry.get_actions(tool["name"])
+        }
         report["native_profile"] = {
             "model": MODEL,
             "categories": native["active_tool_categories"],
             "offered_count": len(native_definitions),
-            # Registered tools this host or transport cannot execute are not offered.
+            "offered_actions": len(offered_names),
+            # Registered actions this host or transport cannot execute are not offered.
             "not_offered": sorted(
                 name
                 for names in categories.values()
@@ -101,7 +107,8 @@ def main() -> int:
         # logos-tools deliberately executes only temporary filesystem fixtures.
         # Native dialogue uses the full profile above after knowledge preparation.
         active = ["filesystem"]
-        definitions = bound.registry.get_definitions(set(active))
+        # The model gets filesystem as one function; the probe audits its actions one by one.
+        definitions = bound.registry.get_action_definitions("filesystem")
         exposed = {tool["name"]: tool["parameters"] for tool in definitions}
         report["mode"] = "logos-tools"
         report["generation_requests"] = 0

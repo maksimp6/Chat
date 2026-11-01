@@ -198,6 +198,14 @@
         var activeData = results[1];
         var listEl = document.getElementById("tools-category-list");
         var categories = catData.categories || {};
+        // One tool, one function: the function picks the action; these are its actions.
+        var actionsOf = catData.actions || {};
+        function countOf(n, one, few, many) {
+          var mod10 = n % 10;
+          var mod100 = n % 100;
+          var word = mod10 === 1 && mod100 !== 11 ? one : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? few : many;
+          return n + " " + word;
+        }
         var active =
           activeData && activeData.active_tool_categories !== null
             ? activeData.active_tool_categories
@@ -206,7 +214,10 @@
           .map(function (cat) {
             var isChecked = active.indexOf(cat) !== -1;
             var label = categoryLabels[cat] || "Модуль: " + cat;
-            var count = (categories[cat] || []).length;
+            var functions = categories[cat] || [];
+            var actions = actionsOf[cat] || [];
+            var summary = countOf(functions.length, "функция", "функции", "функций");
+            if (actions.length) summary += " · " + countOf(actions.length, "действие", "действия", "действий");
             return (
               '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--m-border,#ddd);border-radius:6px;background:var(--m-card,#fff);cursor:pointer;">' +
               '<input type="checkbox" class="tool-cat-chk" disabled value="' +
@@ -218,11 +229,17 @@
               UI.escapeHtml(label) +
               "</div>" +
               '<div style="font-size:11px;color:var(--m-muted,#666);">' +
-              count +
-              " функций доступно</div>" +
+              UI.escapeHtml(summary) +
+              "</div>" +
               '<div style="display:flex;flex-wrap:wrap;margin-top:4px;">' +
-              (categories[cat] || []).map(toolChip).join("") +
-              "</div></div></label>"
+              functions.map(toolChip).join("") +
+              "</div>" +
+              (actions.length
+                ? '<details style="margin-top:4px;font-size:11px;color:var(--m-muted,#666);"><summary>Действия функции</summary>' +
+                  UI.escapeHtml(actions.join(", ")) +
+                  "</details>"
+                : "") +
+              "</div></label>"
             );
           })
           .join("");

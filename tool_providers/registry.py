@@ -1,8 +1,17 @@
 """Provider-agnostic registry for Logos tools.
 
-Legacy tool definitions remain compatible: parameters/func are still
-accepted, while the registry also exposes a normalized Universal Tool
-contract for every registered tool.
+One tool, one function (owner's command). The registered entries are *actions*
+(``git_status``, ``read_file``, ...), each with its own handler and schema. A
+category of actions is one *tool*, named after the category (``git``,
+``filesystem``, ...), and that tool has exactly one function: it picks the action
+by its ``tool`` field and takes the action's parameters in ``arguments``. A tool
+with one action is that action under the tool's name, with the action's own
+parameters. The model, the tools panel and the executor see tools; the actions
+stay available, every one of them, inside their tool.
+
+Legacy action definitions remain compatible: parameters/func are still accepted,
+while the registry also exposes a normalized Universal Tool contract for every
+registered action.
 """
 
 from __future__ import annotations
@@ -10,11 +19,12 @@ from __future__ import annotations
 import copy
 import functools
 import inspect
+import json
 import logging
 import re
 import shutil
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from importlib import import_module
 from typing import Any
 
@@ -87,9 +97,52 @@ def _git_policy(name: str, cfg: Mapping[str, Any]) -> Mapping[str, Any]:
     return cfg
 
 
+_RISK_ORDER = ("low", "medium", "high", "critical")
+
+
+def _highest_risk(levels) -> str:
+    known = [level for level in levels if level in _RISK_ORDER]
+    return max(known, key=_RISK_ORDER.index) if known else "medium"
+
+
+def _as_object(value: Any) -> Any:
+    if isinstance(value, str):
+        return json.loads(value) if value.strip() else {}
+    return {} if value is None else value
+
+
+def _split_call(args: Mapping[str, Any]) -> tuple[Any, Any]:
+    """(action, its arguments) from the shapes models actually send (#1703 follow-up).
+
+    The function is not strict, so Qwen3.6 sent, besides the documented
+    {tool, arguments}: everything nested one level down ({arguments: {tool,
+    arguments}}), the action name inside arguments ({arguments: {tool, query}}),
+    "parameters" instead of "arguments", and the parameters beside "tool"."""
+    tool = args.get("tool")
+    payload_key = (
+        "arguments"
+        if "arguments" in args
+        else "parameters"
+        if "parameters" in args
+        else None
+    )
+    payload = _as_object(args[payload_key]) if payload_key else None
+    if (
+        not isinstance(tool, str)
+        and isinstance(payload, Mapping)
+        and isinstance(payload.get("tool"), str)
+    ):
+        # The whole call was put inside "arguments": take it from there.
+        return _split_call(payload)
+    if payload_key is None:
+        return tool, {key: value for key, value in args.items() if key != "tool"}
+    return tool, payload
+
+
 class ToolRegistry:
     def __init__(self):
-        self._tools: dict[str, dict[str, Any]] = {}
+        # Every registered action by name; a category of actions is one tool.
+        self._actions: dict[str, dict[str, Any]] = {}
         self._categories: dict[str, list[str]] = {}
         self._load_all()
 
@@ -130,7 +183,7 @@ class ToolRegistry:
                     previous,
                     category,
                 )
-        self._tools[name] = normalized
+        self._actions[name] = normalized
         self._categories.setdefault(category, []).append(name)
 
     def register(self, category: str, name: str, cfg: Mapping[str, Any]) -> None:
@@ -257,37 +310,211 @@ class ToolRegistry:
             "strict": not self._has_open_object(parameters),
         }
 
-    def get_definitions(self, active_categories: set = None) -> list:
-        tools_list = []
+    # --- tools: one function per category of actions ---
+
+    def category_of(self, action: str) -> str | None:
+        """The tool (category) an action belongs to."""
+        for category, names in self._categories.items():
+            if action in names:
+                return category
+        return None
+
+    def is_tool(self, name: str) -> bool:
+        return name in self._categories
+
+    def _offered_actions(
+        self,
+        category: str,
+        transport: str,
+        which,
+        allow_action: Callable[[UniversalToolDefinition], bool] | None = None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        offered = []
+        for name in self._categories.get(category, []):
+            cfg = self._actions.get(name)
+            if cfg is None or not self.is_offered(cfg, transport, which):
+                continue
+            if allow_action is not None and not allow_action(
+                UniversalToolDefinition.from_mapping(name, cfg)
+            ):
+                continue
+            offered.append((name, cfg))
+        return offered
+
+    def get_actions(
+        self,
+        category: str,
+        *,
+        transport: str = "responses_api",
+        allow_action: Callable[[UniversalToolDefinition], bool] | None = None,
+    ) -> list[str]:
+        """The actions of one tool this transport and host can run."""
         which = self._which_per_listing()
-        # Category of each tool in one pass; the first category that lists it wins.
-        category_of: dict[str, str] = {}
-        for cat, names in self._categories.items():
-            for tool_name in names:
-                category_of.setdefault(tool_name, cat)
-        for name, cfg in self._tools.items():
-            category = category_of.get(name, "general")
+        return [
+            name for name, _ in self._offered_actions(category, transport, which, allow_action)
+        ]
+
+    def get_tool_actions(self) -> dict[str, list[str]]:
+        """Every tool with every registered action, whatever the transport."""
+        return {category: list(names) for category, names in self._categories.items()}
+
+    def _tool_function(
+        self, category: str, actions: list[tuple[str, Mapping[str, Any]]]
+    ) -> dict[str, Any]:
+        """The one function of a tool: ``tool`` picks the action, ``arguments`` carries its parameters.
+
+        A tool of one action is that action under the tool's name, with the action's
+        own (strict) parameters: there is nothing to pick."""
+        if len(actions) == 1:
+            name, cfg = actions[0]
+            function = self._function_definition(name, cfg)
+            function["name"] = category
+            if name != category:
+                function["description"] = (
+                    f"Инструмент «{category}», одна функция — действие {name}. "
+                    + str(function.get("description") or "")
+                )
+            return function
+        names = [name for name, _ in actions]
+        listing = "\n".join(
+            f"- {name} — {' '.join(str(cfg.get('description') or '').split())}"
+            for name, cfg in actions
+        )
+        branches = []
+        for name, cfg in actions:
+            schema = UniversalToolDefinition.from_mapping(name, cfg).input_schema
+            branch: dict[str, Any] = {"title": name}
+            if isinstance(schema, Mapping):
+                branch.update(copy.deepcopy(dict(schema)))
+            else:
+                branch["type"] = "object"
+            branch.setdefault("description", f"Параметры действия {name}")
+            branches.append(branch)
+        return {
+            "type": "function",
+            "name": category,
+            "description": (
+                f"Инструмент «{category}». Одна функция: поле tool выбирает действие, "
+                "поле arguments — объект параметров этого действия (его схема стоит "
+                "в arguments под именем действия).\nДействия:\n" + listing
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tool": {
+                        "type": "string",
+                        "enum": names,
+                        "description": "Действие инструмента",
+                    },
+                    "arguments": {
+                        "description": "Параметры выбранного действия",
+                        "anyOf": branches,
+                    },
+                },
+                "required": ["tool", "arguments"],
+                "additionalProperties": False,
+            },
+            # The arguments differ per action, which strict function calling cannot express.
+            "strict": False,
+        }
+
+    def get_tools_by_category(
+        self,
+        category: str,
+        *,
+        transport: str = "responses_api",
+        allow_action: Callable[[UniversalToolDefinition], bool] | None = None,
+    ) -> list:
+        """The one Responses API function of a tool, or nothing when no action is offered."""
+        which = self._which_per_listing()
+        actions = self._offered_actions(category, transport, which, allow_action)
+        return [self._tool_function(category, actions)] if actions else []
+
+    def get_definitions(self, active_categories: set = None) -> list:
+        """One function per tool (category), for the active categories."""
+        tools_list = []
+        for category in self._categories:
             if active_categories is not None and category not in active_categories:
                 continue
-            if self.is_offered(cfg, which=which):
-                tools_list.append(self._function_definition(name, cfg))
+            tools_list.extend(self.get_tools_by_category(category))
         return tools_list
 
-    def get_tools_by_category(self, category: str) -> list:
-        """Return Responses API function definitions for one local category."""
-        names = self._categories.get(category, [])
-        tools_list = []
+    def get_action_definitions(self, category: str) -> list:
+        """Per-action function definitions of one tool (diagnostics; never sent to a model)."""
         which = self._which_per_listing()
-        for name in names:
-            cfg = self._tools.get(name)
-            if cfg and self.is_offered(cfg, which=which):
-                tools_list.append(self._function_definition(name, cfg))
-        return tools_list
+        return [
+            self._function_definition(name, cfg)
+            for name, cfg in self._offered_actions(category, "responses_api", which)
+        ]
+
+    def get_available_categories(self) -> dict:
+        """Every tool with its one function: ``{category: [category]}``."""
+        return {category: [category] for category in self._categories}
+
+    def unwrap_call(self, name: str, arguments: Any) -> tuple[str, Any]:
+        """(action, its arguments) behind a call of a tool's one function.
+
+        An action name, or a name that is no tool, is returned unchanged. A tool of
+        one action takes the action's own arguments, or {tool, arguments} naming it.
+        A ``tool`` that is no action of the tool raises ValueError naming the
+        allowed actions, so the model can correct the call."""
+        actions = self._categories.get(name)
+        if not actions or not isinstance(arguments, Mapping):
+            return name, arguments
+        tool, inner = _split_call(arguments)
+        if len(actions) == 1:
+            if tool is None:
+                # The action's own arguments, as the function advertises them.
+                return actions[0], arguments
+            if tool in (actions[0], name):
+                return actions[0], inner
+        if not isinstance(tool, str) or tool not in actions:
+            raise ValueError(
+                f"{name}: tool {tool!r} is not an action of {name!r}; "
+                f"use one of: {', '.join(actions)}"
+            )
+        return tool, inner
+
+    def _tool_cfg(self, category: str) -> dict[str, Any]:
+        """The Universal Tool contract of a tool, summed up from its actions."""
+        names = self._categories[category]
+        actions = [(name, self._actions[name]) for name in names if name in self._actions]
+        function = self._tool_function(category, actions)
+        capabilities: list[str] = []
+        transports: list[str] = []
+        for _, cfg in actions:
+            for item in cfg.get("capabilities") or ():
+                if item not in capabilities:
+                    capabilities.append(item)
+            for item in cfg.get("supported_transports") or ():
+                if item not in transports:
+                    transports.append(item)
+        approval_actions = [
+            name for name, cfg in actions if cfg.get("requires_approval")
+        ]
+        for _, cfg in actions:
+            for item in (cfg.get("metadata") or {}).get("approval_actions") or ():
+                if item not in approval_actions:
+                    approval_actions.append(item)
+        return {
+            "title": category,
+            "description": function["description"],
+            "inputSchema": function["parameters"],
+            "capabilities": capabilities or [category],
+            "risk_level": _highest_risk(str(cfg.get("risk_level")) for _, cfg in actions),
+            "read_only": bool(actions) and all(cfg.get("read_only") for _, cfg in actions),
+            "requires_approval": any(cfg.get("requires_approval") for _, cfg in actions),
+            "supported_transports": transports or ["responses_api", "local_agent"],
+            "executor": {"type": "local"},
+            "metadata": {"actions": list(names), "approval_actions": approval_actions},
+        }
 
     def get_universal_definition(
         self, tool_name: str
     ) -> UniversalToolDefinition | None:
-        cfg = self._tools.get(tool_name)
+        cfg = self._actions.get(tool_name)
+        if cfg is None and tool_name in self._categories:
+            cfg = self._tool_cfg(tool_name)
         if cfg is None:
             return None
         return UniversalToolDefinition.from_mapping(tool_name, cfg)
@@ -297,11 +524,11 @@ class ToolRegistry:
     ) -> list[dict[str, Any]]:
         definitions = []
         which = self._which_per_listing()
-        for name in sorted(self._tools):
+        for name in sorted(self._actions):
             definition = self.get_universal_definition(name)
             if definition is None:
                 continue
-            if transport and not self.is_offered(self._tools[name], transport, which):
+            if transport and not self.is_offered(self._actions[name], transport, which):
                 continue
             definitions.append(definition.to_mapping())
         return definitions
@@ -313,9 +540,17 @@ class ToolRegistry:
         server_configs: list = None,
         context: Mapping[str, Any] | None = None,
     ) -> dict:
-        if tool_name not in self._tools:
+        if tool_name not in self._actions and tool_name in self._categories:
+            # A tool's one function: run the action its arguments name.
+            action, inner = self.unwrap_call(tool_name, arguments)
+            if action == tool_name:
+                return {"error": f"Инструмент '{tool_name}' не назвал действие"}
+            return self.execute(
+                action, inner, server_configs=server_configs, context=context
+            )
+        if tool_name not in self._actions:
             return {"error": f"Инструмент '{tool_name}' не найден"}
-        tool_cfg = self._tools[tool_name]
+        tool_cfg = self._actions[tool_name]
         func = tool_cfg.get("func")
         if not func:
             return {"error": f"Функция для '{tool_name}' не определена"}
@@ -351,16 +586,13 @@ class ToolRegistry:
 
     def get_tool_meta(self, tool_name: str):
         # A copy, so a caller cannot change the registry; functions are shared.
-        cfg = self._tools.get(tool_name)
+        cfg = self._actions.get(tool_name)
         if cfg is None:
             return None
         return {
             key: value if callable(value) else copy.deepcopy(value)
             for key, value in cfg.items()
         }
-
-    def get_available_categories(self) -> dict:
-        return {cat: list(names) for cat, names in self._categories.items()}
 
 
 _default_registry = None

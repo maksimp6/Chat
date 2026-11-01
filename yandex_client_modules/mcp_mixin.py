@@ -6,7 +6,6 @@ from typing import Any
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
-from yandex_client_modules.tool_groups import ALL_CATEGORY, fit_tools, unwrap_call
 from yandex_client_modules.tool_config import (
     deferred_tool_categories,
     file_search_max_results,
@@ -98,14 +97,8 @@ class YandexMcpMixin:
                         ) from None
                 if not isinstance(args, dict):
                     raise ValueError("Invalid tool arguments: expected a JSON object")
-                # A call named after a category stands for one action of that category.
-                inner_name, args = unwrap_call(
-                    name,
-                    args,
-                    lambda category: bound.registry.get_definitions()
-                    if category == ALL_CATEGORY
-                    else bound.registry.get_tools_by_category(category),
-                )
+                # A tool's one function names its action in "tool" (one tool, one function).
+                inner_name, args = bound.registry.unwrap_call(name, args)
                 if inner_name != name and isinstance(trace, bound.ExecutionTrace):
                     trace.add_event(
                         "tool_group_call",
@@ -349,50 +342,42 @@ class YandexMcpMixin:
 
         tools = mcp_tools + hosted_tools if execution_policy is None else []
 
-        local_tools: list[dict[str, Any]] = []
-        local_by_category: list[tuple[str, list[dict[str, Any]]]] = []
+        # One tool, one function: each category goes as one function named after it,
+        # whose "tool" field picks the action. The registry offers only the actions
+        # this transport and host can run; a policy narrows them further.
+        sent_local: list[dict[str, Any]] = []
+        actions_offered = 0
+        # Which tool each action sits in, for a tool_choice that names an action.
+        grouped_into: dict[str, str] = {}
+        allow_action = None if execution_policy is None else execution_policy.allows_tool
         defer_on, eager_categories = deferred_tool_categories(tools_config)
         for category in active_cats:
             try:
-                category_tools = bound.registry.get_tools_by_category(category)
-                if category_tools and defer_on and category not in eager_categories:
-                    category_tools = [
-                        {**tool, "defer_loading": True} for tool in category_tools
-                    ]
-                if category_tools:
-                    offered = [
-                        tool
-                        for tool in category_tools
-                        if execution_policy is None
-                        or (
-                            (
-                                definition := bound.registry.get_universal_definition(
-                                    tool["name"]
-                                )
-                            )
-                            is not None
-                            and execution_policy.allows_tool(definition)
-                        )
-                    ]
-                    local_tools.extend(offered)
-                    local_by_category.append((category, offered))
+                actions = bound.registry.get_actions(category, allow_action=allow_action)
+                if not actions:
+                    continue
+                functions = bound.registry.get_tools_by_category(
+                    category, allow_action=allow_action
+                )
+                if defer_on and category not in eager_categories:
+                    functions = [{**tool, "defer_loading": True} for tool in functions]
+                sent_local.extend(functions)
+                actions_offered += len(actions)
+                grouped_into.update({action: category for action in actions})
             except Exception as e:
                 api_logger.error(f"[TOOLS] Ошибка категории {category}: {e}")
                 note("tool_category", f"tool category {category} left out: {e}")
 
-        # Each category is one tool whose single function picks the action.
-        sent_local, grouped_into = fit_tools(local_by_category, len(tools))
-        if grouped_into and trace is not None and isinstance(trace, bound.ExecutionTrace):
+        if sent_local and trace is not None and isinstance(trace, bound.ExecutionTrace):
             trace.add_event(
                 "tools_grouped_by_category",
                 {
-                    "tools": len(local_tools),
+                    "tools": actions_offered,
                     "functions": len(sent_local),
                     "other_tools": len(tools),
                 },
             )
-        if sent_local:
-            tools.extend(sent_local)
+        tools.extend(sent_local)
 
         # The server owns the tool list: a caller's "tools" entry never reaches the provider.
         ask_params = dict(params)
@@ -435,9 +420,10 @@ class YandexMcpMixin:
             isinstance(choice, dict)
             and choice.get("type") == "function"
             and choice.get("name") in grouped_into
+            and grouped_into[choice["name"]] != choice["name"]
         ):
-            # The chosen tool now sits inside its category's function: force the group
-            # and say which tool of it, so the choice is not widened to the category.
+            # The chosen action sits inside its tool's one function: force that function
+            # and say which action of it, so the choice is not widened to the tool.
             ask_params["tool_choice"] = {**choice, "name": grouped_into[choice["name"]]}
             ask_params["instructions"] = (ask_params.get("instructions") or "") + (
                 f"\n\nВызови {grouped_into[choice['name']]} с tool=\"{choice['name']}\"."

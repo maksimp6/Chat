@@ -309,9 +309,11 @@ def tool_call_requires_approval(
         if str(action)
     }
     if approval_actions:
-        action = str((arguments or {}).get("action") or "")
-        if action in approval_actions:
-            return True
+        # A tool's one function names its action in "tool"; court names it in "action".
+        picked = arguments or {}
+        for key in ("tool", "action"):
+            if str(picked.get(key) or "") in approval_actions:
+                return True
 
     return requires_approval
 
@@ -391,6 +393,19 @@ class UniversalToolExecutor:
                 approved=False,
                 metadata=call.get("metadata") or {},
             )
+
+        try:
+            call = self._resolve_action(call)
+        except ValueError as exc:
+            return UniversalToolResult(
+                False,
+                error=str(exc),
+                metadata={
+                    "tool": call.tool_name,
+                    "phase": "validation",
+                    "call_id": call.call_id,
+                },
+            ).to_mapping()
 
         if not isinstance(call.arguments, Mapping) or any(
             not isinstance(key, str) for key in call.arguments
@@ -535,6 +550,19 @@ class UniversalToolExecutor:
                 },
             ).to_mapping()
 
+    def _resolve_action(self, call: UniversalToolCall) -> UniversalToolCall:
+        """The action behind a call of a tool's one function (one tool, one function).
+
+        A call that names an action, or a registry without tools, is returned as is.
+        A ``tool`` that is no action of the named tool raises ValueError."""
+        unwrap = getattr(self.registry, "unwrap_call", None)
+        if unwrap is None:
+            return call
+        action, arguments = unwrap(call.tool_name, call.arguments)
+        if action == call.tool_name and arguments is call.arguments:
+            return call
+        return replace(call, tool_name=str(action), arguments=arguments)
+
     def execute_with_trace(
         self,
         call: UniversalToolCall,
@@ -546,6 +574,11 @@ class UniversalToolExecutor:
         if trace is None:
             return self.execute(call, server_configs=server_configs, **legacy_hooks)
 
+        try:
+            # The trace records the action; execute() reports a wrong action name itself.
+            call = self._resolve_action(call)
+        except ValueError:
+            pass
         definition = self.registry.get_universal_definition(call.tool_name)
         arguments = (
             dict(call.arguments)

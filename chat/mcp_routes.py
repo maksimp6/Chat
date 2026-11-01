@@ -2321,7 +2321,13 @@ def list_skills():
 
 @mcp_bp.route("/api/tools/categories", methods=["GET"])
 def list_tool_categories():
-    return jsonify({"categories": bound.registry.get_available_categories()})
+    """Every tool with its one function, and the actions that function picks from."""
+    return jsonify(
+        {
+            "categories": bound.registry.get_available_categories(),
+            "actions": bound.registry.get_tool_actions(),
+        }
+    )
 
 
 
@@ -2721,6 +2727,13 @@ def execute_approved():
         arguments = data.get("arguments", {})
         model_key = bound.CHAT_MODEL
 
+        # A tool's one function names its action in "tool": the action is what runs.
+        try:
+            func_name, arguments = bound.registry.unwrap_call(
+                str(func_name or ""), arguments if isinstance(arguments, dict) else {}
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         tool_config = bound.registry.get_tool_meta(func_name)
         if not tool_config:
             return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
