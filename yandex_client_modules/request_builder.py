@@ -216,6 +216,7 @@ _RESPONSES_PARAMETERS = (
     "service_tier",
     "text",
     "prompt_cache_key",
+    "user",
     "prompt",
     "previous_response_id",
     "conversation",
@@ -447,6 +448,12 @@ def build_response_payload(
     cache_key = params.get("prompt_cache_key") or conversation_id
     if cache_key:
         payload["prompt_cache_key"] = str(cache_key)
+        # Yandex AI Studio caches a prompt automatically when its beginning repeats an
+        # earlier request's, and lists prompt_cache_key as "currently not supported";
+        # the supported field that "boosts cache hit rates by better bucketing similar
+        # requests" is user (createResponse reference). The same stable id goes there,
+        # so every request of a dialog lands where its cache is (#1742).
+        payload["user"] = str(cache_key)
 
     if params.get("reasoning"):
         payload["reasoning"] = params["reasoning"]

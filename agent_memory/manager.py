@@ -112,6 +112,9 @@ def get_controlled_memory_summary() -> str:
     ][:limit]
     if not facts:
         return ""
+    # The most recent facts are chosen, then written in a fixed order: a block that
+    # only changes when its facts change keeps the provider's prompt cache warm (#1742).
+    facts.sort(key=lambda item: (item["category"], item["fact"]))
     return "\n[ГЛОБАЛЬНАЯ ПАМЯТЬ ПРОЕКТОВ]\n" + "".join(
         f"- [{item['category'].upper()}] {item['fact']}\n" for item in facts
     )

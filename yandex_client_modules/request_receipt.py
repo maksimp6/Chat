@@ -210,7 +210,7 @@ def build_request_manifest(payload: dict[str, Any]) -> dict[str, Any]:
         "metadata": _field(payload, "metadata"),
         "linkage": {
             name: _field(payload, name)
-            for name in ("conversation", "previous_response_id", "prompt_cache_key")
+            for name in ("conversation", "previous_response_id", "prompt_cache_key", "user")
         },
     }
 

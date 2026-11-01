@@ -287,6 +287,7 @@ RESPONSES = obj(
         "max_tool_calls": {"type": "integer", "minimum": 0},
         "top_logprobs": {"type": "integer", "minimum": 0, "maximum": 20},
         "prompt_cache_key": S,
+        "user": S,
         "service_tier": enum("auto", "default", "flex", "scale", "priority"),
         "reasoning": obj(
             {"effort": enum("none", "minimal", "low", "medium", "high", "xhigh")}
