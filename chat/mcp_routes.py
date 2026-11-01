@@ -1086,6 +1086,52 @@ def _provider_conversation_id(
     return set_yandex_conversation(conv_id, provider_id)
 
 
+def _calls_deleted_tool(response) -> bool:
+    """The provider failed the turn because the model called a tool it was not given."""
+    error = response.get("error") if isinstance(response, dict) else None
+    return (
+        isinstance(error, dict)
+        and error.get("code") == "model_call_error"
+        and str(error.get("message") or "").startswith("Model called unexpected tool")
+    )
+
+
+def _rebuild_provider_conversation(client, conv_id, message, trace):
+    """A new provider conversation holding the chat's messages as plain text, mapped to the chat.
+
+    The current user message is already stored; it is left out, the turn sends it.
+    Stored failure notices ("⚠️ Ошибка: …") are no part of the dialog and are left out."""
+    said = [
+        m
+        for m in get_messages(conv_id)
+        if (m.get("text") or "").strip() and not m["text"].startswith("⚠️ Ошибка")
+    ]
+    if said and said[-1].get("role") == "user" and said[-1].get("text") == message:
+        said = said[:-1]
+    items = [
+        {
+            "type": "message",
+            "role": m["role"],
+            "content": [
+                {
+                    "type": "input_text" if m["role"] == "user" else "output_text",
+                    "text": m["text"],
+                }
+            ],
+        }
+        for m in said
+        if m.get("role") in ("user", "assistant")
+    ]
+    provider_id = client.create_conversation(execution_trace=trace)["id"]
+    if items:
+        client.add_conversation_items(provider_id, items, trace)
+    trace.add_event(
+        "provider_conversation_rebuilt",
+        {"provider_conversation_id": provider_id, "messages": len(items)},
+    )
+    return set_yandex_conversation(conv_id, provider_id, replace=True)
+
+
 def _validate_chat_payload(conv_id, model_key, message, attachments):
     """Validate the turn content before creating an invocation or storing a message."""
     if not isinstance(conv_id, str) or not conv_id.strip():
@@ -1198,6 +1244,22 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
         params=params,
         trace=trace,
     )
+    if _calls_deleted_tool(response):
+        # The provider history holds calls of a tool since deleted (tools_cache), and
+        # the model repeats them instead of reading the message; the provider fails
+        # every such turn (invocation bebaf037). The history is rebuilt from the
+        # chat's own messages, without tool calls, and the turn runs once more.
+        provider_conversation_id = _rebuild_provider_conversation(
+            client, invocation.conversation_id, message, trace
+        )
+        response = client.ask_with_mcp(
+            message=message,
+            model_key=model_key,
+            conversation_id=provider_conversation_id,
+            settings_conversation_id=invocation.conversation_id,
+            params=params,
+            trace=trace,
+        )
 
     api_requests = trace.trace.get("api_requests", [])
     if api_requests:

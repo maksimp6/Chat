@@ -286,12 +286,14 @@ def get_yandex_conversation(conv_id: str) -> str | None:
     return get_store().get("chat/yandex/" + conv_id)
 
 
-def set_yandex_conversation(conv_id: str, yandex_id: str) -> str:
-    """Map a chat to its provider conversation once; a concurrent first message keeps the first id (#A-005)."""
+def set_yandex_conversation(conv_id: str, yandex_id: str, *, replace: bool = False) -> str:
+    """Map a chat to its provider conversation once; a concurrent first message keeps the first id (#A-005).
+
+    ``replace`` maps the chat to a rebuilt conversation instead of keeping the stored one."""
     key = "chat/yandex/" + conv_id
     with get_store().transaction() as tx:
         stored = tx.get(key)
-        if stored:
+        if stored and not replace:
             return stored
         tx.set(key, yandex_id)
         return yandex_id
