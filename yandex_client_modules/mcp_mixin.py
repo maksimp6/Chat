@@ -6,6 +6,7 @@ from typing import Any
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
+from yandex_client_modules.request_builder import response_input
 from yandex_client_modules.tool_config import (
     deferred_tool_categories,
     file_search_max_results,
@@ -382,15 +383,17 @@ class YandexMcpMixin:
         # The server owns the tool list: a caller's "tools" entry never reaches the provider.
         ask_params = dict(params)
         ask_params.pop("tools", None)
-        # The provider caches a prompt whose beginning repeats an earlier request's, so
-        # the instructions keep their fixed parts first and the part that changes between
-        # turns, the memory block, last (#1742).
+        # The provider caches a prompt whose beginning repeats an earlier request's (#1742).
+        # The instructions come before the tools, so they carry only fixed text; the
+        # memory block, which changes after every turn, goes into the input below.
         if settings_id and execution_policy is None:
             ask_params["instructions"] = (ask_params.get("instructions") or "") + (
                 FILE_SEARCH_ON_NOTE if file_search_active else FILE_SEARCH_OFF_NOTE
             )
-        # Global memory reaches the system prompt of chat turns only. Settings (enabled, facts
-        # limit, categories) are applied inside the summary builder.
+        # Global memory reaches chat turns only, as a system message ahead of the user's: in
+        # the instructions a new fact changed the prefix and every turn paid full price for
+        # the instructions and tools (invocation e31d1b90: 256 of 44800 tokens cached).
+        # Settings (enabled, facts limit, categories) are applied inside the summary builder.
         if settings_id and execution_policy is None:
             try:
                 memory_summary = get_controlled_memory_summary()
@@ -399,9 +402,10 @@ class YandexMcpMixin:
                 note("memory", f"memory left out of the reply: {type(e).__name__}: {e}")
                 memory_summary = ""
             if memory_summary:
-                ask_params["instructions"] = (
-                    ask_params.get("instructions") or ""
-                ) + memory_summary
+                ask_params["input"] = [
+                    {"role": "system", "content": memory_summary.strip()},
+                    *response_input(ask_params, message),
+                ]
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
         if not tools and ask_params.get("tool_choice") == "required":
