@@ -61,6 +61,12 @@ def _court_tools():
     return COURT_TOOLS
 
 
+def _ssl_tools():
+    from tool_providers.ssl_server import SSL_TOOLS
+
+    return SSL_TOOLS
+
+
 # (category, loader, log label, exception logged instead of raised)
 SOURCES = (
     ("government", _government_tools, "Government", Exception),
@@ -72,4 +78,5 @@ SOURCES = (
     ("rootagent", _rootagent_tools, "Root agent", Exception),
     ("tty", _tty_tools, "TTY", Exception),
     ("court", _court_tools, "Court", Exception),
+    ("ssl", _ssl_tools, "SSL server", Exception),
 )

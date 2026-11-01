@@ -21,6 +21,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | [`tool_providers.registry`](registry.py) | Provider-agnostic registry for Logos tools. |
 | [`tool_providers.runtime_tools`](runtime_tools.py) | Universal tool definitions backed by the SSH Runtime. |
 | [`tool_providers.rootagent`](rootagent.py) | Logos tools `rootagent_run` and `rootagent_result` for the Redmi 9 RootAgent job on GitHub Actions. Registered as the `rootagent` external tool source through `composition/tool_sources.py`; not in `__all__`. |
+| [`tool_providers.ssl_server`](ssl_server.py) | SSL and web-server tools (category `ssl`): ssl_cert_check, ssl_server_status, ssl_server_config_test, ssl_cert_issue, ssl_cert_renew, ssl_server_service. Server commands go through the SSH Runtime; the changing ones need the owner's approval. Not in `__all__`. |
 | [`tool_providers.tty`](tty.py) | PTY terminal sessions (category `tty`): tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list. Owner-checked; opening needs the owner's approval. Not yet verified on the Redmi (Termux). |
 | [`tool_providers.universal_tool_platform`](universal_tool_platform.py) | Provider-agnostic tool contracts and execution pipeline for Logos. |
 
