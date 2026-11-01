@@ -1,12 +1,21 @@
-## Change
+# Logos | Review Docket
+
+Use the [Logos court procedure](../docs/agents/logos-court-procedure.md) as the
+review record's guide.
+
+## Case file
 
 Describe the concrete problem and resulting behavior.
 
-## Related work
+## Question before the court
+
+State the change's purpose and scope.
+
+## Record and authorities
 
 Link the owning issue, exact source material and any overlapping PR.
 
-## Validation actually performed
+## Examination and findings
 
 - Source/head SHA:
 - Diff review and document/data checks:
@@ -16,7 +25,7 @@ Link the owning issue, exact source material and any overlapping PR.
 Code tests require a separate owner request and run only inside GitHub Actions
 runner (AGENTS.md). Do not mark an unrun check as passing.
 
-## Data and operations
+## Operational effects
 
 Describe applicable effects on journal compatibility, backups, credentials,
 ExecutionTrace and billing. Keep secrets out of the PR and evidence.
@@ -24,7 +33,7 @@ ExecutionTrace and billing. Keep secrets out of the PR and evidence.
 For deployment work, link process revision/PID and the requested visible outcome.
 HTTP 200 or a successful job alone does not establish user acceptance.
 
-## Delivery boundary
+## Requested disposition
 
 Follow the owner's route and AGENTS.md. Stage acceptance ("OK") does not authorize
 merge or promotion to master.
