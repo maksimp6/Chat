@@ -6,7 +6,7 @@ the turn's tools do not fit, each local category is sent as one function
 ``tools_<category>`` whose description lists every tool of the category by name and
 synonyms (not its full description or parameters); the model calls it with ``tool``
 and ``arguments`` and the executor runs that tool. Parameters and usage examples are
-not inlined — the model looks them up in the index (cache_search / file_search).
+not inlined — the model looks them up in the index (file_search).
 Every tool stays available; only the shape of the call changes.
 """
 
@@ -67,8 +67,7 @@ def group_tool(category: str, tools: list[dict[str, Any]]) -> dict[str, Any]:
         "нужного инструмента — и полем arguments — объект его параметров.\n"
         "Ниже только имена и синонимы (для узнавания), без параметров и примеров. "
         "Чтобы узнать параметры и увидеть примеры вызова инструмента, найди их в индексе: "
-        "инструментом cache_search (накопленный индекс, туда же попадает архив диалогов) "
-        "или встроенным file_search по имени инструмента.\n"
+        "встроенным file_search (индекс, в котором архив диалогов) по имени инструмента.\n"
         "Инструменты (имя и синонимы):\n" + "\n".join(_tool_line(tool) for tool in tools)
     )
     grouped = {

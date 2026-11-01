@@ -30,7 +30,6 @@
 | browser | browser/tools.py (composition/tool_sources.py) | 17 | browser_open, browser_read, browser_find, browser_extract, browser_click, browser_fill_form, browser_act, browser_wait, browser_evaluate, browser_screenshot, browser_history, browser_tabs, browser_session, browser_cookies, browser_search, browser_request, browser_download |
 | rootagent | tool_providers/rootagent.py (composition/tool_sources.py) | 2 | rootagent_run (управление телефоном как юзер: status, probe, capture, tap, swipe, text, key, move, click как задания GitHub Actions на develop), rootagent_result (статус запуска и JSON-результат по run_id). Настройка и границы — [docs/redmi-root-agent.md](../redmi-root-agent.md#logos-tool) |
 | tty | tool_providers/tty.py (composition/tool_sources.py) | 6 | tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list |
-| cache | tool_providers/cache.py | 3 | cache_append, cache_read, cache_search |
 
 ## Настройки: общие и только для чтения
 
@@ -173,41 +172,6 @@ exceeds the maximum allowed limit of 100»), и отложенные (`defer_loa
   лимита приложения). Сессии живут в памяти процесса; при штатном завершении процесса
   открытые сессии закрываются, при аварийном завершении или SIGTERM — нет.
 - **Вывод.** Вывод терминала и аргумент `data` не попадают в трассировку открытым текстом.
-
-## Кэш (категория cache)
-
-Определены в `tool_providers/cache.py` (`CACHE_TOOLS`), собственный источник реестра;
-доступны в диалоге, локальному агенту и через MCP, без подтверждения. Кэш — один длинный
-текст, который только растёт: в него дописывают модель и инструменты всех диалогов,
-ничего не меняется и не удаляется. Файлы рядом с файлом памяти
-(`storage.records.memory_file_path`): `logos.cache.md` — сам текст,
-`logos.cache.vectors.jsonl` — векторы каждого дописанного куска,
-`logos.cache.index.json` — какой файл сейчас лежит в индексе.
-
-| Инструмент | Что делает |
-| --- | --- |
-| cache_append | Дописать текст в конец (`source`: `model` или имя инструмента). Кусок получает строку-заголовок `## <время> · <источник> · <диалог>`; вызов возвращается сразу после записи текста. В фоне (один поток на процесс) кусок встраивается каждой моделью из `EMBEDDING_MODELS` (text-search-doc, text-search-query, text-embeddings-v2-doc, text-embeddings-v2-query; v2 — в наибольшем размере 768), у каждого вектора хранится URI модели с версией, затем весь текст загружается в индекс одним файлом `logos-cache.md` во все хранилища знаний (`knowledge_vector_store_ids`), которые ищет File Search диалога; прежняя загрузка убирается из хранилищ и удаляется. Если в очереди несколько кусков, индекс обновляется один раз после последнего. Итог последней фоновой работы (`embedding_errors`, `index`, `index_errors`) возвращается в `background.previous` следующего вызова. Куски, не успевшие обработаться до остановки процесса, остаются в тексте без векторов |
-| cache_read | Только весь текст целиком, без параметров: частичного чтения нет |
-| cache_search | Поиск через модель-помощника `deepseek-v4.1-flash` (`SEARCH_MODEL`, окно контекста 1M, reasoning_effort `high`): единственный параметр `query` — что найти. Помощник получает весь текст кэша и запрос одним запросом провайдера без инструментов и возвращает найденные места дословно с заголовками кусков и краткий вывод; в результате — `answer`, рассуждение, статус, `error`/`incomplete_details`, `usage`. Запрос пишется в трассировку вызывающего хода |
-
-- **Начало хода.** Когда `cache_append` есть в запросе, первый запрос хода (там, где
-  действует правило `tool_choice: required`) получает `tool_choice` =
-  `{"type": "function", "name": "cache_append"}`, а сам `cache_append` уходит без
-  `defer_loading`: ход всегда начинается с записи вопроса пользователя в кэш
-  (`source: user`).
-- **Инструкции.** К инструкциям модели добавляется `CACHE_NOTE`
-  (`yandex_client_modules/mcp_mixin.py`): первым вызовом записать вопрос, в каждом ходе
-  перед финальным ответом дописать в кэш свой ответ целиком и то, как модель видит ход (вход, инструкции,
-  инструменты, основания, неуверенность), а ошибки кэша называть в ответе. Это тратит
-  токены (четыре эмбеддинга и перезагрузка всего текста в индекс на каждую запись — в
-  фоне, ход их не ждёт; весь текст кэша на входе помощника при каждом поиске) ради диагностики самовосприятия модели.
-- **Иконки.** `static/icons/tools/cache_*.svg`, записи в `static/icons/tools/index.json`.
-- **Настройки.** Ревизия настроек диалога 4 добавляет категорию `cache` в сохранённый
-  выбор категорий; ревизия 6 убирает из него категорию `helper` (ревизии 5), которой
-  больше нет.
-- **Лимиты.** Размер текста не ограничен (0 — без лимита приложения). Провайдер
-  эмбеддингов ограничивает длину куска сам: слишком длинный кусок остаётся без векторов
-  с ошибкой в `embedding_errors`; Files API принимает файл до 128 МБ.
 
 ## Bridge-инструменты MCP-сервера (logos_*)
 
