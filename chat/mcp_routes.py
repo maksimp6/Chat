@@ -206,17 +206,17 @@ REASONING_CUT_CONTINUE_PROMPT = (
 TEXT_CALL_PROMPT = (
     "Ты написал вызов инструмента текстом, и он не выполнился: это обычный текст "
     "ответа, а не вызов функции. Если нужно выполнить это действие, вызови функцию "
-    "(у сгруппированных инструментов — функцию tools_<категория> с полями tool и "
-    "arguments). Не пиши вызов текстом."
+    "инструмента: её имя — имя категории (git, filesystem, browser…), поле tool — "
+    "действие, поле arguments — его параметры. Не пиши вызов текстом."
 )
 
 
 # Sent when a reply ends by announcing an action ("Добавлю:") that it never called.
 ANNOUNCED_CALL_PROMPT = (
     "Ты закончил ответ обещанием действия (текст кончается двоеточием), но не "
-    "вызвал функцию, и действие не выполнено. Если оно нужно, вызови функцию сейчас "
-    "(у сгруппированных инструментов — функцию tools_<категория> с полями tool и "
-    "arguments). Если не нужно, дай итоговый ответ."
+    "вызвал функцию, и действие не выполнено. Если оно нужно, вызови функцию "
+    "инструмента сейчас (имя категории, поля tool и arguments). Если не нужно, дай "
+    "итоговый ответ."
 )
 
 
@@ -683,8 +683,8 @@ def _define_logos_client(base: type) -> type:
             def execute_tool(call):
                 nonlocal tool_servers
                 name = call.get("name")
-                if isinstance(name, str) and name.startswith("tools_"):
-                    # A whole category sent as one function: show the tool it runs.
+                if isinstance(name, str):
+                    # A tool's one function picks the action by "tool": show that action.
                     try:
                         inner = _json.loads(call.get("arguments") or "{}")
                     except (TypeError, ValueError):
