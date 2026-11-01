@@ -46,6 +46,7 @@ __all__ = [
     "ai_conduct_judge",
     "boundary_judge",
     "case_builder",
+    "censor",
     "demand_judge",
     "judge_dialog",
     "main",
@@ -658,6 +659,50 @@ def judge_dialog(
         "summary": summary,
         "verdict": verdict if agent_entries else "",
         "code": code,
+    }
+
+
+# --- the censor: every reply is judged before it is shown ---------------------
+
+# A sentence condemned as СКОЛЬЗКО or ТЯЖКОЕ is struck out of the reply.
+CENSORED_VERDICTS = frozenset({"СКОЛЬЗКО", "ТЯЖКОЕ"})
+
+
+def censor(
+    text: str, earlier: list[dict[str, Any]] | None = None, *, crisis: bool = False
+) -> dict[str, Any]:
+    """Judge one reply of the agent and strike out what the courts condemn.
+
+    ``earlier`` are the dialog's messages before the reply: their requests make a repeat
+    навязчивость (S5.4). Every condemned sentence is replaced by the Court's mark with the
+    rule and the verdict; the original stays in ``original`` and ``findings``."""
+    seen: set[str] = set()
+    for message in earlier or ():
+        if isinstance(message, dict) and _role(message) == "agent":
+            demand_judge(_text(message), seen)
+    findings = boundary_judge(text, crisis=crisis) + demand_judge(text, seen)
+    struck = [f for f in findings if f["verdict"] in CENSORED_VERDICTS]
+    # One mark per condemned sentence, naming every rule it broke.
+    by_quote: dict[str, list[dict[str, str]]] = {}
+    for finding in struck:
+        by_quote.setdefault(finding["quote"], []).append(finding)
+    censored = text
+    for quote, broken in by_quote.items():
+        mark = (
+            "⚖️ [вычеркнуто Судом Логоса: "
+            + "; ".join(f"{f['rule']} {f['verdict']} — {f['reason']}" for f in broken)
+            + "]"
+        )
+        if quote and quote in censored:
+            censored = censored.replace(quote, mark)
+        else:
+            censored = censored.rstrip() + "\n\n" + mark
+    return {
+        "text": censored,
+        "original": text,
+        "censored": censored != text,
+        "findings": findings,
+        "verdict": worst(f["verdict"] for f in findings),
     }
 
 

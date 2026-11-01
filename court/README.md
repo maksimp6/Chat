@@ -17,6 +17,8 @@ The repository is public, so the issue carries no dialog text. The full error, p
 
 Verdicts, lightest first: ПРАВО, БЕСПОЛЕЗНОЕ, СКОЛЬЗКО, ТЯЖКОЕ (indelible). The protocol's code is `0` (no violation), `1` (condemned) or `2` (nothing to judge: no agent replies). The owner's values (swear roots, boundary phrases, request markers) are the constants of `court/judging.py`; the court guesses no category beyond them. From the command line: `python3 -m court.judging <export.json | folder> [--crisis]`, where an export is a JSON list of messages with `role`, `text` and `created_at`, and a folder is the batch mode (a `*.protocol.json` per dialog and a summary); the exit code is the court's code.
 
+**The censor: every reply is judged** (`court.judging.censor`, `court.hearings.censor_reply`, `court.hearings.record_reply`). Every model reply of every dialog goes to the Court before it is stored: S4 and S5 judge it (S5.4 against the requests of the earlier replies), and every sentence condemned as СКОЛЬЗКО or ТЯЖКОЕ is replaced in the stored and shown reply by the mark `⚖️ [вычеркнуто Судом Логоса: <rule> <verdict> — <reason>]`. The original words and the findings are kept under `court/censor/<dialog>/<message>`, and the turn's answer carries them as `court`. After every reply the sitting over the dialog is opened (`opened_by: court:censor`) or judged again, over the words as they were said, so every message, the user's flares included, is in its protocol. A failure of the Court is a Court case of its own (`court_censor_failed`, `court_sitting_failed`); the reply is then stored as the model said it. The live stream shows the words as they come; the censored text replaces them when the turn ends.
+
 **The Court in the group chat** (`court.hearings.speak`, `POST /api/court/speak`). The Court is a participant of the group chat (👥 → «Суд Логоса», `static/group_chat.js`): after the chosen models have answered, the server judges the replies since the Court's last word and writes the verdicts into the chat as a message with `source: court` (never judged itself); when the user's last message asks about the rules, the Court lists them. The models see the Court's word in the history and the follow-up tells them they may discuss, dispute and refine it, so the understanding deepens as the dialog goes. The first word opens the sitting over the dialog, every later word updates it.
 
 **The hall of hearings** (`court.hearings`, the ⚖️ button of the page, `static/court.js`). A hearing is one sitting over one dialog: the protocol, the case drafts the flares opened, and the owner's decisions in the states of the Court procedure (`ALLEGED` until the owner decides, then `INVESTIGATING`, `CONFIRMED`, `REFUTED`, `UNKNOWN`, `FIXED`, `VERIFIED`, `ACCEPTED`), each with a reason and a history. A sitting can be judged again (decisions on the cases that are still there are kept), closed and reopened with a reason. Filing a case to GitHub is the owner's action, never automatic: the issue carries verdicts, rules and message numbers, the quotes go to the encrypted evidence. Hearings are kept in the Kristall store under `court/hearing/<id>`.
@@ -28,7 +30,7 @@ Verdicts, lightest first: ПРАВО, БЕСПОЛЕЗНОЕ, СКОЛЬЗКО, 
 | Module | Purpose |
 | --- | --- |
 | [`court.filing`](filing.py) | File a Logos Court case for every error (AGENTS.md, «Ошибки и дела Суда») and a case from the hall. |
-| [`court.hearings`](hearings.py) | Зал заседаний: заседания над диалогами, протоколы судов, черновики дел и решения владельца; the blueprint `court_bp` (`/api/court`). |
+| [`court.hearings`](hearings.py) | Цензор каждого ответа (`censor_reply`, `record_reply`); зал заседаний: заседания над диалогами, протоколы судов, черновики дел и решения владельца; the blueprint `court_bp` (`/api/court`). |
 | [`court.judging`](judging.py) | Суды над диалогом (docs/agents/court-ideas.md): протокол по сообщениям. |
 | [`court.tools`](tools.py) | Court tools (category `court`): the judges over a dialog and the hall of hearings. |
 
@@ -37,6 +39,7 @@ Other units reach it only through their own ports:
 | Provides | To |
 | --- | --- |
 | `court.filing.file_case` | `chat`, `invocation` |
+| `court.hearings.censor_reply`, `court.hearings.record_reply` | `chat` (`censor_reply`, `record_court_reply`) |
 
 ## HTTP API
 

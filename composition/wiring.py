@@ -161,6 +161,8 @@ def _chat():
     from economy.knowledge_economics import embedding_cost
     from invocation.manager import fail_invocation
     from court.filing import file_case as file_court_case
+    from court.hearings import censor_reply
+    from court.hearings import record_reply as record_court_reply
     from invocation.manager import finish_invocation
     from yandex_client_modules.realtime import generate_realtime
     from storage.records import get_conversation_title
@@ -247,6 +249,7 @@ def _chat():
         completion_model_keys=completion_model_keys,
         compose_skill_instructions=compose_skill_instructions,
         create_conversation=create_conversation,
+        censor_reply=censor_reply,
         create_invocation=create_invocation,
         create_invocation_trace=create_invocation_trace,
         embed_texts=embed_texts,
@@ -255,6 +258,7 @@ def _chat():
         file_court_case=file_court_case,
         finish_invocation=finish_invocation,
         generate_realtime=generate_realtime,
+        record_court_reply=record_court_reply,
         get_conversation_title=get_conversation_title,
         get_current_owner_id=get_current_owner_id,
         get_current_trace=get_current_trace,

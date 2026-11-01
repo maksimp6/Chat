@@ -37,10 +37,11 @@ from court.host import (
     get_store,
     list_owned_conversations,
 )
-from court.judging import COURT_SOURCE, judge_dialog, rules_table
+from court.judging import COURT_SOURCE, censor, judge_dialog, rules_table
 
 __all__ = [
     "DECISIONS",
+    "censor_reply",
     "close_hearing",
     "conclude",
     "court_bp",
@@ -51,6 +52,7 @@ __all__ = [
     "list_hearings",
     "open_hearing",
     "prepare_court_records",
+    "record_reply",
     "rejudge_hearing",
     "reopen_hearing",
     "speak",
@@ -164,7 +166,7 @@ def open_hearing(
 ) -> dict[str, Any]:
     """Judge the dialog now and keep the sitting."""
     owner = opened_by if opened_by is not None else _owner()
-    messages = _dialog_messages(conversation_id, owner)
+    messages = _with_originals(conversation_id, _dialog_messages(conversation_id, owner))
     protocol = judge_dialog(messages, crisis=crisis)
     now = int(time.time())
     hearing = {
@@ -195,7 +197,9 @@ def rejudge_hearing(hearing_id: str, *, crisis: bool | None = None) -> dict[str,
     hearing = _load(hearing_id)
     if crisis is None:
         crisis = hearing["crisis"]
-    messages = _dialog_messages(hearing["conversation_id"], owner)
+    messages = _with_originals(
+        hearing["conversation_id"], _dialog_messages(hearing["conversation_id"], owner)
+    )
     protocol = judge_dialog(messages, crisis=crisis)
     previous = {
         (case["flare"].get("message_id"), case["flare"]["n"]): case
@@ -441,8 +445,9 @@ def speak(conversation_id: str, *, crisis: bool | None = None) -> dict[str, Any]
         if str(message.get("role") or "").lower() == "user":
             asked_rules = "правил" in str(message.get("text") or "").lower()
             break
-    protocol = judge_dialog(messages, crisis=crisis)
-    text = _speech(protocol, since, asked_rules)
+    # The Court speaks over what the chat shows; the sitting keeps the words as they were said.
+    text = _speech(judge_dialog(messages, crisis=crisis), since, asked_rules)
+    protocol = judge_dialog(_with_originals(conversation_id, messages), crisis=crisis)
     message_id = add_message(
         str(conversation_id), "assistant", text, source=COURT_SOURCE
     )
@@ -474,6 +479,94 @@ def speak(conversation_id: str, *, crisis: bool | None = None) -> dict[str, Any]
         )
         hearing = _save(hearing)
     return {"message_id": message_id, "text": text, "hearing": hearing}
+
+
+# --- the censor: every reply of every dialog is judged -------------------------
+
+CENSOR_PREFIX = "court/censor/"
+
+
+def censor_reply(conversation_id: str, reply: str) -> dict[str, Any]:
+    """Judge a model's reply before it is stored and strike out what the courts condemn.
+
+    The crisis flag is the open sitting's, if the dialog has one."""
+    hearing = _hearing_of(conversation_id)
+    crisis = bool(hearing["crisis"]) if hearing else False
+    return censor(str(reply or ""), get_messages(str(conversation_id)), crisis=crisis)
+
+
+def _with_originals(conversation_id: str, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The dialog as it was said: a censored reply is judged by its original words."""
+    records = get_store().items(prefix=CENSOR_PREFIX + str(conversation_id) + "/")
+    originals = {
+        str(record.get("message_id")): record.get("original")
+        for record in records.values()
+        if isinstance(record, dict) and isinstance(record.get("original"), str)
+    }
+    return [
+        {**message, "text": originals[str(message.get("id"))]}
+        if str(message.get("id")) in originals
+        else message
+        for message in messages
+    ]
+
+
+def record_reply(
+    conversation_id: str,
+    message_id: Any,
+    judged: dict[str, Any],
+    owner: str | None = None,
+) -> dict[str, Any]:
+    """Keep the Court's record of a stored reply and bring the sitting over the dialog up to date.
+
+    The original words of a censored reply are kept under ``court/censor/<dialog>/<message>``;
+    the sitting is opened on the first reply of a dialog and judged again after every reply,
+    so every message of every dialog is in its protocol."""
+    conversation_id = str(conversation_id)
+    if message_id is not None and judged.get("censored"):
+        with get_store().transaction() as tx:
+            tx.set(
+                CENSOR_PREFIX + conversation_id + "/" + str(message_id),
+                {
+                    "conversation_id": conversation_id,
+                    "message_id": message_id,
+                    "original": judged["original"],
+                    "text": judged["text"],
+                    "findings": judged["findings"],
+                    "verdict": judged["verdict"],
+                    "at": int(time.time()),
+                },
+            )
+    messages = _with_originals(conversation_id, _dialog_messages(conversation_id, owner))
+    hearing = _hearing_of(conversation_id)
+    crisis = bool(hearing["crisis"]) if hearing else False
+    protocol = judge_dialog(messages, crisis=crisis)
+    if hearing is None:
+        now = int(time.time())
+        hearing = {
+            "id": "hearing-" + uuid4().hex[:16],
+            "conversation_id": conversation_id,
+            "title": str(get_conversation_title(conversation_id, "") or ""),
+            "opened_at": now,
+            "updated_at": now,
+            "opened_by": "court:censor",
+            "crisis": crisis,
+            "closure": "OPEN",
+            "closure_reason": "",
+            "protocol": protocol,
+            "cases": [_new_case(case) for case in protocol["cases"]],
+            "revision": 1,
+        }
+        with get_store().transaction() as tx:
+            tx.set(_key(hearing["id"]), hearing)
+        return hearing
+    hearing.update(
+        {
+            "protocol": protocol,
+            "cases": _merge_cases(hearing, protocol, owner or "UNASSIGNED"),
+        }
+    )
+    return _save(hearing)
 
 
 # --- the judge's questions to the accused and the conclusion of guilt ----------

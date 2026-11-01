@@ -69,6 +69,7 @@ class Host:
     build_generation_payload: (
         Any  # yandex_client_modules.image_generation.build_generation_payload
     )
+    censor_reply: Any  # court.hearings.censor_reply
     check_access: Any  # conversations.ownership.check_access
     completion_model_keys: Any  # core.model_profiles.completion_model_keys
     compose_skill_instructions: Any  # agent_skills.registry.compose_skill_instructions
@@ -107,6 +108,7 @@ class Host:
         Any  # yandex_client_modules.request_mixin.provider_request_headers
     )
     read_upload: Any  # workspace.upload_routes.read_upload
+    record_court_reply: Any  # court.hearings.record_reply
     record_usage: Any  # provider_accounts.quotas.record_usage
     record_yandex_mcp_activity: Any  # mcp_server.trace.record_yandex_mcp_activity
     registry: Any  # tool_providers.registry.registry
@@ -148,6 +150,7 @@ __all__ = [
     "bind_current_trace",
     "build_ai_billing_item",
     "build_generation_payload",
+    "censor_reply",
     "check_access",
     "completion_model_keys",
     "compose_skill_instructions",
@@ -178,6 +181,7 @@ __all__ = [
     "open_image_file",
     "persist_invocation_trace",
     "read_upload",
+    "record_court_reply",
     "provider_request_headers",
     "record_usage",
     "record_yandex_mcp_activity",
@@ -260,6 +264,14 @@ def fail_invocation(*args: Any, **kwargs: Any) -> Any:
 
 def file_court_case(*args: Any, **kwargs: Any) -> Any:
     return current().file_court_case(*args, **kwargs)
+
+
+def censor_reply(*args: Any, **kwargs: Any) -> Any:
+    return current().censor_reply(*args, **kwargs)
+
+
+def record_court_reply(*args: Any, **kwargs: Any) -> Any:
+    return current().record_court_reply(*args, **kwargs)
 
 
 def finish_invocation(*args: Any, **kwargs: Any) -> Any:

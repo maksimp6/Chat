@@ -31,6 +31,7 @@ from chat.host import (
     bind_current_trace,
     bound,
     build_ai_billing_item,
+    censor_reply,
     check_access,
     completion_model_keys,
     compose_skill_instructions,
@@ -51,6 +52,7 @@ from chat.host import (
     normalize_conversation_title,
     persist_invocation_trace,
     read_upload,
+    record_court_reply,
     record_yandex_mcp_activity,
     reset_current_trace,
     set_owner,
@@ -1034,6 +1036,44 @@ def _file_unsettled(settlement: dict[str, Any], **ids: Any) -> None:
         logger.exception("[COURT] Settlement case was not filed")
 
 
+def _court_censor(conv_id: str, reply: str, **ids: Any) -> dict[str, Any] | None:
+    """The Court judges every reply before it is stored and strikes out what it condemns.
+
+    A failure of the Court is a Court case of its own; the reply is then stored as said."""
+    try:
+        return censor_reply(conv_id, reply)
+    except Exception as exc:
+        logger.exception("[COURT] The reply was not judged")
+        _file_court_failure(conv_id, "court_censor_failed", exc, **ids)
+        return None
+
+
+def _court_record(
+    conv_id: str, message_id: Any, judged: dict[str, Any] | None, owner_id: Any, **ids: Any
+) -> None:
+    """Keep the original of a censored reply and bring the dialog's sitting up to date."""
+    if judged is None or message_id is None:
+        return
+    try:
+        record_court_reply(conv_id, message_id, judged, owner_id)
+    except Exception as exc:
+        logger.exception("[COURT] The sitting over the dialog was not updated")
+        _file_court_failure(conv_id, "court_sitting_failed", exc, message_id=message_id, **ids)
+
+
+def _file_court_failure(conv_id: str, code: str, exc: Exception, **ids: Any) -> None:
+    try:
+        file_court_case(
+            {
+                "conversation_id": conv_id,
+                **{key: value for key, value in ids.items() if value is not None},
+                "error": {"code": code, "message": f"{type(exc).__name__}: {exc}"},
+            }
+        )
+    except Exception:
+        logger.exception("[COURT] The Court's own failure was not filed")
+
+
 def _settled_turn_cost(
     billing: dict[str, Any], settlement: dict[str, Any]
 ) -> float | None:
@@ -1670,6 +1710,15 @@ def _finalize_chat_turn(
         }
 
     persist_invocation_trace(invocation.invocation_id, trace_data)
+    judged = None
+    if not provider_failed and reply:
+        judged = _court_censor(
+            invocation.conversation_id,
+            str(reply),
+            invocation_id=invocation.invocation_id,
+        )
+        if judged is not None:
+            reply = judged["text"]
     reply_message_id = add_message(
         invocation.conversation_id,
         "assistant",
@@ -1686,6 +1735,13 @@ def _finalize_chat_turn(
         source="error" if provider_failed else None,
         reasoning=reasoning,
         request_id=request_id,
+    )
+    _court_record(
+        invocation.conversation_id,
+        reply_message_id,
+        judged,
+        invocation.user_id,
+        invocation_id=invocation.invocation_id,
     )
     outcome = {
         "reply": reply,
@@ -1735,6 +1791,15 @@ def _finalize_chat_turn(
             "title": conversation_title
             or get_conversation_title(invocation.conversation_id),
             "status": "failed" if provider_failed else "completed",
+            "court": (
+                {
+                    "censored": judged["censored"],
+                    "verdict": judged["verdict"],
+                    "findings": judged["findings"],
+                }
+                if judged is not None
+                else None
+            ),
             **provider_diagnostics,
             **(
                 {"error": provider_error, "partial_output": partial_output or None}
@@ -2960,14 +3025,20 @@ def execute_approved():
                 "[BILLING] Approval follow-up billing failed after the action ran"
             )
         _file_unsettled(settlement, conversation_id=conv_id)
+        judged = None
+        if not followup_failed and reply:
+            judged = _court_censor(conv_id, str(reply))
+            if judged is not None:
+                reply = judged["text"]
         try:
-            add_message(
+            followup_message_id = add_message(
                 conv_id,
                 "assistant",
                 reply,
                 cost=cost,
                 source="error" if followup_failed else None,
             )
+            _court_record(conv_id, followup_message_id, judged, owner_id)
         except Exception:
             logger.exception(
                 "[TOOL_APPROVAL] Could not store the approval reply after the action ran"
