@@ -236,6 +236,8 @@ def _announced_without_call(text) -> str | None:
 
 
 _TEXT_CALL_MARKER = "[TOOL_CALL_START]"
+# The DSML markup of DeepSeek tool calls: written as text, it is never a function call here.
+_DSML_MARKER = "<｜DSML｜"
 
 
 def _tool_call_written_as_text(text) -> str | None:
@@ -252,6 +254,10 @@ def _tool_call_written_as_text(text) -> str | None:
     # The model's own marker form, [TOOL_CALL_START]name {json...}: often cut off, so it is not parsed,
     # only recognized as a call that never ran (#1721).
     if body.startswith(_TEXT_CALL_MARKER):
+        return " ".join(body.split())
+    # DSML markup alone is a call written as text too; it is recognized, not parsed (the
+    # reply that was only this markup was saved as the answer, msg 701 of logos-court).
+    if body.startswith(_DSML_MARKER):
         return " ".join(body.split())
     if not body.startswith("{"):
         return None

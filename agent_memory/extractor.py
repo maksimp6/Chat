@@ -43,6 +43,16 @@ MEMORY_SCHEMA = {
 }
 
 
+# The cache tools were deleted (05a79dd1). A fact that names one tells the model to call a
+# tool that does not exist, so such a fact is kept out of the prompt and out of the store.
+_REMOVED_TOOL_NAMES = ("cache_append", "cache_read", "cache_search", "tools_cache")
+
+
+def names_removed_tool(fact: str) -> bool:
+    """True when a fact names a tool the runtime no longer has."""
+    return any(name in fact for name in _REMOVED_TOOL_NAMES)
+
+
 def init_global_memory() -> None:
     """Open the native journal. There is no SQL schema to initialize."""
     get_memory_client(memory_file_path())
@@ -82,7 +92,7 @@ def save_global_memory_facts(
             if not isinstance(fact, str):
                 continue
             fact = fact.strip()
-            if not fact or len(fact) > 8192:
+            if not fact or len(fact) > 8192 or names_removed_tool(fact):
                 continue
             category = entry.get("category", "general")
             key = _FACT_PREFIX + hashlib.sha256(fact.encode("utf-8")).hexdigest()
@@ -157,7 +167,12 @@ def extract_and_save_facts(dialog_messages: list) -> int:
 def get_global_memory_summary() -> str:
     """Format current native memory facts for the system prompt."""
     records = sorted(
-        list_global_memory_facts(), key=lambda row: (row["category"], row["fact"])
+        (
+            row
+            for row in list_global_memory_facts()
+            if not names_removed_tool(row["fact"])
+        ),
+        key=lambda row: (row["category"], row["fact"]),
     )
     if not records:
         return ""
