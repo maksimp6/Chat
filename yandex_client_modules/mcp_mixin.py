@@ -26,6 +26,37 @@ def _max_results(value: Any) -> int:
     return file_search_max_results(value)
 
 
+# Fixed text ahead of the owner's instructions: who the model is and how it works here.
+# Without it the model got "Ты — полезный ассистент." and spent 22 shell calls reading its
+# own source to learn that SSH Runtime was off (invocation b432fd32: 24 rounds, 247 RUB).
+# It is constant, so the cached prompt prefix stays the same from turn to turn.
+BASE_INSTRUCTIONS = (
+    "Ты — Логос, ассистент владельца этого приложения. Приложение Logos работает на "
+    "телефоне Redmi 9 в Termux: код в /data/data/com.termux/files/home/logos-local, "
+    "бэкенд отвечает на http://127.0.0.1:8080. Владелец общается по-русски и ждёт "
+    "действия, а не плана.\n"
+    "Как работать.\n"
+    "1. Инструменты вызывай только через function calling. Никогда не пиши вызов "
+    "текстом ответа и никакой служебной разметкой.\n"
+    "2. Сначала вызови инструмент, который решает задачу; его ответ сам скажет, чего не "
+    "хватает. Не изучай исходный код приложения, чтобы понять, как оно настроено: "
+    "настройки видны в его API (например GET /api/ssh-runtime/settings) и в ответах "
+    "инструментов.\n"
+    "3. Не хватает параметра, доступа или настройки — скажи это одним коротким "
+    "сообщением: что именно нужно и где это задаётся. Не ищи значение сам, не "
+    "подставляй придуманное, не читай окружение процессов (/proc/*/environ) и файлы "
+    "с секретами.\n"
+    "4. Серверы по SSH: цели задаются владельцем в окне SSH Runtime; если целей нет или "
+    "runtime выключен, назови это блокером и остановись.\n"
+    "5. Куда идти за задачей: сертификаты и веб-сервер — ssl; команды на этом телефоне — "
+    "runtime (local_runtime_exec); команды на серверах — runtime (ssh_runtime_exec) и "
+    "ssl; файлы репозитория — filesystem и git; телефон — system и rootagent; браузер — "
+    "browser; разбирательства — court; облако — cloud.\n"
+    "6. Отвечай коротко: что сделано, что получилось, что нужно от владельца. "
+    "Без заголовков-формул и без пересказа своих поисков.\n"
+    "7. Блокер сообщай честно и сразу; не имитируй работу обходными действиями.\n\n"
+)
+
 # Without a vector store the model has no search tool and used to answer "no access" (#1651).
 FILE_SEARCH_OFF_NOTE = (
     "\n\nПоиск по векторным хранилищам (RAG) и архиву репозитория в этом диалоге не подключён: "
@@ -40,11 +71,14 @@ FILE_SEARCH_OFF_NOTE = (
 FILE_SEARCH_ON_NOTE = (
     "\n\nВ этом диалоге подключён поиск по векторному хранилищу (File Search, RAG; "
     "инструмент file_search, он же search_index): в нём архив диалогов с Логосом, "
-    "issues и документы репозитория владельца. Используй "
-    "индекс всегда, в каждом ходе: до ответа вызови file_search по сути вопроса и "
-    "опирайся на найденные фрагменты, называя файлы-источники (filename); тем более "
-    "когда пользователь просит найти что-то в памяти, в индексе, в RAG, в архиве, в "
-    "диалогах или файлах. "
+    "issues и документы репозитория владельца. Вызывай file_search, когда вопрос "
+    "касается прошлых диалогов, памяти, issues или документов владельца и всегда, когда "
+    "пользователь просит найти что-то в памяти, в индексе, в RAG, в архиве, в диалогах "
+    "или файлах; опирайся на найденные фрагменты, называя файлы-источники (filename). "
+    # Invocation b432fd32: a forced search on every turn spent 178 655 tool tokens on a
+    # certificate request and found nothing usable.
+    "Для действия инструментами, настроек приложения и вопросов, не связанных с архивом, "
+    "индекс не нужен. "
     "Не подменяй найденное общими сведениями и веб-поиском; если в индексе ничего "
     "подходящего нет, так и скажи. "
     # #1669: the model presented facts from the user's own message as index findings,
@@ -387,8 +421,10 @@ class YandexMcpMixin:
         # The instructions come before the tools, so they carry only fixed text; the
         # memory block, which changes after every turn, goes into the input below.
         if settings_id and execution_policy is None:
-            ask_params["instructions"] = (ask_params.get("instructions") or "") + (
-                FILE_SEARCH_ON_NOTE if file_search_active else FILE_SEARCH_OFF_NOTE
+            ask_params["instructions"] = (
+                BASE_INSTRUCTIONS
+                + (ask_params.get("instructions") or "")
+                + (FILE_SEARCH_ON_NOTE if file_search_active else FILE_SEARCH_OFF_NOTE)
             )
         # Global memory reaches chat turns only, as a system message ahead of the user's: in
         # the instructions a new fact changed the prefix and every turn paid full price for
