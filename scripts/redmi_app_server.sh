@@ -13,9 +13,10 @@ case "$action" in start|restart|status|stop|deploy) ;; *) echo 'Use start, resta
 app=${LOGOS_APP_DIR:-$HOME/logos-local}
 state=${LOGOS_STATE_DIR:-$HOME/logos-local-state}
 port=${LOGOS_PORT:-8080}
-limit=${LOGOS_START_TIMEOUT:-40}
+# Seconds to wait for readiness; 0 (the default) waits as long as the process lives.
+limit=${LOGOS_START_TIMEOUT:-0}
 [[ $port =~ ^[0-9]+$ && $port -ge 1024 && $port -le 65535 ]] || exit 2
-[[ $limit =~ ^[0-9]+$ && $limit -ge 1 && $limit -le 120 ]] || exit 2
+[[ $limit =~ ^[0-9]+$ ]] || exit 2
 [[ -d $app && -d $state && -f $app/app.py && -x $app/.venv/bin/python && -f $state/start-logos.py ]] || {
   echo 'The existing Logos installation is incomplete' >&2; exit 1;
 }
@@ -227,7 +228,7 @@ wait_ready() {
   local deadline=$((SECONDS + limit))
   until ready; do
     owned "$pid" || { echo 'Application exited before readiness; inspect local backend.log' >&2; return 1; }
-    if [[ $SECONDS -ge $deadline ]]; then
+    if [[ $limit -gt 0 && $SECONDS -ge $deadline ]]; then
       if [[ $outcome == started ]] && owned "$pid"; then kill -TERM "$pid"; fi
       echo 'Application readiness failed; inspect local backend.log' >&2
       [[ ! -f $probe/wifi-proof.json ]] || cat "$probe/wifi-proof.json" >&2

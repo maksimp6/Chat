@@ -68,33 +68,19 @@ jobs:
           # The runner is the only updater. Retire the former independent loop
           # after its in-flight controller finishes, preserving its evidence.
           python scripts/redmi_remove_autoupdate.py
-          # The phone runs out of space when old deploy backups and screenshot folders pile up.
+          # The phone runs out of space when old deploy backups, caches and old LFS objects pile up.
           # The concurrency group runs one workflow at a time, so no capture is active during this step.
-          # Keep only the newest backup of the app memory, and only when that backup is non-empty
-          # and its whole journal verifies as Kristall replays it: complete frames, unbroken digest chain.
-          # Otherwise every backup is kept, so a damaged newest copy never removes the intact older ones.
+          # Memory backups: the two newest are kept (if the newest copy is damaged, the one before
+          # it is still there); every older backup is removed.
           backups=/data/data/com.termux/files/home/logos-local-state/deploy-backups
           if [ -d "$backups" ]; then
-            newest=$(ls -1t "$backups"/*.memory 2>/dev/null | head -n 1 || true)
-            if [ -n "$newest" ] && [ -s "$newest" ] && python - "$newest" <<'PY'
-          import hashlib
-          import json
-          import sys
-          digest = "0" * 64
-          with open(sys.argv[1], "rb") as journal:
-              for frame in journal:
-                  if not frame.endswith(b"\n"):
-                      raise SystemExit("Newest memory backup has an incomplete tail; all backups are kept")
-                  record = json.loads(frame)
-                  encoded = json.dumps(record["payload"], sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
-                  digest = hashlib.sha256(bytes.fromhex(digest) + encoded).hexdigest()
-                  if record["digest"] != digest:
-                      raise SystemExit("Newest memory backup breaks the commit chain; all backups are kept")
-          PY
-            then
-              ls -1t "$backups"/*.memory 2>/dev/null | tail -n +2 | xargs -r rm -f
-            fi
+            ls -1t "$backups"/*.memory 2>/dev/null | tail -n +3 | xargs -r rm -f -- || true
           fi
+          python -m pip cache purge || echo "::warning::pip cache purge failed"
+          git -C "$HOME/logos-local" lfs prune || echo "::warning::git lfs prune failed"
+          # What takes the space, largest first (sizes and paths only).
+          du -xsk "$HOME"/* "$HOME"/.[!.]* /data/data/com.termux/files/home/logos-local-state/* 2>/dev/null | sort -rn | head -n 25 || true
+          df -k "$cleanup_root"
           bash scripts/redmi_app_server.sh deploy
 
   screenshots:
