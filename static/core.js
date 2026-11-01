@@ -119,6 +119,9 @@ window.isDialogModel = function (modelKey) {
 window.changeModel = function (newModel, skipPatch) {
   newModel = LEGACY_MODEL_KEYS[newModel] || newModel;
   if (!window.isDialogModel(newModel)) {
+    // A dialog opened from its stored model: that model is retired or no longer offered, and every
+    // turn answers with the chat model anyway, so opening the dialog must not show an error.
+    if (skipPatch) return false;
     if (window.LogosToast) window.LogosToast.error("Эта модель не предназначена для диалога");
     return false;
   }
