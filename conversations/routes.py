@@ -51,10 +51,16 @@ def set_conv_title(conv_id):
     )
 
 
+# The Court's dialog (COURT_CONVERSATION_ID in chat/mcp_routes.py) is always there.
+COURT_CONVERSATION_ID = "logos-court"
+
+
 def remove_conv(conv_id):
     owner_id = get_current_owner_id(required=False)
     if not owner_id or not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
+    if conv_id == COURT_CONVERSATION_ID:
+        return jsonify({"error": "court_dialog_is_permanent"}), 409
     delete_conversation(conv_id)
     delete_owner(conv_id, owner_id)
     return jsonify({"status": "deleted"})

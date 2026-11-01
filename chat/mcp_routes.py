@@ -2396,6 +2396,24 @@ def mcp_oauth_callback():
     return _oauth_page(f"MCP-сервер «{name}» подключён.")
 
 
+# The Court's own dialog: always there, first in the list, never deleted.
+COURT_CONVERSATION_ID = "logos-court"
+COURT_CONVERSATION_TITLE = "⚖️ Суд Логоса"
+_COURT_DIALOG_LOCK = threading.Lock()
+
+
+def ensure_court_dialog(owner_id: str) -> None:
+    with _COURT_DIALOG_LOCK:
+        if get_conversation_title(COURT_CONVERSATION_ID) is None:
+            create_conversation(
+                COURT_CONVERSATION_ID,
+                COURT_CONVERSATION_TITLE,
+                bound.CHAT_MODEL,
+                provider_pending=True,
+            )
+        set_owner(COURT_CONVERSATION_ID, owner_id)
+
+
 @mcp_bp.route("/api/conversations", methods=["GET", "POST"])
 def conversations():
     owner_id = get_current_owner_id()
@@ -2440,7 +2458,13 @@ def conversations():
             }
         ), 201
 
-    return jsonify({"conversations": list_owned_conversations(owner_id)})
+    ensure_court_dialog(owner_id)
+    rows = [
+        {**row, "court": True} if row["id"] == COURT_CONVERSATION_ID else row
+        for row in list_owned_conversations(owner_id)
+    ]
+    rows.sort(key=lambda row: row["id"] != COURT_CONVERSATION_ID)
+    return jsonify({"conversations": rows})
 
 
 class ForkError(Exception):

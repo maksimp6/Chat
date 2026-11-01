@@ -107,9 +107,14 @@ function renderSidebar() {
     list.appendChild(empty);
     return;
   }
+  // The Court's dialog is always first.
+  items = items.slice().sort(function (a, b) {
+    return (b.court === true) - (a.court === true);
+  });
   items.forEach(function (conv) {
     var div = document.createElement("div");
-    div.className = "conv-item" + (conv.id === currentConvId ? " active" : "");
+    div.className =
+      "conv-item" + (conv.id === currentConvId ? " active" : "") + (conv.court === true ? " conv-court" : "");
 
     var titleSpan = document.createElement("span");
     titleSpan.className = "conv-title";
@@ -226,7 +231,7 @@ function renderSidebar() {
     link.appendChild(titleSpan);
     div.appendChild(link);
     div.appendChild(renameBtn);
-    div.appendChild(delBtn);
+    if (conv.court !== true) div.appendChild(delBtn);
     div.addEventListener("click", function (e) {
       if (e.target === delBtn || e.target === renameBtn || e.target.closest(".conv-link")) return;
       selectConv(conv.id);

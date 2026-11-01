@@ -236,6 +236,11 @@ body {
   box-shadow: inset 3px 0 0 var(--accent);
   font-weight: 500;
 }
+.logos-pro-app .conv-item.conv-court {
+  font-weight: 600;
+  border: 1px solid var(--accent);
+  margin-bottom: 8px;
+}
 .logos-pro-app .conv-title {
   flex: 1;
   overflow: hidden;
