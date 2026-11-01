@@ -394,6 +394,9 @@ class YandexMcpMixin:
         # the instructions a new fact changed the prefix and every turn paid full price for
         # the instructions and tools (invocation e31d1b90: 256 of 44800 tokens cached).
         # Settings (enabled, facts limit, categories) are applied inside the summary builder.
+        # The same message names the chat itself: court and other tools take its
+        # conversation_id, and without it the model spent rounds looking for it
+        # (invocation 9114cb20: 7 rounds, 70 RUB).
         if settings_id and execution_policy is None:
             try:
                 memory_summary = get_controlled_memory_summary()
@@ -401,11 +404,14 @@ class YandexMcpMixin:
                 api_logger.exception("[MEMORY] Память не подключена к ответу")
                 note("memory", f"memory left out of the reply: {type(e).__name__}: {e}")
                 memory_summary = ""
-            if memory_summary:
-                ask_params["input"] = [
-                    {"role": "system", "content": memory_summary.strip()},
-                    *response_input(ask_params, message),
-                ]
+            ask_params["input"] = [
+                {
+                    "role": "system",
+                    "content": f"[ТЕКУЩИЙ ДИАЛОГ]\nconversation_id этого диалога Logos: "
+                    f"{settings_id}\n{memory_summary.strip()}".strip(),
+                },
+                *response_input(ask_params, message),
+            ]
         if tools or execution_policy is not None:
             ask_params["tools"] = tools
         if not tools and ask_params.get("tool_choice") == "required":
