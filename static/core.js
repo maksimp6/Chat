@@ -24,7 +24,9 @@ window.LogosErrorText = function (prefix, error) {
 
 let currentConvId = null;
 let conversations = [];
-let currentModel = "deepseek-v4.1-flash";
+// The one model of Logos: every dialog answers with it, whatever a dialog stored.
+const CHAT_MODEL_KEY = "deepseek-v4.1-flash";
+let currentModel = CHAT_MODEL_KEY;
 let currentModelType = "text";
 let modelsData = { text: {}, voice: {}, image: {} };
 let modelSelectionSequence = 0;
@@ -117,7 +119,7 @@ window.isDialogModel = function (modelKey) {
 };
 
 window.changeModel = function (newModel, skipPatch) {
-  newModel = LEGACY_MODEL_KEYS[newModel] || newModel;
+  newModel = CHAT_MODEL_KEY;
   if (!window.isDialogModel(newModel)) {
     // A dialog opened from its stored model: that model is retired or no longer offered, and every
     // turn answers with the chat model anyway, so opening the dialog must not show an error.
