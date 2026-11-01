@@ -6,7 +6,7 @@ from typing import Any
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
-from yandex_client_modules.tool_groups import ALL_CATEGORY, fit_tools, unwrap_call
+from yandex_client_modules.tool_groups import fit_tools, unwrap_call
 from yandex_client_modules.tool_config import (
     deferred_tool_categories,
     file_search_max_results,
@@ -98,13 +98,9 @@ class YandexMcpMixin:
                         ) from None
                 if not isinstance(args, dict):
                     raise ValueError("Invalid tool arguments: expected a JSON object")
-                # A tools_all call stands for one tool of any category.
+                # A tools_<category> call stands for one tool of that category (#1703).
                 inner_name, args = unwrap_call(
-                    name,
-                    args,
-                    lambda category: bound.registry.get_definitions()
-                    if category == ALL_CATEGORY
-                    else bound.registry.get_tools_by_category(category),
+                    name, args, bound.registry.get_tools_by_category
                 )
                 if inner_name != name and isinstance(trace, bound.ExecutionTrace):
                     trace.add_event(
@@ -380,7 +376,7 @@ class YandexMcpMixin:
                 api_logger.error(f"[TOOLS] Ошибка категории {category}: {e}")
                 note("tool_category", f"tool category {category} left out: {e}")
 
-        # Every local tool goes inside one function, tools_all.
+        # Over the provider's 100-tool limit each category goes as one function (#1703).
         sent_local, grouped_into = fit_tools(local_by_category, len(tools))
         if grouped_into and trace is not None and isinstance(trace, bound.ExecutionTrace):
             trace.add_event(
