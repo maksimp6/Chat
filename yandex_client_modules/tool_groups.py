@@ -1,6 +1,7 @@
-"""One function for every local tool: ``tools_all`` (owner's command).
+"""One tool, one function: every local tool goes to the model as its own function.
 
-Earlier: one function per tool category when a request would exceed the provider's tool limit.
+Grouping (``tools_<category>``, ``tools_all``) is no longer sent; unwrap_call still
+reads such a call if a stored conversation replays one.
 
 Yandex AI Studio refuses a request with more than 100 tools ("The number of tools
 exceeds the maximum allowed limit of 100"), deferred tools included (#1703). When
@@ -95,50 +96,11 @@ def group_tool(category: str, tools: list[dict[str, Any]]) -> dict[str, Any]:
 ALL_CATEGORY = "all"
 
 
-def all_tools_function(tools: list[dict[str, Any]]) -> dict[str, Any]:
-    """The one function through which the model calls every local Logos tool."""
-    names = [tool["name"] for tool in tools]
-    listing = "\n\n".join(
-        f"### {tool['name']}\n{tool.get('description') or ''}\n"
-        f"Параметры: {json.dumps(tool.get('parameters') or {}, ensure_ascii=False)}"
-        for tool in tools
-    )
-    function = {
-        "type": "function",
-        "name": group_name(ALL_CATEGORY),
-        "description": (
-            "Единственная функция для вызова любого инструмента Логоса. Вызови её с полем "
-            "tool — имя инструмента — и полем arguments — объект его параметров.\n"
-            "Инструменты:\n\n" + listing
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "tool": {"type": "string", "enum": names},
-                "arguments": {"type": "object"},
-            },
-            "required": ["tool", "arguments"],
-        },
-        # arguments is a free-form object, which strict function calling cannot express.
-        "strict": False,
-    }
-    if tools and all(tool.get("defer_loading") is True for tool in tools):
-        function["defer_loading"] = True
-    return function
-
-
 def fit_tools(
     categories: list[tuple[str, list[dict[str, Any]]]], other_count: int
 ) -> tuple[list[dict[str, Any]], dict[str, str]]:
-    """The local tools to send, and which tool sits in which function.
-
-    Every local tool of every category goes inside one function, ``tools_all``.
-    ``other_count`` (hosted and MCP tools) is kept for the caller's signature."""
-    tools = [tool for _, category_tools in categories for tool in category_tools]
-    if not tools:
-        return [], {}
-    name = group_name(ALL_CATEGORY)
-    return [all_tools_function(tools)], {tool["name"]: name for tool in tools}
+    """The local tools to send: one tool, one function, never grouped (owner's command)."""
+    return [tool for _, tools in categories for tool in tools], {}
 
 
 def unwrap_call(name: str, args: Any, category_tools: Any) -> tuple[str, Any]:

@@ -380,7 +380,7 @@ class YandexMcpMixin:
                 api_logger.error(f"[TOOLS] Ошибка категории {category}: {e}")
                 note("tool_category", f"tool category {category} left out: {e}")
 
-        # Every local tool goes inside one function, tools_all.
+        # One tool, one function: every local tool goes as its own function.
         sent_local, grouped_into = fit_tools(local_by_category, len(tools))
         if grouped_into and trace is not None and isinstance(trace, bound.ExecutionTrace):
             trace.add_event(
