@@ -11,9 +11,12 @@ Deployment fetches the current `develop` tip from the existing application's
 anything. A delayed or retried job uses the current branch tip, not an older event
 SHA. Tracked local changes block the update. The previous commit is retained under
 `refs/logos/deployments/`, and the stopped application's journal is copied into the
-private `deploy-backups` directory before checkout. Before each deployment the job keeps the
-two newest memory backups and removes older ones, purges the pip cache, prunes old Git LFS
-objects and prints what takes the space. Readiness is awaited as long as the started process
+private `deploy-backups` directory before checkout. Before each deployment the job removes
+everything in the Termux home except the server (`logos-local`), its state with the dialogs
+(`logos-local-state`, newest memory backup only), the Actions runner, RDC (`.logos-rdc` without
+its screenshots, the Desktop Commander device) and the shell, keys and settings they run on;
+it purges the pip cache, prunes old Git LFS objects and prints what takes the space in the home
+and on `/sdcard`. Readiness is awaited as long as the started process
 lives (`LOGOS_START_TIMEOUT`, seconds, 0 = no limit, the default).
 
 The existing `~/logos-local` virtualenv, on-phone launcher and

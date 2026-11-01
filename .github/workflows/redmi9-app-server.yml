@@ -70,16 +70,39 @@ jobs:
           python scripts/redmi_remove_autoupdate.py
           # The phone runs out of space when old deploy backups, caches and old LFS objects pile up.
           # The concurrency group runs one workflow at a time, so no capture is active during this step.
-          # Memory backups: the two newest are kept (if the newest copy is damaged, the one before
-          # it is still there); every older backup is removed.
-          backups=/data/data/com.termux/files/home/logos-local-state/deploy-backups
+          # Owner's order (2026-11-01): everything on the phone is removed except the dialogs, the
+          # server and what RDC needs to work. Kept in the Termux home: the server (logos-local),
+          # its state with the dialogs (logos-local-state, newest memory backup only), the Actions
+          # runner that deploys it, RDC (.logos-rdc without its screenshots, the Desktop Commander
+          # device), and the shell, keys and settings they run on. Every other entry is removed.
+          home=/data/data/com.termux/files/home
+          backups=$home/logos-local-state/deploy-backups
           if [ -d "$backups" ]; then
-            ls -1t "$backups"/*.memory 2>/dev/null | tail -n +3 | xargs -r rm -f -- || true
+            ls -1t "$backups"/*.memory 2>/dev/null | tail -n +2 | xargs -r rm -f -- || true
           fi
+          if [ -d "$home/.logos-rdc/screenshots" ]; then
+            find "$home/.logos-rdc/screenshots" -mindepth 1 -maxdepth 1 ! -name 'latest.*' -exec rm -rf -- {} + || true
+          fi
+          keep=" logos-local logos-local-state github-python-runner storage .logos-rdc .desktop-commander-device .claude-server-commander .termux .ssh .gnupg .android .config .local .pyproxy.env .logos-media-ram "
+          # The former RDC home stays only while something still runs from it.
+          if grep -rqs alice-rdc "$home/.termux/boot" || ps -A -o args 2>/dev/null | grep -v grep | grep -q alice-rdc; then
+            keep="$keep.alice-rdc "
+            echo "::warning::.alice-rdc is still in use and was kept"
+          fi
+          for entry in "$home"/* "$home"/.[!.]*; do
+            [ -e "$entry" ] || [ -L "$entry" ] || continue
+            name=${entry##*/}
+            case "$keep" in *" $name "*) continue ;; esac
+            # Small dotfiles (shell profile, git settings, credentials) stay; only directories go.
+            if [ "${name#.}" != "$name" ] && [ ! -d "$entry" ]; then continue; fi
+            echo "removing $entry"
+            rm -rf -- "$entry" 2>/dev/null || timeout 60 su -c "rm -rf -- '$entry'" || echo "::warning::could not remove $entry"
+          done
           python -m pip cache purge || echo "::warning::pip cache purge failed"
-          git -C "$HOME/logos-local" lfs prune || echo "::warning::git lfs prune failed"
-          # What takes the space, largest first (sizes and paths only).
-          du -xsk "$HOME"/* "$HOME"/.[!.]* /data/data/com.termux/files/home/logos-local-state/* 2>/dev/null | sort -rn | head -n 25 || true
+          git -C "$home/logos-local" lfs prune || echo "::warning::git lfs prune failed"
+          # What takes the space now, largest first (sizes and paths only), in the home and on /sdcard.
+          du -xsk "$home"/* "$home"/.[!.]* "$home"/logos-local-state/* 2>/dev/null | sort -rn | head -n 25 || true
+          timeout 120 su -c "du -xsk /sdcard/* /sdcard/Android/data/* 2>/dev/null" | sort -rn | head -n 25 || true
           df -k "$cleanup_root"
           bash scripts/redmi_app_server.sh deploy
 
