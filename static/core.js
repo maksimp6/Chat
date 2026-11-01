@@ -158,6 +158,7 @@ window.changeModel = function (newModel, skipPatch) {
         currentModelType = previousType;
         if (previousStoredModel === null) localStorage.removeItem("current_model");
         else localStorage.setItem("current_model", previousStoredModel);
+        if (typeof updateModelButton === "function") updateModelButton();
         if (typeof updateUIForModel === "function") updateUIForModel();
       }
       if (window.LogosToast) window.LogosToast.error(window.LogosErrorText("Не удалось сохранить выбранную модель", e));
@@ -167,6 +168,7 @@ window.changeModel = function (newModel, skipPatch) {
     if (conv) conv.model = newModel;
   }
 
+  if (typeof updateModelButton === "function") updateModelButton();
   if (typeof updateUIForModel === "function") updateUIForModel();
   return true;
 };
@@ -206,6 +208,7 @@ async function loadModels() {
   var failureClassified = false;
   modelLoadState = { status: "loading", message: "Загрузка моделей…" };
   reportModelLoad("request_start");
+  if (typeof renderModelModal === "function") renderModelModal();
   try {
     var response = await fetchWithTimeout(
       "/api/models",
@@ -251,6 +254,7 @@ async function loadModels() {
     reportModelLoad("success", {
       modelCount: Object.keys(text).length + Object.keys(voice).length + Object.keys(image).length,
     });
+    if (typeof renderModelModal === "function") renderModelModal();
     return modelsData;
   } catch (error) {
     if (!failureClassified) {
@@ -260,6 +264,7 @@ async function loadModels() {
       status: "error",
       message: "Не удалось загрузить модели. Проверьте соединение и повторите попытку.",
     };
+    if (typeof renderModelModal === "function") renderModelModal();
     throw error;
   }
 }
@@ -310,6 +315,9 @@ async function enhanceCore() {
       }
     }
 
+    if (!currentConvId && typeof updateModelButton === "function") {
+      updateModelButton();
+    }
     if (typeof updateUIForModel === "function") updateUIForModel();
     if (window.LogosCoreAPI && window.LogosCoreAPI.status) {
       window.LogosCoreAPI.status.set("core", "ready", "Ядро готово", { revocable: false });
@@ -327,6 +335,7 @@ async function enhanceCore() {
     }
     if (!conversations.length) applyConversationCache();
     if (typeof updateUIForModel === "function") updateUIForModel();
+    if (typeof updateModelButton === "function") updateModelButton();
   }
 }
 
@@ -354,6 +363,7 @@ function initCore() {
   });
   if (cachedCurrentConv && cachedCurrentConv.model) window.changeModel(cachedCurrentConv.model, true);
   if (typeof updateUIForModel === "function") updateUIForModel();
+  if (typeof updateModelButton === "function") updateModelButton();
   if (window.LogosBoot && typeof window.LogosBoot.markShellReady === "function") {
     window.LogosBoot.markShellReady();
   }

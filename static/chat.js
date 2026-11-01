@@ -1692,6 +1692,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     } finally {
       window.changeModel(original, true);
+      if (typeof updateModelButton === "function") updateModelButton();
     }
   }
 

@@ -342,6 +342,21 @@ body {
   pointer-events: none;
 }
 
+.logos-pro-app .model-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  flex: 0 0 44px;
+  font-size: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-header);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 /* Chatbox */
 .logos-pro-app #chatbox {
@@ -609,6 +624,30 @@ body {
   color: var(--text-main);
 }
 
+.logos-pro-app .model-option {
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  background: var(--btn-bg);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  display: flex;
+  width: 100%;
+  line-height: 1.3;
+  text-align: left;
+  flex-direction: column;
+  gap: 4px;
+}
+.logos-pro-app .model-option:hover {
+  border-color: var(--accent);
+}
+.logos-pro-app .model-option.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  font-weight: 600;
+  background: var(--accent-soft);
+}
 .logos-pro-app .model-price {
   font-size: 12px;
   color: var(--text-secondary);
@@ -795,6 +834,9 @@ body {
   }
   .logos-pro-app .header-row {
     gap: 8px;
+  }
+  .logos-pro-app .header-row-primary .model-btn {
+    min-width: 0;
   }
 }
 /* Treasury modal */
@@ -1082,6 +1124,27 @@ body {
   padding: 20px;
   color: var(--text-secondary);
   text-align: center;
+}
+.logos-pro-app .model-list-note {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+.logos-pro-app .model-option-empty {
+  cursor: default;
+  opacity: 0.7;
+}
+.logos-pro-app .model-option-price {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.logos-pro-app .model-option-unavailable {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.logos-pro-app .model-option-ultra {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 .logos-pro-app #voice-ui,
 .logos-pro-app #response-mode-wrap,
@@ -2022,6 +2085,18 @@ body {
 }
 
 /* Модели: список и повтор загрузки (пункты 68, 69) */
+.logos-pro-app #model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.logos-pro-app .model-option-retry {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-main);
+}
 /* Пустое состояние: одно оформление для всех мест (пункт 17) */
 .logos-pro-app .empty-state {
   display: flex;
