@@ -1407,6 +1407,11 @@ def _build_chat_reply(client, response, trace) -> _ChatReply:
             ) or provider_diagnostics.get("provider_error_type")
             if error_name:
                 provider_message += " (" + str(error_name) + ")"
+            # The provider's own words name the cause ("Model called unexpected tool X"):
+            # without them the owner saw only the code and had to open the trace (#1746).
+            provider_words = _provider_error_words(response)
+            if provider_words:
+                provider_message += ": " + provider_words
         trace.record_error(
             "provider_response", provider_message, error_type=provider_error
         )
@@ -1672,6 +1677,16 @@ def _finalize_chat_turn(
             ),
         }
     ), 502 if provider_failed else 200
+
+
+def _provider_error_words(response) -> str:
+    """The provider's error message, one line, cut to a sentence or two; "" when absent."""
+    error = response.get("error") if isinstance(response, dict) else None
+    message = error.get("message") if isinstance(error, dict) else None
+    if not isinstance(message, str):
+        return ""
+    words = " ".join(message.split())
+    return words[:300] + ("…" if len(words) > 300 else "")
 
 
 def _turn_error_text(error):
