@@ -1100,11 +1100,15 @@ def _rebuild_provider_conversation(client, conv_id, message, trace):
     """A new provider conversation holding the chat's messages as plain text, mapped to the chat.
 
     The current user message is already stored; it is left out, the turn sends it.
-    Stored failure notices ("⚠️ Ошибка: …") are no part of the dialog and are left out."""
+    Stored failure notices ("⚠️ Ошибка: …") are no part of the dialog and are left out,
+    and so is a reply that is only a tool call written as text: the model copied it
+    instead of reading the message (msg 701 of logos-court, a cache_append in DSML)."""
     said = [
         m
         for m in get_messages(conv_id)
-        if (m.get("text") or "").strip() and not m["text"].startswith("⚠️ Ошибка")
+        if (m.get("text") or "").strip()
+        and not m["text"].startswith("⚠️ Ошибка")
+        and _tool_call_written_as_text(m["text"]) is None
     ]
     if said and said[-1].get("role") == "user" and said[-1].get("text") == message:
         said = said[:-1]
