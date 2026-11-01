@@ -4,7 +4,7 @@ For each agent over the KPI window (a week by default):
 
 - merged PRs, and PRs closed without a merge (work thrown away or redone);
 - median time from opening a PR to its merge;
-- reviews per merged PR (Copilot, Codex and people; more rounds, more rework);
+- reviews per merged PR (review bots and people; more rounds, more rework);
 - open PRs now, and how many of them have red CI;
 - issues handed to the agent, and items the observer flags as stuck.
 """

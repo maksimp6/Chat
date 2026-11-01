@@ -1,4 +1,4 @@
-"""Tools that watch the GitHub "agent office": Claude, Codex, Copilot and Logos."""
+"""Tools for monitoring the GitHub agent office."""
 
 from __future__ import annotations
 

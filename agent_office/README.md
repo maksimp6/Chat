@@ -1,6 +1,6 @@
 # `agent_office`
 
-Tools that watch the GitHub "agent office" (Claude, Codex, Copilot and Logos): an observer that builds a readable thread for every task, per-agent KPIs, owner labels, and the dispatch model and state machine of dispatched tasks.
+Tools for monitoring the GitHub agent office. The observer builds a readable thread for each task and provides per-agent KPIs, owner labels, and the dispatch model and state machine for dispatched tasks.
 
 ## Public API
 
@@ -8,7 +8,7 @@ Tools that watch the GitHub "agent office" (Claude, Codex, Copilot and Logos): a
 
 | Module | Purpose |
 | --- | --- |
-| [`agent_office.observer`](observer.py) | Watch the GitHub agent office and build a readable thread for every task. |
+| [`agent_office.observer`](observer.py) | Monitors the GitHub agent office and builds a readable thread for each task. |
 
 Command line:
 

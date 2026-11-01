@@ -144,7 +144,7 @@ def classify_login(login: str | None) -> str:
     """Map a GitHub login or commit author name to an agent id.
 
     Matches whole words of the login, so a person whose name merely contains
-    "logos" or "codex" is not taken for that agent. Names are still self-chosen,
+    an agent id is not taken for that agent. Names are still self-chosen,
     so this labels activity; it does not prove who acted.
     """
     name = (login or "").strip().lower()
@@ -190,7 +190,7 @@ def classify_actor(login: str | None, text: str | None = None) -> str:
     return agent
 
 
-# Known branch prefixes; kept apart from AGENTS because "claude" has no KPI row.
+# Known branch prefixes; kept apart from AGENTS because one prefix has no KPI row.
 BRANCH_AGENT_PREFIXES = frozenset({*AGENTS, "claude"})
 
 
@@ -201,7 +201,7 @@ def classify_branch(ref: str | None) -> str | None:
 
 _MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|logos|logos)\b", re.I)
 _EXECUTABLE_MENTION = re.compile(r"(?<![\w/])@(codex|copilot|logos|logos)\b", re.I)
-# "@logos" addresses the Logos workflow, which is the "logos" agent (see AGENT_LABELS).
+# A mention of the `logos` id addresses that agent's workflow (see AGENT_LABELS).
 _MENTION_ALIASES = {"logos": "logos"}
 _EXECUTABLE_AGENT = {
     "codex": "codex",
@@ -224,7 +224,7 @@ def mentioned_agents(text: str | None) -> list[str]:
 def executable_mentioned_agents(text: str | None) -> list[str]:
     """Return the agent ids named by executable mentions in ``text``.
 
-    Pull request threads never start the Logos backend; only issue threads do.
+    Pull request threads never start the `logos` workflow; only issue threads do.
     The thread-kind rule is applied where trigger eligibility is recorded.
     """
     return sorted(
@@ -389,10 +389,10 @@ def build_thread(
             thread.url,
         )
     )
-    # The copilot assignment in force; unassigning removes this entry and nothing else.
+    # The agent assignment in force; unassigning removes this entry and nothing else.
     assignment: tuple[str, datetime] | None = None
     if not is_pr:
-        # logos.yml also starts on the issue title, so a title mention counts like a body mention.
+        # The workflow also starts on the issue title, so a title mention counts like a body mention.
         _record_dispatch(
             thread,
             f"{thread.title}\n{body}",
@@ -445,7 +445,7 @@ def build_thread(
                 thread.dispatches.append(assignment)
         elif not is_pr and kind == "unassigned":
             if classify_login(_login(raw.get("assignee"))) == "copilot" and assignment:
-                # Only the assignment goes; @copilot mentions in the thread stay as dispatches.
+                # Only the assignment goes; agent mentions in the thread stay as dispatches.
                 thread.dispatches.remove(assignment)
                 assignment = None
         elif not is_pr and kind == "labeled":
@@ -493,7 +493,7 @@ def _record_dispatch(
         thread.kind == "pr" and _MAINTAINER_INTENT.search(text or "")
     )
     for agent in executable_mentioned_agents(text):
-        # The Logos workflow ignores pull request comments (logos.yml guards on issue threads).
+        # The `logos` workflow ignores pull request comments (it guards on issue threads).
         if agent == "logos" and thread.kind == "pr":
             continue
         if agent != poster:
@@ -573,7 +573,7 @@ def _has_copilot_review(thread: Thread) -> bool:
 
 
 def _has_codex_check(thread: Thread) -> bool:
-    """Codex's own bot answered with a review or comment; a request or a Codex commit is not one."""
+    """The review bot answered with a review or comment; a request or a commit by it is not one."""
     return any(
         event.kind in {"reviewed", "commented"}
         and classify_login(event.actor) == "codex"
