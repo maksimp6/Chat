@@ -175,6 +175,7 @@
             >
               🔐
             </button>
+            <span class="header-brand">Логос</span>
           </div>
           <div id="header-actions-2" class="header-row header-row-secondary">
             <button
@@ -312,7 +313,11 @@
           Версия {{ app_revision[:8] if app_revision != 'unknown' else static_version[:8] }}
         </div>
         <div id="chatbox" role="log" aria-live="polite" aria-label="Переписка">
-          <div class="empty-state">Начните диалог или выберите модель</div>
+          <div class="empty-state">
+            <div class="empty-mark" aria-hidden="true">Λ</div>
+            <div class="empty-title">Логос</div>
+            <div class="empty-sub">Начните диалог или выберите модель</div>
+          </div>
         </div>
         <div id="voice-ui">
           <canvas id="waveform"></canvas>

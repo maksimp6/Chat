@@ -809,7 +809,17 @@ function waitForOpenQuestion(convId, count, last) {
 function showEmptyChat(chatbox, before) {
   const empty = document.createElement("div");
   empty.className = "empty-state";
-  empty.textContent = "Начните диалог";
+  for (const [cls, text] of [
+    ["empty-mark", "Λ"],
+    ["empty-title", "Логос"],
+    ["empty-sub", "Начните диалог"],
+  ]) {
+    const part = document.createElement("div");
+    part.className = cls;
+    part.textContent = text;
+    if (cls === "empty-mark") part.setAttribute("aria-hidden", "true");
+    empty.appendChild(part);
+  }
   if (before && before.isConnected) chatbox.insertBefore(empty, before);
   else chatbox.appendChild(empty);
 }
