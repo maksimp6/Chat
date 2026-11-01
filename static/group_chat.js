@@ -36,12 +36,11 @@
 
   var memoryOnly = readStored();
 
+  // One model answers everything in Logos: the group chat has the chat model and never another.
+  var CHAT_MODEL = "deepseek-v4.1-flash";
+
   function dialogModels() {
-    var text = (typeof modelsData !== "undefined" && modelsData.text) || {};
-    return Object.keys(text).filter(function (key) {
-      return window.isDialogModel(key) && !(modelsData.voice && modelsData.voice[key]) &&
-        !(modelsData.image && modelsData.image[key]);
-    });
+    return window.isDialogModel(CHAT_MODEL) ? [CHAT_MODEL] : [];
   }
 
   // The Court of Logos sits in the group chat as a participant: after the models it judges the
