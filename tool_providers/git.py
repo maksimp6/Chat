@@ -550,15 +550,4 @@ TOOL_REGISTRY = {
 }
 
 
-def execute_tool(tool_name: str, arguments: dict, cfg: dict = None) -> dict:
-    if tool_name not in TOOL_REGISTRY:
-        return {"error": f"Неизвестный инструмент: {tool_name}"}
-    tool = TOOL_REGISTRY[tool_name]
-    try:
-        return tool["func"](arguments or {}, cfg or {})
-    except Exception as e:
-        logger.exception(f"Ошибка выполнения {tool_name}: {e}")
-        return {"error": str(e)}
-
-
 GIT_TOOLS = TOOL_REGISTRY
