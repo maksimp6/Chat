@@ -94,7 +94,9 @@
             (srv.server_url
               ? '<div style="display:flex;gap:6px;"><button class="logos-btn mcp-oauth-btn settings-contract-btn" data-id="' +
                 UI.escapeHtml(srv.id) +
-                '">⚡ OAuth</button></div>'
+                '">' +
+                (srv.server_label === "rdc" ? "🖥 Подключить RDC" : "⚡ OAuth") +
+                "</button></div>"
               : "") +
             "</div>"
           );

@@ -14,6 +14,7 @@ import base64
 import hashlib
 import json
 import logging
+import re
 import secrets
 import time
 import urllib.error
@@ -71,13 +72,111 @@ def _http_json(method: str, url: str, *, data: dict[str, Any] | None = None, for
     return parsed
 
 
-def discover(server_url: str) -> dict[str, Any]:
-    """The authorization-server metadata for an MCP server, or raise if it has none."""
+def _try_json(url: str) -> dict[str, Any] | None:
+    """The JSON object at ``url``, or ``None`` when it is absent or unreadable."""
+    try:
+        return _http_json("GET", url)
+    except OAuthError:
+        return None
+
+
+def _challenge_metadata_url(server_url: str) -> str | None:
+    """The ``resource_metadata`` URL from the server's 401 ``WWW-Authenticate`` (RFC 9728 §5.1)."""
+    request = urllib.request.Request(
+        server_url,
+        method="GET",
+        headers={"Accept": "application/json, text/event-stream", "User-Agent": "logos-mcp-oauth"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT):
+            return None
+    except urllib.error.HTTPError as error:
+        header = error.headers.get("WWW-Authenticate") if error.headers else None
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+    if not header:
+        return None
+    match = re.search(r'resource_metadata\s*=\s*"([^"]+)"', header) or re.search(
+        r"resource_metadata\s*=\s*([^\s,]+)", header
+    )
+    return match.group(1) if match else None
+
+
+def _protected_resource(server_url: str) -> dict[str, Any] | None:
+    """The protected resource metadata of an MCP server (RFC 9728), if it publishes one."""
+    candidates: list[str] = []
+    challenged = _challenge_metadata_url(server_url)
+    if challenged:
+        candidates.append(challenged)
     origin = _origin(server_url)
+    path = urlsplit(server_url).path.rstrip("/")
+    if path:
+        candidates.append(origin + "/.well-known/oauth-protected-resource" + path)
+    candidates.append(origin + "/.well-known/oauth-protected-resource")
+    for url in candidates:
+        meta = _try_json(url)
+        if meta and isinstance(meta.get("authorization_servers"), list) and meta["authorization_servers"]:
+            return meta
+    return None
+
+
+def _authorization_server(issuer: str) -> dict[str, Any] | None:
+    """Authorization server metadata for ``issuer`` (RFC 8414 §3, then OpenID Connect Discovery)."""
+    origin = _origin(issuer)
+    path = urlsplit(issuer).path.rstrip("/")
+    if path:
+        candidates = [
+            origin + "/.well-known/oauth-authorization-server" + path,
+            origin + "/.well-known/openid-configuration" + path,
+            origin + path + "/.well-known/openid-configuration",
+        ]
+    else:
+        candidates = [
+            origin + "/.well-known/oauth-authorization-server",
+            origin + "/.well-known/openid-configuration",
+        ]
+    for url in candidates:
+        meta = _try_json(url)
+        if meta and all(isinstance(meta.get(field), str) for field in ("authorization_endpoint", "token_endpoint")):
+            return meta
+    return None
+
+
+def discover(server_url: str) -> dict[str, Any]:
+    """The authorization-server metadata for an MCP server, or raise if it has none.
+
+    Follows the MCP authorization spec: the server's protected resource metadata
+    (RFC 9728) names its authorization server, whose metadata is then read
+    (RFC 8414 / OpenID Connect). A server without protected resource metadata is
+    looked up on its own origin. The result carries ``resource`` (the value sent
+    as the RFC 8707 ``resource`` parameter) and the resource's ``resource_scopes``.
+    """
+    origin = _origin(server_url)
+    resource_meta = _protected_resource(server_url)
+    if resource_meta is not None:
+        meta = None
+        for issuer in resource_meta["authorization_servers"]:
+            if isinstance(issuer, str) and issuer:
+                try:
+                    meta = _authorization_server(issuer)
+                except OAuthError:
+                    meta = None
+                if meta is not None:
+                    break
+        if meta is None:
+            raise OAuthError("Сервер авторизации MCP-сервера не отдаёт метаданные OAuth")
+        resource = resource_meta.get("resource")
+        meta = dict(meta)
+        meta["resource"] = resource if isinstance(resource, str) and resource else origin
+        meta["resource_scopes"] = [s for s in resource_meta.get("scopes_supported") or [] if isinstance(s, str)]
+        return meta
     meta = _http_json("GET", origin + "/.well-known/oauth-authorization-server")
     for field in ("authorization_endpoint", "token_endpoint"):
         if not isinstance(meta.get(field), str):
             raise OAuthError("Сервер не поддерживает OAuth (нет endpoints)")
+    meta = dict(meta)
+    meta["resource"] = origin
+    meta["resource_scopes"] = []
     return meta
 
 
@@ -137,7 +236,7 @@ def start(server_id: str, *, owner_id: str, redirect_uri: str) -> str:
     if not redirect_uri.startswith(("http://", "https://")):
         raise OAuthError("Некорректный redirect_uri")
     meta = discover(str(server["server_url"]))
-    scope = " ".join(meta.get("scopes_supported") or []) or DEFAULT_SCOPE
+    scope = " ".join(meta["resource_scopes"] or meta.get("scopes_supported") or []) or DEFAULT_SCOPE
     client = _register_client(meta, redirect_uri, scope)
     verifier, challenge = _pkce()
     state = secrets.token_urlsafe(24)
@@ -149,7 +248,7 @@ def start(server_id: str, *, owner_id: str, redirect_uri: str) -> str:
         "token_endpoint": meta["token_endpoint"],
         "client_id": client["client_id"],
         "client_secret": client.get("client_secret") or "",
-        "resource": _origin(str(server["server_url"])),
+        "resource": meta["resource"],
         "created_at": time.time(),
     }
     with get_store().transaction() as tx:
