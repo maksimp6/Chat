@@ -2726,11 +2726,14 @@ body {
   box-shadow: none;
   font-size: 16px;
   line-height: 22px;
-  color: var(--text-main);
+  /* The composer capsule is dark in every theme, so its text is light in every theme:
+     the theme's --text-main is near-black in the light themes and was invisible here. */
+  color: #f5f5f7;
+  caret-color: #f5f5f7;
 }
 .logos-pro-app #text-ui #msg-input::placeholder {
-  color: var(--text-secondary);
-  opacity: 0.75;
+  color: #a3adc8;
+  opacity: 0.85;
 }
 .logos-pro-app #text-ui #msg-input:focus-visible {
   border: none;
