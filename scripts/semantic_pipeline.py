@@ -1649,6 +1649,31 @@ def ensure_vector_store_files_attached(
     return sorted(set(cast("list[str]", confirmed_ids)))
 
 
+def remove_vector_store_files(
+    store_id: str, file_ids: list[str], project: str, key: str
+) -> list[str]:
+    """Detach superseded files from the store and delete them from Files storage.
+
+    A file that is already gone (404) counts as removed. Returns the removed ids."""
+    store_files = f"/vector_stores/{quote(store_id, safe='')}/files"
+    attached = {
+        _attached_file_id(item)
+        for item in list_yandex_objects(store_files, project, key, ("files",))
+    }
+    removed = []
+    for file_id in sorted(set(file_ids)):
+        for path in (
+            [store_files + "/" + quote(file_id, safe="")] if file_id in attached else []
+        ) + ["/files/" + quote(file_id, safe="")]:
+            try:
+                yandex_api_request("DELETE", path, project, key)
+            except YandexHTTPError as error:
+                if error.status != 404:
+                    raise
+        removed.append(file_id)
+    return removed
+
+
 def wait_for_vector_store_index(
     store_id: str, file_id: str, project: str, key: str
 ) -> None:

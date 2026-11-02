@@ -751,11 +751,23 @@ def upload_archive(
         key,
         checkpoint_path=archive.directory / "index-checkpoint.json",
     )
+    # Packs of this repository that no longer carry a current document are trash:
+    # once the current packs are indexed they are detached and deleted.
+    kept = {item["file_id"] for item in selected}
+    stale = [
+        item["id"]
+        for item in semantic.list_yandex_objects("/files", project, key, ("files",))
+        if str(item.get("filename", "")).startswith(prefix)
+        and isinstance(item.get("id"), str)
+        and item["id"] not in kept
+    ]
+    removed = semantic.remove_vector_store_files(store_id, stale, project, key)
     return {
         "status": "indexed_available_corpus",
         "store_id": store_id,
         "documents": len(required),
         "packs": selected,
+        "removed_stale_packs": removed,
         "generation_requests": 0,
     }
 

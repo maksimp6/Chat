@@ -2,7 +2,8 @@
 
 This is preparation for the native dialogue, not a second retrieval pipeline.
 It reuses the semantic pipeline's Files/Vector Store transport and never creates
-a store, deletes an old snapshot, or starts a model generation.
+a store or starts a model generation. Once the current case is indexed, the older
+case snapshots (``chat-task-history-context-*``) are detached and deleted.
 """
 
 from __future__ import annotations
@@ -182,6 +183,16 @@ def _index_context(
     ]
     if len(target) != 1 or target[0].get("status") != "completed":
         raise ValueError("knowledge_target_file_index_not_completed")
+    # The complete current case supersedes every earlier case snapshot.
+    stale = [
+        item["id"]
+        for item in semantic.list_yandex_objects("/files", project, key, ("files",))
+        if str(item.get("filename", "")).startswith("chat-task-history-context-")
+        and isinstance(item.get("id"), str)
+        and item["id"] != file_id
+    ]
+    removed = semantic.remove_vector_store_files(store_id, stale, project, key)
+    attached = [item for item in attached if item not in removed]
     return {
         "status": "indexed",
         "vector_store_ids": [store_id],
@@ -190,6 +201,7 @@ def _index_context(
         "document_sha256": digest,
         "bytes": len(content),
         "attached_files": attached,
+        "removed_stale_snapshots": removed,
         "scope": "existing_project_knowledge_plus_complete_current_case",
         "generation_requests": 0,
         "cost": {"status": "unknown", "provider_confirmed": False},
