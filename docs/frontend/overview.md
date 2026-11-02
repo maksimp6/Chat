@@ -8,4 +8,4 @@
 
 Не подключайте CDN, удалённые stylesheet/script URL или другие внешние asset URL в пользовательском интерфейсе. В частности, favicon должен загружаться из `/static/favicon.svg`.
 
-Для этого правила поддерживается регрессионный тест `tests/test_local_web_assets.py`.
+Регрессионного теста для этого правила (`tests/test_local_web_assets.py`) в репозитории пока нет.

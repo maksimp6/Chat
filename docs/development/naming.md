@@ -1,9 +1,10 @@
 # Naming conventions
 
 One rule set for user-visible text, frontend code, files, Python modules,
-branches and pull requests. `tests/test_naming_conventions.py` enforces the
-mechanical rules. Existing violations are listed there as a shrinking
-allowlist: rename an entry, then delete it from the list.
+branches and pull requests. The planned check `tests/test_naming_conventions.py`
+(not in the repository yet) is meant to enforce the mechanical rules, with
+existing violations listed as a shrinking allowlist: rename an entry, then
+delete it from the list.
 
 ## User-visible text
 
@@ -52,8 +53,9 @@ allowlist: rename an entry, then delete it from the list.
 
 - Modules and packages use `snake_case`. Implementation lives in packages
   (#430). The repository root holds only entrypoints and project metadata;
-  `tests/test_repository_root_layout.py` rejects new root modules and lists
-  the legacy ones still waiting to move.
+  the planned check `tests/test_repository_root_layout.py` (not in the
+  repository yet) is meant to reject new root modules and list the legacy
+  ones still waiting to move.
 - Classes use `PascalCase`, functions and variables `snake_case`, constants
   `UPPER_SNAKE_CASE`.
 - Name a module after the capability it owns (`trace_manager`), never after a

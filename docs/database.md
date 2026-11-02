@@ -12,8 +12,8 @@ backend.
   in any environment.
 - SQLite (`logos_pro.db`) and PostgreSQL are not runtime modes. There is no
   PostgreSQL service, compose file, SQL migration or SQL driver to install.
-- `tests/test_sql_free_contract.py` keeps SQL driver imports and SQL connection
-  helpers out of the runtime.
+- SQL driver imports and SQL connection helpers stay out of the runtime. The
+  planned check `tests/test_sql_free_contract.py` is not in the repository yet.
 
 ## The store
 

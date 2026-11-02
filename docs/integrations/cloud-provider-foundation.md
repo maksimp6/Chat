@@ -51,8 +51,9 @@ can also be wired into an external cron/scheduler that calls it directly.
 ### e2e scenario: create → execute → delete
 
 This cannot run against the real Cloud.ru API in CI (no paid resources are created in
-CI); it is covered by mocked unit tests (`tests/test_cloudru_environment_adapter.py`,
-`tests/test_environment_adapters.py`, `tests/test_cloud_tools.py`) and documented here
+CI); the mocked unit tests meant to cover it (`tests/test_cloudru_environment_adapter.py`,
+`tests/test_environment_adapters.py`, `tests/test_cloud_tools.py`) are not in the
+repository yet, so it is documented here
 for manual verification against a real Cloud.ru project:
 
 1. Set `CLOUDRU_ENVIRONMENT_ENDPOINT`/`CLOUDRU_ENVIRONMENT_PATH` and Cloud.ru

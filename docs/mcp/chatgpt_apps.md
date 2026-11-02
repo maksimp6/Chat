@@ -84,7 +84,8 @@ For local development, expose the Flask service through a public HTTPS tunnel su
 
 ## Validation
 
-The contract is covered by `tests/test_chatgpt_mcp.py`, including:
+The planned check `tests/test_chatgpt_mcp.py` (not in the repository yet) is
+meant to cover the contract, including:
 
 - deterministic `tools/list`;
 - structured `tools/call` results;

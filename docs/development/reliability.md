@@ -85,8 +85,8 @@ let the error propagate to a caller that can report it.
 
 Python code is checked with `mypy --strict` (configured in `pyproject.toml`,
 with `no_site_packages` so results do not depend on installed packages;
-pinned in `requirements-dev.txt`). `tests/test_type_checking.py` is a ratchet
-with two rules:
+pinned in `requirements-dev.txt`). The planned ratchet
+`tests/test_type_checking.py` (not in the repository yet) has two rules:
 
 - the error count for each mypy error code may only go down;
 - files listed in `STRICT_CLEAN_FILES` have zero errors and must stay that way.

@@ -95,8 +95,8 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
 - `resolve_secret_management_value(db, purpose)` — тонкая обёртка поверх неё
   для существующей границы `provider_credentials.py`.
 
-Запрещено и проверено тестами (`tests/test_cloudru_secret_management.py`,
-`tests/test_provider_credentials_secret_management.py`):
+Запрещено (проверки `tests/test_cloudru_secret_management.py` и
+`tests/test_provider_credentials_secret_management.py` в репозитории пока нет):
 
 - обычный трейсируемый HTTP-клиент (`CloudRuClient.request`, тот же путь, что
   используют остальные Cloud.ru API) — `get_secret_value` намеренно его не
