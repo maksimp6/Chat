@@ -44,12 +44,28 @@ branch protection or production policy.
 Logos exposes metadata from the catalog first and loads the full body only for skills
 selected for one invocation. Do not automatically install remote/unreviewed skills.
 
-## 3D skills for Logos Pro
+## Repository rules
 
-- `3d-print-preflight`: import/check 3D assets, require real slicing, and
-  verify a single Bambu A1 mini `.gcode.3mf` with `printing3d.plate.inspect`.
-- `a1-mini-print-watch`: view print telemetry and one camera snapshot
-  through authorized read-only device connections, without controlling a job.
+Skills follow the repository's `AGENTS.md`. Where it forbids an action, a skill
+must not instruct it: no branches or pull requests for code changes (push directly
+to `develop`), and no writing or running of tests, typechecks or builds unless the
+owner explicitly asks. A skipped check is reported as `NOT_RUN`, never as passed.
+
+## Consolidated skills
+
+Related procedures share one skill. A mode named in its description selects the procedure.
+
+- `3d-printing`: preflight of a single Bambu A1 mini `.gcode.3mf`, read-only
+  print watch, and staged delivery evidence.
+- `failure-diagnosis`: first broken boundary behind a failure. Modes: invocation
+  and tool loop, settings that do not reach the provider request, MCP connection
+  and authorization, red CI, and TypeScript contract mismatch.
+- `change-delivery`: implement one issue and push it to `develop`, release and
+  Cloud.ru readiness on an exact commit, and read-only readiness of an existing PR.
+- `evidence-review`: documentation sync, privacy and compliance reconciliation,
+  durable-storage proof, security review of a change, and hardware evidence
+  bound to its archived verification.
+- `frontend-capability-audit` and `service-hypothesis-validation`: single-purpose.
 
 These roles expose procedures only. They do not create a missing slicer,
 root-owned service, printer authorization or access to another owner's

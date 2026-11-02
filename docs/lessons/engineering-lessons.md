@@ -16,7 +16,7 @@ Memory — данные и их жизненный цикл. Чат остаёт
 
 Существующие [AI pipeline](../architecture/ai-execution-pipeline.md),
 [Universal Tool Platform](../mcp/tools.md) и
-`../../.agents/skills/logos-runtime-debugging/SKILL.md`
+`../../.agents/skills/failure-diagnosis/SKILL.md`
 остаются каноническими. Usage/cost считает детерминированный код; текст модели
 может объяснять результат, но не становится расчётным источником.
 
@@ -35,7 +35,7 @@ H04: сохранение работало, но request assembler читал `a
 [chat boundary](../../chat/mcp_routes.py) и
 [request shaping](../../yandex_client_modules/request_mixin.py), а не переносить
 исторический диагноз без сверки. Новая процедура:
-[settings-payload-verification](../../.agents/skills/settings-payload-verification/SKILL.md).
+[failure-diagnosis](../../.agents/skills/failure-diagnosis/SKILL.md), режим settings.
 
 ## Checks, принятие и результат — отдельные доказательства
 
@@ -48,8 +48,8 @@ filters, условия jobs и фактическое имя завершивш
 Разделяйте код workflow, активацию ruleset, merge и deployment. Исторический
 запрос review или отказ из-за квоты не является проведённым review. Ручная
 проверка автора не становится независимым одобрением. Процедуры уже есть в
-[github-ci-diagnosis](../../.agents/skills/github-ci-diagnosis/SKILL.md) и
-[github-pr-readiness](../../.agents/skills/github-pr-readiness/SKILL.md).
+[failure-diagnosis](../../.agents/skills/failure-diagnosis/SKILL.md), режим CI, и
+[change-delivery](../../.agents/skills/change-delivery/SKILL.md), режим existing PR.
 
 H18/#1102: dependency diff review и полный аудит установленных пакетов решают
 разные задачи. Изменения manifest/lockfile должны выбирать нужные test suites.
@@ -75,7 +75,7 @@ H13: KiCad-архив содержит native inputs, netlist, ERC, PDF/SVG и m
 ERC — ноль errors/warnings/exclusions. Это учебная схема с идеальным RC расчётом.
 Наличие библиотеки ngspice не доказало наличие работающего simulator и
 подходящей NE555P модели. Подмена другим таймером не закрывала проверку.
-Процедура: [source-bound-circuit-verification](../../.agents/skills/source-bound-circuit-verification/SKILL.md).
+Процедура: [evidence-review](../../.agents/skills/evidence-review/SKILL.md), режим hardware.
 
 H14: manifold mesh из 296 triangles оказался недостаточно узнаваемым по
 реальному render; disconnected shells и nonmanifold edge остались blockers.

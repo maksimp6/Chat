@@ -114,7 +114,7 @@ kristall = "chat/message/<n>, chat/yandex/<id>, runtime_session:<sid>, runtime_i
 name = "Tools during the turn"
 ui = "results appear in the reply; MCP servers in static/settings/settings_modal.js"
 routes = ["POST /api/chat", "GET /api/mcp-servers"]
-backend = ["yandex_client_modules.mcp_mixin:YandexMcpMixin.ask_with_mcp", "chat.mcp_routes:handle_mcp_servers"]
+backend = ["yandex_client_modules.tools_mixin:YandexToolsMixin.ask_with_tools", "chat.mcp_routes:handle_mcp_servers"]
 units = ["yandex_client_modules", "tool_providers", "mcp_server", "agent_memory", "workspace", "storage", "kristall"]
 kristall = "mcp/server/*, global_fact:*"
 

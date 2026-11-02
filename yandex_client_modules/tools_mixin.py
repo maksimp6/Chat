@@ -1,4 +1,4 @@
-"""MCP mixin of the Responses client: requests with MCP and hosted tools (ask_with_mcp), including file search."""
+"""Tool-enabled Responses client requests, including MCP and hosted tools."""
 
 import json
 from typing import Any
@@ -91,7 +91,7 @@ FILE_SEARCH_ON_NOTE = (
     "содержит, так и скажи."
 )
 
-class YandexMcpMixin:
+class YandexToolsMixin:
     def _execute_single_tool(
         self, tc, all_servers, trace=None, *, execution_policy=None
     ):
@@ -226,7 +226,7 @@ class YandexMcpMixin:
             "timing": timing,
         }
 
-    def ask_with_mcp(
+    def ask_with_tools(
         self,
         message: Any,
         model_key: Any,

@@ -246,7 +246,7 @@ def _speechkit_turn(
     client = logos_client_type()(bound.Config)
     # Settings are global: the dialog turn takes every tool category.
     params = {"instructions": session.instructions} if session.instructions else {}
-    response = client.ask_with_mcp(
+    response = client.ask_with_tools(
         message=transcript,
         model_key=session.model,
         conversation_id=_provider_conversation_id(

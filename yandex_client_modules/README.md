@@ -1,6 +1,6 @@
 # `yandex_client_modules`
 
-The Yandex AI Studio client: the Responses API client with its request, polling, parsing, MCP, conversation and file mixins, the Realtime WebSocket and image-generation transports, hosted-tool settings, the API-key provider and a minimal SDK.
+The Yandex AI Studio client: the Responses API client with its request, polling, parsing, tools, conversation and file mixins, the Realtime WebSocket and image-generation transports, hosted-tool settings, the API-key provider and a minimal SDK.
 
 ## Role in a dialog
 
@@ -19,7 +19,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | Module | Purpose |
 | --- | --- |
 | [`yandex_client_modules.api_key_provider`](api_key_provider.py) | Concrete Yandex Cloud API-key provider used by the rotation worker. |
-| [`yandex_client_modules.client`](client.py) | The Yandex AI Studio Responses API client, assembled from the request, polling, conversation, MCP and file mixins. |
+| [`yandex_client_modules.client`](client.py) | The Yandex AI Studio Responses API client, assembled from the request, polling, conversation, tools and file mixins. |
 | [`yandex_client_modules.errors`](errors.py) | Errors raised by the Yandex client. |
 | [`yandex_client_modules.image_generation`](image_generation.py) | Alice AI ART through the synchronous OpenAI-compatible Yandex Images API. |
 | [`yandex_client_modules.realtime`](realtime.py) | Yandex Realtime WebSocket transport, with server-side credentials only. |

@@ -29,22 +29,22 @@ role-scoped выбору Logos**. Это отдельная будущая ин�
 | Триггер | Каноническая процедура | Происхождение и граница |
 | --- | --- | --- |
 | Проверить идею AI-сервиса до автоматизации | [service-hypothesis-validation](../../.agents/skills/service-hypothesis-validation/SKILL.md) | H01; планирование, не доказательство дохода |
-| Ошибка типов deferred promise или mock | [typed-async-contract-repair](../../.agents/skills/typed-async-contract-repair/SKILL.md) | H03; исторический успешный build, не текущий frontend Logos |
-| Настройки сохранены, но модель их игнорирует | [settings-payload-verification](../../.agents/skills/settings-payload-verification/SKILL.md) | H04; проверять каждый переход UI → payload |
-| MCP достижим, но tools/identity/scopes не работают | [mcp-authorization-diagnosis](../../.agents/skills/mcp-authorization-diagnosis/SKILL.md) | H06–H08; старые PR не выдавать за shipped |
-| Нужно доказать durability, restore или cutover | [durable-storage-evidence](../../.agents/skills/durable-storage-evidence/SKILL.md) | H12; контракт отдельно от миграции |
-| Конфиг, deployment и фактическое состояние расходятся | [deployment-evidence-review](../../.agents/skills/deployment-evidence-review/SKILL.md) | H09, H11; read-only проверка evidence, не deploy |
-| Документы privacy расходятся с кодом | [compliance-evidence-reconciliation](../../.agents/skills/compliance-evidence-reconciliation/SKILL.md) | H10; инженерная проверка, не правовое заключение |
-| Нужно архивировать проверяемую редактируемую схему | [source-bound-circuit-verification](../../.agents/skills/source-bound-circuit-verification/SKILL.md) | H13; ERC не заменяет SPICE и стенд |
-| Надо передать модель/слайс/готовый файл без ложного успеха | [3d-artifact-handoff](../../.agents/skills/3d-artifact-handoff/SKILL.md) | H14–H16; стадии и реальные байты отдельно |
+| Ошибка типов deferred promise или mock | [failure-diagnosis](../../.agents/skills/failure-diagnosis/SKILL.md), режим TypeScript | H03; исторический успешный build, не текущий frontend Logos |
+| Настройки сохранены, но модель их игнорирует | [failure-diagnosis](../../.agents/skills/failure-diagnosis/SKILL.md), режим settings | H04; проверять каждый переход UI → payload |
+| MCP достижим, но tools/identity/scopes не работают | [failure-diagnosis](../../.agents/skills/failure-diagnosis/SKILL.md), режим MCP | H06–H08; старые PR не выдавать за shipped |
+| Нужно доказать durability, restore или cutover | [evidence-review](../../.agents/skills/evidence-review/SKILL.md), режим durable storage | H12; контракт отдельно от миграции |
+| Конфиг, deployment и фактическое состояние расходятся | [change-delivery](../../.agents/skills/change-delivery/SKILL.md), режим release | H09, H11; read-only проверка evidence, не deploy |
+| Документы privacy расходятся с кодом | [evidence-review](../../.agents/skills/evidence-review/SKILL.md), режим compliance | H10; инженерная проверка, не правовое заключение |
+| Нужно архивировать проверяемую редактируемую схему | [evidence-review](../../.agents/skills/evidence-review/SKILL.md), режим hardware | H13; ERC не заменяет SPICE и стенд |
+| Надо передать модель/слайс/готовый файл без ложного успеха | [3d-printing](../../.agents/skills/3d-printing/SKILL.md) | H14–H16; стадии и реальные байты отдельно |
 | Требуется найти недостающие взаимодействия UI | [frontend-capability-audit](../../.agents/skills/frontend-capability-audit/SKILL.md) | H02, H17 и текущий аудит; UI/backend/PR/deploy отдельно |
-| Добавляются агенты, модели или tools | [Архитектурный урок](engineering-lessons.md#architecture) + [issue-to-pr](../../.agents/skills/issue-to-pr/SKILL.md) | H02; продолжать существующую архитектуру |
-| Расходятся invocation/session/trace IDs | `../../.agents/skills/logos-runtime-debugging/SKILL.md` | H05; один request-scoped контекст |
-| PR завис или старое зелёное CI не соответствует head | [github-pr-readiness](../../.agents/skills/github-pr-readiness/SKILL.md), [github-ci-diagnosis](../../.agents/skills/github-ci-diagnosis/SKILL.md) | H07, H18; точный head и события workflow |
-| Нужна проверка release/deployment evidence | [release-readiness](../../.agents/skills/release-readiness/SKILL.md), [cloudru-change](../../.agents/skills/cloudru-change/SKILL.md) | H09, H11; новый навык дополняет проверкой происхождения артефакта |
-| Утечки, неверные scopes или доверие к внешним данным | [security-review](../../.agents/skills/security-review/SKILL.md) | H08, H14; конкретный trust boundary |
-| Устарели документация или статусы | [docs-sync](../../.agents/skills/docs-sync/SKILL.md) | Все строки; metadata и код важнее старой прозы |
-| Нужен offline preflight или наблюдение печати | [PR #1109](https://github.com/maksimp6/Chat/pull/1109) | H16; существующие draft-пакеты `3d-print-preflight` и `a1-mini-print-watch` здесь не копируются |
+| Добавляются агенты, модели или tools | [Архитектурный урок](engineering-lessons.md#architecture) + [change-delivery](../../.agents/skills/change-delivery/SKILL.md) | H02; продолжать существующую архитектуру |
+| Расходятся invocation/session/trace IDs | [failure-diagnosis](../../.agents/skills/failure-diagnosis/SKILL.md), режим invocation | H05; один request-scoped контекст |
+| PR завис или старое зелёное CI не соответствует head | [failure-diagnosis](../../.agents/skills/failure-diagnosis/SKILL.md), режим CI, и [change-delivery](../../.agents/skills/change-delivery/SKILL.md), режим existing PR | H07, H18; точный head и события workflow |
+| Нужна проверка release/deployment evidence | [change-delivery](../../.agents/skills/change-delivery/SKILL.md), режим release | H09, H11; проверка происхождения артефакта и Cloud.ru-изменений |
+| Утечки, неверные scopes или доверие к внешним данным | [evidence-review](../../.agents/skills/evidence-review/SKILL.md), режим security | H08, H14; конкретный trust boundary |
+| Устарели документация или статусы | [evidence-review](../../.agents/skills/evidence-review/SKILL.md), режим docs | Все строки; metadata и код важнее старой прозы |
+| Нужен offline preflight или наблюдение печати | [3d-printing](../../.agents/skills/3d-printing/SKILL.md) | H16; предыдущие draft-пакеты [PR #1109](https://github.com/maksimp6/Chat/pull/1109) объединены в один навык |
 
 ## Источники и покрытие истории
 

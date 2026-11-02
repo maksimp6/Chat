@@ -140,7 +140,7 @@ def _ask(client, prompt: str, trace, result: dict[str, Any], params: dict) -> No
     enforce_native_launch_hold()
     conversation_id = client.create_conversation(trace)["id"]
     result["conversation_id"] = conversation_id
-    response = client.ask_with_mcp(
+    response = client.ask_with_tools(
         message=prompt,
         model_key=DEFAULT_MODEL,
         conversation_id=conversation_id,

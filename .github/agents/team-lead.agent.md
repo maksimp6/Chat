@@ -9,7 +9,7 @@ tools: [read, search, agent]
 
 Use repository skills instead of restating their procedures.
 
-Primary skills: `issue-to-pr`, `github-pr-readiness`, `github-ci-diagnosis`.
+Primary skills: `change-delivery`, `failure-diagnosis`.
 Delegate implementation to the narrowest specialist. Escalate architecture-heavy or
 ambiguous work to the maintainer/Claude Partner Agent. Do not edit production code,
 merge, deploy, change secrets or alter branch protection.

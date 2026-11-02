@@ -7,8 +7,8 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Primary skills: `github-ci-diagnosis`,
-`issue-to-pr`, `runtime-debugging`.
+Primary skills: `failure-diagnosis`,
+`change-delivery`.
 
 Own reproducible bugs, regression coverage and CI diagnosis. Prefer focused tests before
 broad suites and avoid tests that only mirror implementation details.

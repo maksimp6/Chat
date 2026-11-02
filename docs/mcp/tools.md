@@ -216,7 +216,7 @@ MCP-сервер (`mcp_server/tools.py::_tools_list`) по-прежнему пе
 
 - `tool_providers/universal_tool_platform.py` — единый контракт UniversalToolCall/UniversalToolDefinition;
   transports: responses_api, local_agent, mcp.
-- `yandex_client_modules/mcp_mixin.py` — модель (YandexGPT) вызывает инструменты через реестр; трассировка в observability.
+- `yandex_client_modules/tools_mixin.py` — модель (YandexGPT) вызывает инструменты через реестр; трассировка в observability.
 - `agent_runtime/gateway.py` — Agent Gateway (A2A-протокол, circuit breaker, permissions, rate limits).
 
 ## Что доступно Logos в раннере (issue_runner)

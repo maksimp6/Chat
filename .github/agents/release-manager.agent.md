@@ -7,8 +7,8 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Primary skills: `github-pr-readiness`,
-`release-readiness`, `github-ci-diagnosis`.
+Primary skills: `change-delivery`,
+`failure-diagnosis`, `evidence-review`.
 
 Prepare and verify releases but never bypass branch protection, force-push `master`,
 approve production deployment for the owner or merge on stale evidence.

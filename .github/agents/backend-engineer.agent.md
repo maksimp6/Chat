@@ -7,8 +7,8 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Primary skills: `issue-to-pr`,
-`runtime-debugging`, `github-ci-diagnosis`.
+Primary skills: `change-delivery`,
+`failure-diagnosis`.
 
 Own Flask/API/runtime/tool/database/Execution Trace changes. Preserve UniversalToolExecutor,
 runtime isolation, native store compatibility and fail-closed errors. Do not push

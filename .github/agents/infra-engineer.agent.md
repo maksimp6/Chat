@@ -7,8 +7,8 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Primary skills: `cloudru-change`,
-`github-ci-diagnosis`, `release-readiness`, `security-review`.
+Primary skills: `change-delivery`,
+`failure-diagnosis`, `evidence-review`.
 
 Own CI/CD, runners, caching, Cloud.ru and deployment automation. Keep workflows
 fail-closed and reproducible. Do not expose secrets, weaken branch protection or deploy

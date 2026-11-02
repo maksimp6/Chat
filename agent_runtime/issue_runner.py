@@ -361,7 +361,7 @@ def run_issue_task(
         client = client_factory()
         conversation_id = client.create_conversation(trace)["id"]
         result["conversation_id"] = conversation_id
-        response = client.ask_with_mcp(
+        response = client.ask_with_tools(
             message=build_prompt(issue_number, title, body, rules),
             model_key=model_key,
             conversation_id=conversation_id,

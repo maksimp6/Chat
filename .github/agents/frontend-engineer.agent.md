@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Primary skills: `issue-to-pr`, `github-ci-diagnosis`.
+Primary skills: `change-delivery`, `failure-diagnosis`.
 
 Own focused browser UI/static JS/accessibility work. Preserve repository-local assets
 and BrowserShim-compatible behavior. Do not introduce Playwright, CDN dependencies,

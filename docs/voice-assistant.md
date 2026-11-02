@@ -72,7 +72,7 @@ as though non-execution were proven. The SpeechKit pipeline retains the existing
 text-model quota/tool path without another Realtime reservation. Realtime's
 single-turn adapter does not currently expose tools; provider support and runtime
 tool support are separate. Text-model microphone requests retain the normal
-`ask_with_mcp` executor and conversation settings rather than substituting a model.
+`ask_with_tools` executor and conversation settings rather than substituting a model.
 
 Each endpoint verifies the session owner and the existing conversation access
 policy. The worker checks conversation access before loading history and before

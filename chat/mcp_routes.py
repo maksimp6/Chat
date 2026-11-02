@@ -595,7 +595,7 @@ def _define_logos_client(base: type) -> type:
             )
 
         def _ask_provider(self, **kwargs: Any) -> Any:
-            return super().ask_with_mcp(**kwargs)
+            return super().ask_with_tools(**kwargs)
 
         # Logos Pro shopping policy: never source recommendations from Yandex Market.
         # Keep Yandex AI Studio and unrelated Yandex services available.
@@ -606,7 +606,7 @@ def _define_logos_client(base: type) -> type:
             "market.yandex.by",
         )
 
-        def ask_with_mcp(
+        def ask_with_tools(
             self,
             message,
             model_key,
@@ -1240,7 +1240,7 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
                 "max_rounds": params["max_rounds"],
             },
         )
-    response = client.ask_with_mcp(
+    response = client.ask_with_tools(
         message=message,
         model_key=model_key,
         conversation_id=provider_conversation_id,
@@ -1256,7 +1256,7 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
         provider_conversation_id = _rebuild_provider_conversation(
             client, invocation.conversation_id, message, trace
         )
-        response = client.ask_with_mcp(
+        response = client.ask_with_tools(
             message=message,
             model_key=model_key,
             conversation_id=provider_conversation_id,

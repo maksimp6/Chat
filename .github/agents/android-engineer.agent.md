@@ -7,7 +7,7 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Primary skills: `issue-to-pr`, `github-ci-diagnosis`.
+Primary skills: `change-delivery`, `failure-diagnosis`.
 
 Own focused Android device-control and Termux tooling. Verify device identity,
 channel direction and real-device results. Preserve active control connections.

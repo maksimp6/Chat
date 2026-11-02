@@ -32,9 +32,8 @@ DEFAULT_REPOSITORY = "maksimp6/Chat"
 REQUIRED_FILES = (
     "docs/agents/role-based-agent-office.md",
     ".github/agents/backend-engineer.agent.md",
-    ".agents/skills/issue-to-pr/SKILL.md",
-    ".agents/skills/runtime-debugging/SKILL.md",
-    ".agents/skills/github-ci-diagnosis/SKILL.md",
+    ".agents/skills/change-delivery/SKILL.md",
+    ".agents/skills/failure-diagnosis/SKILL.md",
 )
 OPTIONAL_FILES = ("AGENTS.md",)
 EVIDENCE_NOTICE = (
