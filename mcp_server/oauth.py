@@ -72,8 +72,30 @@ def _http_json(method: str, url: str, *, data: dict[str, Any] | None = None, for
     return parsed
 
 
+def _https(url: Any) -> bool:
+    """Only https URLs with a host are fetched from metadata (RFC 9728 §7, RFC 8414 §2)."""
+    if not isinstance(url, str):
+        return False
+    parts = urlsplit(url)
+    return parts.scheme == "https" and bool(parts.hostname)
+
+
+def _resource_matches(resource: Any, server_url: str) -> bool:
+    """RFC 9728 §3.3: the advertised resource must be the server being accessed —
+    same origin, and the server's path within the resource's path."""
+    if not _https(resource):
+        return False
+    if _origin(resource) != _origin(server_url):
+        return False
+    resource_path = urlsplit(resource).path.rstrip("/")
+    server_path = urlsplit(server_url).path.rstrip("/")
+    return server_path == resource_path or server_path.startswith(resource_path + "/")
+
+
 def _try_json(url: str) -> dict[str, Any] | None:
     """The JSON object at ``url``, or ``None`` when it is absent or unreadable."""
+    if not _https(url):
+        return None
     try:
         return _http_json("GET", url)
     except OAuthError:
@@ -92,6 +114,7 @@ def _challenge_metadata_url(server_url: str) -> str | None:
             return None
     except urllib.error.HTTPError as error:
         header = error.headers.get("WWW-Authenticate") if error.headers else None
+        error.close()
     except (urllib.error.URLError, OSError, ValueError):
         return None
     if not header:
@@ -115,7 +138,12 @@ def _protected_resource(server_url: str) -> dict[str, Any] | None:
     candidates.append(origin + "/.well-known/oauth-protected-resource")
     for url in candidates:
         meta = _try_json(url)
-        if meta and isinstance(meta.get("authorization_servers"), list) and meta["authorization_servers"]:
+        if (
+            meta
+            and isinstance(meta.get("authorization_servers"), list)
+            and meta["authorization_servers"]
+            and _resource_matches(meta.get("resource"), server_url)
+        ):
             return meta
     return None
 
@@ -156,7 +184,7 @@ def discover(server_url: str) -> dict[str, Any]:
     if resource_meta is not None:
         meta = None
         for issuer in resource_meta["authorization_servers"]:
-            if isinstance(issuer, str) and issuer:
+            if _https(issuer):
                 try:
                     meta = _authorization_server(issuer)
                 except OAuthError:
@@ -165,9 +193,8 @@ def discover(server_url: str) -> dict[str, Any]:
                     break
         if meta is None:
             raise OAuthError("Сервер авторизации MCP-сервера не отдаёт метаданные OAuth")
-        resource = resource_meta.get("resource")
         meta = dict(meta)
-        meta["resource"] = resource if isinstance(resource, str) and resource else origin
+        meta["resource"] = resource_meta["resource"]
         meta["resource_scopes"] = [s for s in resource_meta.get("scopes_supported") or [] if isinstance(s, str)]
         return meta
     meta = _http_json("GET", origin + "/.well-known/oauth-authorization-server")
