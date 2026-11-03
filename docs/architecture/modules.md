@@ -204,6 +204,7 @@ flowchart LR
     steel[steel]
     storage[storage]
     tool_providers[tool_providers]
+    vector_db[vector_db]
     web_shell[web_shell]
     workspace[workspace]
     yandex_client_modules[yandex_client_modules]

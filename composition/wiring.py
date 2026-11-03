@@ -912,6 +912,14 @@ def _tool_providers():
     )
 
 
+def _vector_db():
+    from vector_db import host
+    from yandex_client_modules.embeddings import embed_texts
+    from storage.records import get_store
+
+    return host.Host(embed_texts=embed_texts, get_store=get_store)
+
+
 def _web_shell():
     from web_shell import host
     from kristall import KristallError
@@ -1037,6 +1045,7 @@ _HOSTS = {
     "sessions": ("sessions.host", _sessions),
     "storage": ("storage.host", _storage),
     "tool_providers": ("tool_providers.host", _tool_providers),
+    "vector_db": ("vector_db.host", _vector_db),
     "web_shell": ("web_shell.host", _web_shell),
     "workspace": ("workspace.host", _workspace),
     "yandex_client_modules": ("yandex_client_modules.host", _yandex_client_modules),

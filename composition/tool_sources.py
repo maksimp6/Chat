@@ -67,6 +67,12 @@ def _rag_tools():
     return RAG_TOOLS
 
 
+def _vector_tools():
+    from vector_db.tools import VECTOR_TOOLS
+
+    return VECTOR_TOOLS
+
+
 def _ssl_tools():
     from tool_providers.ssl_server import SSL_TOOLS
 
@@ -85,5 +91,6 @@ SOURCES = (
     ("tty", _tty_tools, "TTY", Exception),
     ("court", _court_tools, "Court", Exception),
     ("rag", _rag_tools, "Repository knowledge", Exception),
+    ("vectors", _vector_tools, "Vector database", Exception),
     ("ssl", _ssl_tools, "SSL server", Exception),
 )

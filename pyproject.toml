@@ -240,6 +240,7 @@ copies = [
     "court/_binding.py",
     "economy/_binding.py",
     "rag_sync/_binding.py",
+    "vector_db/_binding.py",
     "forge/_binding.py",
     "invocation/_binding.py",
     "scripts/_logos_knowledge_binding.py",

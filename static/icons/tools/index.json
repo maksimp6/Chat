@@ -169,6 +169,7 @@
   "tty_read": "terminal",
   "tty_resize": "terminal",
   "tty_write": "terminal",
+  "vectors": "stack",
   "wikipedia": "search",
   "wikipedia_search": "search",
   "wikipedia_summary": "search",
