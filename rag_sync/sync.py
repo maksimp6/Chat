@@ -101,6 +101,9 @@ class _Writer:
             )
             self.totals["embedded_chunks"] += embedded["chunks"]
             self.totals["embedding_tokens"] += embedded["tokens"]
+            self.totals["embedded_records"] = self.totals.get("embedded_records", 0) + 1
+            # The state shows every embedded record: a first pack of 4 MiB takes many requests.
+            _set_state(totals=dict(self.totals), stage=f"{self.kind}: embedding pack {self.part + 1}")
         self.part += 1
         name = f"{PREFIX}{self.kind}-{self.stamp}-{self.part:03d}.md"
         body = (f"# {self.kind} · {github_source.repository()}\n\n" + _SEPARATOR.join(self.parts) + "\n").encode()
@@ -130,6 +133,7 @@ def _sync_git(client, store_id: str, ledger: dict, totals: dict) -> None:
     since = ledger["cursors"].get("git")
     for sha, text, masked in git_source.records(root, since):
         totals["masked"] += masked
+        totals["read_records"] = totals.get("read_records", 0) + 1
         writer.add(sha, sha, text)
     writer.flush()
 
