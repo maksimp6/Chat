@@ -9,13 +9,25 @@ from vector_db import store
 __all__ = ["VECTOR_TOOLS"]
 
 
+def _trace_of(cfg) -> Any:
+    """The execution trace of the tool call (the turn's trace), if the executor passed one."""
+    context = cfg.get("_universal_context") if isinstance(cfg, dict) else None
+    call = context.get("call") if isinstance(context, dict) else None
+    metadata = getattr(call, "metadata", None)
+    return metadata.get("execution_trace") if isinstance(metadata, dict) else None
+
+
 def _add(args, cfg=None):
-    return {"success": True, **store.add(args.get("collection"), args.get("text"), args.get("id"), args.get("metadata"))}
+    return {"success": True, **store.add(
+        args.get("collection"), args.get("text"), args.get("id"), args.get("metadata"), trace=_trace_of(cfg)
+    )}
 
 
 def _search(args, cfg=None):
     k = args.get("k")
-    return {"success": True, **store.search(args.get("query"), args.get("collection"), None if k is None else int(k))}
+    return {"success": True, **store.search(
+        args.get("query"), args.get("collection"), None if k is None else int(k), trace=_trace_of(cfg)
+    )}
 
 
 def _delete(args, cfg=None):

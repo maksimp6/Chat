@@ -2,9 +2,15 @@
 
 The app's own vector database: texts are embedded by the Yandex embeddings API (`yandex_client_modules.embeddings.embed_texts`) and kept and searched on the server, in the Kristall store. No provider Vector Store is involved.
 
-**Add.** `vector_db.store.add(collection, text, doc_id=None, metadata=None)` splits the text into chunks (paragraphs joined up to `CHUNK_CHARS` = 2000 characters, a longer paragraph cut at that size), embeds every chunk with the document model (`text-search-doc`) and keeps it as `vector_db/<collection>/<doc id>/<chunk>` with its text, metadata and vector. The same id replaces the document; without an id the text's hash is the id.
+**Two models.** Stored chunks are embedded with the document model `text-embeddings-v2-doc`, queries with the query model `text-embeddings-v2-query` (the provider's pair made to be compared), both at 768 dimensions, their largest size. A search compares only chunks of the document model at the query's size.
 
-**Search.** `search(query, collection=None, k=None)` embeds the query with the query model (`text-search-query`, the pair made to be compared with the document model) and ranks every chunk of the collection (of every collection when none is named) by cosine similarity; without `k` every chunk is returned, best first.
+**Kristall has no search.** It is a key/value store with prefix listing; a search reads every chunk of the asked collections and ranks them by cosine similarity in this unit.
+
+**Traces.** Every `add` and `search` passes the tool call's execution trace to `embed_texts` (the provider key is recorded there) and writes an event: `vector_db_add` (collection, id, chunks, tokens, model, dimensions) and `vector_db_search` (collection, chunks searched, results, top score, tokens, model).
+
+**Add.** `vector_db.store.add(collection, text, doc_id=None, metadata=None, trace=None)` splits the text into chunks (paragraphs joined up to `CHUNK_CHARS` = 2000 characters, a longer paragraph cut at that size), embeds every chunk with the document model and keeps it as `vector_db/<collection>/<doc id>/<chunk>` with its text, metadata and vector. The same id replaces the document; without an id the text's hash is the id.
+
+**Search.** `search(query, collection=None, k=None, trace=None)` embeds the query with the query model and ranks every chunk of the collection (of every collection when none is named) by cosine similarity; without `k` every chunk is returned, best first.
 
 **Cost.** Every embedded text is one paid provider request; each call returns the tokens it spent.
 

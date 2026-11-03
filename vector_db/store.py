@@ -1,12 +1,16 @@
 """Collections of texts with their embeddings, kept in the Kristall store and searched by cosine similarity.
 
-A text is split into chunks (paragraphs joined up to CHUNK_CHARS characters, a longer
-paragraph cut at that size), every chunk is embedded with the document model
-(``text-search-doc``) and kept as ``vector_db/<collection>/<doc id>/<chunk>`` with its
-text, metadata and vector. A query is embedded with the query model
-(``text-search-query``), the pair the provider made to be compared, and every chunk of
-the asked collections is ranked by cosine similarity. Every embedded text is one paid
-provider request; the tokens spent are returned with each call.
+Two models, the provider's pair made to be compared: every stored chunk is embedded
+with the document model (DOC_MODEL, ``text-embeddings-v2-doc``), every query with the
+query model (QUERY_MODEL, ``text-embeddings-v2-query``), both at their largest size
+(DIMENSIONS, 768). A text is split into chunks (paragraphs joined up to CHUNK_CHARS
+characters, a longer paragraph cut at that size) kept as
+``vector_db/<collection>/<doc id>/<chunk>`` with text, metadata, vector and model.
+
+Kristall is a key/value store with prefix listing and no search of its own: a search
+reads every chunk of the asked collections and ranks them by cosine similarity here.
+Every embedded text is one paid provider request; each call returns the tokens spent
+and writes an event into the caller's execution trace.
 """
 
 from __future__ import annotations
@@ -25,6 +29,9 @@ PREFIX = "vector_db/"
 CHUNK_CHARS = 2000
 # Texts sent in one embed_texts call (its whole-call budget is 60 s).
 BATCH = 16
+DOC_MODEL = "text-embeddings-v2-doc"
+QUERY_MODEL = "text-embeddings-v2-query"
+DIMENSIONS = 768
 
 
 def _name(value: str, what: str) -> str:
@@ -52,28 +59,36 @@ def chunks(text: str) -> list[str]:
     return parts
 
 
-def _embed(texts: list[str], mode: str) -> tuple[list[list[float]], int, str]:
-    vectors, tokens, model = [], 0, ""
+def _embed(texts: list[str], model: str, trace: Any) -> tuple[list[list[float]], int, str]:
+    vectors, tokens = [], 0
     for start in range(0, len(texts), BATCH):
-        result = embed_texts(texts[start : start + BATCH], mode=mode)
+        result = embed_texts(
+            texts[start : start + BATCH], model=model, dimensions=DIMENSIONS, trace=trace
+        )
         vectors += result["vectors"]
         tokens += int(result.get("tokens") or 0)
-        model = result.get("model") or model
     return vectors, tokens, model
+
+
+def _trace(trace: Any, event: str, payload: dict[str, Any]) -> None:
+    if trace is not None and hasattr(trace, "add_event"):
+        trace.add_event(event, payload)
 
 
 def _doc_prefix(collection: str, doc_id: str) -> str:
     return f"{PREFIX}{collection}/{doc_id}/"
 
 
-def add(collection: str, text: str, doc_id: str | None = None, metadata: dict | None = None) -> dict[str, Any]:
+def add(
+    collection: str, text: str, doc_id: str | None = None, metadata: dict | None = None, trace: Any = None
+) -> dict[str, Any]:
     """Embed ``text`` into ``collection``; a document with the same id is replaced."""
     collection = _name(collection, "collection")
     if not isinstance(text, str) or not text.strip():
         raise ValueError("text must be a non-empty string")
     doc_id = _name(doc_id, "id") if doc_id else hashlib.sha256(text.encode()).hexdigest()[:24]
     parts = chunks(text)
-    vectors, tokens, model = _embed(parts, "doc")
+    vectors, tokens, model = _embed(parts, DOC_MODEL, trace)
     store = get_store()
     old = store.items(prefix=_doc_prefix(collection, doc_id))
     now = int(time.time())
@@ -86,9 +101,13 @@ def add(collection: str, text: str, doc_id: str | None = None, metadata: dict | 
             tx.set(
                 f"{_doc_prefix(collection, doc_id)}{index:05d}",
                 {"collection": collection, "id": doc_id, "chunk": index, "text": part,
-                 "metadata": metadata or {}, "vector": vector, "model": model, "at": now},
+                 "metadata": metadata or {}, "vector": vector, "model": model,
+                 "dimensions": len(vector), "at": now},
             )
-    return {"collection": collection, "id": doc_id, "chunks": len(parts), "tokens": tokens, "model": model}
+    result = {"collection": collection, "id": doc_id, "chunks": len(parts), "tokens": tokens,
+              "model": model, "dimensions": DIMENSIONS}
+    _trace(trace, "vector_db_add", result)
+    return result
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -97,22 +116,32 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / norm if norm else 0.0
 
 
-def search(query: str, collection: str | None = None, k: int | None = None) -> dict[str, Any]:
+def search(query: str, collection: str | None = None, k: int | None = None, trace: Any = None) -> dict[str, Any]:
     """Chunks ranked by meaning; every collection when none is named, every match when no ``k``."""
     if not isinstance(query, str) or not query.strip():
         raise ValueError("query must be a non-empty string")
     prefix = PREFIX + (_name(collection, "collection") + "/" if collection else "")
-    (vector,), tokens, model = _embed([query], "query")
+    (vector,), tokens, model = _embed([query], QUERY_MODEL, trace)
     hits = []
     for record in get_store().items(prefix=prefix).values():
-        if isinstance(record, dict) and isinstance(record.get("vector"), list):
+        # Only chunks embedded by the paired document model at the same size are comparable.
+        if (
+            isinstance(record, dict)
+            and record.get("model") == DOC_MODEL
+            and isinstance(record.get("vector"), list)
+            and len(record["vector"]) == len(vector)
+        ):
             hits.append(
                 {"score": round(_cosine(vector, record["vector"]), 6),
                  **{key: record.get(key) for key in ("collection", "id", "chunk", "text", "metadata")}}
             )
     hits.sort(key=lambda hit: hit["score"], reverse=True)
-    return {"results": hits if k is None else hits[: max(0, int(k))], "searched": len(hits),
-            "tokens": tokens, "model": model}
+    results = hits if k is None else hits[: max(0, int(k))]
+    _trace(trace, "vector_db_search", {
+        "collection": collection, "searched": len(hits), "results": len(results),
+        "top_score": results[0]["score"] if results else None, "tokens": tokens, "model": model,
+    })
+    return {"results": results, "searched": len(hits), "tokens": tokens, "model": model}
 
 
 def delete(collection: str, doc_id: str) -> dict[str, Any]:
