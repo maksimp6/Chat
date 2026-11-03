@@ -33,13 +33,13 @@ def newline_text(value: bytes) -> str:
 
 
 def read_output(
-    proc: subprocess.Popen[bytes], timeout: float, limit: int
+    proc: subprocess.Popen[bytes], timeout: float | None, limit: int
 ) -> tuple[bytes, bytes]:
     """Read stdout and stderr to the end and wait for the process, keeping the first ``limit`` bytes of each.
 
     On POSIX the rest is read and dropped, so a large output neither fills memory nor blocks the
     pipe. A deadline passed while reading raises TimeoutExpired with the bytes kept so far, as
-    communicate() does.
+    communicate() does. ``timeout=None`` waits for the process without a deadline.
     Elsewhere pipes cannot be polled, and communicate() reads the output.
     """
     if os.name != "posix":
@@ -47,13 +47,16 @@ def read_output(
     # Callers open both pipes; the contract above reads stdout and stderr.
     stdout_pipe = cast("IO[bytes]", proc.stdout)
     stderr_pipe = cast("IO[bytes]", proc.stderr)
-    deadline = time.monotonic() + timeout
+    deadline = None if timeout is None else time.monotonic() + timeout
+
+    def left() -> float | None:
+        return None if deadline is None else deadline - time.monotonic()
     kept = {stdout_pipe.fileno(): bytearray(), stderr_pipe.fileno(): bytearray()}
     with selectors.DefaultSelector() as selector:
         for fd in kept:
             selector.register(fd, selectors.EVENT_READ)
-        while selector.get_map() and time.monotonic() < deadline:
-            for key, _events in selector.select(deadline - time.monotonic()):
+        while selector.get_map() and (deadline is None or time.monotonic() < deadline):
+            for key, _events in selector.select(left()):
                 chunk = os.read(key.fd, 65536)
                 if not chunk:
                     selector.unregister(key.fd)
@@ -64,7 +67,8 @@ def read_output(
     stderr = bytes(kept[stderr_pipe.fileno()])
     if not timed_out:
         try:
-            proc.wait(timeout=max(0.0, deadline - time.monotonic()))
+            remaining = left()
+            proc.wait(timeout=None if remaining is None else max(0.0, remaining))
         except subprocess.TimeoutExpired as exc:
             # As communicate() does: a timeout after both pipes closed carries no output.
             exc.timeout = timeout

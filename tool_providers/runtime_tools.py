@@ -96,10 +96,12 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     if not command:
         raise ValueError("Command is required")
 
+    # No application limit (AGENTS.md, #1722): without timeout_seconds, or with 0, the
+    # command runs until it ends; a positive timeout_seconds is the caller's own deadline.
     raw_timeout = args.get("timeout_seconds")
-    timeout = 30.0 if raw_timeout is None else float(raw_timeout)
-    if not math.isfinite(timeout) or timeout < 1 or timeout > 300:
-        raise ValueError("timeout_seconds must be between 1 and 300")
+    timeout = None if raw_timeout in (None, 0) else float(raw_timeout)
+    if timeout is not None and (not math.isfinite(timeout) or timeout <= 0):
+        raise ValueError("timeout_seconds must be a positive number, 0 or null (no limit)")
 
     raw_cwd = args.get("cwd")
     cwd = os.path.abspath(os.path.expanduser(str(raw_cwd))) if raw_cwd else os.getcwd()
@@ -398,7 +400,7 @@ RUNTIME_TOOLS = {
                 },
                 "timeout_seconds": {
                     "anyOf": [
-                        {"type": "number", "minimum": 1, "maximum": 300},
+                        {"type": "number", "minimum": 0},
                         {"type": "null"},
                     ]
                 },
