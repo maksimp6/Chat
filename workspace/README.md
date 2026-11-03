@@ -1,4 +1,6 @@
-# `workspace`
+# Nakeri
+
+`workspace` · Serves user files, vector stores, uploads and a project tree.
 
 The workspace HTTP API: Files and Vector Stores, and a bounded project tree.
 

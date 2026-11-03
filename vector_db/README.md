@@ -1,4 +1,6 @@
-# `vector_db`
+# Remuza
+
+`vector_db` · Embeds texts with Yandex models and searches them by meaning.
 
 The app's own vector database: texts are embedded by the Yandex embeddings API (`yandex_client_modules.embeddings.embed_texts`) and kept and searched on the server, in the Kristall store. No provider Vector Store is involved.
 

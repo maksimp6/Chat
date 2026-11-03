@@ -1,4 +1,6 @@
-# `conversations`
+# Gebato
+
+`conversations` · Tracks conversation ownership, titles, models, settings and deletion.
 
 Conversations: ownership records of shared local conversations, helpers for creating Yandex conversations, and the HTTP API of one conversation (title, model, deletion and dialog settings).
 

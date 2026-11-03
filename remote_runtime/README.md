@@ -1,4 +1,6 @@
-# `remote_runtime`
+# Jolara
+
+`remote_runtime` · Runs branch environments and commands as Linux users over SSH.
 
 Remote runtimes: the branch-aware application environment control plane and its REST API, and the SSH runtime (execution as configured Linux users, its settings policy and HTTP API).
 

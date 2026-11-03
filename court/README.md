@@ -1,4 +1,6 @@
-# `court`
+# Veridu
+
+`court` · Opens GitHub cases for errors and censors rule-breaking replies.
 
 Logos Court: every error becomes a case, every dialog can be judged, and the owner decides in the hall of hearings.
 

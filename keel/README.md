@@ -1,4 +1,6 @@
-# `keel`
+# Derako
+
+`keel` · Reconciles deployments with cloud state, plus health checks and recovery.
 
 Keel Platform: configuration management and reconciliation. It validates the desired state, observes reality through providers (Cloud.ru, DNS, storage), plans and applies actions and recovers from failures.
 

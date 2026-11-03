@@ -1,4 +1,6 @@
-# `identity`
+# Oriselo
+
+`identity` · Placeholder for the local installation's identity; no modules yet.
 
 Namespace of the local installation's identity. Visitor sign-in has been removed; it holds no modules.
 

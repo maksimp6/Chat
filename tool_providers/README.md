@@ -1,4 +1,6 @@
-# `tool_providers`
+# Fenaro
+
+`tool_providers` · Tool contracts, a policy-checked execution pipeline and built-in tool sources.
 
 The tool platform: provider-agnostic tool contracts and the execution pipeline, the shared tool registry, and the built-in tool sources (git, Termux, system, filesystem, Wikipedia, profiler, theme, SSH runtime, PTY terminal sessions, cache) with JSON Schema helpers and the read-only policy.
 

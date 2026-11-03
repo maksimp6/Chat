@@ -1,4 +1,6 @@
-# `memory_engine`
+# Miruka
+
+`memory_engine` · Standalone key/value store run as a private Unix-socket service.
 
 Memory DB: a synchronous typed key/value store with client-owned explicit commits, and a dedicated Unix-socket service that runs it under a private service UID.
 

@@ -1,4 +1,6 @@
-# `agent_shell`
+# Zorumi
+
+`agent_shell` · Minimal command line to add, run and approve agent tasks on a durable Kristall store.
 
 A minimal shell for running agent tasks: a durable task store on Kristall, a runner over a handler registry, built-in task kinds and a command line.
 

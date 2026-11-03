@@ -1,4 +1,6 @@
-# `organization`
+# Fidalo
+
+`organization` · Department registry, government case workflow and partner CRM as tools.
 
 Departments of the Logos organization: the department registry and API, the Government department (cases and IP registration) and the Partner Relations department (a local CRM with communications and follow-ups), with their tools.
 

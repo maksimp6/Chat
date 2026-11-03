@@ -1,4 +1,6 @@
-# `printing3d`
+# Cavori
+
+`printing3d` · 3D-printing business domain: quotes, slicing, preflight, telemetry and workflow.
 
 The 3D-printing business domain, independent of the host app (quotes and finance, slicing, model preflight, G-code audit, Bambu A1 mini telemetry and delivery, the print workflow, video), and `forge`, which binds it to Logos storage and identity and serves its HTTP API and tools. `printing3d` never imports `forge`.
 

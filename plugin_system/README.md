@@ -1,4 +1,6 @@
-# `plugin_system`
+# Tirona
+
+`plugin_system` · Discovers local plugins from manifests and manages their state.
 
 Plugins: manifest and lifecycle management, plugin access to the existing execution boundaries, and the HTTP API for discovery and lifecycle.
 

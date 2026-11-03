@@ -1,4 +1,6 @@
-# `agent_retrieval`
+# Rekavi
+
+`agent_retrieval` · Finds bounded, token-budgeted hits across context, memory and repositories.
 
 Token-bounded, deterministic hybrid retrieval for agent task packets over the context cache, shared memory and repository indexes, with BM25-style scoring and telemetry.
 

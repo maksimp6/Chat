@@ -1,4 +1,6 @@
-# `web_shell`
+# Ocheva
+
+`web_shell` · Serves the Logos web page and health and readiness endpoints.
 
 The web shell: the page, health, readiness and version endpoints, the Cache-Control and unexpected-error policy, and storage start-up.
 

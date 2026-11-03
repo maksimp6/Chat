@@ -1,4 +1,6 @@
-# `rag_sync`
+# Hadomi
+
+`rag_sync` · Adds new commits and GitHub activity to chat file search.
 
 Appends the repository's git history and its GitHub data to the owner's knowledge store (the store of `yandex_client_modules.tool_config.knowledge_vector_store_ids()`, the chat's File Search). Only new data is written, into new files; nothing stored is rebuilt.
 

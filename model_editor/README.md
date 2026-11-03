@@ -1,4 +1,6 @@
-# `model_editor`
+# Gilaro
+
+`model_editor` · Local 3D scene builder with versioned scenes and STL exports.
 
 The Logos Pro local 3D scene editor: bounded, deterministic primitive geometry, immutable owner-scoped scene versions with STL artifacts, and tools that edit scenes.
 

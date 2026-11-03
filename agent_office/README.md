@@ -1,4 +1,6 @@
-# `agent_office`
+# Sovaro
+
+`agent_office` · Watches agent work on GitHub and flags stuck tasks.
 
 Tools for monitoring the GitHub agent office. The observer builds a readable thread for each task and provides per-agent KPIs, owner labels, and the dispatch model and state machine for dispatched tasks.
 

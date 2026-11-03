@@ -1,4 +1,6 @@
-# `agent_skills`
+# Pelisu
+
+`agent_skills` · Finds repository Agent Skills and loads their instructions into chats.
 
 Repository Agent Skills: discovery, policy and lazy loading.
 

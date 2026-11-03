@@ -1,4 +1,6 @@
-# `runtime`
+# Ruvane
+
+`runtime` · Scoped dispatcher for preview runtimes' database, file and tool access.
 
 Scoped preview runtimes: the execution boundary (dispatcher), request-scoped runtime metadata, the runtime storage capability, a small extension loader, conversation-scoped agent selection and session/invocation API helpers.
 

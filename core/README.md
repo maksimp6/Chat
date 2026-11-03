@@ -1,4 +1,6 @@
-# `core`
+# Ketavi
+
+`core` · Holds the model catalog, pricing, environment settings and shared helpers.
 
 Process-wide configuration: the model catalog and pricing, the runtime view of the prepared model profiles, the process environment and small shared helpers.
 

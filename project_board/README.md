@@ -1,4 +1,6 @@
-# `project_board`
+# Yurena
+
+`project_board` · Private project board for discussions, incidents, tasks and evidence.
 
 Logos Board: private, SQL-free discussions, incidents, tasks and evidence on a durable append-only store, with a local HTTP API and an explicit seed.
 

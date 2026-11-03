@@ -1,4 +1,6 @@
-# `sessions`
+# Tamoro
+
+`sessions` · Keeps durable AI sessions with reusable profiles and lightweight runtimes.
 
 Durable runtime sessions stored as Kristall journal records, built-in reusable AI session profiles and the managed lightweight runtimes behind them.
 

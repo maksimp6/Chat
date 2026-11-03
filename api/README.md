@@ -1,4 +1,6 @@
-# `api`
+# Heravo
+
+`api` · Holds Yandex API contracts and gates the Yandex calls routed through its transport.
 
 API contracts: strict contracts shared by routes, offline validation against the pinned Yandex documentation snapshot, reviewed outbound request profiles and the single outbound admission boundary for Yandex API callers.
 

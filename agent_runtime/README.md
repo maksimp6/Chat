@@ -1,4 +1,6 @@
-# `agent_runtime`
+# Tavuro
+
+`agent_runtime` · Provider-agnostic agent gateway, remote tool agents and GitHub issue runner.
 
 The agent runtime: the provider-agnostic agent gateway, the persistent gateway for remote Local Tool Agents and its client, the headless GitHub issue runner, the launch hold, the read-only review policy and helpers for Yandex Responses tool loops.
 

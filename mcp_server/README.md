@@ -1,4 +1,6 @@
-# `mcp_server`
+# Benora
+
+`mcp_server` · MCP endpoint: external clients read dialogs and call tools.
 
 The Logos MCP server: protocol and transport, the shared local identity, records of MCP servers and their per-conversation selection, the ChatGPT bridge tools and the bridge to the runtime dispatcher.
 

@@ -1,4 +1,6 @@
-# `observability`
+# Eskaro
+
+`observability` · Records each invocation's steps, API calls, tools, errors and timing.
 
 Observability: the Execution Trace (the primary per-invocation record of agent steps, API calls, tools, errors and timing) and the small process-level system log for start-up and failures that happen before a trace exists.
 

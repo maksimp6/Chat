@@ -1,4 +1,6 @@
-# `repository_index`
+# Zerano
+
+`repository_index` · Validates identity and provenance of immutable repository index snapshots.
 
 Shared contracts for immutable repository indexes and validation of a snapshot's identity.
 

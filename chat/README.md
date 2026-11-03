@@ -1,4 +1,6 @@
-# `chat`
+# Kelura
+
+`chat` · Serves chat turns, voice, images, embeddings and completions.
 
 The chat: conversation routes that record the full execution chain, and the voice (Yandex Realtime), image generation (Alice AI ART), embeddings, prompt classification and synchronous completion endpoints.
 

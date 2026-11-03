@@ -1,4 +1,6 @@
-# `storage`
+# Ondera
+
+`storage` · Saves chats and settings in the Kristall journal and generated images as private files.
 
 Logos chat and configuration records in the native durable Kristall journal (`storage.records`; `storage.db` is its former name and still works), provider-neutral storage contracts, generated image artifacts, journal maintenance and the process-local engine used in development.
 

@@ -1,4 +1,6 @@
-# `browser`
+# Dulena
+
+`browser` · Web browsing tools for pages, forms, search and downloads.
 
 Browser capabilities: contracts shared by the cloud and local browsing adapters, an adapter backed by the Node.js browser emulator, deterministic parallel browser-role orchestration and semantic synthesis of its results, and the versatile browser the model drives through the shared tool registry (category `browser`, also over MCP): a pure-Python HTTP engine and an optional Chrome engine (DevTools Protocol).
 

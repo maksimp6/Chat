@@ -1,4 +1,6 @@
-# `agents`
+# Ilmane
+
+`agents` · Reserved namespace for agent transport adapters; no modules yet.
 
 Namespace for Alice Pro agent transports and adapters. It holds no modules yet.
 

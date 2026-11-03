@@ -1,4 +1,6 @@
-# `provider_accounts`
+# Nuvero
+
+`provider_accounts` · Stores and rotates provider credentials, enforces quotas, lists chat models.
 
 Model-provider accounts: deployment credentials and their API, provider-agnostic key rotation and the rotation workers' logic, import of runner-issued keys, per-user quotas and their API, and model discovery with the model catalog API.
 

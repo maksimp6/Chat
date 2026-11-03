@@ -1,4 +1,6 @@
-# `agent_rules`
+# Dorvane
+
+`agent_rules` · Proposed agent rule registry and blocking controller; not deployed.
 
 A proposed provider-independent Agent Rules Registry and its candidate enforcement controller. It is not installed in production.
 

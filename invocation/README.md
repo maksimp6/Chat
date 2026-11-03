@@ -1,4 +1,6 @@
-# `invocation`
+# Kalumi
+
+`invocation` · Manages each invocation's lifecycle, execution trace and request context.
 
 The invocation lifecycle on native Kristall (create, start, finish and fail, with execution traces), the immutable request-scoped execution context and RFC 9457 Problem Details responses.
 

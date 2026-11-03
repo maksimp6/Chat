@@ -1,4 +1,6 @@
-# `economy`
+# Ferino
+
+`economy` · Tracks each reply's cost, billing, budgets and paper treasury ledger.
 
 The economy of Logos: a paper treasury ledger with a demo top-up and its HTTP API, the shared local identity used for accounting, billing and energy-based compute pricing of execution traces, department budgets, provider pricing snapshots and knowledge economics.
 

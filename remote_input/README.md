@@ -1,4 +1,6 @@
-# Logos Mouse — модуль управления указателем (staging)
+# Lisora
+
+`remote_input` · Staging-only: turns authorized pointer commands into signed, short-lived grants.
 
 Версия: модуль для интеграции, **не развернут в root-сервисе**. Issue #650 / PR #1082.
 

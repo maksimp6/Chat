@@ -1,4 +1,6 @@
-# `secret_store`
+# Vesara
+
+`secret_store` · Resolves secret references into redacted values with policy and audit.
 
 Provider-neutral secret resolution: typed references with redacted values, resolver and backend contracts, the Cloud.ru Secret Management backend, aliases, policy and audit, capability-only delivery to agents, encrypted storage of provider credentials, and deterministic fakes.
 

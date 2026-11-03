@@ -1,4 +1,6 @@
-# `cloud`
+# Ravusa
+
+`cloud` · Provider-neutral cloud IAM, secrets, storage and sandboxes for Logos tools.
 
 The provider-neutral cloud surface (resource models, policy, provider registry, sandbox environment contract and cloud tools), the Cloud.ru provider (IAM and API keys, Secret Management, Object Storage, billing, environments) and the self-hosted Alice Cloud control plane.
 

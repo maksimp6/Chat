@@ -1,4 +1,6 @@
-# `yandex_client_modules`
+# Eduran
+
+`yandex_client_modules` · Yandex AI Studio client: Responses, streaming, files and image generation.
 
 The Yandex AI Studio client: the Responses API client with its request, polling, parsing, MCP, conversation and file mixins, the Realtime WebSocket and image-generation transports, hosted-tool settings, the API-key provider and a minimal SDK.
 

@@ -1,4 +1,6 @@
-# `rdc_connection`
+# Sobeki
+
+`rdc_connection` · Redirects to an active Remote Desktop Commander pairing page.
 
 Remote Desktop Commander pairing: the `/rdc` redirect to the verification URL of an existing device flow, and task-local limits for authorized RDC callbacks.
 

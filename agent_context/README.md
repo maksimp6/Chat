@@ -1,4 +1,6 @@
-# `agent_context`
+# Telira
+
+`agent_context` · Builds cached, GitHub-based context packets for agent tasks.
 
 Deterministic task-context packets for Logos agents: GitHub-first task contracts and an exact-head context cache that reuses evidence selectively.
 
