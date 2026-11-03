@@ -1674,6 +1674,51 @@ def remove_vector_store_files(
     return removed
 
 
+# Snapshot families this pipeline owns: a new fingerprint supersedes every older one.
+_SNAPSHOT_FILE = re.compile(r"^chat-(?:task-history|repository)-[0-9a-f]{16}\.md$")
+_SNAPSHOT_STORE_PREFIXES = ("chat-repo-", "chat-task-history-")
+
+
+def purge_superseded_snapshots(
+    keep_store_id: str, keep_file_ids: list[str], project: str, key: str
+) -> dict:
+    """Delete the vector stores and snapshot files an earlier run left behind.
+
+    Every store named like this pipeline's stores, other than ``keep_store_id`` and the
+    owner's knowledge stores (LOGOS_VECTOR_STORE_IDS, else DEFAULT_VECTOR_STORE_IDS), is
+    deleted; every snapshot file other than ``keep_file_ids`` is detached and deleted."""
+    from yandex_client_modules.tool_config import knowledge_vector_store_ids
+
+    protected = {keep_store_id, *knowledge_vector_store_ids()}
+    deleted_stores = []
+    for store in list_yandex_objects("/vector_stores", project, key, ("vector_stores",)):
+        store_id, name = store.get("id"), store.get("name")
+        if (
+            isinstance(store_id, str)
+            and store_id not in protected
+            and isinstance(name, str)
+            and name.startswith(_SNAPSHOT_STORE_PREFIXES)
+        ):
+            try:
+                yandex_api_request(
+                    "DELETE", f"/vector_stores/{quote(store_id, safe='')}", project, key
+                )
+            except YandexHTTPError as error:
+                if error.status != 404:
+                    raise
+            deleted_stores.append(store_id)
+    kept = set(keep_file_ids)
+    stale = [
+        item["id"]
+        for item in list_yandex_objects("/files", project, key, ("files",))
+        if isinstance(item.get("id"), str)
+        and item["id"] not in kept
+        and _SNAPSHOT_FILE.match(str(item.get("filename") or ""))
+    ]
+    removed = remove_vector_store_files(keep_store_id, stale, project, key)
+    return {"deleted_vector_stores": deleted_stores, "deleted_files": removed}
+
+
 def wait_for_vector_store_index(
     store_id: str, file_id: str, project: str, key: str
 ) -> None:
@@ -2390,11 +2435,15 @@ def _upload_repository_snapshots(
     ]
     if len(store_files) != len(attached_file_ids):
         raise ValueError("vector_store_file_metadata_missing")
+    progress["stage"] = "purge_superseded_snapshots"
+    purged = purge_superseded_snapshots(store_id, [issue_file_id, file_id], project, key)
+    current = {issue_file_id, file_id}
     return {
         "store_id": store_id,
         "file_id": file_id,
         "file_meta": file_meta,
-        "store_files": store_files,
+        "store_files": [item for item in store_files if item["file_id"] in current],
+        "purged": purged,
     }
 
 
@@ -2452,7 +2501,10 @@ def _prepare_task_vector_store(
     file_id, file_meta = ensure_yandex_file(filename, content, project, key)
     progress["stage"] = "attach_snapshot"
     ensure_file_attached(store_id, file_id, project, key)
+    progress["stage"] = "purge_superseded_snapshots"
+    purged = purge_superseded_snapshots(store_id, [file_id], project, key)
     return {
+        "purged": purged,
         "fingerprint": fingerprint,
         "repository_fingerprint": None,
         "store_name": store_name,
