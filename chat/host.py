@@ -127,6 +127,7 @@ class Host:
     validate_dialog_model: (
         Any  # provider_accounts.model_discovery.validate_dialog_model
     )
+    vector_add: Any  # vector_db.store.add
     validate_generation_params: (
         Any  # yandex_client_modules.request_builder.validate_generation_params
     )
@@ -182,6 +183,7 @@ __all__ = [
     "persist_invocation_trace",
     "read_upload",
     "record_court_reply",
+    "vector_add",
     "provider_request_headers",
     "record_usage",
     "record_yandex_mcp_activity",
@@ -264,6 +266,10 @@ def fail_invocation(*args: Any, **kwargs: Any) -> Any:
 
 def file_court_case(*args: Any, **kwargs: Any) -> Any:
     return current().file_court_case(*args, **kwargs)
+
+
+def vector_add(*args: Any, **kwargs: Any) -> Any:
+    return current().vector_add(*args, **kwargs)
 
 
 def censor_reply(*args: Any, **kwargs: Any) -> Any:

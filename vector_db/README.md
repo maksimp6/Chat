@@ -16,6 +16,11 @@ The app's own vector database: texts are embedded by the Yandex embeddings API (
 
 Also `delete(collection, doc_id)`, `drop(collection)`, `collections()`.
 
+## What is in it
+
+- `repository-git`, `repository-issues`, `repository-issue_comments`, `repository-review_comments`, `repository-runs`: every record `rag_sync` appends (the app's code and history, its GitHub data).
+- `dialogs`: every stored model reply with its question (`chat.mcp_routes._embed_turn`, in a thread after the reply is stored; a failure is a Court case `dialog_embedding_failed`).
+
 ## Tool
 
 Category `vectors`, one function `vectors`, field `action`: `add`, `search`, `delete`, `drop`, `collections`. The base instructions (`yandex_client_modules/mcp_mixin.py`) name it, so Logos uses it by itself.

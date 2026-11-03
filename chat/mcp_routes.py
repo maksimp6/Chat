@@ -54,6 +54,7 @@ from chat.host import (
     read_upload,
     record_court_reply,
     record_yandex_mcp_activity,
+    vector_add,
     reset_current_trace,
     set_owner,
     set_yandex_conversation,
@@ -1061,6 +1062,28 @@ def _court_record(
         _file_court_failure(conv_id, "court_sitting_failed", exc, message_id=message_id, **ids)
 
 
+def _embed_turn(conv_id: str, user_message_id: Any, reply_message_id: Any, reply: str) -> None:
+    """The question and the stored answer go into the app's vector database (collection dialogs).
+
+    Runs in its own thread after the reply is stored; a failure is a Court case."""
+    try:
+        question = get_message(conv_id, int(user_message_id)) if user_message_id else None
+        text = (
+            ("Пользователь: " + str(question.get("text") or question.get("content") or "") + "\n\n")
+            if isinstance(question, dict) else ""
+        ) + "Логос: " + reply
+        vector_add(
+            "dialogs",
+            text,
+            f"{conv_id}-{reply_message_id}",
+            {"conversation_id": conv_id, "message_id": reply_message_id,
+             "user_message_id": user_message_id},
+        )
+    except Exception as exc:
+        logger.exception("[VECTORS] The turn was not embedded")
+        _file_court_failure(conv_id, "dialog_embedding_failed", exc, message_id=reply_message_id)
+
+
 def _file_court_failure(conv_id: str, code: str, exc: Exception, **ids: Any) -> None:
     try:
         file_court_case(
@@ -1763,6 +1786,13 @@ def _finalize_chat_turn(
         )
     else:
         finish_invocation(invocation.invocation_id, result=outcome)
+        if reply and reply_message_id is not None:
+            threading.Thread(
+                target=_embed_turn,
+                args=(invocation.conversation_id, user_message_id, reply_message_id, str(reply)),
+                name="logos-embed-turn",
+                daemon=True,
+            ).start()
         if reply and model_key:
             threading.Thread(
                 target=_remember_turn_facts,

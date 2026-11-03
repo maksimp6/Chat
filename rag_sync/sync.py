@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from rag_sync import git_source, github_source
-from rag_sync.host import bound, get_store, knowledge_vector_store_ids
+from rag_sync.host import bound, get_store, knowledge_vector_store_ids, vector_add
 
 __all__ = ["PACK_LIMIT", "OLD_PREFIXES", "PREFIX", "reset", "start", "status"]
 
@@ -73,6 +73,7 @@ class _Writer:
         self.kind, self.client, self.store_id, self.ledger, self.totals = kind, client, store_id, ledger, totals
         self.stamp, self.part = _now(), 0
         self.parts: list[str] = []
+        self.keys: list[str] = []
         self.size = 0
         self.last: tuple[str, list[str]] | None = None  # cursor and the keys stored at it
 
@@ -81,6 +82,7 @@ class _Writer:
         if self.parts and self.size + encoded > PACK_LIMIT:
             self.flush()
         self.parts.append(text)
+        self.keys.append(key)
         self.size += encoded
         if self.last and self.last[0] == cursor:
             self.last[1].append(key)
@@ -90,6 +92,15 @@ class _Writer:
     def flush(self) -> None:
         if not self.parts:
             return
+        # Every record also goes into the app's own vector database (vector_db), one
+        # document per record, so the app's content is searchable by meaning there too.
+        # The same key replaces its document, so a record written again is not doubled.
+        for key, text in zip(self.keys, self.parts, strict=True):
+            embedded = vector_add(
+                f"repository-{self.kind}", text, key.replace("/", "_"), {"kind": self.kind, "key": key}
+            )
+            self.totals["embedded_chunks"] += embedded["chunks"]
+            self.totals["embedding_tokens"] += embedded["tokens"]
         self.part += 1
         name = f"{PREFIX}{self.kind}-{self.stamp}-{self.part:03d}.md"
         body = (f"# {self.kind} · {github_source.repository()}\n\n" + _SEPARATOR.join(self.parts) + "\n").encode()
@@ -109,7 +120,7 @@ class _Writer:
         _save_ledger(self.ledger)
         self.totals["files"] += 1
         self.totals["records"] += len(self.parts)
-        self.parts, self.size = [], 0
+        self.parts, self.keys, self.size = [], [], 0
         _set_state(totals=dict(self.totals), stage=f"{self.kind}: {name} stored")
 
 
@@ -139,7 +150,7 @@ def _sync_github(client, store_id: str, ledger: dict, totals: dict, token: str |
 
 
 def _run(token: str | None, sources: tuple[str, ...]) -> None:
-    totals = {"files": 0, "records": 0, "masked": 0}
+    totals = {"files": 0, "records": 0, "masked": 0, "embedded_chunks": 0, "embedding_tokens": 0}
     try:
         client, store_id = _client(), _store_id()
         ledger = _ledger()

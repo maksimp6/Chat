@@ -20,6 +20,7 @@ class Host:
     YandexResponsesClient: Any  # yandex_client_modules.client.YandexResponsesClient
     get_store: Any  # storage.records.get_store
     knowledge_vector_store_ids: Any  # yandex_client_modules.tool_config.knowledge_vector_store_ids
+    vector_add: Any  # vector_db.store.add
 
 
 _binding: Binding[Host] = Binding("rag_sync")
@@ -37,6 +38,7 @@ __all__ = [
     "provide",
     "get_store",
     "knowledge_vector_store_ids",
+    "vector_add",
 ]
 
 
@@ -46,3 +48,7 @@ def get_store(*args: Any, **kwargs: Any) -> Any:
 
 def knowledge_vector_store_ids(*args: Any, **kwargs: Any) -> Any:
     return current().knowledge_vector_store_ids(*args, **kwargs)
+
+
+def vector_add(*args: Any, **kwargs: Any) -> Any:
+    return current().vector_add(*args, **kwargs)

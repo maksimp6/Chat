@@ -16,6 +16,8 @@ An edited issue or comment is appended again as a record of its new version; the
 
 **GitHub token.** The token given to `POST /api/rag/sync` (used for that sync only, not stored), else `GITHUB_TOKEN`; without one the public API is used. A rate limit ends the sync with stage `rate_limited`; the next sync goes on from the cursor.
 
+**Vector database.** Every record is also embedded into the app's own vector database (`vector_db`, port `vector_add`), one document per record in the collection `repository-<kind>` (`repository-git`, `repository-issues`, …), before its file is stored; the record's key is the document id, so a record written again replaces its document.
+
 **Reset.** `reset` detaches and deletes every `logos-rag-*` file and the packs of the scripts this unit replaced (`gh-*`, `chat-repository-archive-*`), then forgets the cursors: the next sync appends the whole history again.
 
 **Not covered.** GitHub returns at most 1000 Actions runs for one query, so a first sync stores the latest 1000 runs and later syncs the new ones. Commits of a side branch can be written twice when a pack ends between branches (`<cursor>..HEAD` names commits not reachable from the cursor); nothing is lost.
@@ -33,6 +35,7 @@ Category `rag`, one function `rag`, field `action`: `sync` (optional `sources`: 
 | `YandexResponsesClient` | `yandex_client_modules.client.YandexResponsesClient` |
 | `get_store` | `storage.records.get_store` |
 | `knowledge_vector_store_ids` | `yandex_client_modules.tool_config.knowledge_vector_store_ids` |
+| `vector_add` | `vector_db.store.add` |
 
 ## Install
 
