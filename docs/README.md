@@ -117,7 +117,7 @@
 - [Agent observer](agents/agent-observer.md) — наблюдение за работой агентов в issues и pull requests
 - [Process observation and governance](agents/process-observation-and-governance.md) — наблюдение и улучшение процесса, когда обычный цикл не сходится
 - [Agent Rules Registry](agents/agent-rules-registry.md) — кандидат v1: ошибка → доказательство → правило (#1159)
-- [Репозиторий в RAG](agents/repository-rag.md) — полный репозиторий как доказательная база существующего RAG (#1413)
+- [Репозиторий в RAG](agents/repository-rag.md) — история git и данные GitHub дозаписью в базу знаний (rag_sync, инструмент `rag`)
 - [Поиск по истории задач](agents/semantic-pipeline.md) — семантические цитаты из задач (#1413, PR #1435)
 
 ## Память и данные

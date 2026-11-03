@@ -10,9 +10,9 @@ from yandex_client_modules._vendor.wikifunctions import clamp_integer
 # The provider returns at most 50 File Search results; settings stay at that maximum.
 FILE_SEARCH_MAX_RESULTS = 50
 
-# The owner's knowledge store: the chat's File Search, the repository RAG
-# (scripts/repository_rag.py, scripts/logos_knowledge.py) and the dialog-archive
-# ingest (.github/workflows/redmi9-rag-ingest.yml) all use this one store.
+# The owner's knowledge store: the chat's File Search, the repository knowledge the
+# rag_sync unit appends (tool rag, .github/workflows/redmi9-rag-ingest.yml) and
+# scripts/logos_knowledge.py all use this one store.
 DEFAULT_VECTOR_STORE_IDS = ("fvtvp6t2su0g5q4ft2ev",)
 
 # Dialog settings saved before this revision carry the old medium/off defaults; they

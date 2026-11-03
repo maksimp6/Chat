@@ -151,18 +151,18 @@ def _chat():
     from observability.trace_manager import bind_current_trace
     from economy.billing import build_ai_billing_item
     from yandex_client_modules.image_generation import build_generation_payload
+    from court.hearings import censor_reply
     from conversations.ownership import check_access
     from core.model_profiles import completion_model_keys
     from agent_skills.registry import compose_skill_instructions
     from storage.records import create_conversation
     from invocation.manager import create_invocation
+    from invocation.manager import conversation_turn_running
     from invocation.trace import create_invocation_trace
     from yandex_client_modules.embeddings import embed_texts
     from economy.knowledge_economics import embedding_cost
     from invocation.manager import fail_invocation
     from court.filing import file_case as file_court_case
-    from court.hearings import censor_reply
-    from court.hearings import record_reply as record_court_reply
     from invocation.manager import finish_invocation
     from yandex_client_modules.realtime import generate_realtime
     from storage.records import get_conversation_title
@@ -184,8 +184,9 @@ def _chat():
     from storage.records import normalize_conversation_title
     from storage.generated_images import open_image_file
     from invocation.manager import persist_invocation_trace
-    from workspace.upload_routes import read_upload
     from yandex_client_modules.request_mixin import provider_request_headers
+    from workspace.upload_routes import read_upload
+    from court.hearings import record_reply as record_court_reply
     from provider_accounts.quotas import record_usage
     from mcp_server.trace import record_yandex_mcp_activity
     from tool_providers.registry import registry
@@ -199,7 +200,6 @@ def _chat():
     from storage.records import set_yandex_conversation
     from economy.billing import settle_billing_to_treasury
     from invocation.manager import start_invocation
-    from invocation.manager import conversation_turn_running
     from observability.trace_manager import traced_operation
     from api.contracts import validate_api_contract
     from provider_accounts.model_discovery import validate_dialog_model
@@ -245,12 +245,13 @@ def _chat():
         bind_current_trace=bind_current_trace,
         build_ai_billing_item=build_ai_billing_item,
         build_generation_payload=build_generation_payload,
+        censor_reply=censor_reply,
         check_access=check_access,
         completion_model_keys=completion_model_keys,
         compose_skill_instructions=compose_skill_instructions,
         create_conversation=create_conversation,
-        censor_reply=censor_reply,
         create_invocation=create_invocation,
+        conversation_turn_running=conversation_turn_running,
         create_invocation_trace=create_invocation_trace,
         embed_texts=embed_texts,
         embedding_cost=embedding_cost,
@@ -258,7 +259,6 @@ def _chat():
         file_court_case=file_court_case,
         finish_invocation=finish_invocation,
         generate_realtime=generate_realtime,
-        record_court_reply=record_court_reply,
         get_conversation_title=get_conversation_title,
         get_current_owner_id=get_current_owner_id,
         get_current_trace=get_current_trace,
@@ -278,8 +278,9 @@ def _chat():
         normalize_conversation_title=normalize_conversation_title,
         open_image_file=open_image_file,
         persist_invocation_trace=persist_invocation_trace,
-        read_upload=read_upload,
         provider_request_headers=provider_request_headers,
+        read_upload=read_upload,
+        record_court_reply=record_court_reply,
         record_usage=record_usage,
         record_yandex_mcp_activity=record_yandex_mcp_activity,
         registry=registry,
@@ -293,7 +294,6 @@ def _chat():
         set_yandex_conversation=set_yandex_conversation,
         settle_billing_to_treasury=settle_billing_to_treasury,
         start_invocation=start_invocation,
-        conversation_turn_running=conversation_turn_running,
         traced_operation=traced_operation,
         validate_api_contract=validate_api_contract,
         validate_dialog_model=validate_dialog_model,
@@ -332,50 +332,6 @@ def _cloud():
     )
 
 
-def _court():
-    from court import host
-    from storage.records import add_message
-    from conversations.ownership import check_access
-    from economy.treasury_identity import TreasuryIdentityError
-    from economy.treasury_identity import get_current_owner_id
-    from storage.records import get_conversation_title
-    from storage.records import get_messages
-    from storage.records import get_store
-    from conversations.ownership import list_owned_conversations
-    from api.contracts import ContractViolation
-    from chat.mcp_routes import ForkError, call_yandex_operation, fork_dialog
-    from invocation.api import (
-        get_invocation_status,
-        get_invocation_trace,
-        get_message_trace,
-        list_message_traces,
-    )
-    from yandex_client_modules.errors import YandexClientError
-    from yandex_client_modules.operations import OperationRefused, list_operations
-
-    return host.Host(
-        ContractViolation=ContractViolation,
-        ForkError=ForkError,
-        OperationRefused=OperationRefused,
-        TreasuryIdentityError=TreasuryIdentityError,
-        YandexClientError=YandexClientError,
-        add_message=add_message,
-        call_yandex_operation=call_yandex_operation,
-        check_access=check_access,
-        fork_dialog=fork_dialog,
-        get_conversation_title=get_conversation_title,
-        get_current_owner_id=get_current_owner_id,
-        get_invocation_status=get_invocation_status,
-        get_invocation_trace=get_invocation_trace,
-        get_message_trace=get_message_trace,
-        get_messages=get_messages,
-        get_store=get_store,
-        list_message_traces=list_message_traces,
-        list_owned_conversations=list_owned_conversations,
-        list_yandex_operations=list_operations,
-    )
-
-
 def _conversations():
     from conversations import host
     from agent_memory.conversation_ownership_store import ConversationOwnershipStore
@@ -402,6 +358,53 @@ def _conversations():
         update_conversation_title=update_conversation_title,
         global_settings=global_settings,
         validate_dialog_model=validate_dialog_model,
+    )
+
+
+def _court():
+    from court import host
+    from api.contracts import ContractViolation
+    from chat.mcp_routes import ForkError
+    from yandex_client_modules.operations import OperationRefused
+    from economy.treasury_identity import TreasuryIdentityError
+    from yandex_client_modules.errors import YandexClientError
+    from storage.records import add_message
+    from chat.mcp_routes import call_yandex_operation
+    from conversations.ownership import check_access
+    from chat.mcp_routes import fork_dialog
+    from storage.records import get_conversation_title
+    from economy.treasury_identity import get_current_owner_id
+    from invocation.api import get_invocation_status
+    from invocation.api import get_invocation_trace
+    from invocation.api import get_message_trace
+    from storage.records import get_messages
+    from storage.records import get_store
+    from invocation.api import list_message_traces
+    from conversations.ownership import list_owned_conversations
+    from yandex_client_modules.operations import (
+        list_operations as list_yandex_operations,
+    )
+
+    return host.Host(
+        ContractViolation=ContractViolation,
+        ForkError=ForkError,
+        OperationRefused=OperationRefused,
+        TreasuryIdentityError=TreasuryIdentityError,
+        YandexClientError=YandexClientError,
+        add_message=add_message,
+        call_yandex_operation=call_yandex_operation,
+        check_access=check_access,
+        fork_dialog=fork_dialog,
+        get_conversation_title=get_conversation_title,
+        get_current_owner_id=get_current_owner_id,
+        get_invocation_status=get_invocation_status,
+        get_invocation_trace=get_invocation_trace,
+        get_message_trace=get_message_trace,
+        get_messages=get_messages,
+        get_store=get_store,
+        list_message_traces=list_message_traces,
+        list_owned_conversations=list_owned_conversations,
+        list_yandex_operations=list_yandex_operations,
     )
 
 
@@ -731,6 +734,23 @@ def _provider_accounts():
     )
 
 
+def _rag_sync():
+    from rag_sync import host
+    from core.config import Config
+    from yandex_client_modules.errors import YandexClientError
+    from yandex_client_modules.client import YandexResponsesClient
+    from storage.records import get_store
+    from yandex_client_modules.tool_config import knowledge_vector_store_ids
+
+    return host.Host(
+        Config=Config,
+        YandexClientError=YandexClientError,
+        YandexResponsesClient=YandexResponsesClient,
+        get_store=get_store,
+        knowledge_vector_store_ids=knowledge_vector_store_ids,
+    )
+
+
 def _remote_runtime():
     from remote_runtime import host
     from observability.trace_manager import ExecutionTrace
@@ -1010,6 +1030,7 @@ _HOSTS = {
     "printing3d": ("printing3d.host", _printing3d),
     "project_board": ("project_board.host", _project_board),
     "provider_accounts": ("provider_accounts.host", _provider_accounts),
+    "rag_sync": ("rag_sync.host", _rag_sync),
     "remote_runtime": ("remote_runtime.host", _remote_runtime),
     "runtime": ("runtime.host", _runtime),
     "secret_store": ("secret_store.host", _secret_store),

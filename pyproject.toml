@@ -67,7 +67,6 @@ standalone-downloads = [
     "scripts/redmi_root_agent.py",
     "scripts/redmi_root_agent_e2e.py",
     "scripts/redmi_candidate_tools_check.py",
-    "scripts/rag_ingest_via_app.py",
 ]
 data-reads = ["scripts/validate_ultra_profiles.py -> core/config.py"]
 third-party = [
@@ -98,10 +97,7 @@ printing3d = { packages = ["printing3d", "forge"], forbid = [["printing3d", "for
 "tools.knowledge" = { files = [
     "scripts/retrieval_core.py", "scripts/semantic_pipeline.py", "scripts/rag_pipeline.py",
     "scripts/logos_context.py", "scripts/logos_knowledge.py", "scripts/logos_project_tools.py",
-    "scripts/repository_corpus_actions.py", "scripts/repository_corpus_binary.py",
-    "scripts/repository_corpus_git.py", "scripts/repository_corpus_github.py",
-    "scripts/repository_rag.py", "scripts/repository_rag_resume.py",
-    "scripts/repository_rag_verify.py", "scripts/logos_dialogue.py", "scripts/logos_quality.py",
+    "scripts/logos_dialogue.py", "scripts/logos_quality.py",
     "scripts/logos_tool_probe.py", "scripts/logos_once.py", "scripts/logos_launch_hold.py",
     "scripts/logos_generation_gate.py", "scripts/logos_provider_receipt.py",
     "scripts/logos_responses_tool_loop.py", "scripts/logos_knowledge_host.py",
@@ -243,6 +239,7 @@ copies = [
     "conversations/_binding.py",
     "court/_binding.py",
     "economy/_binding.py",
+    "rag_sync/_binding.py",
     "forge/_binding.py",
     "invocation/_binding.py",
     "scripts/_logos_knowledge_binding.py",

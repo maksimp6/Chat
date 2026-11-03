@@ -1,7 +1,16 @@
 name: redmi9-rag-ingest
 
+# Appends new git commits and new GitHub data (issues, pull requests, comments, Actions runs)
+# to the knowledge store through the app's own rag_sync unit (POST /api/rag/sync). The sync
+# runs inside the app in the background; this job starts it and follows its state.
+
 on:
   workflow_dispatch:
+    inputs:
+      reset:
+        description: "Remove every stored repository pack first and load the whole history again"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -18,39 +27,52 @@ jobs:
     runs-on: redmi9
     timeout-minutes: 360
     steps:
-      - name: Ingest the exports/ dialog archives through the app API
+      - name: Remove the stored repository packs
+        if: ${{ inputs.reset }}
         timeout-minutes: 15
-        env:
-          GH_TOKEN: ${{ github.token }}
-          STORE_ID: fvtvp6t2su0g5q4ft2ev
-          KINDS: export
         run: |
           set -eu
-          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -
-      - name: Ingest GitHub issues through the app API
-        timeout-minutes: 15
+          curl -fsS --noproxy 127.0.0.1 --max-time 840 -X POST http://127.0.0.1:8080/api/rag/reset
+      - name: Start the sync in the app
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
-          STORE_ID: fvtvp6t2su0g5q4ft2ev
-          KINDS: issue
         run: |
           set -eu
-          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -
-      - name: Ingest pull requests through the app API
+          python3 - <<'PY'
+          import json, os, urllib.request
+          opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          body = json.dumps({"token": os.environ["GH_TOKEN"]}).encode()
+          request = urllib.request.Request(
+              "http://127.0.0.1:8080/api/rag/sync", data=body, method="POST",
+              headers={"Content-Type": "application/json"},
+          )
+          try:
+              with opener.open(request, timeout=60) as response:
+                  print(response.read().decode())
+          except urllib.error.HTTPError as error:
+              print(error.read().decode())
+              if error.code != 409:
+                  raise
+          PY
+      - name: Follow the sync
         timeout-minutes: 15
-        env:
-          GH_TOKEN: ${{ github.token }}
-          STORE_ID: fvtvp6t2su0g5q4ft2ev
-          KINDS: pull
         run: |
           set -eu
-          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -
-      - name: Ingest Actions run metadata through the app API
-        timeout-minutes: 15
-        env:
-          GH_TOKEN: ${{ github.token }}
-          STORE_ID: fvtvp6t2su0g5q4ft2ev
-          KINDS: run
-        run: |
-          set -eu
-          curl -fsSL --max-time 60 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/scripts/rag_ingest_via_app.py" | python3 -
+          python3 - <<'PY'
+          import json, sys, time, urllib.request
+          opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          deadline = time.time() + 14 * 60
+          while True:
+              with opener.open("http://127.0.0.1:8080/api/rag/status", timeout=60) as response:
+                  status = json.loads(response.read().decode())
+              state = status.get("state", {})
+              print(json.dumps({"stage": state.get("stage"), "totals": state.get("totals"),
+                                "error": state.get("error"), "files": status.get("files")}), flush=True)
+              if not state.get("running"):
+                  sys.exit(1 if state.get("stage") == "failed" else 0)
+              if time.time() > deadline:
+                  print("the sync goes on in the app; run this workflow again to follow it")
+                  sys.exit(0)
+              time.sleep(30)
+          PY

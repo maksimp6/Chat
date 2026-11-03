@@ -192,6 +192,7 @@ flowchart LR
     printing3d[printing3d]
     project_board[project_board]
     provider_accounts[provider_accounts]
+    rag_sync[rag_sync]
     rdc_connection[rdc_connection]
     recovery[recovery]
     remote_input[remote_input]
@@ -206,5 +207,6 @@ flowchart LR
     web_shell[web_shell]
     workspace[workspace]
     yandex_client_modules[yandex_client_modules]
+    yandex_client_modules -->|3| api
 ```
 <!-- END GENERATED: unit map -->

@@ -2534,9 +2534,9 @@ def _validate_vector_store_demo_args(args: argparse.Namespace) -> str | None:
     if args.corpus not in {None, "tasks"}:
         raise ValueError("vector_store_corpus_must_be_tasks")
     if getattr(args, "include_repository", False) and not existing_store_id:
-        # The repository is uploaded only by scripts/repository_rag.py, which appends
-        # changed documents; a whole-repository snapshot here re-uploaded everything.
-        raise ValueError("repository_upload_is_append_only_use_repository_rag")
+        # The repository is appended to the knowledge store only by the app's rag_sync
+        # unit (tool rag, POST /api/rag/sync); a whole-repository snapshot here re-uploaded everything.
+        raise ValueError("repository_upload_is_append_only_use_rag_sync")
     return existing_store_id
 
 
@@ -2805,7 +2805,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help=(
             "with --existing-store-id: inspect a repository store; the repository is "
-            "uploaded only by scripts/repository_rag.py (append-only)"
+            "appended only by the app's rag_sync unit (tool rag)"
         ),
     )
     parser.add_argument(

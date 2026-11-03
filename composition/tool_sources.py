@@ -61,6 +61,12 @@ def _court_tools():
     return COURT_TOOLS
 
 
+def _rag_tools():
+    from rag_sync.tools import RAG_TOOLS
+
+    return RAG_TOOLS
+
+
 def _ssl_tools():
     from tool_providers.ssl_server import SSL_TOOLS
 
@@ -78,5 +84,6 @@ SOURCES = (
     ("rootagent", _rootagent_tools, "Root agent", Exception),
     ("tty", _tty_tools, "TTY", Exception),
     ("court", _court_tools, "Court", Exception),
+    ("rag", _rag_tools, "Repository knowledge", Exception),
     ("ssl", _ssl_tools, "SSL server", Exception),
 )
