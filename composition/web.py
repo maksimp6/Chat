@@ -28,6 +28,7 @@ from conversations.ownership import prepare_conversation_ownership_records
 from conversations.routes import install as install_conversation_routes
 from court.hearings import court_bp, prepare_court_records
 from rag_sync.routes import rag_bp
+from vector_db.routes import vectors_bp
 from economy.treasury import prepare_treasury_records
 from economy.treasury_routes import install as install_treasury_routes
 from forge import prepare_printing_records
@@ -87,6 +88,7 @@ BLUEPRINTS = (
     printing3d_bp,
     court_bp,
     rag_bp,
+    vectors_bp,
 )
 
 # Turns opened before this process booted were killed with the previous one (#1710).

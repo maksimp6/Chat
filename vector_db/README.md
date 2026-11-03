@@ -25,6 +25,10 @@ Also `delete(collection, doc_id)`, `drop(collection)`, `collections()`.
 
 Category `vectors`, one function `vectors`, field `action`: `add`, `search`, `delete`, `drop`, `collections`. The base instructions (`yandex_client_modules/mcp_mixin.py`) name it, so Logos uses it by itself.
 
+## HTTP
+
+`POST /api/vectors/<action>` (`add`, `search`, `delete`, `drop`, `collections`) with the tool's fields as JSON.
+
 ## Ports
 
 | Port | Provided by |
@@ -34,4 +38,4 @@ Category `vectors`, one function `vectors`, field `action`: `add`, `search`, `de
 
 ## Install
 
-`composition/wiring.py` registers the host (`vector_db`), `composition/tool_sources.py` adds the category `vectors`.
+`composition/wiring.py` registers the host (`vector_db`), `composition/tool_sources.py` adds the category `vectors`, `composition/web.py` registers `vectors_bp`.
