@@ -14,7 +14,7 @@ An edited issue or comment is appended again as a record of its new version; the
 
 **Files.** Records are packed into `logos-rag-<kind>-<UTC time>-NNN.md` of at most `PACK_LIMIT` (4 MiB, the size the replaced ingest used). Each file is uploaded to Files and attached to the store, and only then does its source's cursor move past the records it holds; a file that fails leaves the cursor, so the next sync writes those records again. The ledger (Kristall `rag_sync/ledger`) keeps the cursors and every file written; `rag_sync/state` keeps the running or last sync. One sync runs at a time, in a background thread.
 
-**GitHub token.** The token given to `POST /api/rag/sync` (used for that sync only, not stored), else `LOGOS_COURT_TOKEN`, `GITHUB_TOKEN` or `GH_TOKEN`; without one the public API is used. A rate limit ends the sync with stage `rate_limited`; the next sync goes on from the cursor.
+**GitHub token.** The token given to `POST /api/rag/sync` (used for that sync only, not stored), else `GITHUB_TOKEN`; without one the public API is used. A rate limit ends the sync with stage `rate_limited`; the next sync goes on from the cursor.
 
 **Reset.** `reset` detaches and deletes every `logos-rag-*` file and the packs of the scripts this unit replaced (`gh-*`, `chat-repository-archive-*`), then forgets the cursors: the next sync appends the whole history again.
 

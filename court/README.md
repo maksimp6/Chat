@@ -99,7 +99,7 @@ Everything `court` uses from other units is a field of `Host` in [`court/host.py
 
 | Variable | Meaning |
 | --- | --- |
-| `LOGOS_COURT_TOKEN`, else `GITHUB_TOKEN`, else `GH_TOKEN` | Token that may create issues and comments. Without one (or when GitHub fails) an error case is queued and logged at ERROR level; the next filing that has a token files every queued case first, in order. A case of the hall is the owner's action and is not queued: without a token the filing fails and says so. |
+| `GITHUB_TOKEN` | Token that may create issues and comments. Without one (or when GitHub fails) an error case is queued and logged at ERROR level; the next filing that has a token files every queued case first, in order. A case of the hall is the owner's action and is not queued: without a token the filing fails and says so. |
 | `LOGOS_COURT_PENDING` | Queue of cases not yet filed (JSONL, owner-only), `~/.config/logos/court-pending.jsonl`. A case leaves it only once it is filed. |
 | `LOGOS_COURT_REPO` | Repository of the Court, `maksimp6/Chat`. |
 | `LOGOS_COURT_KEYS_DIR` | Directory of the month keys (`YYYY-MM.agekey`, made on first use; `.published` marks a published one), `~/.config/logos/court-keys`. |

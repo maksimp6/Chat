@@ -15,7 +15,7 @@ first use). A month's key is published on the same branch, ``keys/YYYY-MM.agekey
 once the following month is over: every piece of evidence stays sealed for at
 least a month and then becomes readable by everyone.
 
-``LOGOS_COURT_TOKEN`` (or ``GITHUB_TOKEN`` / ``GH_TOKEN``) authorizes the
+``GITHUB_TOKEN`` authorizes the
 GitHub calls; ``LOGOS_COURT_REPO`` names the repository.
 """
 
@@ -69,12 +69,7 @@ def _repo() -> str:
 
 
 def _token() -> str:
-    return (
-        os.environ.get("LOGOS_COURT_TOKEN")
-        or os.environ.get("GITHUB_TOKEN")
-        or os.environ.get("GH_TOKEN")
-        or ""
-    )
+    return os.environ.get("GITHUB_TOKEN") or ""
 
 
 def _error_fields(report: dict[str, Any]) -> dict[str, Any]:
@@ -516,7 +511,7 @@ def file_case_now(report: dict[str, Any]) -> str | None:
     Without a token the case is queued and filed later; queued cases go first."""
     token = _token()
     if not token:
-        _queue(report, "no LOGOS_COURT_TOKEN/GITHUB_TOKEN/GH_TOKEN")
+        _queue(report, "no GITHUB_TOKEN")
         return None
     _file_pending(token)
     return _file_one(report, token)
@@ -687,7 +682,7 @@ def file_hearing_case(hearing: dict[str, Any], case: dict[str, Any]) -> str:
     The owner's action, so there is no queue: without a token it fails."""
     token = _token()
     if not token:
-        raise RuntimeError("no LOGOS_COURT_TOKEN/GITHUB_TOKEN/GH_TOKEN: дело не подано")
+        raise RuntimeError("no GITHUB_TOKEN: дело не подано")
     now = datetime.now(UTC)
     report = _hearing_report(hearing, case)
     fp = fingerprint(report)

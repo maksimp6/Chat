@@ -1152,7 +1152,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
+    token = os.environ.get("GITHUB_TOKEN") or ""
     gh = GitHub(token, args.repo)
     try:
         result = run(gh, publish=args.publish)

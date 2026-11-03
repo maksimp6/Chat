@@ -3,8 +3,8 @@
 Each listing is asked only for what changed after its cursor (``since`` / ``created``),
 oldest first, so a sync appends new records and never re-reads old ones. An edited issue
 or comment is appended again as a new record of its new version; the old record stays.
-A token is used when there is one (the call's own, else LOGOS_COURT_TOKEN, GITHUB_TOKEN,
-GH_TOKEN); without one the public API is used. A rate limit stops the sync with the
+A token is used when there is one (the call's own, else GITHUB_TOKEN); without one the
+public API is used. A rate limit stops the sync with the
 cursor at the last stored record, and the next sync goes on from there.
 """
 
@@ -34,10 +34,7 @@ def repository() -> str:
 
 
 def env_token() -> str | None:
-    for name in ("LOGOS_COURT_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"):
-        if os.environ.get(name):
-            return os.environ[name]
-    return None
+    return os.environ.get("GITHUB_TOKEN") or None
 
 
 def _get(url: str, token: str | None) -> tuple[Any, str]:
