@@ -11,7 +11,7 @@ from yandex_client_modules._vendor.wikifunctions import clamp_integer
 FILE_SEARCH_MAX_RESULTS = 50
 
 # The owner's knowledge store: the chat's File Search, the repository knowledge the
-# rag_sync unit appends (tool rag, .github/workflows/redmi9-rag-ingest.yml) and
+# rag_sync unit appends (tool rag, called by Logos itself) and
 # scripts/logos_knowledge.py all use this one store.
 DEFAULT_VECTOR_STORE_IDS = ("fvtvp6t2su0g5q4ft2ev",)
 

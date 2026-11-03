@@ -36,8 +36,8 @@ Search (RAG) по запросам «Логос», «Судный Логос» �
 прочитай найденные диалоги с Логосом. Ищи только через File Search: не через
 web_search, не через grep_search и не по локальным файлам. Потом ответь на вопрос: можешь ли ты
 судить как Логос?» The dialogues come from the chat RAG store,
-which `redmi9-rag-ingest` fills with issues, pull requests, run metadata and the
-`exports/` dialog archives (GigaChat exports and the Logos memory module).
+which Logos fills itself with the tool `rag` (git history, including the `exports/` dialog
+archives, plus issues, pull requests, comments and run metadata).
 
 The request and reply must persist without trace errors. A separate
 `logos_rag_judgement` checkpoint records whether the request offered
