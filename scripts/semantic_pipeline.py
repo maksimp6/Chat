@@ -2533,6 +2533,10 @@ def _validate_vector_store_demo_args(args: argparse.Namespace) -> str | None:
         raise ValueError("vector_store_write_not_authorized")
     if args.corpus not in {None, "tasks"}:
         raise ValueError("vector_store_corpus_must_be_tasks")
+    if getattr(args, "include_repository", False) and not existing_store_id:
+        # The repository is uploaded only by scripts/repository_rag.py, which appends
+        # changed documents; a whole-repository snapshot here re-uploaded everything.
+        raise ValueError("repository_upload_is_append_only_use_repository_rag")
     return existing_store_id
 
 
@@ -2799,7 +2803,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--include-repository",
         action="store_true",
-        help="include tracked text files and binary file metadata in the snapshot",
+        help=(
+            "with --existing-store-id: inspect a repository store; the repository is "
+            "uploaded only by scripts/repository_rag.py (append-only)"
+        ),
     )
     parser.add_argument(
         "--existing-store-id",

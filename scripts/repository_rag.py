@@ -478,9 +478,10 @@ def _existing_packs(archive, store_path, prefix, required, project, key):
         file_id, raw, documents = record
         selected = set(documents) & required
         attachment_allowed = set(documents) <= required
-        if not selected or (not attachment_allowed and file_id not in attached_ids):
-            # An already attached historical pack can represent unchanged current
-            # documents. Never newly attach its excluded historical contents.
+        if not selected or not attachment_allowed:
+            # A pack that holds a document no longer current is not reused: its
+            # current documents are appended in new packs, and once those are indexed
+            # the old pack is detached and deleted, so only current text stays searchable.
             continue
         known.update(selected)
         pack_records.append(
@@ -723,7 +724,10 @@ def _attach_and_wait(
 def upload_archive(
     archive: CorpusArchive, store_id: str, project: str, key: str
 ) -> dict:
-    """Reuse verified packs; append only previously unrepresented documents."""
+    """Reuse verified packs; append only previously unrepresented documents.
+
+    Only changed documents are uploaded; a pack that also carries an outdated
+    document is replaced by new packs of its current documents, then deleted."""
     if not project or not key:
         raise ValueError("knowledge_provider_credentials_missing")
     documents_to_upload = prepared_documents(archive)
