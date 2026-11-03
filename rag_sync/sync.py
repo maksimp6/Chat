@@ -78,6 +78,16 @@ class _Writer:
         self.last: tuple[str, list[str]] | None = None  # cursor and the keys stored at it
 
     def add(self, cursor: str, key: str, text: str) -> None:
+        # Every record goes into the app's own vector database (vector_db) as it is read,
+        # one document per record; the same key replaces its document, so a record
+        # written again is not doubled.
+        embedded = vector_add(
+            f"repository-{self.kind}", text, key.replace("/", "_"), {"kind": self.kind, "key": key}
+        )
+        self.totals["embedded_records"] = self.totals.get("embedded_records", 0) + 1
+        self.totals["embedded_chunks"] += embedded["chunks"]
+        self.totals["embedding_tokens"] += embedded["tokens"]
+        _set_state(totals=dict(self.totals), stage=f"{self.kind}: {key} embedded")
         encoded = len(text.encode()) + len(_SEPARATOR)
         if self.parts and self.size + encoded > PACK_LIMIT:
             self.flush()
@@ -92,18 +102,6 @@ class _Writer:
     def flush(self) -> None:
         if not self.parts:
             return
-        # Every record also goes into the app's own vector database (vector_db), one
-        # document per record, so the app's content is searchable by meaning there too.
-        # The same key replaces its document, so a record written again is not doubled.
-        for key, text in zip(self.keys, self.parts, strict=True):
-            embedded = vector_add(
-                f"repository-{self.kind}", text, key.replace("/", "_"), {"kind": self.kind, "key": key}
-            )
-            self.totals["embedded_chunks"] += embedded["chunks"]
-            self.totals["embedding_tokens"] += embedded["tokens"]
-            self.totals["embedded_records"] = self.totals.get("embedded_records", 0) + 1
-            # The state shows every embedded record: a first pack of 4 MiB takes many requests.
-            _set_state(totals=dict(self.totals), stage=f"{self.kind}: embedding pack {self.part + 1}")
         self.part += 1
         name = f"{PREFIX}{self.kind}-{self.stamp}-{self.part:03d}.md"
         body = (f"# {self.kind} · {github_source.repository()}\n\n" + _SEPARATOR.join(self.parts) + "\n").encode()
@@ -131,9 +129,11 @@ def _sync_git(client, store_id: str, ledger: dict, totals: dict) -> None:
     root = git_source.repository_root()
     writer = _Writer("git", client, store_id, ledger, totals)
     since = ledger["cursors"].get("git")
+    _set_state(stage="git: listing new commits")
     for sha, text, masked in git_source.records(root, since):
         totals["masked"] += masked
         totals["read_records"] = totals.get("read_records", 0) + 1
+        _set_state(totals=dict(totals), stage=f"git: {sha[:12]} read ({len(text)} chars)")
         writer.add(sha, sha, text)
     writer.flush()
 
@@ -145,8 +145,10 @@ def _sync_github(client, store_id: str, ledger: dict, totals: dict, token: str |
         cursor = ledger["cursors"].get(kind)
         edge = set(ledger["edges"].get(kind) or [])
         try:
+            _set_state(stage=f"{kind}: listing since {cursor or 'the beginning'}")
             for at, key, text, masked in github_source.records(kind, repo, cursor, edge, token):
                 totals["masked"] += masked
+                totals["read_records"] = totals.get("read_records", 0) + 1
                 writer.add(at, key, text)
         finally:
             # What was read before a rate limit or an error is still stored.

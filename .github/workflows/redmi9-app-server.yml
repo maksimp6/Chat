@@ -177,6 +177,9 @@ jobs:
               time.sleep(30)
           else:
               print("rag sync still running in the app after 10 minutes; it goes on in the background", flush=True)
+              totals = (current.get("totals") or {})
+              if not totals.get("read_records") and not totals.get("embedded_records"):
+                  failures.append(f"rag sync made no progress in 10 minutes: stage {current.get('stage')}")
           if failures:
               print("FAIL:", *failures, sep="\n", flush=True)
               sys.exit(1)
