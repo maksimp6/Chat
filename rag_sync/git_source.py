@@ -53,7 +53,8 @@ def new_commits(root: Path, since: str | None) -> list[str]:
 
 
 def _changes(root: Path, sha: str, parent: str | None) -> list[tuple[str, str, str | None]]:
-    args = ["diff-tree", "-r", "-z", "--name-status", "-M"]
+    # --no-commit-id: with one commit (the root) diff-tree would print its id as the first field.
+    args = ["diff-tree", "-r", "-z", "--no-commit-id", "--name-status", "-M"]
     args += [parent, sha] if parent else ["--root", sha]
     fields = _git(root, *args).decode(errors="replace").split("\0")
     changes, index = [], 0
