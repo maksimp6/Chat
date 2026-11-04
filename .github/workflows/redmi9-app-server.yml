@@ -103,6 +103,14 @@ jobs:
             timeout 120 su -c "pm uninstall com.mobile.legends" || echo "::warning::could not uninstall com.mobile.legends"
           fi
           timeout 120 su -c "rm -rf -- /sdcard/Android/data/com.mobile.legends /sdcard/Android/obb/com.mobile.legends" || echo "::warning::could not remove Mobile Legends data"
+          # Owner's request (2026-11-04): candidates for removal, nothing is removed yet. Kept: Termux
+          # with its plugins, the Yandex apps, and Iceraven (the screenshots job and RootAgent browse
+          # drive it). Every package is listed with its APK path so system apps can be judged too.
+          keep_apps='^(com\.termux(\..*)?|ru\.yandex\..*|com\.yandex\..*|io\.github\.forkmaintainers\.iceraven)$'
+          timeout 60 su -c "pm list packages -3" </dev/null | sed 's/^package://' | sort | while read -r app; do
+            if printf '%s\n' "$app" | grep -qE "$keep_apps"; then echo "APP_KEEP $app"; else echo "APP_REMOVE_CANDIDATE $app"; fi
+          done || true
+          timeout 60 su -c "pm list packages -s -e -f" </dev/null | sed 's/^package:/APP_SYSTEM /' | sort || true
           # What fills .alice-rdc and what still runs from it (sizes, paths and process lines only).
           if [ -d "$home/.alice-rdc" ]; then
             du -xak "$home/.alice-rdc" 2>/dev/null | sort -rn | head -n 40 || true
