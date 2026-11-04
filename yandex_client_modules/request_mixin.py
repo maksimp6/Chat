@@ -222,6 +222,30 @@ def _ask_local(message, model_key, params, execution_trace, trace_step, timeout)
     perf = time.perf_counter()
     if trace is not None:
         trace.add_event("api_request_sent", {"method": "POST", "url": url, "step": step})
+    sink = params.get("on_stream_event")
+    live = None
+    if callable(sink):
+        emit_event(sink, {"kind": "response_status", "status": "in_progress", "response_id": None})
+        # One reasoning part per request: the live view joins its pieces without breaks.
+        part = f"ollama-{step or 0}-{started}"
+
+        def live(event):
+            kind = event.get("kind")
+            if kind == "reasoning_delta":
+                emit_event(sink, {"kind": "reasoning_delta", "text": event["text"], "summary": False, "part": part})
+            elif kind == "text_delta":
+                emit_event(sink, {"kind": "text_delta", "text": event["text"]})
+            elif kind == "tool_call_requested":
+                # A tool's one function names its action in "tool": show the action.
+                arguments = event.get("arguments")
+                name = event.get("name")
+                if isinstance(arguments, dict) and isinstance(arguments.get("tool"), str):
+                    name = arguments["tool"]
+                emit_event(
+                    sink,
+                    {"kind": "tool_progress", "tool": "function", "phase": "requested", "name": name, "server_label": None},
+                )
+
     try:
         body, result = ollama_ask(
             url,
@@ -231,6 +255,7 @@ def _ask_local(message, model_key, params, execution_trace, trace_step, timeout)
             params,
             context=bound.Config.OLLAMA_CONTEXT,
             timeout=timeout or None,
+            on_event=live,
         )
     except OllamaError as exc:
         error = YandexClientError(

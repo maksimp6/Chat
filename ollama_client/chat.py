@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 import requests
@@ -205,13 +206,21 @@ def ask(
     *,
     context: int,
     timeout: float | None,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """(request body, Responses-shaped answer) of one /api/chat request to Ollama at ``url``."""
+    """(request body, Responses-shaped answer) of one /api/chat request to Ollama at ``url``.
+
+    With ``on_event`` the answer streams: every piece of thinking and text is reported
+    as it arrives ({"kind": "reasoning_delta" | "text_delta", "text"}), and every tool
+    call as soon as the model makes it ({"kind": "tool_call_requested", "name",
+    "arguments"}). ``timeout`` then bounds the wait between pieces, not the whole answer.
+    """
     body = build_body(upstream, items, params, context)
+    body["stream"] = on_event is not None
     endpoint = url.rstrip("/") + "/api/chat"
     started = time.time()
     try:
-        resp = requests.post(endpoint, json=body, timeout=timeout)
+        resp = requests.post(endpoint, json=body, timeout=timeout, stream=on_event is not None)
     except requests.RequestException as exc:
         raise OllamaError(
             f"Ollama {endpoint} unreachable: {type(exc).__name__}: {exc}", reached=False
@@ -220,8 +229,60 @@ def ask(
         raise OllamaError(
             f"Ollama HTTP {resp.status_code}: {resp.text[:500]}", status_code=resp.status_code
         )
-    try:
-        data = resp.json()
-    except ValueError as exc:
-        raise OllamaError("Ollama returned a response that is not valid JSON", status_code=200) from exc
+    if on_event is None:
+        try:
+            data = resp.json()
+        except ValueError as exc:
+            raise OllamaError("Ollama returned a response that is not valid JSON", status_code=200) from exc
+    else:
+        data = _read_stream(resp, on_event)
     return body, _response(data if isinstance(data, dict) else {}, model_key, started)
+
+
+def _read_stream(resp: requests.Response, on_event: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
+    """The streamed /api/chat answer joined into one, reported piece by piece."""
+    thinking: list[str] = []
+    content: list[str] = []
+    calls: list[dict[str, Any]] = []
+    last: dict[str, Any] = {}
+    try:
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            try:
+                chunk = json.loads(line)
+            except ValueError as exc:
+                raise OllamaError("Ollama streamed a line that is not valid JSON", status_code=200) from exc
+            if not isinstance(chunk, dict):
+                continue
+            if chunk.get("error"):
+                raise OllamaError(f"Ollama: {chunk['error']}", status_code=200)
+            message = chunk.get("message") if isinstance(chunk.get("message"), dict) else {}
+            if message.get("thinking"):
+                thinking.append(message["thinking"])
+                on_event({"kind": "reasoning_delta", "text": message["thinking"]})
+            if message.get("content"):
+                content.append(message["content"])
+                on_event({"kind": "text_delta", "text": message["content"]})
+            for call in message.get("tool_calls") or []:
+                function = call.get("function") if isinstance(call, dict) else None
+                if not isinstance(function, dict) or not function.get("name"):
+                    continue
+                calls.append(call)
+                on_event(
+                    {
+                        "kind": "tool_call_requested",
+                        "name": function["name"],
+                        "arguments": function.get("arguments"),
+                    }
+                )
+            if chunk.get("done"):
+                last = chunk
+    except requests.RequestException as exc:
+        raise OllamaError(f"Ollama stream broke: {type(exc).__name__}: {exc}", status_code=200) from exc
+    finally:
+        resp.close()
+    return {
+        **last,
+        "message": {"role": "assistant", "thinking": "".join(thinking), "content": "".join(content), "tool_calls": calls},
+    }
