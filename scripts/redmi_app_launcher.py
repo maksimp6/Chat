@@ -3,6 +3,7 @@
 import errno
 import json
 import os
+import signal
 import socket
 import subprocess
 from pathlib import Path
@@ -91,38 +92,28 @@ def main():
         stream.flush()
         os.fsync(stream.fileno())
     temporary.replace(state / "backend.pid")
-    start_watchdog(app, state, port)
+    stop_watchdog(state)
     print(json.dumps({"pid": process.pid, "bind_host": host, "port": port}))
 
 
-def start_watchdog(app, state, port):
-    """Start the watchdog that restarts a server which stops answering, unless one runs."""
+def stop_watchdog(state):
+    """Stop the watchdog an earlier launcher started (owner, 05.11.2026: delete it).
+
+    A new server spends ~2 minutes loading its store before it answers /healthz; the
+    watchdog took that for a hang and restarted it, so every deploy started Logos twice.
+    It ran in its own session: the whole group goes, so a restart it already started
+    (waiting for the deploy's control lock) goes with it."""
     pid_file = state / "watchdog.pid"
     try:
         pid = int(pid_file.read_text().strip())
         if b"redmi_watchdog.py" in Path(f"/proc/{pid}/cmdline").read_bytes():
-            return
+            os.killpg(pid, signal.SIGTERM)
     except (OSError, ValueError):
         pass
-    # No runner variables (the job ends) and no secrets: it only asks /healthz and restarts.
-    env = {
-        k: v
-        for k, v in os.environ.items()
-        if not k.startswith(("GITHUB_", "ACTIONS_", "RUNNER_", "GH_"))
-        and not any(word in k for word in ("TOKEN", "KEY", "SECRET", "PASSWORD"))
-    }
-    env.update(LOGOS_APP_DIR=str(app), LOGOS_STATE_DIR=str(state), LOGOS_PORT=str(port))
-    with (state / "watchdog.log").open("ab", buffering=0) as log:
-        watchdog = subprocess.Popen(
-            [str(app / ".venv/bin/python"), str(app / "scripts/redmi_watchdog.py")],
-            cwd=app,
-            env=env,
-            stdin=subprocess.DEVNULL,
-            stdout=log,
-            stderr=log,
-            start_new_session=True,
-        )
-    pid_file.write_text(str(watchdog.pid))
+    try:
+        pid_file.unlink()
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":
