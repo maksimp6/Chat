@@ -319,18 +319,23 @@ class LiveTurn:
             server_label = event.get("server_label")
             # The next status is shown again after a tool line.
             self._phase = "tool"
-            self.emit(
-                {
-                    "type": "tool",
-                    "phase": phase,
-                    "kind": tool,
-                    "name": name if isinstance(name, str) and name else None,
-                    "server_label": server_label
-                    if isinstance(server_label, str) and server_label
-                    else None,
-                    "text": tool_text(tool, phase, name, server_label),
-                }
-            )
+            wire = {
+                "type": "tool",
+                "phase": phase,
+                "kind": tool,
+                "name": name if isinstance(name, str) and name else None,
+                "server_label": server_label
+                if isinstance(server_label, str) and server_label
+                else None,
+                "text": tool_text(tool, phase, name, server_label),
+            }
+            # What the tool was called with and what it returned, as JSON text for the page.
+            for field in ("arguments", "output"):
+                if field in event:
+                    wire[field] = json.dumps(
+                        event[field], ensure_ascii=False, indent=2, default=str
+                    )
+            self.emit(wire)
             return
         if kind == "retry":
             delay_s = _number(event.get("delay_s"))

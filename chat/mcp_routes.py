@@ -692,15 +692,18 @@ def _define_logos_client(base: type) -> type:
             def execute_tool(call):
                 nonlocal tool_servers
                 name = call.get("name")
-                if isinstance(name, str):
-                    # A tool's one function picks the action by "tool": show that action.
-                    try:
-                        inner = _json.loads(call.get("arguments") or "{}")
-                    except (TypeError, ValueError):
-                        inner = call.get("arguments")
-                    if isinstance(inner, dict) and isinstance(inner.get("tool"), str):
-                        name = inner["tool"]
-                emit({"kind": "tool_call", "phase": "start", "name": name})
+                try:
+                    inner = _json.loads(call.get("arguments") or "{}")
+                except (TypeError, ValueError):
+                    inner = call.get("arguments")
+                arguments = inner
+                if isinstance(name, str) and isinstance(inner, dict) and isinstance(inner.get("tool"), str):
+                    # A tool's one function picks the action by "tool": show that action
+                    # and the action's own arguments.
+                    name = inner["tool"]
+                    arguments = inner.get("arguments", {})
+                # The live view shows what the tool was called with and what it returned.
+                emit({"kind": "tool_call", "phase": "start", "name": name, "arguments": arguments})
                 try:
                     if tool_servers is None:
                         tool_servers = bound.mcp_storage.list_servers(
@@ -712,18 +715,25 @@ def _define_logos_client(base: type) -> type:
                         trace=trace,
                         **policy_kwargs,
                     )
-                except Exception:
-                    emit({"kind": "tool_call", "phase": "failed", "name": name})
+                except Exception as exc:
+                    emit(
+                        {
+                            "kind": "tool_call",
+                            "phase": "failed",
+                            "name": name,
+                            "output": {"error": f"{type(exc).__name__}: {exc}"},
+                        }
+                    )
                     raise
-                failed = result.get("error") is not None
-                emit(
-                    {
-                        "kind": "tool_call",
-                        "phase": "failed" if failed else "done",
-                        "name": name,
-                    }
-                )
-                if failed:
+                if result.get("error") is not None:
+                    emit(
+                        {
+                            "kind": "tool_call",
+                            "phase": "failed",
+                            "name": name,
+                            "output": {"error": result["error"]},
+                        }
+                    )
                     return {"error": result["error"], "tool": result.get("name")}
                 sees_images = model_key in image_input_model_keys()
                 output, images = _take_screenshots(
@@ -739,6 +749,8 @@ def _define_logos_client(base: type) -> type:
                         if isinstance(output, dict)
                         else {"result": output, "screen_description": description}
                     )
+                # Screenshots were taken out of output above, so it carries no image data.
+                emit({"kind": "tool_call", "phase": "done", "name": name, "output": output})
                 return output
 
             def describe_screenshots(images):

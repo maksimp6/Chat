@@ -1759,11 +1759,36 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         render();
       },
-      addTool: function (text) {
+      // details: [label, JSON text] pairs (the call's arguments, the tool's result), shown when the line is opened.
+      addTool: function (text, details) {
         const last = toolsEl.lastElementChild;
-        if (last && last.textContent === text) return;
+        if (last && last.dataset.text === text && !(details && details.length)) return;
         const item = document.createElement("li");
-        item.textContent = text;
+        item.dataset.text = text;
+        if (details && details.length) {
+          const box = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.textContent = text;
+          box.appendChild(summary);
+          details.forEach(function (pair) {
+            const caption = document.createElement("div");
+            caption.textContent = pair[0];
+            caption.style.opacity = "0.7";
+            caption.style.marginTop = "4px";
+            const pre = document.createElement("pre");
+            pre.textContent = pair[1];
+            pre.style.whiteSpace = "pre-wrap";
+            pre.style.wordBreak = "break-word";
+            pre.style.maxHeight = "320px";
+            pre.style.overflow = "auto";
+            pre.style.margin = "2px 0 0";
+            pre.style.fontSize = "12px";
+            box.append(caption, pre);
+          });
+          item.appendChild(box);
+        } else {
+          item.textContent = text;
+        }
         toolsEl.appendChild(item);
         toolsEl.hidden = false;
       },
@@ -2630,8 +2655,12 @@ document.addEventListener("DOMContentLoaded", function () {
       // Kept for a re-attachment: the server sends a status only when its phase changes, so the replay after a break
       // may hold none.
       if (typeof event.text === "string" && event.text) turn.liveLabel = event.text;
-      if (event.type === "tool" && turn.status && typeof event.text === "string" && event.text) turn.status.addTool(event.text);
-      else setTurnLabel(turn, event.text);
+      if (event.type === "tool" && turn.status && typeof event.text === "string" && event.text) {
+        const details = [];
+        if (typeof event.arguments === "string") details.push(["Параметры", event.arguments]);
+        if (typeof event.output === "string") details.push(["Результат", event.output]);
+        turn.status.addTool(event.text, details);
+      } else setTurnLabel(turn, event.text);
     } else {
       live.apply(event);
     }
