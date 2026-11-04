@@ -194,9 +194,20 @@ def _home_public_ip() -> str | None:
     return _home_ip["address"]
 
 
+# The owner's proxy server (maxxxpavlov.online, ai-proxy.maxxxpavlov.online): the owner's
+# devices that go out through it reach chat.maxxxpavlov.ru from this address (owner,
+# 05.11.2026: open access to my proxy server IP).
+OWNER_PROXY_ADDRESSES = frozenset({"157.228.161.121"})
+
+
 def _home(address: str) -> bool:
-    """Inside the home network, directly or through the router's own public address."""
-    return _local(address) or address == _home_public_ip()
+    """Inside the home network, directly or through the router's own public address,
+    or coming from the owner's proxy server."""
+    return (
+        _local(address)
+        or address in OWNER_PROXY_ADDRESSES
+        or address == _home_public_ip()
+    )
 
 
 def _ddns_page(message: str = "") -> bytes:
