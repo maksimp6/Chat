@@ -246,13 +246,19 @@ def _ask_local(message, model_key, params, execution_trace, trace_step, timeout)
                     {"kind": "tool_progress", "tool": "function", "phase": "requested", "name": name, "server_label": None},
                 )
 
+    # Only the local model's own tools: all the schemas would not fit its context.
+    tools = [
+        tool
+        for tool in params.get("tools") or []
+        if isinstance(tool, dict) and tool.get("name") in bound.Config.OLLAMA_TOOLS
+    ]
     try:
         body, result = ollama_ask(
             url,
             bound.Config.OLLAMA_MODELS[model_key],
             model_key,
             _response_input(params, message),
-            params,
+            {**params, "tools": tools},
             context=bound.Config.OLLAMA_CONTEXT,
             timeout=timeout or None,
             on_event=live,

@@ -158,6 +158,9 @@ CHAT_MODEL = "qwen3-4b"
 # Ollama on the owner's PC (Intel N100, 8 GB RAM). A larger context froze the PC.
 OLLAMA_URL = "http://192.168.10.6:11434"
 OLLAMA_CONTEXT = 8192
+# The tools a local model is given. All tool schemas together are ~33,000 tokens: they
+# do not fit its 8192-token context, and the N100 reads a prompt at ~14 tokens/s.
+OLLAMA_TOOLS = ("remember",)
 OLLAMA_MODELS = {
     key: info["upstream"]
     for key, info in TEXT_MODELS.items()
@@ -282,6 +285,7 @@ class Config:
     PORT = PORT
     OLLAMA_URL = OLLAMA_URL
     OLLAMA_CONTEXT = OLLAMA_CONTEXT
+    OLLAMA_TOOLS = OLLAMA_TOOLS
     OLLAMA_MODELS = OLLAMA_MODELS
 
 
