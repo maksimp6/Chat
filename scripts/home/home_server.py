@@ -179,6 +179,26 @@ def _local(address: str) -> bool:
     return ip.is_private or ip.is_loopback
 
 
+_home_ip = {"address": None, "at": 0.0}
+
+
+def _home_public_ip() -> str | None:
+    """The home's public IP, refreshed every 5 minutes. A device on the home Wi-Fi that
+    opens chat.maxxxpavlov.ru comes back through the router with this address."""
+    if time.time() - _home_ip["at"] > 300:
+        try:
+            _home_ip["address"] = ddns_regru.public_ip()
+        except (OSError, ValueError):
+            pass
+        _home_ip["at"] = time.time()
+    return _home_ip["address"]
+
+
+def _home(address: str) -> bool:
+    """Inside the home network, directly or through the router's own public address."""
+    return _local(address) or address == _home_public_ip()
+
+
 def _ddns_page(message: str = "") -> bytes:
     try:
         lines = ddns_regru.LOG.read_text(encoding="utf-8").splitlines()[-8:]
@@ -208,7 +228,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _proxy(self) -> None:
         """Logos for the home network only; from outside chat.maxxxpavlov.ru does not exist."""
-        if not _local(self.client_address[0]):
+        if not _home(self.client_address[0]):
             self.send_error(404)
             return
         length = int(self.headers.get("Content-Length") or 0)
