@@ -159,9 +159,12 @@ TEXT_MODELS: dict[str, dict[str, Any]] = {
 # A dialog has no text model of its own; image and voice dialogs keep their model.
 CHAT_MODEL = "ollama-qwen3-4b"
 
-# Ollama on the owner's PC (Intel N100, 8 GB RAM). A larger context froze the PC.
+# Ollama on the owner's PC (Intel N100, 8 GB RAM). The context is the whole room for the
+# prompt, the thinking and the answer (no output cap is sent). 16384 fits in the memory
+# 8192 took because the PC's Ollama compresses its context cache (OLLAMA_FLASH_ATTENTION=1,
+# OLLAMA_KV_CACHE_TYPE=q8_0; owner, 05.11.2026: reasoning and output at maximum).
 OLLAMA_URL = "http://192.168.10.6:11434"
-OLLAMA_CONTEXT = 8192
+OLLAMA_CONTEXT = 16384
 # The tools a local model is given. All tool schemas together are ~33,000 tokens: they
 # do not fit its 8192-token context, and the N100 reads a prompt at ~14 tokens/s.
 OLLAMA_TOOLS = ("remember",)
