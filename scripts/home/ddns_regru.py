@@ -27,7 +27,7 @@ import urllib.request
 from pathlib import Path
 
 DOMAIN = "maxxxpavlov.ru"
-SUBDOMAINS = ("@", "www")
+SUBDOMAINS = ("@", "www", "chat")
 API = "https://api.reg.ru/api/regru2/"
 IP_URL = "https://api.ipify.org"
 INTERVAL_SECONDS = 300
@@ -150,12 +150,18 @@ def main() -> int:
         update(account)
         return 0
     install_boot_hook()
+    script = Path(__file__).resolve()
+    loaded = script.stat().st_mtime
     while True:
         try:
             update(account)
         except Exception as exc:
             log(f"error: {exc}")
         time.sleep(INTERVAL_SECONDS)
+        # A deploy rewrites this file: the loop restarts on the new code (new subdomains).
+        if script.stat().st_mtime != loaded:
+            log("script changed, restarting")
+            os.execv(sys.executable, [sys.executable, str(script)])
 
 
 if __name__ == "__main__":

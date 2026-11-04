@@ -5,17 +5,22 @@ Run from the Logos checkout in Termux; the script also writes its Termux:Boot ho
     python scripts/home/home_server.py
 
 Port 80 opens without root because the boot hook ``10-unprivileged-ports`` sets
-``net.ipv4.ip_unprivileged_port_start`` to 0. The page shows only the state below;
-the Logos server (port 8080) is not exposed through it.
+``net.ipv4.ip_unprivileged_port_start`` to 0. The page shows only the state below.
+
+``chat.maxxxpavlov.ru`` is the Logos server (port 8080), proxied here only for
+addresses inside the home network: Logos has no login and its tools run on the
+phone, so from outside that name answers 404 (owner, 04.11.2026: LAN only).
 """
 
 from __future__ import annotations
 
 import html
+import http.client
 import ipaddress
 import json
 import os
 import sys
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -28,6 +33,13 @@ import ddns_regru  # noqa: E402 (sibling script)
 PORT = int(os.environ.get("HOME_PAGE_PORT", "80"))
 BOOT_HOOK = Path.home() / ".termux/boot/70-home-page"
 STARTED = time.time()
+CHAT_HOST = "chat." + ddns_regru.DOMAIN
+LOGOS = ("127.0.0.1", 8080)
+# Connection-level headers belong to one hop; the proxy never forwards them.
+_HOP_HEADERS = {
+    "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+    "te", "trailer", "transfer-encoding", "upgrade",
+}
 
 
 def _meminfo() -> dict[str, int]:
@@ -190,7 +202,65 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _for_chat(self) -> bool:
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip().lower().rstrip(".")
+        return host == CHAT_HOST
+
+    def _proxy(self) -> None:
+        """Logos for the home network only; from outside chat.maxxxpavlov.ru does not exist."""
+        if not _local(self.client_address[0]):
+            self.send_error(404)
+            return
+        length = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(length) if length else None
+        headers = {k: v for k, v in self.headers.items() if k.lower() not in _HOP_HEADERS}
+        headers["X-Forwarded-For"] = self.client_address[0]
+        headers["X-Forwarded-Host"] = CHAT_HOST
+        # A chat turn can run for many minutes on the local model.
+        upstream = http.client.HTTPConnection(*LOGOS, timeout=3600)
+        try:
+            upstream.request(self.command, self.path, body=body, headers=headers)
+            response = upstream.getresponse()
+        except OSError:
+            upstream.close()
+            self.send_error(502, "Logos is not answering")
+            return
+        try:
+            self.send_response(response.status, response.reason)
+            for name, value in response.getheaders():
+                if name.lower() not in _HOP_HEADERS | {"server", "date"}:
+                    self.send_header(name, value)
+            self.send_header("Connection", "close")
+            self.end_headers()
+            if self.command != "HEAD":
+                # Copied as it arrives, so live turn events (server-sent events) stream.
+                while chunk := response.read1(65536):
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+        except OSError:
+            pass  # the browser went away
+        finally:
+            upstream.close()
+
+    def do_PUT(self) -> None:  # noqa: N802 (http.server API)
+        self._proxy() if self._for_chat() else self.send_error(404)
+
+    def do_PATCH(self) -> None:  # noqa: N802 (http.server API)
+        self._proxy() if self._for_chat() else self.send_error(404)
+
+    def do_DELETE(self) -> None:  # noqa: N802 (http.server API)
+        self._proxy() if self._for_chat() else self.send_error(404)
+
+    def do_OPTIONS(self) -> None:  # noqa: N802 (http.server API)
+        self._proxy() if self._for_chat() else self.send_error(404)
+
+    def do_HEAD(self) -> None:  # noqa: N802 (http.server API)
+        self._proxy() if self._for_chat() else self.send_error(404)
+
     def do_POST(self) -> None:  # noqa: N802 (http.server API)
+        if self._for_chat():
+            self._proxy()
+            return
         if self.path != "/ddns" or not _local(self.client_address[0]):
             self.send_error(404)
             return
@@ -211,6 +281,9 @@ class Handler(BaseHTTPRequestHandler):
         self._send(_ddns_page(message))
 
     def do_GET(self) -> None:  # noqa: N802 (http.server API)
+        if self._for_chat():
+            self._proxy()
+            return
         state = _state()
         if self.path == "/ddns":
             if not _local(self.client_address[0]):
@@ -256,7 +329,23 @@ def main() -> None:
         encoding="utf-8",
     )
     BOOT_HOOK.chmod(0o700)
+    threading.Thread(target=_restart_on_change, args=(script,), daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+
+
+def _restart_on_change(script: Path) -> None:
+    """A deploy rewrites the scripts: the server restarts on the new code by itself."""
+    sources = [script, Path(ddns_regru.__file__).resolve()]
+    loaded = [path.stat().st_mtime for path in sources]
+    while True:
+        time.sleep(30)
+        try:
+            changed = [path.stat().st_mtime for path in sources] != loaded
+        except OSError:
+            continue
+        if changed:
+            print(time.strftime("%Y-%m-%d %H:%M:%S"), "script changed, restarting", flush=True)
+            os.execv(sys.executable, [sys.executable, str(script)])
 
 
 if __name__ == "__main__":

@@ -221,6 +221,31 @@ PY
   [[ -f $state/backend.pid ]] || { echo 'Launcher did not write an application PID' >&2; return 1; }
   pid=$(<"$state/backend.pid")
   outcome=started
+  restart_home || echo 'The home page or DDNS did not restart' >&2
+}
+
+restart_home() {
+  # The home page (port 80, the LAN-only chat.maxxxpavlov.ru proxy) and the DDNS loop
+  # run from this checkout, so a deploy restarts them on its code.
+  local script log
+  for script in home_server.py ddns_regru.py; do
+    [[ -f $app/scripts/home/$script ]] || continue
+    if [[ $script == ddns_regru.py ]]; then
+      [[ -f $HOME/.config/regru/ddns.json ]] || continue
+      log=$HOME/.ddns-regru.log
+    else
+      log=$HOME/.home-page.log
+    fi
+    pkill -f "scripts/home/$script" 2>/dev/null || true
+    sleep 1
+    "$python" - "$app/scripts/home/$script" "$log" 9>&- <<'PY'
+import subprocess, sys
+subprocess.Popen(
+    [sys.executable, sys.argv[1]], stdin=subprocess.DEVNULL,
+    stdout=open(sys.argv[2], "a"), stderr=subprocess.STDOUT, start_new_session=True,
+)
+PY
+  done
 }
 
 wait_ready() {
