@@ -229,7 +229,12 @@ class Handler(BaseHTTPRequestHandler):
     def _proxy(self) -> None:
         """Logos for the home network only; from outside chat.maxxxpavlov.ru does not exist."""
         if not _home(self.client_address[0]):
-            self.send_error(404)
+            # Says which address was refused, so a device that should be at home shows why.
+            self.send_error(
+                404,
+                explain=f"Logos открыт только из домашней сети. Ваш адрес: {self.client_address[0]}; "
+                f"адрес дома: {_home_public_ip() or 'неизвестен'}.",
+            )
             return
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length else None
