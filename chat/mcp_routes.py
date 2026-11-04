@@ -1071,8 +1071,12 @@ def _court_record(
         _file_court_failure(conv_id, "court_sitting_failed", exc, message_id=message_id, **ids)
 
 
-def _embed_turn(conv_id: str, user_message_id: Any, reply_message_id: Any, reply: str) -> None:
-    """The question and the stored answer go into the app's vector database (collection dialogs).
+def _embed_turn(
+    conv_id: str, user_message_id: Any, reply_message_id: Any, reply: str, reasoning: str = ""
+) -> None:
+    """The question, the model's thinking and the stored answer go into the app's vector
+    database (collection dialogs): the thinking is the memory the remember tool searches
+    (owner, 05.11.2026: the model does not write memory itself).
 
     Runs in its own thread after the reply is stored; a failure is a Court case."""
     try:
@@ -1080,6 +1084,8 @@ def _embed_turn(conv_id: str, user_message_id: Any, reply_message_id: Any, reply
         text = (
             ("Пользователь: " + str(question.get("text") or question.get("content") or "") + "\n\n")
             if isinstance(question, dict) else ""
+        ) + (
+            ("Мысли Логоса: " + reasoning.strip() + "\n\n") if reasoning and reasoning.strip() else ""
         ) + "Логос: " + reply
         vector_add(
             "dialogs",
@@ -1814,7 +1820,13 @@ def _finalize_chat_turn(
         if reply and reply_message_id is not None:
             threading.Thread(
                 target=_embed_turn,
-                args=(invocation.conversation_id, user_message_id, reply_message_id, str(reply)),
+                args=(
+                    invocation.conversation_id,
+                    user_message_id,
+                    reply_message_id,
+                    str(reply),
+                    str(reasoning or ""),
+                ),
                 name="logos-embed-turn",
                 daemon=True,
             ).start()

@@ -25,7 +25,7 @@ window.LogosErrorText = function (prefix, error) {
 let currentConvId = null;
 let conversations = [];
 // The one model of Logos: every dialog answers with it, whatever a dialog stored.
-const CHAT_MODEL_KEY = "qwen3-4b";
+const CHAT_MODEL_KEY = "ollama-qwen3-1.7b";
 let currentModel = CHAT_MODEL_KEY;
 let currentModelType = "text";
 let modelsData = { text: {}, voice: {}, image: {} };
