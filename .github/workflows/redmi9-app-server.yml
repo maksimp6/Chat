@@ -98,6 +98,17 @@ jobs:
             echo "removing $entry"
             rm -rf -- "$entry" 2>/dev/null || timeout 60 su -c "rm -rf -- '$entry'" || echo "::warning::could not remove $entry"
           done
+          # Owner's order (2026-11-04): Mobile Legends is removed from the phone with its data.
+          if timeout 60 su -c "pm list packages com.mobile.legends" | grep -qx 'package:com.mobile.legends'; then
+            timeout 120 su -c "pm uninstall com.mobile.legends" || echo "::warning::could not uninstall com.mobile.legends"
+          fi
+          timeout 120 su -c "rm -rf -- /sdcard/Android/data/com.mobile.legends /sdcard/Android/obb/com.mobile.legends" || echo "::warning::could not remove Mobile Legends data"
+          # What fills .alice-rdc and what still runs from it (sizes, paths and process lines only).
+          if [ -d "$home/.alice-rdc" ]; then
+            du -xak "$home/.alice-rdc" 2>/dev/null | sort -rn | head -n 40 || true
+            grep -rls alice-rdc "$home/.termux/boot" || true
+            ps -A -o pid,args 2>/dev/null | grep -v grep | grep alice-rdc || true
+          fi
           python -m pip cache purge || echo "::warning::pip cache purge failed"
           git -C "$home/logos-local" lfs prune || echo "::warning::git lfs prune failed"
           # What takes the space now, largest first (sizes and paths only), in the home and on /sdcard.
