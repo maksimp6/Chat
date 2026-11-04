@@ -137,12 +137,13 @@ TEXT_MODELS: dict[str, dict[str, Any]] = {
         "output": 0.30,
     },
     # Served by Ollama on the owner's PC, not by Yandex (owner, 04.11.2026: no Yandex API).
-    # The key is not a Yandex catalog key (qwen3-4b and qwen3-1.7b are), so no Yandex
-    # price or profile applies. 1.7B (owner, 05.11.2026): on the N100 it reads ~34 and
-    # writes ~9 tokens/s, against ~14 and ~4.5 for qwen3:4b.
-    "ollama-qwen3-1.7b": {
-        "name": "Qwen3 1.7B (Ollama)",
-        "upstream": "qwen3:1.7b",
+    # The key is not a Yandex catalog key (qwen3-4b is), so no Yandex price or profile
+    # applies. qwen3:1.7b was tried on 05.11.2026 (~34/~9 tokens/s read/write against
+    # ~14/~4.5): it called remember but answered with the call as text, so the owner
+    # chose qwen3:4b.
+    "ollama-qwen3-4b": {
+        "name": "Qwen3 4B (Ollama)",
+        "upstream": "qwen3:4b",
         "provider": "ollama",
         "type": "text",
         "capabilities": {"tools": True, "function_calling": True, "multimodal": None},
@@ -156,7 +157,7 @@ TEXT_MODELS: dict[str, dict[str, Any]] = {
 
 # The one text model of every Logos dialog.
 # A dialog has no text model of its own; image and voice dialogs keep their model.
-CHAT_MODEL = "ollama-qwen3-1.7b"
+CHAT_MODEL = "ollama-qwen3-4b"
 
 # Ollama on the owner's PC (Intel N100, 8 GB RAM). A larger context froze the PC.
 OLLAMA_URL = "http://192.168.10.6:11434"

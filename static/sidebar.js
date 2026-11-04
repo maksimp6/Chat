@@ -261,7 +261,7 @@ function selectConv(id, updateHistory) {
   });
   if (conv) {
     if (typeof window.changeModel === "function") {
-      window.changeModel(conv.model || "ollama-qwen3-1.7b", true);
+      window.changeModel(conv.model || "ollama-qwen3-4b", true);
     }
   }
   if (typeof window.loadServerConvSettings === "function") {
@@ -312,7 +312,7 @@ function deleteConv(id) {
         chatbox.appendChild(empty);
       }
       if (typeof window.changeModel === "function") {
-        window.changeModel("ollama-qwen3-1.7b", true);
+        window.changeModel("ollama-qwen3-4b", true);
       }
     }
   }
