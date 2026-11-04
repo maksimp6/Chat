@@ -2,6 +2,7 @@
 
 Run from the Logos checkout in Termux; the script also writes its Termux:Boot hook:
 
+    python scripts/home/ddns_regru.py setup    # ask for the REG.RU login, update now, keep running
     python scripts/home/ddns_regru.py          # check every 5 minutes, forever
     python scripts/home/ddns_regru.py --once   # one check
 
@@ -15,7 +16,10 @@ request comes from an address allowed there.
 
 from __future__ import annotations
 
+import getpass
 import json
+import os
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -101,7 +105,37 @@ def install_boot_hook() -> None:
     BOOT_HOOK.chmod(0o700)
 
 
+def setup() -> int:
+    username = input("Логин REG.RU: ").strip()
+    password = getpass.getpass("Пароль REG.RU (не отображается): ")
+    account = {"username": username, "password": password}
+    try:
+        update(account)
+    except Exception as exc:
+        print(f"Не получилось: {exc}")
+        print("Проверьте логин и пароль и что в REG.RU (Настройки -> API) включён доступ к API")
+        print("и разрешён адрес этого дома. Затем запустите setup ещё раз.")
+        return 1
+    CREDENTIALS.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(CREDENTIALS.parent, 0o700)
+    fd = os.open(CREDENTIALS, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(account, handle)
+    os.chmod(CREDENTIALS, 0o600)
+    install_boot_hook()
+    subprocess.run(["pkill", "-f", f"{Path(__file__).name}$"], check=False)
+    with open(LOG, "a", encoding="utf-8") as log_file:
+        subprocess.Popen(
+            [sys.executable, str(Path(__file__).resolve())],
+            stdin=subprocess.DEVNULL, stdout=log_file, stderr=log_file, start_new_session=True,
+        )
+    print(f"Готово: {DOMAIN} указывает на этот дом и будет обновляться сам, в том числе после перезагрузки.")
+    return 0
+
+
 def main() -> int:
+    if sys.argv[1:] == ["setup"]:
+        return setup()
     account = json.loads(CREDENTIALS.read_text(encoding="utf-8"))
     if "--once" in sys.argv:
         update(account)
