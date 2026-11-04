@@ -133,7 +133,10 @@ REMEMBER_TOOLS = {
         "title": "Remember",
         "description": "Вспомнить. Без параметров: сначала подумай, что именно нужно вспомнить, "
         "затем вызови. Память ищется по смыслу твоего размышления и возвращается как context.",
-        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        # Open: a small model adds arguments of its own ({"what": ...}, seen 05.11.2026 on
+        # qwen3:1.7b), and a closed schema refused the call. They are ignored: memory is
+        # searched by the thinking text.
+        "parameters": {"type": "object", "additionalProperties": True},
         "capabilities": ["remember", "memory", "vectors"],
         "risk_level": "low",
         "read_only": True,
