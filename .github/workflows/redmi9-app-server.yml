@@ -83,12 +83,8 @@ jobs:
           if [ -d "$home/.logos-rdc/screenshots" ]; then
             find "$home/.logos-rdc/screenshots" -mindepth 1 -maxdepth 1 ! -name 'latest.*' -exec rm -rf -- {} + || true
           fi
-          keep=" logos-local logos-local-state github-python-runner storage .logos-rdc .desktop-commander-device .claude-server-commander .termux .ssh .gnupg .android .config .local .pyproxy.env .logos-media-ram "
-          # The former RDC home stays only while something still runs from it.
-          if grep -rqs alice-rdc "$home/.termux/boot" || ps -A -o args 2>/dev/null | grep -v grep | grep -q alice-rdc; then
-            keep="$keep.alice-rdc "
-            echo "::warning::.alice-rdc is still in use and was kept"
-          fi
+          # .alice-rdc holds the RDC package that scripts/rdc/termux-rdc.sh runs; it is always kept.
+          keep=" logos-local logos-local-state github-python-runner storage .logos-rdc .alice-rdc .desktop-commander-device .claude-server-commander .termux .ssh .gnupg .android .config .local .pyproxy.env .logos-media-ram "
           for entry in "$home"/* "$home"/.[!.]*; do
             [ -e "$entry" ] || [ -L "$entry" ] || continue
             name=${entry##*/}
@@ -124,6 +120,8 @@ jobs:
           timeout 120 su -c "du -xsk /sdcard/* /sdcard/Android/data/* 2>/dev/null" | sort -rn | head -n 25 || true
           df -k "$cleanup_root"
           bash scripts/redmi_app_server.sh deploy
+          # RDC is started (or left running) after every deploy, with its watchdog.
+          bash "$home/logos-local/scripts/rdc/termux-rdc.sh" || echo "::warning::RDC did not start; see $home/.logos-rdc/rdc.log"
 
   rag_vectors_check:
     # Real check of the rag and vectors tools against the running app on the phone:

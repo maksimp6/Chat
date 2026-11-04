@@ -15,6 +15,22 @@ healthy_pid() {
   cmdline="$(tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null)" || return 1
   [[ "$cmdline" == *desktop-commander* && "$cmdline" == *remote* ]]
 }
+# The package may live in the former RDC home or be missing after a cleanup:
+# use an existing copy, otherwise install it into $RDC_HOME/package.
+find_entry() {
+  [[ -f "$ENTRY" ]] && return 0
+  local found
+  found="$(find "$HOME/.alice-rdc" -path '*/node_modules/@wonderwhy-er/desktop-commander/dist/index.js' -print -quit 2>/dev/null || true)"
+  if [[ -n "$found" ]]; then
+    ENTRY="$found"
+    return 0
+  fi
+  command -v npm >/dev/null || { echo "npm missing" >&2; return 1; }
+  echo "RDC package missing; installing into $RDC_HOME/package"
+  mkdir -p "$RDC_HOME/package"
+  npm install --prefix "$RDC_HOME/package" @wonderwhy-er/desktop-commander@latest >>"$RDC_HOME/rdc.log" 2>&1 || { echo "RDC install failed; inspect $RDC_HOME/rdc.log" >&2; return 1; }
+  [[ -f "$ENTRY" ]]
+}
 start_agent() {
   exec 8>"$RDC_HOME/start.lock"
   flock -x 8
@@ -22,7 +38,7 @@ start_agent() {
     echo "RDC process already running"
     return
   fi
-  [[ -f "$ENTRY" ]] || { echo "RDC package missing: $ENTRY" >&2; return 1; }
+  find_entry || { echo "RDC package missing: $ENTRY" >&2; return 1; }
   command -v node >/dev/null || { echo "Node.js missing" >&2; return 1; }
   nohup node "$ENTRY" remote --disable-no-sleep >>"$RDC_HOME/rdc.log" 2>&1 </dev/null &
   echo "$!" >"$PID_FILE"
