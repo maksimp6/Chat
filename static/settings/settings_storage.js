@@ -12,8 +12,8 @@
     // Off (owner, 30.10.2026, #1723): background mode queued every round at the provider
     // for 1-3 minutes; a chat answers synchronously and still streams.
     background: false,
-    // Live (streamed) answers are off (owner, 30.10.2026): the answer appears when it is complete.
-    stream: false,
+    // Live (streamed) answers are on (owner, 05.11.2026: "make text live").
+    stream: true,
     previous_response_id: "",
     parallel_tool_calls: true,
     tool_choice: "auto",
@@ -69,7 +69,7 @@
     var revision = Number.isInteger(settings.settings_revision) ? settings.settings_revision : 0;
     if (revision >= SETTINGS_REVISION) return settings;
     if (revision < 2) upgradeToRevision2(settings);
-    if (revision < 3 && !("stream" in settings)) settings.stream = false;
+    if (revision < 3 && !("stream" in settings)) settings.stream = true;
     settings.settings_revision = SETTINGS_REVISION;
     return settings;
   }

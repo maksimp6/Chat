@@ -95,9 +95,10 @@ def upgrade_dialog_settings(settings: Any) -> Any:
         files["max_results"] = FILE_SEARCH_MAX_RESULTS
         tools["file_search"] = files
         upgraded["tools_config"] = tools
-    # Only a missing key takes the new default: a stored stream value is a choice and stays.
+    # Live (streamed) answers are on (owner, 05.11.2026: "make text live"). Only a missing
+    # key takes this value: a stored stream value is a choice and stays.
     if revision < 3 and "stream" not in upgraded:
-        upgraded["stream"] = False
+        upgraded["stream"] = True
     # The cache and helper categories no longer exist; a stored one names no tool.
     categories = upgraded.get("active_tool_categories")
     if revision < 7 and isinstance(categories, list):
