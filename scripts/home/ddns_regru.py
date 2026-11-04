@@ -105,17 +105,9 @@ def install_boot_hook() -> None:
     BOOT_HOOK.chmod(0o700)
 
 
-def setup() -> int:
-    username = input("Логин REG.RU: ").strip()
-    password = getpass.getpass("Пароль REG.RU (не отображается): ")
-    account = {"username": username, "password": password}
-    try:
-        update(account)
-    except Exception as exc:
-        print(f"Не получилось: {exc}")
-        print("Проверьте логин и пароль и что в REG.RU (Настройки -> API) включён доступ к API")
-        print("и разрешён адрес этого дома. Затем запустите setup ещё раз.")
-        return 1
+def save_and_start(account: dict[str, str]) -> None:
+    """Check the account by updating the records, then save it and start the background check."""
+    update(account)
     CREDENTIALS.parent.mkdir(parents=True, exist_ok=True)
     os.chmod(CREDENTIALS.parent, 0o700)
     fd = os.open(CREDENTIALS, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -129,6 +121,23 @@ def setup() -> int:
             [sys.executable, str(Path(__file__).resolve())],
             stdin=subprocess.DEVNULL, stdout=log_file, stderr=log_file, start_new_session=True,
         )
+
+
+HINT = (
+    "Проверьте логин и пароль и что в REG.RU (Настройки -> API) включён доступ к API "
+    "и разрешён адрес этого дома."
+)
+
+
+def setup() -> int:
+    username = input("Логин REG.RU: ").strip()
+    password = getpass.getpass("Пароль REG.RU (не отображается): ")
+    try:
+        save_and_start({"username": username, "password": password})
+    except Exception as exc:
+        print(f"Не получилось: {exc}")
+        print(HINT)
+        return 1
     print(f"Готово: {DOMAIN} указывает на этот дом и будет обновляться сам, в том числе после перезагрузки.")
     return 0
 

@@ -12,13 +12,18 @@ the Logos server (port 8080) is not exposed through it.
 from __future__ import annotations
 
 import html
+import ipaddress
 import json
 import os
 import sys
 import time
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ddns_regru  # noqa: E402 (sibling script)
 
 PORT = int(os.environ.get("HOME_PAGE_PORT", "80"))
 BOOT_HOOK = Path.home() / ".termux/boot/70-home-page"
@@ -98,18 +103,121 @@ PAGE = """<!doctype html>
     <div class="card"><div class="label">Свободное место</div>
       <div class="value">{disk_free} <span class="label">из {disk_total}</span></div></div>
   </div>
-  <footer>Страница работает {page_uptime_hours} ч · данные обновляются при каждом открытии</footer>
+  <footer>Страница работает {page_uptime_hours} ч · данные обновляются при каждом открытии · <a href="/ddns" style="color: inherit">DDNS</a></footer>
 </main>
 </body>
 </html>
 """
 
 
+DDNS_PAGE = """<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDNS</title>
+<style>
+  :root {{ --bg: #f5f3ee; --card: #ffffff; --text: #1f2328; --muted: #6b6f76; --ok: #2f7d4f; --bad: #b3412e; --line: #d9d6cf; }}
+  @media (prefers-color-scheme: dark) {{
+    :root {{ --bg: #16181c; --card: #1f2227; --text: #e8e6e1; --muted: #9a9ea5; --ok: #5fbf85; --bad: #e27a66; --line: #3a3d43; }}
+  }}
+  * {{ box-sizing: border-box; }}
+  body {{ margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }}
+  main {{ max-width: 520px; margin: 0 auto; padding: 48px 16px; }}
+  h1 {{ font-size: 32px; margin: 0 0 4px; }}
+  .sub {{ color: var(--muted); margin: 0 0 24px; }}
+  form, .card {{ background: var(--card); border-radius: 14px; padding: 20px; margin-bottom: 16px; }}
+  label {{ display: block; color: var(--muted); font-size: 14px; margin: 12px 0 4px; }}
+  input {{ width: 100%; font: inherit; padding: 10px 12px; border: 1px solid var(--line);
+          border-radius: 10px; background: var(--bg); color: var(--text); }}
+  button {{ margin-top: 16px; width: 100%; font: inherit; font-weight: 600; padding: 12px;
+           border: 0; border-radius: 10px; background: var(--text); color: var(--bg); cursor: pointer; }}
+  .ok {{ color: var(--ok); }} .bad {{ color: var(--bad); }}
+  pre {{ white-space: pre-wrap; font-size: 13px; color: var(--muted); margin: 0; }}
+  a {{ color: inherit; }}
+</style>
+</head>
+<body>
+<main>
+  <h1>DDNS</h1>
+  <p class="sub">{domain} указывает на дом и обновляется каждые 5 минут</p>
+  {message}
+  <form method="post" action="/ddns">
+    <label for="u">Логин REG.RU</label>
+    <input id="u" name="username" autocomplete="username" required>
+    <label for="p">Пароль REG.RU</label>
+    <input id="p" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Сохранить и обновить</button>
+  </form>
+  <div class="card"><pre>{log}</pre></div>
+  <p class="sub"><a href="/">← Дом</a></p>
+</main>
+</body>
+</html>
+"""
+
+
+def _local(address: str) -> bool:
+    """The DDNS form takes the REG.RU password, so it answers only inside the home network."""
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    return ip.is_private or ip.is_loopback
+
+
+def _ddns_page(message: str = "") -> bytes:
+    try:
+        lines = ddns_regru.LOG.read_text(encoding="utf-8").splitlines()[-8:]
+    except OSError:
+        lines = []
+    return DDNS_PAGE.format(
+        domain=ddns_regru.DOMAIN,
+        message=message,
+        log=html.escape("\n".join(lines) or "Записей пока нет"),
+    ).encode("utf-8")
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "home"
 
+    def _send(self, body: bytes, content_type: str = "text/html; charset=utf-8") -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self) -> None:  # noqa: N802 (http.server API)
+        if self.path != "/ddns" or not _local(self.client_address[0]):
+            self.send_error(404)
+            return
+        length = int(self.headers.get("Content-Length") or 0)
+        form = urllib.parse.parse_qs(self.rfile.read(length).decode("utf-8"))
+        account = {
+            "username": (form.get("username") or [""])[0].strip(),
+            "password": (form.get("password") or [""])[0],
+        }
+        try:
+            ddns_regru.save_and_start(account)
+            message = f'<div class="card ok">Готово: {ddns_regru.DOMAIN} указывает на этот дом.</div>'
+        except Exception as exc:
+            message = (
+                f'<div class="card bad">Не получилось: {html.escape(str(exc))}<br>'
+                f"{html.escape(ddns_regru.HINT)}</div>"
+            )
+        self._send(_ddns_page(message))
+
     def do_GET(self) -> None:  # noqa: N802 (http.server API)
         state = _state()
+        if self.path == "/ddns":
+            if not _local(self.client_address[0]):
+                self.send_error(404)
+                return
+            self._send(_ddns_page())
+            return
         if self.path == "/state.json":
             body = json.dumps(state).encode("utf-8")
             content_type = "application/json"
