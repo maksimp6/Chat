@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import gzip
 import hashlib
 import json
 import logging
@@ -27,6 +28,9 @@ logger = logging.getLogger("logos.invocation.manager")
 
 _INVOCATION_PREFIX = "runtime_invocation:"
 _VALUE_CHUNK_PREFIX = "runtime_invocation_value:"
+# v1 chunks hold the JSON as is; v2 chunks hold it gzip-compressed. Both are read.
+_VALUE_FORMAT = "kristall-invocation-value-v1"
+_VALUE_FORMAT_GZIP = "kristall-invocation-value-v2"
 
 
 def _value_chunk_bytes() -> int:
@@ -181,6 +185,9 @@ def _prepare_value(
         raise bound.KristallError("unsupported JSON value") from exc
     if len(encoded) <= _inline_value_bytes() and not force_chunks:
         return sanitized, None
+    # A trace repeats the tool schemas and requests on every step: stored gzip-compressed,
+    # it takes a fraction of the space on disk and in Kristall's RAM state.
+    encoded = gzip.compress(encoded, compresslevel=6, mtime=0)
 
     # Chunk transactions retain Kristall's native frame/validation limits.
     # The caller publishes the manifest last in its lifecycle transaction.
@@ -188,7 +195,7 @@ def _prepare_value(
     count = (len(encoded) + _value_chunk_bytes() - 1) // _value_chunk_bytes()
     prefix = f"{_VALUE_CHUNK_PREFIX}{invocation_id}:{field}:{generation}:"
     manifest = {
-        "format": "kristall-invocation-value-v1",
+        "format": _VALUE_FORMAT_GZIP,
         "generation": generation,
         "chunks": count,
         "bytes": len(encoded),
@@ -312,7 +319,7 @@ def _discard_prepared_chunks(
 def _read_chunked_value(invocation_id: str, field: str, manifest: Any) -> Any:
     if (
         not isinstance(manifest, dict)
-        or manifest.get("format") != "kristall-invocation-value-v1"
+        or manifest.get("format") not in {_VALUE_FORMAT, _VALUE_FORMAT_GZIP}
         or not isinstance(manifest.get("generation"), str)
         or not re.fullmatch(r"[0-9a-f]{32}", manifest["generation"])
         or type(manifest.get("chunks")) is not int
@@ -345,8 +352,10 @@ def _read_chunked_value(invocation_id: str, field: str, manifest: Any) -> Any:
     if hashlib.sha256(encoded).hexdigest() != manifest["sha256"]:
         raise bound.KristallError("invocation value integrity mismatch")
     try:
+        if manifest["format"] == _VALUE_FORMAT_GZIP:
+            encoded = gzip.decompress(encoded)
         return json.loads(encoded.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError) as exc:
+    except (OSError, EOFError, ValueError, UnicodeDecodeError) as exc:
         raise bound.KristallError("invalid invocation value encoding") from exc
 
 
