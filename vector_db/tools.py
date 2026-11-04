@@ -6,15 +6,39 @@ from typing import Any
 
 from vector_db import store
 
-__all__ = ["VECTOR_TOOLS"]
+__all__ = ["REMEMBER_TOOLS", "VECTOR_TOOLS"]
+
+# Chunks the remember tool gives back: the local model's whole context is 8192 tokens.
+REMEMBER_RESULTS = 5
+
+
+def _metadata_of(cfg) -> dict:
+    """The metadata of the tool call, if the executor passed the call."""
+    context = cfg.get("_universal_context") if isinstance(cfg, dict) else None
+    call = context.get("call") if isinstance(context, dict) else None
+    metadata = getattr(call, "metadata", None)
+    return metadata if isinstance(metadata, dict) else {}
 
 
 def _trace_of(cfg) -> Any:
     """The execution trace of the tool call (the turn's trace), if the executor passed one."""
-    context = cfg.get("_universal_context") if isinstance(cfg, dict) else None
-    call = context.get("call") if isinstance(context, dict) else None
-    metadata = getattr(call, "metadata", None)
-    return metadata.get("execution_trace") if isinstance(metadata, dict) else None
+    return _metadata_of(cfg).get("execution_trace")
+
+
+def remember(args, cfg=None):
+    """Memory by meaning: the vector database searched with what the model was thinking."""
+    thought = str(_metadata_of(cfg).get("thought") or "").strip()
+    if not thought:
+        return {"success": False, "error": "нет текста размышления: подумай о том, что нужно вспомнить, и вызови снова"}
+    found = store.search(thought, None, REMEMBER_RESULTS, trace=_trace_of(cfg))
+    return {
+        "success": True,
+        "context": [
+            {key: hit.get(key) for key in ("text", "score", "collection", "id")}
+            for hit in found["results"]
+        ],
+        "searched": found["searched"],
+    }
 
 
 def _add(args, cfg=None):
@@ -75,7 +99,7 @@ def vectors(args, cfg=None):
 VECTOR_TOOLS = {
     "vectors": {
         "title": "Vector database",
-        "description": "Векторная база приложения (эмбеддинги Yandex, поиск по смыслу на сервере) одной "
+        "description": "Векторная база приложения (эмбеддинги Ollama на ПК, поиск по смыслу на сервере) одной "
         "функцией: поле action выбирает действие. "
         + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items()),
         "parameters": {
@@ -100,5 +124,22 @@ VECTOR_TOOLS = {
         "executor": {"type": "local"},
         "func": vectors,
         "metadata": {"approval_actions": [name for name, entry in _ACTIONS.items() if entry["write"]]},
+    }
+}
+
+
+REMEMBER_TOOLS = {
+    "remember": {
+        "title": "Remember",
+        "description": "Вспомнить. Без параметров: сначала подумай, что именно нужно вспомнить, "
+        "затем вызови. Память ищется по смыслу твоего размышления и возвращается как context.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        "capabilities": ["remember", "memory", "vectors"],
+        "risk_level": "low",
+        "read_only": True,
+        "requires_approval": False,
+        "supported_transports": ["responses_api", "local_agent"],
+        "executor": {"type": "local"},
+        "func": remember,
     }
 }

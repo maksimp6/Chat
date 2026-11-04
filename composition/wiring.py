@@ -918,8 +918,13 @@ def _tool_providers():
 
 def _vector_db():
     from vector_db import host
-    from yandex_client_modules.embeddings import embed_texts
+    from core.config import OLLAMA_URL
+    from ollama_client import embed
     from storage.records import get_store
+
+    def embed_texts(texts, *, model, trace=None):
+        # The vector database embeds with Ollama on the owner's PC (no Yandex API).
+        return embed(OLLAMA_URL, model, texts)
 
     return host.Host(embed_texts=embed_texts, get_store=get_store)
 

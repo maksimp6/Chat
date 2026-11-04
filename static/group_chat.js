@@ -37,7 +37,7 @@
   var memoryOnly = readStored();
 
   // One model answers everything in Logos: the group chat has the chat model and never another.
-  var CHAT_MODEL = "deepseek-v4.1-flash";
+  var CHAT_MODEL = "qwen3-4b";
 
   function dialogModels() {
     return window.isDialogModel(CHAT_MODEL) ? [CHAT_MODEL] : [];

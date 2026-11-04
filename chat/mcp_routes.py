@@ -653,10 +653,16 @@ def _define_logos_client(base: type) -> type:
                     }
                 )
 
+            # What the model thought in the latest round: the remember tool searches memory by it.
+            thought = {"text": message if isinstance(message, str) else ""}
+
             def round_result(response):
                 """The round's final text, the same extraction the stored reply uses."""
                 if isinstance(response, dict):
                     received.append(response)
+                    reasoning, said = self.extract_reasoning_and_text(response)
+                    if (reasoning or said).strip():
+                        thought["text"] = reasoning or said
                 if sink is None or not isinstance(response, dict):
                     return
                 reasoning, text = self.extract_reasoning_and_text(response)
@@ -701,7 +707,10 @@ def _define_logos_client(base: type) -> type:
                             owner_id=get_current_owner_id()
                         )
                     result = self._execute_single_tool(
-                        call, tool_servers, trace=trace, **policy_kwargs
+                        {**call, "thought": thought["text"]},
+                        tool_servers,
+                        trace=trace,
+                        **policy_kwargs,
                     )
                 except Exception:
                     emit({"kind": "tool_call", "phase": "failed", "name": name})
@@ -1159,8 +1168,8 @@ def _calls_deleted_tool(response) -> bool:
     )
 
 
-def _rebuild_provider_conversation(client, conv_id, message, trace):
-    """A new provider conversation holding the chat's messages as plain text, mapped to the chat.
+def _dialog_items(conv_id, message):
+    """The chat's stored messages as plain-text Responses items.
 
     The current user message is already stored; it is left out, the turn sends it.
     Stored failure notices ("⚠️ Ошибка: …") are no part of the dialog and are left out,
@@ -1189,6 +1198,12 @@ def _rebuild_provider_conversation(client, conv_id, message, trace):
         for m in said
         if m.get("role") in ("user", "assistant")
     ]
+    return items
+
+
+def _rebuild_provider_conversation(client, conv_id, message, trace):
+    """A new provider conversation holding the chat's messages as plain text, mapped to the chat."""
+    items = _dialog_items(conv_id, message)
     provider_id = client.create_conversation(execution_trace=trace)["id"]
     if items:
         client.add_conversation_items(provider_id, items, trace)
@@ -1287,13 +1302,23 @@ class _ChatReply:
 def _execute_chat_model(message, model_key, invocation, params, trace):
     """Run one provider/tool turn and collect its terminal response."""
     client = logos_client_type()(bound.Config)
-    provider_conversation_id = _provider_conversation_id(
-        client,
-        invocation.conversation_id,
-        trace,
-        retry_timeout=params["poll_timeout"],
-        on_event=params.get("on_stream_event"),
-    )
+    local = model_key in bound.Config.OLLAMA_MODELS
+    if local:
+        # Ollama keeps no conversation: every turn sends the chat's stored dialog.
+        provider_conversation_id = None
+        params = {
+            **params,
+            "input": _dialog_items(invocation.conversation_id, message)
+            + bound._response_input(params, message),
+        }
+    else:
+        provider_conversation_id = _provider_conversation_id(
+            client,
+            invocation.conversation_id,
+            trace,
+            retry_timeout=params["poll_timeout"],
+            on_event=params.get("on_stream_event"),
+        )
 
     if isinstance(trace, bound.ExecutionTrace):
         trace.add_event(
@@ -1311,7 +1336,7 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
         params=params,
         trace=trace,
     )
-    if _calls_deleted_tool(response):
+    if not local and _calls_deleted_tool(response):
         # The provider history holds calls of a tool since deleted (tools_cache), and
         # the model repeats them instead of reading the message; the provider fails
         # every such turn (invocation bebaf037). The history is rebuilt from the
@@ -2745,20 +2770,24 @@ def fork_dialog(
         }
         for m in turns
     ]
-    client = logos_client_type()(bound.Config)
-    trace = bound.ExecutionTrace()
-    try:
-        provider_id = client.create_conversation(execution_trace=trace)["id"]
-        if items:
-            client.add_conversation_items(provider_id, items, trace)
-    except Exception as exc:
-        logger.exception("[COPY] Provider copy of %s failed", conv_id)
-        raise ForkError("provider_copy_failed", 502, message=str(exc))
+    # A local chat model keeps no provider conversation: the copy's stored messages are its history.
+    provider_id = None
+    if bound.CHAT_MODEL not in bound.Config.OLLAMA_MODELS:
+        client = logos_client_type()(bound.Config)
+        trace = bound.ExecutionTrace()
+        try:
+            provider_id = client.create_conversation(execution_trace=trace)["id"]
+            if items:
+                client.add_conversation_items(provider_id, items, trace)
+        except Exception as exc:
+            logger.exception("[COPY] Provider copy of %s failed", conv_id)
+            raise ForkError("provider_copy_failed", 502, message=str(exc))
     copy_id = str(uuid.uuid4())
     branch_title = normalize_conversation_title(title or get_conversation_title(conv_id))
     set_owner(copy_id, owner_id)
     create_conversation(copy_id, branch_title, model)
-    set_yandex_conversation(copy_id, provider_id)
+    if provider_id is not None:
+        set_yandex_conversation(copy_id, provider_id)
     for m in turns:
         add_message(copy_id, m["role"], m["text"])
     return {"id": copy_id, "title": branch_title, "model": model, "messages": len(turns)}
@@ -2973,7 +3002,9 @@ def execute_approved():
             synth_response = client.ask(
                 prompt,
                 model_key,
-                _provider_conversation_id(client, conv_id, bound.ExecutionTrace()),
+                None
+                if model_key in bound.Config.OLLAMA_MODELS
+                else _provider_conversation_id(client, conv_id, bound.ExecutionTrace()),
                 {"instructions": "Ты системный ассистент."},
             )
         except Exception:

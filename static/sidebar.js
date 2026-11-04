@@ -261,7 +261,7 @@ function selectConv(id, updateHistory) {
   });
   if (conv) {
     if (typeof window.changeModel === "function") {
-      window.changeModel(conv.model || "deepseek-v4.1-flash", true);
+      window.changeModel(conv.model || "qwen3-4b", true);
     }
   }
   if (typeof window.loadServerConvSettings === "function") {
@@ -312,7 +312,7 @@ function deleteConv(id) {
         chatbox.appendChild(empty);
       }
       if (typeof window.changeModel === "function") {
-        window.changeModel("deepseek-v4.1-flash", true);
+        window.changeModel("qwen3-4b", true);
       }
     }
   }

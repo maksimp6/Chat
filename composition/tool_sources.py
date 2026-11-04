@@ -73,6 +73,12 @@ def _vector_tools():
     return VECTOR_TOOLS
 
 
+def _remember_tools():
+    from vector_db.tools import REMEMBER_TOOLS
+
+    return REMEMBER_TOOLS
+
+
 def _ssl_tools():
     from tool_providers.ssl_server import SSL_TOOLS
 
@@ -92,5 +98,6 @@ SOURCES = (
     ("court", _court_tools, "Court", Exception),
     ("rag", _rag_tools, "Repository knowledge", Exception),
     ("vectors", _vector_tools, "Vector database", Exception),
+    ("remember", _remember_tools, "Remember", Exception),
     ("ssl", _ssl_tools, "SSL server", Exception),
 )

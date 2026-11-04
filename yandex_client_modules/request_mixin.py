@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.request_builder import (
+    _response_input,
     build_response_payload,
     ultra_applied_event,
     validate_generation_params,
@@ -208,6 +209,65 @@ def provider_request_headers(credential) -> dict[str, str]:
     }
 
 
+def _ask_local(message, model_key, params, execution_trace, trace_step, timeout):
+    """One request of a local model to Ollama, traced like a provider request."""
+    from ollama_client import OllamaError, ask as ollama_ask
+
+    trace = execution_trace if isinstance(execution_trace, bound.ExecutionTrace) else None
+    step = trace_step
+    if trace is not None and step is None:
+        step = len(trace.trace.get("api_requests", [])) + 1
+    url = bound.Config.OLLAMA_URL
+    started = time.time()
+    perf = time.perf_counter()
+    if trace is not None:
+        trace.add_event("api_request_sent", {"method": "POST", "url": url, "step": step})
+    try:
+        body, result = ollama_ask(
+            url,
+            bound.Config.OLLAMA_MODELS[model_key],
+            model_key,
+            _response_input(params, message),
+            params,
+            context=bound.Config.OLLAMA_CONTEXT,
+            timeout=timeout or None,
+        )
+    except OllamaError as exc:
+        error = YandexClientError(
+            str(exc),
+            status_code=exc.status_code,
+            user_text="Локальная модель не ответила: проверьте, что Ollama запущена на ПК.",
+        )
+        error.request_not_accepted = not exc.reached
+        raise error from exc
+    if trace is not None:
+        ended = time.time()
+        trace.add_api_request(
+            _sanitize_for_log(body), step_index=step, start_timestamp=started, provider_key_id=None
+        )
+        trace.add_response(
+            result,
+            step_index=step,
+            start_timestamp=started,
+            end_timestamp=ended,
+            timing_ms=round((time.perf_counter() - perf) * 1000, 2),
+            kind="initial_response",
+            provider_key_id=None,
+        )
+        trace.add_event(
+            "api_request_completed",
+            {"method": "POST", "url": url, "step": step, "response_id": result["id"], "status": result["status"]},
+        )
+    on_provider_response = params.get("on_provider_response")
+    if callable(on_provider_response):
+        on_provider_response(result)
+    emit_event(
+        params.get("on_stream_event"),
+        {"kind": "response_status", "status": result["status"], "response_id": result["id"]},
+    )
+    return result
+
+
 class YandexRequestMixin:
     def ask(
         self,
@@ -221,6 +281,9 @@ class YandexRequestMixin:
         params = validate_generation_params(params)
         request_timeout = _transport_timeout(params, "request_timeout", 90, 900)
         poll_timeout = _transport_timeout(params, "poll_timeout", 180, 7200)
+        if model_key in bound.Config.OLLAMA_MODELS:
+            # A local model: Ollama on the owner's PC, no credential, quota or conversation.
+            return _ask_local(message, model_key, params, execution_trace, trace_step, poll_timeout)
         on_provider_response = params.get("on_provider_response")
         if on_provider_response is not None and not callable(on_provider_response):
             raise ValueError("on_provider_response must be callable or None")

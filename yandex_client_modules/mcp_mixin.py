@@ -163,6 +163,8 @@ class YandexMcpMixin:
                 metadata={
                     "source": "yandex_responses",
                     "server_count": len(all_servers or []),
+                    # What the model was thinking when it made the call (the remember tool searches by it).
+                    "thought": tc.get("thought") or "",
                 },
             )
             executor = bound.UniversalToolExecutor(bound.registry)

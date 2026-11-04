@@ -1,16 +1,16 @@
 """Collections of texts with their embeddings, kept in the Kristall store and searched by cosine similarity.
 
-Two models, the provider's pair made to be compared: every stored chunk is embedded
-with the document model (DOC_MODEL, ``text-embeddings-v2-doc``), every query with the
-query model (QUERY_MODEL, ``text-embeddings-v2-query``), both at their largest size
-(DIMENSIONS, 768). A text is split into chunks (paragraphs joined up to CHUNK_CHARS
-characters, a longer paragraph cut at that size) kept as
+One model embeds stored chunks and queries alike: Ollama's ``qwen3-embedding:0.6b`` on
+the owner's PC (Logos has no Yandex API since 04.11.2026), at the model's own size.
+DOC_MODEL and QUERY_MODEL both name it. A text is split into chunks (paragraphs joined
+up to CHUNK_CHARS characters, a longer paragraph cut at that size) kept as
 ``vector_db/<collection>/<doc id>/<chunk>`` with text, metadata, vector and model.
+Chunks embedded earlier by Yandex models are not comparable and are skipped by search.
 
 Kristall is a key/value store with prefix listing and no search of its own: a search
 reads every chunk of the asked collections and ranks them by cosine similarity here.
-Every embedded text is one paid provider request; each call returns the tokens spent
-and writes an event into the caller's execution trace.
+Each embed call returns the tokens spent and writes an event into the caller's
+execution trace.
 """
 
 from __future__ import annotations
@@ -29,9 +29,8 @@ PREFIX = "vector_db/"
 CHUNK_CHARS = 2000
 # Texts sent in one embed_texts call (its whole-call budget is 60 s).
 BATCH = 16
-DOC_MODEL = "text-embeddings-v2-doc"
-QUERY_MODEL = "text-embeddings-v2-query"
-DIMENSIONS = 768
+DOC_MODEL = "qwen3-embedding:0.6b"
+QUERY_MODEL = DOC_MODEL
 
 
 def _name(value: str, what: str) -> str:
@@ -62,9 +61,7 @@ def chunks(text: str) -> list[str]:
 def _embed(texts: list[str], model: str, trace: Any) -> tuple[list[list[float]], int, str]:
     vectors, tokens = [], 0
     for start in range(0, len(texts), BATCH):
-        result = embed_texts(
-            texts[start : start + BATCH], model=model, dimensions=DIMENSIONS, trace=trace
-        )
+        result = embed_texts(texts[start : start + BATCH], model=model, trace=trace)
         vectors += result["vectors"]
         tokens += int(result.get("tokens") or 0)
     return vectors, tokens, model
@@ -105,7 +102,7 @@ def add(
                  "dimensions": len(vector), "at": now},
             )
     result = {"collection": collection, "id": doc_id, "chunks": len(parts), "tokens": tokens,
-              "model": model, "dimensions": DIMENSIONS}
+              "model": model, "dimensions": len(vectors[0]) if vectors else 0}
     _trace(trace, "vector_db_add", result)
     return result
 

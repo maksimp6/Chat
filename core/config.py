@@ -136,11 +136,33 @@ TEXT_MODELS: dict[str, dict[str, Any]] = {
         "tool": 0.05,
         "output": 0.30,
     },
+    # Served by Ollama on the owner's PC, not by Yandex (owner, 04.11.2026: no Yandex API).
+    "qwen3-4b": {
+        "name": "Qwen3 4B (Ollama)",
+        "upstream": "qwen3:4b",
+        "provider": "ollama",
+        "type": "text",
+        "capabilities": {"tools": True, "function_calling": True, "multimodal": None},
+        "context_window": 8192,
+        "input": 0.0,
+        "cached": 0.0,
+        "tool": 0.0,
+        "output": 0.0,
+    },
 }
 
 # The one text model of every Logos dialog.
 # A dialog has no text model of its own; image and voice dialogs keep their model.
-CHAT_MODEL = "deepseek-v4.1-flash"
+CHAT_MODEL = "qwen3-4b"
+
+# Ollama on the owner's PC (Intel N100, 8 GB RAM). A larger context froze the PC.
+OLLAMA_URL = "http://192.168.10.6:11434"
+OLLAMA_CONTEXT = 8192
+OLLAMA_MODELS = {
+    key: info["upstream"]
+    for key, info in TEXT_MODELS.items()
+    if info.get("provider") == "ollama"
+}
 
 VOICE_MODELS = {
     "speech-realtime-deepseek-v4-flash": {
@@ -258,6 +280,9 @@ class Config:
     CLOUDRU_API_KEY_ID = CLOUDRU_API_KEY_ID
     HOST = HOST
     PORT = PORT
+    OLLAMA_URL = OLLAMA_URL
+    OLLAMA_CONTEXT = OLLAMA_CONTEXT
+    OLLAMA_MODELS = OLLAMA_MODELS
 
 
 # Keys renamed in #1316. Stored conversations and older clients may still send the old id.
