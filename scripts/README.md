@@ -37,9 +37,8 @@ when the Android application and APK tooling were removed. From the checkout:
 
 ```bash
 bash scripts/rdc/termux-rdc.sh
-bash scripts/rdc/termux-rdc.sh status
 ```
 
-The launcher preserves an active connection. Boot hook installation remains an
-explicit operation through `scripts/rdc/install-rdc-watchdog.sh`; existing hooks
-are preserved for a separately verified migration. These scripts do not build an APK.
+It stops any running agent, starts a new one from `~/.alice-rdc/package`, names the
+device `Redmi 9` (Desktop Commander uses the kernel hostname), and writes the
+Termux:Boot hook `~/.termux/boot/20-alice-rdc` that runs it on every boot.

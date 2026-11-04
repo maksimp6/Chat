@@ -120,8 +120,6 @@ jobs:
           timeout 120 su -c "du -xsk /sdcard/* /sdcard/Android/data/* 2>/dev/null" | sort -rn | head -n 25 || true
           df -k "$cleanup_root"
           bash scripts/redmi_app_server.sh deploy
-          # RDC is started (or left running) after every deploy, with its watchdog.
-          bash "$home/logos-local/scripts/rdc/termux-rdc.sh" || echo "::warning::RDC did not start; see $home/.logos-rdc/rdc.log"
 
   rag_vectors_check:
     # Real check of the rag and vectors tools against the running app on the phone:
