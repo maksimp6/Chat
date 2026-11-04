@@ -21,7 +21,7 @@ from chat.completion_routes import completion_bp
 from chat.embedding_routes import embedding_bp
 from chat.image_routes import image_bp
 from chat.mcp_routes import mcp_bp
-from invocation.manager import fail_interrupted_invocations
+from invocation.manager import compress_stored_values_in_background, fail_interrupted_invocations
 from chat.voice_routes import voice_bp
 from cloud.cloudru.iam_routes import cloudru_iam_bp
 from conversations.ownership import prepare_conversation_ownership_records
@@ -110,6 +110,7 @@ STORAGE_INITIALIZERS = (
     ensure_rdc_server,
     prepare_court_records,
     partial(fail_interrupted_invocations, before=_BOOTED_AT),
+    compress_stored_values_in_background,
 )
 
 

@@ -8,6 +8,7 @@ import hashlib
 import json
 import logging
 import re
+import threading
 import time
 import uuid
 from typing import Any
@@ -437,6 +438,44 @@ def fail_interrupted_invocations(before: float) -> int:
     if failed:
         logger.error("[BOOT] %d turn(s) were interrupted by the last restart", failed)
     return failed
+
+
+def compress_stored_values() -> int:
+    """Rewrite every value stored in v1 (uncompressed) chunks as gzip v2 chunks.
+
+    The v2 manifest is published first; the v1 chunks are removed after it, so a
+    value is never left without readable chunks. Returns how many values moved."""
+    client = get_memory_client(memory_file_path())
+    moved = 0
+    for key, record in client.items(_INVOCATION_PREFIX).items():
+        if not isinstance(record, dict):
+            continue
+        invocation_id = str(record.get("id") or key[len(_INVOCATION_PREFIX):])
+        for name, manifest in list(record.items()):
+            if not name.endswith("_chunks") or not isinstance(manifest, dict):
+                continue
+            if manifest.get("format") != _VALUE_FORMAT:
+                continue
+            field = name[: -len("_chunks")]
+            try:
+                value = _read_chunked_value(invocation_id, field, manifest)
+                if not _publish_invocation_values(invocation_id, {field: value}):
+                    continue
+            except Exception:
+                logger.exception("invocation %s %s was not compressed", invocation_id, field)
+                continue
+            _discard_prepared_chunks(invocation_id, field, manifest)
+            moved += 1
+    if moved:
+        logger.info("[BOOT] %d stored invocation value(s) compressed", moved)
+    return moved
+
+
+def compress_stored_values_in_background() -> None:
+    """Compress old invocation values without holding up the start of the server."""
+    threading.Thread(
+        target=compress_stored_values, name="invocation-value-compression", daemon=True
+    ).start()
 
 
 def cancel_invocation(invocation_id: str, reason: Any = None) -> bool:
