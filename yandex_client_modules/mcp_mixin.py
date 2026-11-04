@@ -439,7 +439,13 @@ class YandexMcpMixin:
         # (invocation 9114cb20: 7 rounds, 70 RUB).
         if settings_id and execution_policy is None:
             try:
-                memory_summary = get_controlled_memory_summary()
+                # A local model calls remember for its memory: the 100 facts (~8,000 tokens)
+                # alone would fill its 8192-token context.
+                memory_summary = (
+                    ""
+                    if model_key in bound.Config.OLLAMA_MODELS
+                    else get_controlled_memory_summary()
+                )
             except Exception as e:
                 api_logger.exception("[MEMORY] Память не подключена к ответу")
                 note("memory", f"memory left out of the reply: {type(e).__name__}: {e}")
