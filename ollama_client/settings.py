@@ -11,8 +11,10 @@ from __future__ import annotations
 from typing import Any
 
 # Ollama on the owner's PC (Intel N100, 8 GB RAM, OLLAMA_HOST=0.0.0.0:11434). The PC's
-# Ollama compresses its context cache (OLLAMA_FLASH_ATTENTION=1, OLLAMA_KV_CACHE_TYPE=q8_0),
-# which is what lets 16384 tokens fit where 8192 did before.
+# Ollama compresses its context cache (OLLAMA_FLASH_ATTENTION=1, OLLAMA_KV_CACHE_TYPE=q4_0)
+# and keeps one model loaded (OLLAMA_MAX_LOADED_MODELS=1, so it never swaps to the SSD).
+# Owner, 05.11.2026: "lets reduce model ram usage": the q4_0 cache holds 16384 tokens in
+# ~650 MB instead of 1224 MB (q8_0).
 URL = "http://192.168.10.6:11434"
 
 # The models Logos serves through Ollama: the key Logos uses -> its catalog entry. The key is
@@ -39,6 +41,9 @@ MODELS: dict[str, dict[str, Any]] = {
 CONTEXT = 16384
 # -1: the answer runs until the model stops or the context is full; no output cap.
 NUM_PREDICT = -1
+# Prompt tokens read per step. Measured on the PC (05.11.2026): 512 needs ~100 MB less RAM
+# than Ollama's 1024 and reads a prompt ~10% faster, with the same answer.
+NUM_BATCH = 512
 # The model always thinks; its thinking streams live and is what remember searches by.
 THINK = True
 
@@ -68,7 +73,7 @@ USER_TEXT_UNREACHABLE = "Локальная модель не ответила: 
 
 def options() -> dict[str, Any]:
     """The /api/chat options every request sends."""
-    return {"num_ctx": CONTEXT, "num_predict": NUM_PREDICT}
+    return {"num_ctx": CONTEXT, "num_predict": NUM_PREDICT, "num_batch": NUM_BATCH}
 
 
 def describe() -> dict[str, Any]:

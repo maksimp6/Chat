@@ -449,6 +449,7 @@
             ],
             ["Контекст (num_ctx)", options.num_ctx],
             ["Длина ответа (num_predict)", options.num_predict === -1 ? "без ограничения (-1)" : options.num_predict],
+            ["Промпт за шаг (num_batch)", options.num_batch],
             ["Мышление (think)", s.think ? "включено" : "выключено"],
             ["Потоковый вывод", s.stream ? "включён" : "выключен"],
             ["Инструменты", (s.tools || []).join(", ") || "нет"],
