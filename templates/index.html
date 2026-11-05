@@ -19,6 +19,24 @@
         document.documentElement.setAttribute("data-theme", t);
       } catch (e) {}
     </script>
+    <script>
+      // The open chat's history is asked for first, before the stylesheets and the ~45 scripts below: on a slow link
+      // (10 KB/s) it arrives while they load instead of after them, and chat.js shows it as soon as it runs
+      // (takeEarlyHistory). The chat is the one core.js opens: the URL's, else the last one opened.
+      (function () {
+        try {
+          var id = new URLSearchParams(location.search).get("conversation_id") || localStorage.getItem("current_conv_id");
+          if (!id || id === "null") return;
+          var response = fetch(
+            {{ (preview_base_path or '')|tojson }} + "/api/conversations/" + encodeURIComponent(id) + "/messages",
+            { headers: { Accept: "application/x-ndjson, application/json" }, priority: "high" }
+          );
+          // A failed read is named by chat.js when it takes it, not reported as an unhandled rejection.
+          response.catch(function () {});
+          window.__LOGOS_EARLY_HISTORY = { convId: id, response: response };
+        } catch (e) {}
+      })();
+    </script>
     {% set static_root = (preview_base_path ~ "/static") if preview_base_path else "/static" %}
     <link rel="stylesheet" href="{{ static_root }}/style.css?v={{ static_version }}" />
     <link rel="stylesheet" href="{{ static_root }}/toast.css?v={{ static_version }}" />

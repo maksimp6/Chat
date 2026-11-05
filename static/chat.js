@@ -837,11 +837,35 @@ function renderStoredMessage(convId, msg, owner, hasImage) {
   return node;
 }
 
+// Set once the chat's handlers are in place (DOMContentLoaded). The first history is read as soon as this script runs,
+// before the scripts after it arrive, so it can come before them.
+let chatHandlersReady = false;
+
 function waitForOpenQuestion(convId, count, last) {
   // A plain question with no answer yet is still being answered on the server: wait for it, as after a lost connection.
-  if (last && last.role === "user" && !last.source && typeof window.logosResumeWaitingTurn === "function") {
+  if (!(last && last.role === "user" && !last.source)) return;
+  if (!chatHandlersReady) {
+    // The history came before the page finished loading: the wait starts once the chat's handlers are set up.
+    document.addEventListener("DOMContentLoaded", function () { waitForOpenQuestion(convId, count, last); }, { once: true });
+    return;
+  }
+  if (typeof window.logosResumeWaitingTurn === "function") {
     window.logosResumeWaitingTurn(convId, Math.max(0, count - 1), last);
   }
+}
+
+// The history read the page started before its scripts (templates/index.html), for the chat it opened with. It is
+// taken once, by the first read of the history; a first read of another chat drops it and stops its download, which
+// would otherwise share a slow link with the read that is wanted.
+function takeEarlyHistory(convId) {
+  const early = window.__LOGOS_EARLY_HISTORY;
+  if (!early) return null;
+  window.__LOGOS_EARLY_HISTORY = null;
+  if (early.convId === convId) return early.response;
+  early.response.then(function (response) {
+    if (response.body) response.body.cancel().catch(function () {});
+  }, function () {});
+  return null;
 }
 
 function showEmptyChat(chatbox, before) {
@@ -1033,9 +1057,11 @@ async function streamHistory(convId, options) {
 
   try {
     const query = !fresh && oldest && oldest.dataset.messageId ? "?before=" + encodeURIComponent(oldest.dataset.messageId) : "";
-    const response = await window.LogosDispatcher.request(`/api/conversations/${convId}/messages${query}`, {
+    // The first read of the chat the page opened with was started by the page itself, ahead of its scripts.
+    const early = query ? null : takeEarlyHistory(convId);
+    const response = await (early || window.LogosDispatcher.request(`/api/conversations/${convId}/messages${query}`, {
       headers: { Accept: HISTORY_STREAM_TYPE + ", application/json" },
-    });
+    }));
     if (!response.ok) {
       const error = new Error("HTTP " + response.status);
       error.status = response.status;
@@ -3340,8 +3366,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
 
-  // Single history trigger: it does not depend on the conversation list or model catalog.
   syncSendButton();
-  if (currentConvId) loadHistory(currentConvId);
+  chatHandlersReady = true;
 });
+
+// Single history trigger: it runs as soon as this script does (the page is parsed by then), not after the scripts that
+// follow it (about 50 KB, 5 s at 10 KB/s), and it does not depend on the conversation list or model catalog.
+if (currentConvId) loadHistory(currentConvId);
 
