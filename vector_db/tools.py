@@ -8,7 +8,8 @@ from vector_db import store
 
 __all__ = ["REMEMBER_TOOLS", "VECTOR_TOOLS"]
 
-# Chunks the remember tool gives back: the local model's whole context is 8192 tokens.
+# Chunks the remember tool gives back (up to 5 x 2000 characters); the local model's context is 16384 tokens
+# (ollama_client.settings.CONTEXT).
 REMEMBER_RESULTS = 5
 
 
