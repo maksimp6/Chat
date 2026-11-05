@@ -1,4 +1,4 @@
-"""The workspace HTTP API: the file manager's files kept on the phone, and a bounded project tree."""
+"""The workspace HTTP API: Files and Vector Stores, and a bounded project tree."""
 
 from __future__ import annotations
 

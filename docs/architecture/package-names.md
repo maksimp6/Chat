@@ -56,7 +56,7 @@ disk, which the code imports and the architecture map uses, does not change.
 | **Fenaro** | `tool_providers` | Tool contracts, a policy-checked execution pipeline and built-in tool sources. |
 | **Remuza** | `vector_db` | Embeds texts with Yandex models and searches them by meaning. |
 | **Ocheva** | `web_shell` | Serves the Logos web page and health and readiness endpoints. |
-| **Nakeri** | `workspace` | Serves user files, uploads and a project tree. |
+| **Nakeri** | `workspace` | Serves user files, vector stores, uploads and a project tree. |
 | **Eduran** | `yandex_client_modules` | Yandex AI Studio client: Responses, streaming, files and image generation. |
 
 The application itself is **Logos**; `app.py` is its entry point.

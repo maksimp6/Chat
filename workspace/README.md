@@ -1,8 +1,8 @@
 # Nakeri
 
-`workspace` · Serves user files, uploads and a project tree.
+`workspace` · Serves user files, vector stores, uploads and a project tree.
 
-The workspace HTTP API: the file manager's files, kept on the phone and written into the vector database (Logos has no Yandex API since the owner deleted the Yandex project on 05.11.2026), uploads, and a bounded project tree.
+The workspace HTTP API: Files and Vector Stores, and a bounded project tree.
 
 ## Role in a dialog
 
@@ -16,9 +16,8 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 
 | Module | Purpose |
 | --- | --- |
-| [`workspace.file_routes`](file_routes.py) | HTTP routes of the file manager (`/api/files`): files kept on the phone. |
+| [`workspace.file_routes`](file_routes.py) | HTTP routes for Files and Vector Stores API |
 | [`workspace.project_tree`](project_tree.py) | Functional project tree API with safe, bounded filesystem traversal. |
-| [`workspace.stored_files`](stored_files.py) | The file manager's files in `files/` next to the memory file, each a document of the vector database collection `files`. |
 | [`workspace.upload_routes`](upload_routes.py) | Uploads that survive a broken connection: a file or a photo sent in pieces at an offset (`/api/uploads`). |
 
 Other units reach it only through their own ports:
@@ -33,9 +32,11 @@ Everything `workspace` uses from other units is a field of `Host` in [`workspace
 
 | Port | Provided by |
 | --- | --- |
-| `memory_file_path` | `storage.records.memory_file_path` |
-| `vector_add` | `vector_db.store.add` |
-| `vector_delete` | `vector_db.store.delete` |
+| `Config` | `core.config.Config` |
+| `ExpiredCredentialError` | `provider_accounts.credentials.ExpiredCredentialError` |
+| `NoActiveCredentialError` | `provider_accounts.credentials.NoActiveCredentialError` |
+| `YandexClientError` | `yandex_client_modules.errors.YandexClientError` |
+| `YandexResponsesClient` | `yandex_client_modules.client.YandexResponsesClient` |
 
 ## Install
 

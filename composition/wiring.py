@@ -959,15 +959,18 @@ def _web_shell():
 
 def _workspace():
     from workspace import host
-    from storage.records import memory_file_path
-    from vector_db.store import add as vector_add
-    from vector_db.store import delete as vector_delete
+    from core.config import Config
+    from provider_accounts.credentials import ExpiredCredentialError
+    from provider_accounts.credentials import NoActiveCredentialError
+    from yandex_client_modules.errors import YandexClientError
+    from yandex_client_modules.client import YandexResponsesClient
 
-    # The file manager keeps its files itself, next to the memory file (Logos has no Yandex API).
     return host.Host(
-        memory_file_path=memory_file_path,
-        vector_add=vector_add,
-        vector_delete=vector_delete,
+        Config=Config,
+        ExpiredCredentialError=ExpiredCredentialError,
+        NoActiveCredentialError=NoActiveCredentialError,
+        YandexClientError=YandexClientError,
+        YandexResponsesClient=YandexResponsesClient,
     )
 
 
