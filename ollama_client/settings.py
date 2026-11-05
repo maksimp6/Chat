@@ -21,6 +21,8 @@ URL = "http://192.168.10.6:11434"
 # not a Yandex catalog key (qwen3-4b is), so no Yandex price or profile applies.
 # qwen3:1.7b was tried on 05.11.2026 (~34/~9 tokens/s read/write against ~14/~4.5): it
 # called remember but answered with the call as text, so the owner chose qwen3:4b.
+# "think": whether the model thinks before answering (Ollama's /api/chat "think"); a model
+# without thinking (qwen2.5-coder) rejects the flag with HTTP 400.
 MODELS: dict[str, dict[str, Any]] = {
     "ollama-qwen3-4b": {
         "name": "Qwen3 4B (Ollama)",
@@ -29,6 +31,25 @@ MODELS: dict[str, dict[str, Any]] = {
         "type": "text",
         "capabilities": {"tools": True, "function_calling": True, "multimodal": None},
         "context_window": 16384,
+        "think": True,
+        "input": 0.0,
+        "cached": 0.0,
+        "tool": 0.0,
+        "output": 0.0,
+    },
+    # The coding model (owner, 05.11.2026: "specific ollama models for coding", "compress to
+    # the maximum"). Every dedicated Qwen coder is 30B or larger (19 GB+); the largest coder
+    # the 8 GB PC holds beside Windows is Qwen2.5-Coder 3B, and q2_K is Ollama's smallest
+    # quantisation of it: 1.3 GB against 1.9 GB (q4_K_M). 7B at q2_K (3.0 GB) would swap
+    # again (#1760). The model does not think, so "think" is off for it.
+    "ollama-qwen2.5-coder-3b": {
+        "name": "Qwen2.5 Coder 3B q2_K (Ollama)",
+        "upstream": "qwen2.5-coder:3b-instruct-q2_K",
+        "provider": "ollama",
+        "type": "text",
+        "capabilities": {"tools": True, "function_calling": True, "multimodal": None},
+        "context_window": 16384,
+        "think": False,
         "input": 0.0,
         "cached": 0.0,
         "tool": 0.0,
@@ -44,12 +65,23 @@ NUM_PREDICT = -1
 # Prompt tokens read per step. Measured on the PC (05.11.2026): 512 needs ~100 MB less RAM
 # than Ollama's 1024 and reads a prompt ~10% faster, with the same answer.
 NUM_BATCH = 512
-# The model always thinks; its thinking streams live and is what remember searches by.
+# Thinking for a model whose MODELS entry names none; qwen3 thinks: its thinking streams
+# live and is what remember searches by.
 THINK = True
+
+
+def think(upstream_or_key: str) -> bool:
+    """Whether the model (its Logos key or its Ollama name) thinks before answering."""
+    for key, info in MODELS.items():
+        if upstream_or_key in (key, info["upstream"]):
+            return bool(info.get("think", THINK))
+    return THINK
 
 # The tool categories a local model is given. All tool schemas together are ~33,000
 # tokens: they do not fit its context, and the N100 reads a prompt at ~14 tokens/s.
-TOOLS = ("remember",)
+# python (owner, 05.11.2026: "make python execution tool and add alongside remember tool")
+# runs code in the Logos interpreter on the phone; its runs are embedded for remember.
+TOOLS = ("remember", "python")
 
 # Ollama's own instructions, ahead of every turn. They are constant, so Ollama's prompt
 # cache keeps the same beginning from turn to turn.
@@ -82,7 +114,7 @@ def describe() -> dict[str, Any]:
         "url": URL,
         "models": {key: info["upstream"] for key, info in MODELS.items()},
         "options": options(),
-        "think": THINK,
+        "think": {key: bool(info.get("think", THINK)) for key, info in MODELS.items()},
         "stream": True,
         "tools": list(TOOLS),
         "instructions": INSTRUCTIONS,

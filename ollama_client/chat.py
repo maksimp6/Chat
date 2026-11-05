@@ -182,7 +182,7 @@ def build_body(upstream: str, items: Any, params: dict[str, Any]) -> dict[str, A
         "model": upstream,
         "messages": chat_messages(params.get("instructions"), items),
         "stream": False,
-        "think": settings.THINK,
+        "think": settings.think(upstream),
         "options": settings.options(),
     }
     tools = chat_tools(params.get("tools"))
