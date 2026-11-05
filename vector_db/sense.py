@@ -3,8 +3,9 @@
 Owner, 05.11.2026: "we don't need full sentences from remember just do sense extraction, and
 convert it to text". Only the embedding model runs. The best chunk of each of the DOCUMENTS
 best-matching documents is cut into short phrases at its punctuation, words that carry no
-meaning are dropped from the ends of each phrase, a word alone joins the phrase next to it, a
-negation stays with what it negates (a phrase must not say the opposite of the stored text), a
+meaning are dropped from the ends of each phrase, a word alone joins the phrase before it, a
+clause that holds a negation is not cut and takes no word alone, so that a phrase does not say
+the opposite of the stored text (a comma can still part a negation from what it negates), a
 phrase the question itself holds is left out, every other phrase is embedded, and SENSE_PHRASES
 phrases are chosen one by one: the nearest in meaning to the question, each losing
 REPEAT_PENALTY of its likeness to the phrases already chosen (maximal marginal relevance). They
@@ -32,7 +33,8 @@ __all__ = ["DOCUMENTS", "SENSE_PHRASES", "answer", "best_documents", "extract", 
 # Documents read per question; the best chunk of each. From the traces of 04-05.11.2026: the
 # only piece with the asked-for answer was the third document found.
 DOCUMENTS = 3
-# Phrases in the text, and the words of one phrase (a word alone joining it is one more).
+# Phrases in the text, and the words of one phrase (a word alone joining it is one more; a clause
+# that holds a negation stays whole, however long).
 SENSE_PHRASES = 8
 PHRASE_WORDS = 6
 # What a phrase loses for its likeness to the phrases already chosen.
@@ -40,27 +42,31 @@ REPEAT_PENALTY = 0.6
 
 # The speakers' labels of a stored turn (chat.mcp_routes._embed_turn) are no part of what was said.
 _LABEL = re.compile(r"(?:Пользователь|Мысли Логоса|Логос):\s")
-# The number of a list item is no part of the item.
-_LIST_MARK = re.compile(r"^[ \t]*\d+[.)][ \t]+(?=\S)", re.MULTILINE)
+# The number of a list item or a heading is no part of it. It opens a line or follows a sentence
+# ("План: 1. Проверить порт. 2. Перезапустить сервер."); after a colon or a question mark a
+# number is an answer, and a year is no list number. Run before _LABEL, or a reply that opens
+# with a number ("Логос: 12. Все они…") would look like a list.
+_LIST_MARK = re.compile(r"(?:^[ \t]*(?:#+[ \t]+)?|(?<=[.;] ))\d{1,3}[.)][ \t]+(?=\S)", re.MULTILINE)
 # A clause ends at a sentence or list mark followed by a space, a bracket, a quote, a line end or
-# a dash between spaces; a mark inside a word ("2+2=4", "file.py", "qwen3:4b") stays. A colon ends
-# nothing: what follows it belongs to what precedes it ("Имя: Максим", "Код выхода: 0").
-_CLAUSE_END = re.compile(r"[.!?…]+(?=\s|$)|[,;](?=\s|$)|[()\[\]{}«»\"“”\n]|\s[—–-]\s")
+# a dash between spaces, unless a number stands before a hyphen ("12 - 5 = 7"); a mark inside a
+# word ("2+2=4", "file.py", "qwen3:4b") stays. A colon ends nothing: what follows it belongs to
+# what precedes it ("Имя: Максим", "Код выхода: 0").
+_CLAUSE_END = re.compile(r"[.!?…]+(?=\s|$)|[,;](?=\s|$)|[()\[\]{}«»\"“”\n]|\s[—–]\s|(?<!\d)\s-\s")
 # A token of nothing but these marks is markup: a list, heading or table mark, a rule.
 _EDGE = ".,;:!?()[]{}\"'«»“”‘’…*_`#|<>~=-—–"
 # What stands around a word and is no part of it. The sign of "-5", the dot of ".env", the
 # underscore of "_chat_turn" and the "#" of "#1413" are.
 _OPENING = ",;'‘’…*`|"
 _CLOSING = ".,;:!?'‘’…*`|—–"
-# A comparison means something between two words and nothing at the end of a phrase.
-_COMPARISONS = frozenset(("<", ">", "<=", ">=", "=", "==", "!="))
+# A sign means something between two words and nothing at the end of a phrase.
+_SIGNS = frozenset(("<", ">", "<=", ">=", "=", "==", "===", "!=", "!==", "<>", "-", "*"))
 # Words that say nothing at the end of a phrase; inside a phrase they stay, so it reads as said.
-# Negations, numbers, "да", "можно", "надо" and "нужно" are not among them: without one of them
-# a phrase says something else.
+# Negations, numbers, "да", "есть", "можно", "надо" and "нужно" are not among them: without one of
+# them a phrase says something else.
 STOP_WORDS = frozenset(
     """
     а более бы был была были было быть в вам вас вдруг ведь во вот впрочем все всегда всего
-    всех всю вы где даже для до его ее ей ему если есть еще ещё же за зачем здесь и из или им
+    всех всю вы где даже для до его ее ей ему если еще ещё же за зачем здесь и из или им
     иногда их к как какая какой когда конечно кто куда ли лучше между меня мне много может
     мой моя мы на над наконец нас него нее ней нибудь ним них
     но ну о об он она они оно опять от перед по под после потом потому почти при про
@@ -73,8 +79,9 @@ STOP_WORDS = frozenset(
     then there these they this those to too up us was we were what when where which who why will
     with would you your hmm ok okay well
     """.split()
-) | _COMPARISONS
-# Words that turn what follows them into its opposite: a cut does not part them from it.
+) | _SIGNS
+# Words that turn what stands beside them into its opposite, on either side: "не вызывает",
+# "запускать нельзя".
 NEGATIONS = frozenset(
     """
     без не нельзя нет ни нигде никак никогда никто ничего ничто
@@ -82,33 +89,40 @@ NEGATIONS = frozenset(
     shouldn't couldn't
     """.split()
 )
+# A line that ends in a negation after other words is a hard wrap: what it negates opens the next
+# line. A negation alone on its line is an answer, and one after a colon is a value.
+_WRAPPED_NEGATION = re.compile(
+    r"(?<=[^\s:] )(" + "|".join(map(re.escape, NEGATIONS)) + r")\n[ \t]*(?=\S)", re.IGNORECASE
+)
 
 
 def _word(raw: str) -> str:
     """``raw`` without the marks around it; a list, heading or table mark alone is nothing."""
-    if raw in _COMPARISONS:
+    if raw in _SIGNS:
         return raw
     return raw.lstrip(_OPENING).rstrip(_CLOSING) if raw.strip(_EDGE) else ""
 
 
+def _negated(words: list[str]) -> bool:
+    return not NEGATIONS.isdisjoint(word.casefold() for word in words)
+
+
 def _blocks(words: list[str]) -> list[list[str]]:
-    """``words`` in blocks of at most PHRASE_WORDS. A negation among a block's last three words
-    opens the next block, so it stays with what it negates."""
-    blocks, start = [], 0
-    while start < len(words):
-        end = start + PHRASE_WORDS
-        if end < len(words):
-            end = next((i for i in range(end - 1, end - 4, -1) if words[i].casefold() in NEGATIONS), end)
-        blocks.append(words[start:end])
-        start = end
-    return blocks
+    """``words`` in blocks of PHRASE_WORDS, or whole if they hold a negation: a cut would leave one
+    side of it saying the opposite ("Запускать тесты на этом устройстве без отдельной команды нельзя")."""
+    if _negated(words):
+        return [words]
+    return [words[start : start + PHRASE_WORDS] for start in range(0, len(words), PHRASE_WORDS)]
 
 
 def _trimmed(words: list[str]) -> list[str]:
+    """``words`` without the stop words at their ends; the word after a negation stays: "Ошибки не было"."""
     start, end = 0, len(words)
     while start < end and words[start].casefold() in STOP_WORDS:
         start += 1
-    while end > start and words[end - 1].casefold() in STOP_WORDS:
+    while end > start and words[end - 1].casefold() in STOP_WORDS and not (
+        end - 2 >= start and words[end - 2].casefold() in NEGATIONS
+    ):
         end -= 1
     return words[start:end]
 
@@ -124,13 +138,15 @@ def _carries_sense(words: list[str]) -> bool:
 def phrases(text: str) -> list[str]:
     """The short phrases of ``text`` in order: its clauses, in blocks of PHRASE_WORDS words.
 
-    A word alone joins the phrase next to it, where it means something: "Логос: Барсик.", "г. Москва"."""
+    A word alone joins the phrase before it, where it means something ("Логос: Барсик.", "г. Москва"),
+    unless that phrase holds a negation: the word would fall under it ("Порт не 8080, а 9090.")."""
     found: list[list[str]] = []
-    for clause in _CLAUSE_END.split(_LIST_MARK.sub("", _LABEL.sub(" ", text))):
+    plain = _WRAPPED_NEGATION.sub(r"\1 ", _LABEL.sub(" ", _LIST_MARK.sub("", text)))
+    for clause in _CLAUSE_END.split(plain):
         words = [word for word in map(_word, clause.split()) if word]
         for block in _blocks(words):
             phrase = _trimmed(block)
-            if found and len(found[-1]) <= PHRASE_WORDS and not (_carries_sense(phrase) and _carries_sense(found[-1])):
+            if found and not _carries_sense(phrase) and len(found[-1]) <= PHRASE_WORDS and not _negated(found[-1]):
                 found[-1] += phrase
             elif phrase:
                 found.append(phrase)
@@ -168,14 +184,16 @@ def extract(
 ) -> dict[str, Any]:
     """The sense of the chunks ``hits`` for ``query``: ``{"text", "candidates", "tokens"}``.
 
-    ``shown`` holds the phrases already given (casefolded). They are chosen as usual and left out
-    of the text afterwards, so the same question gets nothing rather than the next best phrases."""
+    ``shown`` holds the keys of the phrases already given (the ``key`` of each phrase of a
+    ``sense_extracted`` event: the trace redacts a phrase that looks like a secret, so its text
+    would never match). They are chosen as usual and left out of the text afterwards, so the same
+    question gets nothing rather than the next best phrases."""
     asked_text = query.casefold()
     candidates: dict[str, str] = {}
     for hit in hits:
         for phrase in _usable(str(hit.get("text") or ""), asked_text):
             candidates.setdefault(phrase.casefold(), phrase)
-    found = list(candidates.values())
+    found, keys = list(candidates.values()), list(map(hash, candidates))
     if not found:
         return {"text": "", "candidates": 0, "tokens": 0}
     vectors, tokens = store.unit_vectors([query, *found], trace=trace)
@@ -190,7 +208,7 @@ def extract(
         )
         pool.remove(best)
         chosen.append(best)
-    given = [i for i in chosen if found[i].casefold() not in shown]
+    given = [i for i in chosen if keys[i] not in shown]
     text = "; ".join(found[i] for i in given)
     if trace is not None and hasattr(trace, "add_event"):
         trace.add_event("sense_extracted", {
@@ -198,7 +216,7 @@ def extract(
                 {key: hit.get(key) for key in ("collection", "id", "chunk", "score")} for hit in hits
             ],
             "candidates": len(found),
-            "phrases": [{"phrase": found[i], "score": round(scores[i], 6)} for i in given],
+            "phrases": [{"phrase": found[i], "key": keys[i], "score": round(scores[i], 6)} for i in given],
             "repeats_left_out": len(chosen) - len(given),
             "tokens": tokens,
         })

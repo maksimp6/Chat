@@ -26,11 +26,12 @@ def _trace_of(cfg) -> Any:
 
 
 def _shown_in_turn(trace: Any) -> set:
-    """The phrases remember gave earlier in this turn: the sense_extracted events of the turn's trace."""
+    """The keys of the phrases remember gave earlier in this turn: the sense_extracted events of the
+    turn's trace. Not the phrases: the trace redacts one that looks like a secret."""
     record = getattr(trace, "trace", None)
     events = record.get("events") if isinstance(record, dict) else None
     return {
-        str(given.get("phrase")).casefold()
+        given.get("key")
         for event in events or ()
         if isinstance(event, dict) and event.get("type") == "sense_extracted"
         for given in (event.get("payload") or {}).get("phrases") or ()
