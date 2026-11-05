@@ -117,8 +117,14 @@ class YandexFileManagerMixin:
                 f"{context}: File too large (max 128 MB) (413)", status_code=413
             )
         if status in (401, 403):
+            # The person sees why (the key), not an internal error: Logos has no working Yandex key since 04.11.2026.
             raise YandexClientError(
-                f"{context}: Auth failed ({status})", status_code=502
+                f"{context}: Auth failed ({status})",
+                status_code=502,
+                user_text=(
+                    f"Yandex AI Studio не принял ключ API (HTTP {status}): файлы и векторные хранилища Yandex "
+                    "недоступны, пока в «Ключи провайдеров» нет действующего ключа."
+                ),
             )
         if status == 429:
             raise YandexClientError(

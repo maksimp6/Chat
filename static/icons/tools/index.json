@@ -131,6 +131,7 @@
   "python_ast_outline": "lines",
   "rag": "stack",
   "read_file": "document",
+  "remember": "stack",
   "remove_file": "trash",
   "rootagent": "server",
   "rootagent_result": "server",

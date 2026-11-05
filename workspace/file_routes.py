@@ -34,9 +34,10 @@ def get_client():
 def _err_response(e):
     code = getattr(e, "status_code", None) or (404 if "Not found" in str(e) else 500)
     if code >= 500:
-        # Provider and internal error text stays in the log, not in the response.
+        # Provider and internal error text stays in the log, not in the response; a failure the person can act on
+        # (a rejected API key) says so in its own Russian text.
         logger.error("[FILES] Request failed: %s", e)
-        return jsonify({"error": "Внутренняя ошибка сервиса файлов"}), code
+        return jsonify({"error": getattr(e, "user_text", None) or "Внутренняя ошибка сервиса файлов"}), code
     return jsonify({"error": str(e)}), code
 
 
