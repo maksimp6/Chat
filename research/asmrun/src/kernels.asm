@@ -782,28 +782,29 @@ k_dot_q6k_row:
   push r13
   push r14
   push r15                      ; 8 pushes; entry %16==8 -> %16==8
-  sub  rsp, 72                  ; [0]dot [8]d [16]term1 [32..64) q-code spill; %16->0
+  sub  rsp, 40                  ; [0]dot [8]d6 [16]d8 [24]term1 [28]term2 [32]g_d8 base
   mov  rbx, rcx                 ; block ptr
-  mov  rsi, rdx                 ; x base
   mov  r13, r8
   shr  r13, 8                   ; nblocks
-  mov  r14, r9                  ; xsum16
+  mov  r14, [rel g_q8]          ; int8 activations (this x)
+  mov  rsi, [rel g_bsums]       ; i32 per-16 sums of g_q8
+  mov  rax, [rel g_d8]
+  mov  [rsp+32], rax            ; g_d8 base
   vxorps xmm0, xmm0, xmm0
   vmovss [rsp+0], xmm0          ; dot = 0
   xor  r12, r12                 ; block index
 .blk:
   cmp  r12, r13
   jae  .done
-  movzx eax, word [rbx+208]     ; d (f16)
+  movzx eax, word [rbx+208]     ; d6 (f16)
   vmovd xmm0, eax
   vcvtph2ps xmm0, xmm0
-  vmovss [rsp+8], xmm0          ; d
-  vxorps ymm2, ymm2, ymm2       ; 4 term1 accumulators (sc folded in), whole block
-  vxorps ymm3, ymm3, ymm3
-  vxorps ymm4, ymm4, ymm4
-  vxorps ymm5, ymm5, ymm5
-  mov  r9, r12
-  shl  r9, 8                    ; blk*256 (x value base for this block)
+  vmovss [rsp+8], xmm0          ; d6
+  mov  rax, [rsp+32]
+  vmovss xmm0, [rax + r12*4]
+  vmovss [rsp+16], xmm0         ; d8 = g_d8[blk]
+  mov  dword [rsp+24], 0        ; term1 = 0
+  mov  dword [rsp+28], 0        ; term2 = 0
   xor  rbp, rbp                 ; half h in 0..1
 .half:
   cmp  rbp, 2
@@ -811,10 +812,6 @@ k_dot_q6k_row:
   mov  rax, rbp
   shl  rax, 3
   lea  r15, [rbx + 192 + rax]      ; &sc[h*8] (i8)
-  mov  rax, rbp
-  shl  rax, 7                      ; h*128
-  add  rax, r9                     ; blk*256 + h*128
-  mov  r11, rax                    ; x/out value base for this half
   xor  rdi, rdi                    ; group g in 0..3
 .grp:
   cmp  rdi, 4
@@ -855,78 +852,71 @@ k_dot_q6k_row:
 .qh_mask:
   vpand   ymm1, ymm1, [rel kc_0332]
   vpsllw  ymm1, ymm1, 4
-  vpor    ymm0, ymm0, ymm1         ; 32 codes, 0..63
-  vmovdqu [rsp+32], ymm0           ; spill codes
+  vpor    ymm2, ymm0, ymm1         ; 32 six-bit codes (0..63), kept in ymm2
+  ; value base = 256*blk + h*128 + 32g -> r9 ; q8 ptr = g_q8 + value base
+  mov  r9, r12
+  shl  r9, 8
+  mov  rax, rbp
+  shl  rax, 7
+  add  r9, rax
   mov  rax, rdi
-  shl  rax, 5                       ; 32g
-  add  rax, r11
-  lea  rcx, [rsi + rax*4]           ; &x[group]
+  shl  rax, 5
+  add  r9, rax
+  ; bsums dword index of S0 = 16*blk + h*8 + 2g -> r10
+  mov  r10, r12
+  shl  r10, 4
+  mov  rax, rbp
+  shl  rax, 3
+  add  r10, rax
+  mov  rax, rdi
+  shl  rax, 1
+  add  r10, rax
   mov  rdx, rdi
   shl  rdx, 1                       ; 2g (offset into &sc[h*8])
-  ; sub-block S0 (first 16): value = sc[2g]*code; x[0..16) into acc0/acc1
-  movsx eax, byte [r15 + rdx]
-  vcvtsi2ss xmm1, xmm1, eax
-  vbroadcastss ymm1, xmm1
-  vpmovzxbd ymm0, qword [rsp+32]
-  vcvtdq2ps ymm0, ymm0
-  vmulps    ymm0, ymm0, ymm1
-  vfmadd231ps ymm2, ymm0, [rcx]
-  vpmovzxbd ymm0, qword [rsp+40]
-  vcvtdq2ps ymm0, ymm0
-  vmulps    ymm0, ymm0, ymm1
-  vfmadd231ps ymm3, ymm0, [rcx+32]
-  ; sub-block S1 (next 16): value = sc[2g+1]*code; x[16..32) into acc2/acc3
-  movsx eax, byte [r15 + rdx + 1]
-  vcvtsi2ss xmm1, xmm1, eax
-  vbroadcastss ymm1, xmm1
-  vpmovzxbd ymm0, qword [rsp+48]
-  vcvtdq2ps ymm0, ymm0
-  vmulps    ymm0, ymm0, ymm1
-  vfmadd231ps ymm4, ymm0, [rcx+64]
-  vpmovzxbd ymm0, qword [rsp+56]
-  vcvtdq2ps ymm0, ymm0
-  vmulps    ymm0, ymm0, ymm1
-  vfmadd231ps ymm5, ymm0, [rcx+96]
+  ; S0 (codes 0..15): isum0 = sum_16 q6*q8[vbase..] via vpdpbusd (u8 codes, s8 q8)
+  vpxor  xmm3, xmm3, xmm3
+  {vex} vpdpbusd xmm3, xmm2, [r14 + r9]
+  vpshufd xmm1, xmm3, 0x0E
+  vpaddd  xmm3, xmm3, xmm1
+  vpshufd xmm1, xmm3, 0x01
+  vpaddd  xmm3, xmm3, xmm1
+  vmovd   eax, xmm3                 ; isum0
+  movsx   r8d, byte [r15 + rdx]     ; sc[S0]
+  imul    eax, r8d
+  add     [rsp+24], eax             ; term1 += sc0*isum0
+  mov     eax, [rsi + r10*4]        ; bsums[S0]
+  imul    eax, r8d
+  add     [rsp+28], eax             ; term2 += sc0*bsums0
+  ; S1 (codes 16..31 = high 128 of ymm2): q8[vbase+16..]
+  vextracti128 xmm4, ymm2, 1
+  vpxor  xmm3, xmm3, xmm3
+  {vex} vpdpbusd xmm3, xmm4, [r14 + r9 + 16]
+  vpshufd xmm1, xmm3, 0x0E
+  vpaddd  xmm3, xmm3, xmm1
+  vpshufd xmm1, xmm3, 0x01
+  vpaddd  xmm3, xmm3, xmm1
+  vmovd   eax, xmm3                 ; isum1
+  movsx   r8d, byte [r15 + rdx + 1] ; sc[S1]
+  imul    eax, r8d
+  add     [rsp+24], eax
+  mov     eax, [rsi + r10*4 + 4]    ; bsums[S1]
+  imul    eax, r8d
+  add     [rsp+28], eax
   inc  rdi
   jmp  .grp
 .grp_done:
   inc  rbp
   jmp  .half
 .half_done:
-  ; term1 = hsum(acc0+acc1+acc2+acc3)  (do this before reusing xmm3/5 below)
-  vaddps  ymm2, ymm2, ymm3
-  vaddps  ymm4, ymm4, ymm5
-  vaddps  ymm2, ymm2, ymm4
-  vextractf128 xmm0, ymm2, 1
-  vaddps  xmm2, xmm2, xmm0
-  vhaddps xmm2, xmm2, xmm2
-  vhaddps xmm2, xmm2, xmm2           ; xmm2 = term1
-  ; term2 = sum_{S=0..15} sc[S]*xsum16[blk*16+S]
-  vxorps  xmm3, xmm3, xmm3
-  mov  r10, r12
-  shl  r10, 4                       ; blk*16
-  lea  r11, [rbx+192]               ; &sc[0]
-  xor  rdi, rdi                     ; S
-.s2:
-  cmp  rdi, 16
-  jae  .s2_done
-  movsx eax, byte [r11 + rdi]
+  ; dot += d6*d8*(term1 - 32*term2)  (term1 = Σ sc*isum, term2 = Σ sc*bsums; ints)
+  mov  eax, [rsp+24]                 ; term1
+  mov  ecx, [rsp+28]                 ; term2
+  shl  ecx, 5                        ; 32*term2
+  sub  eax, ecx                      ; term1 - 32*term2
   vcvtsi2ss xmm0, xmm0, eax
-  mov  rax, r10
-  add  rax, rdi
-  vmulss  xmm0, xmm0, [r14 + rax*4]
-  vaddss  xmm3, xmm3, xmm0
-  inc  rdi
-  jmp  .s2
-.s2_done:
-  ; dot += d*(term1 - 32*term2)
-  mov  eax, 32
-  vcvtsi2ss xmm0, xmm0, eax
-  vmulss  xmm3, xmm3, xmm0           ; 32*term2
-  vsubss  xmm2, xmm2, xmm3           ; term1 - 32*term2
-  vmulss  xmm2, xmm2, [rsp+8]        ; * d
-  vmovss  xmm0, [rsp+0]
-  vaddss  xmm0, xmm0, xmm2
+  vmulss  xmm0, xmm0, [rsp+8]        ; * d6
+  vmulss  xmm0, xmm0, [rsp+16]       ; * d8
+  vaddss  xmm0, xmm0, [rsp+0]
   vmovss  [rsp+0], xmm0
   add  rbx, Q6K_BYTES
   inc  r12
@@ -934,7 +924,7 @@ k_dot_q6k_row:
 .done:
   vmovss xmm0, [rsp+0]
   vzeroupper
-  add  rsp, 72
+  add  rsp, 40
   pop  r15
   pop  r14
   pop  r13

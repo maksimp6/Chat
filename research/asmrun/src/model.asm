@@ -407,15 +407,10 @@ model_fill_sums:
   sub  rsp, 48                  ; [rsp+32]=x, [rsp+40]=n
   mov  [rsp+32], rcx
   mov  [rsp+40], rdx
-  ; quantize x to int8 (g_q8/g_d8/g_bsums) for the int8 Q4_K matvec
+  ; quantize x to int8 (g_q8/g_d8/g_bsums) for the int8 Q4_K and Q6_K matvecs
   mov  rcx, [rsp+32]
   mov  rdx, [rsp+40]
   call k_quant_x
-  ; per-16 f32 sums (g_xsum16) for the Q6_K fold-sc matvec
-  mov  rcx, [rel g_xsum16]
-  mov  rdx, [rsp+32]
-  mov  r8, [rsp+40]
-  call k_sum16
   WINEPILOGUE
   ret
 
