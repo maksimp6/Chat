@@ -29,17 +29,21 @@ Performance (qwen3:1.7b, 4 threads), generation always correct:
 | --- | --- | --- | --- |
 | v1: scalar fused dequant | 0.69 | 0.49 GB/s | 0.94 |
 | v2: AVX2-vectorised dequant+dot | 2.17 | 4.03 GB/s | 2.93 |
+| v3: fold scale + 4 FMA accumulators | 4.83 | 6.29 GB/s | 6.54 |
 | Ollama (llama.cpp), same model | 12.5–14.5 | — | — |
 
 Generation is matvec-bound: 1.353 GB of weights are read per token, so
 tok/s ≈ effective_GB/s ÷ 1.353. v1 was badly compute-bound (scalar int→float
 convert and a dependent add per 4-bit weight). v2 unpacks the 4-bit (Q4_K) and
-6-bit (Q6_K) codes with AVX2 and dots them with 8-wide FMA, 3× faster overall
-and ~8× on the big Q6_K output projection — but still only ~21% of the ~13.9 GB/s
-bus (`--bw`). The remaining gap to Ollama is the per-sub-block horizontal sum and
-the float conversion; closing it needs the int8 `vpdpbusd` path (this CPU reports
-`avx_vnni=1`), which does 32 integer MACs per instruction with no float convert
-and no per-sub-block reduction. That is the next step.
+6-bit (Q6_K, assembled from `ql`/`qh` with SIMD masks/shifts) codes with AVX2 and
+dots them with 8-wide FMA. v3 folds each sub-block's scale into its values and
+accumulates the whole 256-value block into four FMA accumulators, reducing just
+once per block instead of once per sub-block — 7× over v1, and ~47% of the
+~13.9 GB/s bus (`--bw`). The float path now plateaus there because it still does
+an int→float convert per 8 weights. Closing the rest of the gap to Ollama needs
+the int8 `vpdpbusd` path (this CPU reports `avx_vnni=1`): quantise the activations
+to int8 once per matvec, then do 32 integer MACs per instruction with no float
+convert. That is the next step.
 
 ## Build
 
