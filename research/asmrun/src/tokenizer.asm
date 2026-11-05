@@ -741,10 +741,11 @@ tok_pair_rank:
   mov  r11d, [rsi + rbx*8 + 12]; B.len
   xor  rcx, rcx                ; dst cursor in g_key
   xor  rdx, rdx                ; src index into A
+  add  r8, r12                 ; A base = g_enc_buf + A.off (x86-64 addr allows only 2 regs)
 .ca:
   cmp  rdx, r9
   jae  .ca_done
-  mov  al, [r12 + r8 + rdx]
+  mov  al, [r8 + rdx]
   mov  [r13 + rcx], al
   inc  rcx
   inc  rdx
@@ -753,10 +754,11 @@ tok_pair_rank:
   mov  byte [r13 + rcx], 0x20  ; the separating space of "A B"
   inc  rcx
   xor  rdx, rdx                ; src index into B
+  add  r10, r12                ; B base = g_enc_buf + B.off
 .cb:
   cmp  rdx, r11
   jae  .cb_done
-  mov  al, [r12 + r10 + rdx]
+  mov  al, [r10 + rdx]
   mov  [r13 + rcx], al
   inc  rcx
   inc  rdx

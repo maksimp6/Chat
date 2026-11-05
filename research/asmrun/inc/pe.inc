@@ -53,7 +53,7 @@ opt_header:
   dw 0, 0                       ; MajorMinor ImageVersion
   dw 6, 0                       ; MajorMinor SubsystemVersion
   dd 0                          ; Win32VersionValue
-  dd (RVA(IMAGE_END) + 0xfff) & ~0xfff   ; SizeOfImage (rounded to SectionAlignment)
+  dd RVA(IMAGE_END)             ; SizeOfImage: IMAGE_END is page-aligned (align 0x1000 in asmrun.asm), so already a multiple of SectionAlignment; NASM -f bin forbids & on a label-relative value
   dd 0x1000                     ; SizeOfHeaders (headers occupy the first page)
   dd 0                          ; CheckSum (not required for an exe)
   dw 3                          ; Subsystem = WINDOWS_CUI (console)

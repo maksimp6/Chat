@@ -10,22 +10,35 @@ It is a research artifact, not a product. It targets exactly one model family
 (Qwen3) and one platform (Windows x64 with AVX2 + FMA + F16C, e.g. the Intel
 N100 this was written for). The architecture is specified in [DESIGN.md](DESIGN.md).
 
-## Status: written, not yet built here
+## Status: builds, runs, and generates correct text — but it is slow
 
-This code has **never been assembled or run on the authoring machine**, because
-that machine has **Smart App Control** in enforcing mode, which blocks the NASM
-assembler and would block the produced `asmrun.exe` (both are unsigned native
-binaries). The build and run steps below are therefore written to be carried out
-on a machine **without** Smart App Control (or inside a VM). I did not disable
-that security setting and you should not have to either — just build somewhere
-it is off.
+It assembles with NASM 3.02 into a 28 KB PE, runs on the Intel N100, and
+generates coherent output ("The capital of France is" → "Paris. The capital of
+the United States is Washington, D.C."). Note that unsigned native code must be
+allowed to run (e.g. Smart App Control off); the assembler and the produced
+`asmrun.exe` are both unsigned.
 
-Because it has not been through an assembler, treat the first build as a
-bring-up: expect to fix a few things the assembler catches. The single most
-likely first fix is the hand-written **PE header** in [inc/pe.inc](inc/pe.inc)
-(a byte-exact executable header is easy to get subtly wrong and only the loader
-will tell you). The code was cross-reviewed for NASM legality, Win64 ABI and
-numeric correctness, but review is not a run.
+Bring-up took three assembler-caught fixes: two three-register effective
+addresses in `tokenizer.asm` (x86-64 allows only base+index) and one bitwise `&`
+on a label-relative value in the hand-written PE header (`inc/pe.inc`, NASM
+`-f bin` forbids it). The compute kernels assembled clean.
+
+First measurement (qwen3:1.7b, 4 threads) — **correct but about 20× slower than
+Ollama**:
+
+| metric | asmrun | reference |
+| --- | --- | --- |
+| generation | 0.69 tok/s | Ollama 12.5–14.5 tok/s |
+| effective matvec bandwidth | 0.94 GB/s | raw bus ~13.9 GB/s (`--bw`) |
+
+The quantized matvec reaches only ~7% of memory bandwidth, so it is
+**compute-bound, not bandwidth-bound**: the fused dequant does scalar work per
+4-bit weight (int→float convert, multiply, dependent add) on a serialized
+accumulator. The win is vectorising that inner dot — and `--cpuid` reports
+`avx_vnni=1`, so this CPU has `vpdpbusd` (int8 dot-product), exactly the
+instruction for an int8 activation path. That is the "second version" noted in
+[DESIGN.md](DESIGN.md), now confirmed necessary by measurement rather than
+assumed.
 
 ## Build
 
