@@ -3033,3 +3033,13 @@ body {
     padding-right: 0;
   }
 }
+
+/* The closed sidebar waits off the screen; its shadow fell on the chat's left edge as a dark band. */
+.logos-pro-app #sidebar:not(.open) {
+  box-shadow: none;
+}
+
+/* The header's heavy shadow darkened the first message under it; a soft one keeps the edge. */
+.logos-pro-app #header {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
