@@ -121,33 +121,52 @@
     return rebuilt;
   }
 
-  function request(input, init, options) {
+  // The time limit the options name. An explicit 0 means no time limit: the caller bounds the request itself (a live
+  // answer runs as long as the turn does). A missing or invalid value still gets the default.
+  function limitFor(options) {
     const settings = options || {};
+    if (settings.timeoutMs === 0 || typeof AbortController !== "function") return null;
     const requestedTimeout = Number(settings.timeoutMs);
-    // An explicit 0 means no time limit: the caller bounds the request itself (a live answer runs as long as
-    // the turn does). A missing or invalid value still gets the default.
-    const unbounded = settings.timeoutMs === 0;
-    const timeoutMs = Math.min(
+    return idleTimeout(Math.min(
       Number.isFinite(requestedTimeout) && requestedTimeout > 0
         ? Math.max(Math.trunc(requestedTimeout), 1)
         : DEFAULT_TIMEOUT_MS,
       MAX_TIMEOUT_MS,
-    );
+    ));
+  }
+
+  function request(input, init, options) {
     const requestInit = Object.assign({}, init || {});
-    const limit = !unbounded && typeof AbortController === "function" ? idleTimeout(timeoutMs) : null;
+    const limit = limitFor(options);
     if (limit) {
       // The caller's signal (for example «Stop») and the time limit both end the request.
       requestInit.signal = requestInit.signal ? combineSignals(requestInit.signal, limit.signal) : limit.signal;
       limit.arm();
     }
+    return follow(input, function () { return fetch(input, requestInit); }, limit);
+  }
 
+  // A request the page started before this script (templates/index.html asks for the open chat's history first, ahead
+  // of the scripts): from now on it is one of this dispatcher's, with the same time limit counted from now (it already
+  // had its head start), and ``abort(reason)`` ends it when the limit runs out.
+  function adopt(input, pending, abort, options) {
+    const limit = limitFor(options);
+    if (limit) {
+      limit.signal.addEventListener("abort", function () { abort(limit.signal.reason); }, { once: true });
+      limit.arm();
+    }
+    return follow(input, function () { return pending; }, limit);
+  }
+
+  // Counts the request as active until its headers, then holds its body to the limit.
+  function follow(input, start, limit) {
     const trace = beginRequestTrace(input);
     activeRequests += 1;
     setNetworkStatus("running", "Сетевой запрос выполняется");
 
     // Release the slot once, first: a throw while reporting the response must not
     // release it again, and the error handler must not run for a success path.
-    return fetch(input, requestInit).then(
+    return start().then(
       function (received) {
         activeRequests = Math.max(activeRequests - 1, 0);
         // The headers came: from here on only silence ends the request.
@@ -201,6 +220,7 @@
 
   window.LogosDispatcher = Object.freeze({
     request,
+    adopt,
     dispatch,
     hold,
     isBusy: () => activeRequests + holds > 0,

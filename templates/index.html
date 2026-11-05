@@ -27,13 +27,25 @@
         try {
           var id = new URLSearchParams(location.search).get("conversation_id") || localStorage.getItem("current_conv_id");
           if (!id || id === "null") return;
+          // dispatcher.js ends it with this when its time limit runs out (LogosDispatcher.adopt).
+          var controller = typeof AbortController === "function" ? new AbortController() : null;
           var response = fetch(
             {{ (preview_base_path or '')|tojson }} + "/api/conversations/" + encodeURIComponent(id) + "/messages",
-            { headers: { Accept: "application/x-ndjson, application/json" }, priority: "high" }
+            {
+              headers: { Accept: "application/x-ndjson, application/json" },
+              priority: "high",
+              signal: controller ? controller.signal : undefined
+            }
           );
           // A failed read is named by chat.js when it takes it, not reported as an unhandled rejection.
           response.catch(function () {});
-          window.__LOGOS_EARLY_HISTORY = { convId: id, response: response };
+          window.__LOGOS_EARLY_HISTORY = {
+            convId: id,
+            response: response,
+            abort: function (reason) {
+              if (controller) controller.abort(reason);
+            }
+          };
         } catch (e) {}
       })();
     </script>

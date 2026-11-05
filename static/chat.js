@@ -855,16 +855,14 @@ function waitForOpenQuestion(convId, count, last) {
 }
 
 // The history read the page started before its scripts (templates/index.html), for the chat it opened with. It is
-// taken once, by the first read of the history; a first read of another chat drops it and stops its download, which
-// would otherwise share a slow link with the read that is wanted.
+// taken once, by the first read of the history; a first read of another chat drops it and aborts it, so it does not
+// share a slow link with the read that is wanted.
 function takeEarlyHistory(convId) {
   const early = window.__LOGOS_EARLY_HISTORY;
   if (!early) return null;
   window.__LOGOS_EARLY_HISTORY = null;
-  if (early.convId === convId) return early.response;
-  early.response.then(function (response) {
-    if (response.body) response.body.cancel().catch(function () {});
-  }, function () {});
+  if (early.convId === convId) return early;
+  early.abort();
   return null;
 }
 
@@ -1055,13 +1053,18 @@ async function streamHistory(convId, options) {
     return true;
   };
 
+  // The page is busy until the read ends: an update found meanwhile reloads it only then, not halfway through a history
+  // that takes a minute on a slow link.
+  const release = window.LogosDispatcher.hold();
   try {
     const query = !fresh && oldest && oldest.dataset.messageId ? "?before=" + encodeURIComponent(oldest.dataset.messageId) : "";
-    // The first read of the chat the page opened with was started by the page itself, ahead of its scripts.
+    const path = `/api/conversations/${convId}/messages${query}`;
+    // The first read of the chat the page opened with was started by the page itself, ahead of its scripts; it gets the
+    // same time limit as any other read from here on.
     const early = query ? null : takeEarlyHistory(convId);
-    const response = await (early || window.LogosDispatcher.request(`/api/conversations/${convId}/messages${query}`, {
-      headers: { Accept: HISTORY_STREAM_TYPE + ", application/json" },
-    }));
+    const response = await (early
+      ? window.LogosDispatcher.adopt(path, early.response, early.abort)
+      : window.LogosDispatcher.request(path, { headers: { Accept: HISTORY_STREAM_TYPE + ", application/json" } }));
     if (!response.ok) {
       const error = new Error("HTTP " + response.status);
       error.status = response.status;
@@ -1126,6 +1129,8 @@ async function streamHistory(convId, options) {
     } else {
       chatbox.replaceChildren(historyErrorBlock(convId, historyErrorText(err)));
     }
+  } finally {
+    release();
   }
 }
 
