@@ -15,11 +15,9 @@ from workspace._binding import Binding, HostNotBound
 
 @dataclass(frozen=True, kw_only=True)
 class Host:
-    Config: Any  # core.config.Config
-    ExpiredCredentialError: Any  # provider_accounts.credentials.ExpiredCredentialError
-    NoActiveCredentialError: Any  # provider_accounts.credentials.NoActiveCredentialError
-    YandexClientError: Any  # yandex_client_modules.errors.YandexClientError
-    YandexResponsesClient: Any  # yandex_client_modules.client.YandexResponsesClient
+    memory_file_path: Any  # storage.records.memory_file_path
+    vector_add: Any  # vector_db.store.add
+    vector_delete: Any  # vector_db.store.delete
 
 
 _binding: Binding[Host] = Binding("workspace")

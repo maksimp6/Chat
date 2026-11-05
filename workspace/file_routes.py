@@ -1,13 +1,19 @@
-"""Flask routes for Files and Vector Stores API"""
+"""Flask routes of the file manager: files kept on the phone (``workspace.stored_files``).
+
+Logos has no Yandex API (the owner deleted the Yandex project on 05.11.2026), so there are
+no Yandex Files and Vector Stores any more: Logos keeps the files itself and writes each
+one into its vector database. The window shows the vector database's collections with
+``POST /api/vectors/collections`` (``vector_db.routes``).
+"""
 
 import logging
 import os
 import re
 from urllib.parse import quote
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 
-from workspace.host import bound
+from workspace import stored_files
 
 logger = logging.getLogger("logos.workspace.file_routes")
 file_bp = Blueprint("file_manager", __name__)
@@ -24,21 +30,8 @@ ALLOWED_EXTENSIONS = {
     ".txt",
 }
 MAX_FILE_SIZE = 128 * 1024 * 1024  # 128 MB
-
-
-def get_client():
-    """Return a request-local Yandex client instead of a process-global Session."""
-    return bound.YandexResponsesClient(bound.Config)
-
-
-def _err_response(e):
-    code = getattr(e, "status_code", None) or (404 if "Not found" in str(e) else 500)
-    if code >= 500:
-        # Provider and internal error text stays in the log, not in the response; a failure the person can act on
-        # (a rejected API key) says so in its own Russian text.
-        logger.error("[FILES] Request failed: %s", e)
-        return jsonify({"error": getattr(e, "user_text", None) or "Внутренняя ошибка сервиса файлов"}), code
-    return jsonify({"error": str(e)}), code
+_NOT_FOUND = "Файл не найден"
+_STORAGE_FAILED = "На сервере нет места или нельзя записать файл."
 
 
 def _attachment_name(name):
@@ -59,13 +52,10 @@ def _content_disposition(name):
 @file_bp.route("/api/files", methods=["GET"])
 def list_files():
     try:
-        limit = request.args.get("limit", 100, type=int)
-        after = request.args.get("after", None)
-        client = get_client()
-        data = client.list_files(limit=limit, after=after)
-        return jsonify(data)
-    except bound.YandexClientError as e:
-        return _err_response(e)
+        return jsonify({"data": stored_files.listing()})
+    except OSError:
+        logger.exception("[FILES] Listing failed")
+        return jsonify({"error": "Не удалось прочитать файлы на сервере"}), 500
 
 
 @file_bp.route("/api/files", methods=["POST"])
@@ -93,162 +83,46 @@ def upload_file():
     if len(file_content) > MAX_FILE_SIZE:
         return jsonify({"error": "File too large (max 128 MB)"}), 413
     try:
-        client = get_client()
-        purpose = request.form.get("purpose", "assistants")
-        logger.info(
-            f"[FILES] Uploading '{file.filename}', size: {len(file_content)} bytes to Yandex API..."
+        result = stored_files.keep_bytes(
+            file_content, file.filename, purpose=request.form.get("purpose", "assistants")
         )
-        result = client.upload_file(file_content, file.filename, purpose=purpose)
-        logger.info(f"[FILES] Successfully uploaded: {result.get('id')}")
-        return jsonify(result), 201
-    except bound.YandexClientError as e:
-        logger.error(f"[FILES] Yandex API error: {e}")
-        return _err_response(e)
-    except Exception as e:
-        logger.error(f"[FILES] Internal upload error: {e}", exc_info=True)
-        return jsonify({"error": "Внутренняя ошибка сервиса файлов"}), 500
+    except OSError as error:
+        logger.error("[FILES] Keeping '%s' failed: %s", file.filename, error)
+        return jsonify({"error": _STORAGE_FAILED}), 507
+    return jsonify(result), 201
 
 
 @file_bp.route("/api/files/<file_id>", methods=["DELETE"])
 def delete_file(file_id):
     try:
-        client = get_client()
-        result = client.delete_file(file_id)
-        return jsonify(result)
-    except bound.YandexClientError as e:
-        return _err_response(e)
+        removed = stored_files.remove(file_id)
+    except OSError as error:
+        logger.error("[FILES] Deleting %s failed: %s", file_id, error)
+        return jsonify({"error": "Не удалось удалить файл на сервере"}), 500
+    if not removed:
+        return jsonify({"error": _NOT_FOUND}), 404
+    return jsonify({"id": file_id, "deleted": True})
 
 
 @file_bp.route("/api/files/<file_id>", methods=["GET"])
 def get_file_info(file_id):
-    try:
-        client = get_client()
-        result = client.retrieve_file(file_id)
-        return jsonify(result)
-    except bound.YandexClientError as e:
-        return _err_response(e)
+    record = stored_files.get(file_id)
+    if record is None:
+        return jsonify({"error": _NOT_FOUND}), 404
+    return jsonify(record)
 
 
 @file_bp.route("/api/files/<file_id>/content", methods=["GET"])
 def download_file(file_id):
-    try:
-        client = get_client()
-        meta = client.retrieve_file(file_id)
-        filename = meta.get("filename", file_id)
-        content = client.download_file(file_id)
-        response = Response(
-            content,
-            mimetype="application/octet-stream",
-            headers={"Content-Disposition": _content_disposition(filename)},
-        )
-        # A stored file never changes, so its id is its version: a download broken on a slow link (10 kb/s) goes
-        # on with a Range request from the byte it reached instead of starting over.
-        response.set_etag(file_id)
-        response.headers["Accept-Ranges"] = "bytes"
-        return response.make_conditional(
-            request, accept_ranges=True, complete_length=len(content)
-        )
-    except bound.YandexClientError as e:
-        return _err_response(e)
-
-
-@file_bp.route("/api/vector-stores", methods=["GET"])
-def list_vector_stores():
-    try:
-        limit = request.args.get("limit", 100, type=int)
-        client = get_client()
-        data = client.list_vector_stores(limit=limit)
-        return jsonify(data)
-    except bound.YandexClientError as e:
-        return _err_response(e)
-
-
-@file_bp.route("/api/vector-stores", methods=["POST"])
-def create_vector_store():
-    try:
-        data = request.get_json(silent=True)
-        if not isinstance(data, dict):
-            return jsonify({"error": "JSON object is required"}), 400
-        name = data.get("name")
-        if not name:
-            return jsonify({"error": "name is required"}), 400
-        file_ids = data.get("file_ids")
-        chunking_strategy = data.get("chunking_strategy")
-        expires_after = data.get("expires_after")
-        client = get_client()
-        result = client.create_vector_store(
-            name=name,
-            file_ids=file_ids,
-            chunking_strategy=chunking_strategy,
-            expires_after=expires_after,
-        )
-        return jsonify(result), 201
-    except bound.YandexClientError as e:
-        return _err_response(e)
-
-
-@file_bp.route("/api/vector-stores/<vs_id>", methods=["DELETE"])
-def delete_vector_store(vs_id):
-    try:
-        client = get_client()
-        result = client.delete_vector_store(vs_id)
-        return jsonify(result)
-    except bound.YandexClientError as e:
-        return _err_response(e)
-
-
-@file_bp.route("/api/vector-stores/<vs_id>", methods=["GET"])
-def get_vector_store(vs_id):
-    try:
-        client = get_client()
-        result = client.get_vector_store(vs_id)
-        return jsonify(result)
-    except bound.YandexClientError as e:
-        return _err_response(e)
-
-
-@file_bp.route("/api/vector-stores/<vs_id>/files", methods=["GET"])
-def list_vs_files(vs_id):
-    try:
-        limit = request.args.get("limit", 100, type=int)
-        filter_status = request.args.get("filter", None)
-        after = request.args.get("after", None)
-        client = get_client()
-        data = client.list_vs_files(
-            vs_id, limit=limit, filter_status=filter_status, after=after
-        )
-        return jsonify(data)
-    except bound.YandexClientError as e:
-        return _err_response(e)
-
-
-@file_bp.route("/api/vector-stores/<vs_id>/files", methods=["POST"])
-def add_file_to_vs(vs_id):
-    try:
-        data = request.get_json(silent=True)
-        if not isinstance(data, dict):
-            return jsonify({"error": "JSON object is required"}), 400
-        file_id = data.get("file_id")
-        if not file_id:
-            return jsonify({"error": "file_id is required"}), 400
-        chunking_strategy = data.get("chunking_strategy")
-        client = get_client()
-        result = client.add_file_to_vs(
-            vs_id, file_id, chunking_strategy=chunking_strategy
-        )
-        return jsonify(result), 201
-    except bound.YandexClientError as e:
-        return _err_response(e)
-
-
-@file_bp.route("/api/vector-stores/<vs_id>/files/<file_id>", methods=["DELETE"])
-def remove_file_from_vs(vs_id, file_id):
-    try:
-        client = get_client()
-        result = client.remove_file_from_vs(vs_id, file_id)
-        return jsonify(result)
-    except bound.YandexClientError as e:
-        return _err_response(e)
+    record = stored_files.get(file_id)
+    path = stored_files.data_path(file_id)
+    if record is None or path is None or not path.is_file():
+        return jsonify({"error": _NOT_FOUND}), 404
+    # A kept file never changes, so its id is its version: a download broken on a slow link (10 kb/s) goes on with a
+    # Range request from the byte it reached instead of starting over.
+    response = send_file(path, mimetype="application/octet-stream", conditional=True, etag=file_id)
+    response.headers["Content-Disposition"] = _content_disposition(record["filename"])
+    return response
 
 
 # Local Files API. Desktop keeps the historical path; Android can override it.

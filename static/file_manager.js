@@ -1,53 +1,3 @@
-window.fetchVectorStores = function () {
-  // Same budget as the file list (LIST_TIMEOUT_MS below): the server may wait 30 s per attempt.
-  return window.LogosDispatcher.request("/api/vector-stores", undefined, { timeoutMs: 90000 })
-    .then(function (r) {
-      return r
-        .json()
-        .catch(function () {
-          return {};
-        })
-        .then(function (data) {
-          if (!r.ok) {
-            var message = "HTTP " + r.status;
-            if (data && typeof data === "object") {
-              if (typeof data.error === "string") message = data.error;
-              else if (data.error && typeof data.error.message === "string")
-                message = data.error.message;
-            }
-            var failure = new Error("Vector Stores: " + message);
-            failure.status = r.status;
-            throw failure;
-          }
-          return data;
-        });
-    })
-    .then(function (data) {
-      var candidate = data;
-      for (var i = 0; i < 3; i++) {
-        if (Array.isArray(candidate)) return candidate;
-        if (!candidate || typeof candidate !== "object") break;
-
-        var next = null;
-        if (Array.isArray(candidate.data)) return candidate.data;
-        if (Array.isArray(candidate.vector_stores)) return candidate.vector_stores;
-        if (Array.isArray(candidate.stores)) return candidate.stores;
-        if (Array.isArray(candidate.items)) return candidate.items;
-
-        if (candidate.data && typeof candidate.data === "object") next = candidate.data;
-        else if (candidate.vector_stores && typeof candidate.vector_stores === "object")
-          next = candidate.vector_stores;
-        else if (candidate.stores && typeof candidate.stores === "object") next = candidate.stores;
-        else if (candidate.items && typeof candidate.items === "object") next = candidate.items;
-
-        if (!next || next === candidate) break;
-        candidate = next;
-      }
-
-      throw new Error("Некорректный ответ Vector Stores: ожидался массив хранилищ.");
-    });
-};
-
 (function () {
   "use strict";
 
@@ -143,15 +93,11 @@ window.fetchVectorStores = function () {
       '        <label for="file-upload" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;cursor:pointer;padding:8px 16px;background:#1f6feb;color:#fff;border-radius:6px;font-size:13px;">Загрузить файлы</label>',
       "    </div>",
       "</div>",
-      // === Секция Vector Stores ===
+      // === Секция векторной базы ===
       '<div style="margin-bottom:20px;padding:16px;border:1px solid var(--m-section-border,#eee);border-radius:8px;background:var(--m-editor,#f8f9fa);">',
       '    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">',
-      '        <h3 style="margin:0;font-size:15px;color:var(--m-text,#222);">Векторные хранилища</h3>',
-      '        <div style="display:flex;gap:8px;">',
-      '            <input id="vs-name-input" type="text" placeholder="Название..." style="padding:6px 10px;border:1px solid var(--m-border,#ddd);border-radius:4px;font-size:12px;background:var(--m-input-bg,#fff);color:var(--m-text,#222);width:160px;">',
-      '            <button id="btn-create-vs" type="button" class="logos-btn file-manager-vs-create-btn">+ Создать</button>',
-      '            <button id="btn-refresh-vs" type="button" class="logos-btn file-manager-vs-refresh-btn">Обновить</button>',
-      "        </div>",
+      '        <h3 style="margin:0;font-size:15px;color:var(--m-text,#222);">Векторная база</h3>',
+      '        <button id="btn-refresh-vs" type="button" class="logos-btn file-manager-vs-refresh-btn">Обновить</button>',
       "    </div>",
       '    <div id="vs-manager-list" style="max-height:200px;overflow-y:auto;"></div>',
       "</div>",
@@ -190,123 +136,36 @@ window.fetchVectorStores = function () {
         );
     }
 
-    // === Рендер списка Vector Stores ===
-    function renderVsManagerList(stores) {
+    // === Векторная база ===
+    // Logos has no Yandex API, so no Yandex vector stores: its own vector database holds every file kept here (the
+    // collection "files") next to the collections of its dialogs and repository. The section only shows them; Logos
+    // changes them with its vectors tool when asked in chat.
+    function renderVectorBase(collections) {
       var cont = document.getElementById("vs-manager-list");
       if (!cont) return;
       cont.replaceChildren();
-
-      if (!Array.isArray(stores)) {
-        var invalid = document.createElement("div");
-        invalid.className = "file-manager-state file-manager-state-error";
-        invalid.textContent = "Ошибка: список Vector Stores имеет неожиданный формат.";
-        cont.appendChild(invalid);
-        return;
-      }
-      if (stores.length === 0) {
+      if (collections.length === 0) {
         var empty = document.createElement("div");
         empty.className = "file-manager-state";
-        empty.textContent = "Нет векторных хранилищ. Создайте новое.";
+        empty.textContent = "Векторная база пуста.";
         cont.appendChild(empty);
         return;
       }
-
-      stores.forEach(function (vs) {
+      collections.forEach(function (entry) {
         var row = document.createElement("div");
         row.className = "file-manager-vs-row";
-
         var details = document.createElement("div");
         details.className = "file-manager-vs-details";
-
         var name = document.createElement("div");
         name.className = "file-manager-vs-name";
-        name.textContent = vs.name || "(без названия)";
-
+        name.textContent = String(entry.collection);
         var meta = document.createElement("div");
         meta.className = "file-manager-vs-meta";
-        var idLabel = document.createTextNode("ID: ");
-        var idCode = document.createElement("code");
-        idCode.className = "vs-id-copy file-manager-copy-id";
-        idCode.dataset.id = vs.id || "";
-        idCode.textContent = (vs.id || "").substring(0, 12) + "...";
-        var fileCount = vs.file_counts ? vs.file_counts.completed || 0 : 0;
-        meta.appendChild(idLabel);
-        meta.appendChild(idCode);
-        meta.appendChild(document.createTextNode(" · Файлов: " + fileCount));
-
+        meta.textContent = "Документов: " + (entry.documents || 0) + " · фрагментов: " + (entry.chunks || 0);
         details.appendChild(name);
         details.appendChild(meta);
-
-        var addBtn = document.createElement("button");
-        addBtn.type = "button";
-        addBtn.className = "logos-btn vs-add-files-btn file-manager-secondary-btn";
-        addBtn.dataset.id = vs.id || "";
-        addBtn.dataset.name = vs.name || "";
-        addBtn.textContent = "+ Файлы";
-
-        var deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.className = "logos-btn vs-delete-btn file-manager-danger-btn";
-        deleteBtn.dataset.id = vs.id || "";
-        deleteBtn.textContent = "Удалить";
-
         row.appendChild(details);
-        row.appendChild(addBtn);
-        row.appendChild(deleteBtn);
         cont.appendChild(row);
-      });
-
-      cont.querySelectorAll(".vs-id-copy").forEach(function (code) {
-        code.addEventListener("click", function () {
-          var self = this;
-          var original = this.textContent;
-          copyToClipboard(this.dataset.id || "").then(function (ok) {
-            self.textContent = ok ? "скопировано!" : "не скопировано";
-            window.LogosCoreAPI.scheduler.defer(function () {
-              self.textContent = original;
-            }, 1500);
-          });
-        });
-      });
-
-      cont.querySelectorAll(".vs-add-files-btn").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          openAddFilesToVsModal(this.dataset.id || "", this.dataset.name || "");
-        });
-      });
-
-      cont.querySelectorAll(".vs-delete-btn").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          var button = this;
-          var vsId = button.dataset.id || "";
-          window.LogosDialog.confirm("Удалить векторное хранилище?", {
-            confirmText: "Удалить",
-            danger: true,
-          }).then(function (confirmed) {
-            if (!confirmed) return;
-            var originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = "...";
-            window.LogosDispatcher.request("/api/vector-stores/" + encodeURIComponent(vsId), {
-              method: "DELETE",
-            })
-              .then(function (response) {
-                if (!response.ok) return window.LogosHttpError(response).then(function (e) { throw e; });
-                return response.json().catch(function () {
-                  return {};
-                });
-              })
-              .then(function () {
-                loadVsList();
-              })
-              .catch(function (error) {
-                button.disabled = false;
-                button.textContent = originalText;
-                button.textContent = "Удалить";
-                LogosToast.error(window.LogosErrorText("Не удалось удалить", error));
-              });
-          });
-        });
       });
     }
 
@@ -315,217 +174,72 @@ window.fetchVectorStores = function () {
       if (cont)
         cont.innerHTML =
           '<div style="padding:10px;text-align:center;color:var(--m-muted,#999);font-size:12px;">Загрузка...</div>';
-      window
-        .fetchVectorStores()
-        .then(function (list) {
-          renderVsManagerList(list);
+      window.LogosDispatcher.request(
+        "/api/vectors/collections",
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+        { timeoutMs: LIST_TIMEOUT_MS },
+      )
+        .then(function (r) {
+          return readJson(r).then(function (data) {
+            if (!r.ok || !data || data.success !== true || !Array.isArray(data.collections)) {
+              throw statusError(r, data && typeof data.error === "string" ? data.error : "");
+            }
+            return data.collections;
+          });
         })
+        .then(renderVectorBase)
         .catch(function (error) {
-          console.error("[FILE MANAGER] Vector Stores load failed:", error);
-          if (!cont) return;
-          var message = describeError(error);
-          // A timeout says nothing about the provider key, so the key hint is shown for real answers only.
-          var keyHint = isNoAnswer(error)
-            ? ""
-            : '<div style="margin-bottom:8px;color:var(--m-muted,#666);">Проверьте ключ провайдера и доступ к векторным хранилищам в настройках.</div>';
-          cont.innerHTML =
+          console.error("[FILE MANAGER] Vector database load failed:", error);
+          var target = document.getElementById("vs-manager-list");
+          if (!target) return;
+          target.innerHTML =
             '<div style="padding:12px;color:var(--m-danger,#c33);font-size:12px;">' +
-            '<div style="font-weight:600;margin-bottom:6px;">Не удалось загрузить векторные хранилища</div>' +
+            '<div style="font-weight:600;margin-bottom:6px;">Не удалось прочитать векторную базу</div>' +
             '<div style="margin-bottom:8px;word-break:break-word;">' +
-            window.SettingsUI.escapeHtml(message) +
+            UI.escapeHtml(describeError(error)) +
             "</div>" +
-            keyHint +
-            '<button class="logos-btn file-manager-vs-refresh-btn" id="btn-retry-vs">Повторить</button>' +
+            '<button class="logos-btn file-manager-vs-refresh-btn" id="btn-retry-vs" type="button">Повторить</button>' +
             "</div>";
           var retry = document.getElementById("btn-retry-vs");
           if (retry) retry.addEventListener("click", loadVsList);
         });
     }
 
-    // Создание нового Vector Store
-    document.getElementById("btn-create-vs").addEventListener("click", function () {
-      var name = document.getElementById("vs-name-input").value.trim();
-      if (!name) {
-        LogosToast.error("Введите название");
-        return;
-      }
-      this.disabled = true;
-      this.innerText = "...";
-      window.LogosDispatcher.request("/api/vector-stores", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name }),
-      })
-        .then(function (r) {
-          if (!r.ok) return window.LogosHttpError(r).then(function (e) { throw e; });
-        })
-        .then(function () {
-          document.getElementById("vs-name-input").value = "";
-          loadVsList();
-        })
-        .catch(function (e) {
-          LogosToast.error(window.LogosErrorText("Не удалось создать хранилище", e));
-        })
-        .finally(function () {
-          var btn = document.getElementById("btn-create-vs");
-          btn.disabled = false;
-          btn.innerText = "+ Создать";
-        });
-    });
-
     document.getElementById("btn-refresh-vs").addEventListener("click", loadVsList);
 
-    // === Модалка добавления файлов в Vector Store ===
-    function openAddFilesToVsModal(vsId, vsName) {
-      var existingBg = document.getElementById("vs-add-files-modal");
-      if (existingBg) existingBg.remove();
-
-      var addBody = document.createElement("div");
-      addBody.className = "file-manager-add-body";
-      var bg = CoreUI.modal.create({
-        id: "vs-add-files-modal",
-        title: "Файлы → " + (vsName || vsId.substring(0, 8)),
-        titleTag: "h3",
-        className: "file-manager-add-modal",
-        contentClassName: "file-manager-add-box",
-        closeAction: "file-manager.add.close",
-        body: addBody,
-      });
-      var panel = addBody;
-
-      var fileListEl = document.createElement("div");
-      fileListEl.id = "vs-add-filelist";
-      fileListEl.className = "file-manager-add-list";
-
-      var confirm = document.createElement("button");
-      confirm.type = "button";
-      confirm.id = "vs-add-confirm";
-      confirm.className = "logos-btn file-manager-primary-btn";
-      confirm.textContent = "Добавить выбранные файлы";
-
-      panel.appendChild(fileListEl);
-      panel.appendChild(confirm);
-      (document.querySelector(".logos-pro-app") || document.body).appendChild(bg);
-      CoreUI.modal.open(bg);
-
-      function closeAddModal() {
-        CoreUI.modal.close(bg);
+    // Where a kept file stands in the vector database (workspace/stored_files.py): text and whether it is a failure.
+    function vectorState(file) {
+      var vectors = (file && file.vectors) || {};
+      if (vectors.state === "done") {
+        if (vectors.text !== "name_only") return { text: "В векторной базе · фрагментов: " + (vectors.chunks || 0) };
+        var pdf = /\.pdf$/i.test(String(file.filename || ""));
+        return {
+          text:
+            "В векторной базе только имя и размер: " +
+            (pdf ? "у Logos нет программы для чтения PDF." : "текст файла не прочитан."),
+        };
       }
-
-      function renderAddFilesState(message, isError) {
-        fileListEl.replaceChildren();
-        var state = document.createElement("div");
-        state.className = "file-manager-state" + (isError ? " file-manager-state-error" : "");
-        state.textContent = message;
-        fileListEl.appendChild(state);
+      if (vectors.state === "failed") {
+        return { text: "Не записан в векторную базу: " + (vectors.error || "ошибка") + ".", error: true };
       }
-
-      // Loads the files that can be added. A failure leaves a retry button in the panel.
-      function loadAddableFiles() {
-        renderAddFilesState("Загрузка...", false);
-
-        window.LogosDispatcher.request("/api/files", undefined, { timeoutMs: LIST_TIMEOUT_MS })
-          .then(function (r) {
-            if (r.ok) return r.json();
-            return readJson(r).then(function (data) {
-              throw statusError(r, data && data.error);
-            });
-          })
-          .then(function (data) {
-            var files = Array.isArray(data.data) ? data.data : [];
-            if (files.length === 0) {
-              renderAddFilesState("Нет файлов. Загрузите их в менеджере.", false);
-              return;
-            }
-            fileListEl.replaceChildren();
-            files.forEach(function (f) {
-              var row = document.createElement("label");
-              row.className = "file-manager-add-row";
-
-              var checkbox = document.createElement("input");
-              checkbox.type = "checkbox";
-              checkbox.className = "vs-add-file-chk";
-              checkbox.value = f.id || "";
-
-              var filename = document.createElement("span");
-              filename.className = "file-manager-add-name";
-              filename.textContent = f.filename || "";
-
-              var size = document.createElement("span");
-              size.className = "file-manager-add-size";
-              size.textContent = formatBytes(f.bytes);
-
-              row.appendChild(checkbox);
-              row.appendChild(filename);
-              row.appendChild(size);
-              fileListEl.appendChild(row);
-            });
-          })
-          .catch(function (e) {
-            renderAddFilesState("Не удалось загрузить список файлов. " + describeError(e), true);
-            var retry = document.createElement("button");
-            retry.type = "button";
-            retry.className = "logos-btn file-manager-secondary-btn";
-            retry.textContent = "Повторить";
-            retry.addEventListener("click", loadAddableFiles);
-            fileListEl.appendChild(retry);
-          });
+      if (vectors.last_error) {
+        return { text: "Записывается в векторную базу снова. Прошлая попытка: " + vectors.last_error, error: true };
       }
+      return { text: "Записывается в векторную базу..." };
+    }
 
-      loadAddableFiles();
-
-      confirm.addEventListener("click", function () {
-        var checked = [];
-        fileListEl.querySelectorAll(".vs-add-file-chk:checked").forEach(function (chk) {
-          checked.push(chk);
-        });
-        if (checked.length === 0) {
-          LogosToast.error("Выберите файлы");
-          return;
-        }
-
-        confirm.disabled = true;
-        confirm.textContent = "Добавление...";
-
-        // The route takes one file_id per request. An added file is unchecked, so a retry
-        // after a failure does not add it a second time.
-        function addFrom(index) {
-          if (index >= checked.length) return Promise.resolve();
-          return window.LogosDispatcher.request(
-            "/api/vector-stores/" + encodeURIComponent(vsId) + "/files",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ file_id: checked[index].value }),
-            },
-          )
-            .then(function (r) {
-              if (!r.ok)
-                return readJson(r).then(function (data) {
-                  throw statusError(r, data && data.error);
-                });
-            })
-            .then(function () {
-              checked[index].checked = false;
-              return addFrom(index + 1);
-            });
-        }
-
-        addFrom(0)
-          .then(function () {
-            closeAddModal();
-            loadVsList();
-          })
-          .catch(function (e) {
-            loadVsList();
-            LogosToast.error("Не удалось добавить файл. " + describeError(e));
-          })
-          .finally(function () {
-            if (!document.getElementById("vs-add-confirm")) return;
-            confirm.disabled = false;
-            confirm.textContent = "Добавить выбранные файлы";
-          });
-      });
+    // While a file is being written into the vector database the list is read again, once at a time, as long as this
+    // window is open.
+    var refreshPending = false;
+    function refreshWhileWriting(list) {
+      if (refreshPending) return;
+      refreshPending = true;
+      window.LogosCoreAPI.scheduler.defer(function () {
+        refreshPending = false;
+        if (document.getElementById("file-list") !== list) return;
+        loadFiles();
+        loadVsList();
+      }, 15000);
     }
 
     // === Рендер файлов ===
@@ -540,6 +254,7 @@ window.fetchVectorStores = function () {
       div.id = "file-row-" + file.id;
       div.style.cssText =
         "padding:10px;border-bottom:1px solid var(--m-section-border,#eee);display:flex;align-items:center;gap:12px;";
+      var vectors = vectorState(file);
       div.innerHTML = [
         '<div style="flex:1;min-width:0;">',
         '    <div style="font-weight:bold;color:var(--m-text,#222);word-break:break-all;">' +
@@ -552,6 +267,11 @@ window.fetchVectorStores = function () {
           '">' +
           UI.escapeHtml(file.id.substring(0, 12)) +
           "...</code></div>",
+        '    <div style="font-size:12px;word-break:break-word;color:' +
+          (vectors.error ? "var(--m-danger,#c33)" : "var(--m-muted,#666)") +
+          ';">' +
+          UI.escapeHtml(vectors.text) +
+          "</div>",
         "</div>",
         '<a class="logos-btn file-manager-secondary-btn" href="/api/files/' +
           encodeURIComponent(file.id) +
@@ -587,7 +307,7 @@ window.fetchVectorStores = function () {
       window.LogosDispatcher.request("/api/files", undefined, { timeoutMs: LIST_TIMEOUT_MS })
         .then(function (r) {
           if (r.ok) return r.json();
-          // The server's reason (a rejected provider key) is shown, as the list of files to add shows it.
+          // The server's reason (a disk that cannot be read, for example) is shown.
           return readJson(r).then(function (data) {
             throw statusError(r, data && typeof data.error === "string" ? data.error : "");
           });
@@ -602,19 +322,23 @@ window.fetchVectorStores = function () {
           data.data.forEach(function (file) {
             renderFile(file);
           });
+          var writing = data.data.some(function (file) {
+            return !file.vectors || file.vectors.state !== "done";
+          });
+          if (writing) refreshWhileWriting(list);
 
           list.querySelectorAll(".fm-delete-btn").forEach(function (btn) {
             btn.addEventListener("click", function () {
               var fileId = this.getAttribute("data-id");
               var deleteBtn = this;
-              window.LogosDialog.confirm("Удалить файл? Он будет удалён из всех хранилищ.", {
+              window.LogosDialog.confirm("Удалить файл? Он будет удалён и из векторной базы.", {
                 confirmText: "Удалить",
                 danger: true,
               }).then(function (confirmed) {
                 if (!confirmed) return;
                 deleteBtn.disabled = true;
                 deleteBtn.innerText = "...";
-                // The server waits up to 30 s for a DELETE and does not retry it, so wait a little longer.
+                // The file is deleted on the phone at once; the wait is for a slow link.
                 window.LogosDispatcher.request(
                   "/api/files/" + encodeURIComponent(fileId),
                   { method: "DELETE" },
@@ -764,8 +488,8 @@ window.fetchVectorStores = function () {
             "</div>",
           ].join("");
           div.style.opacity = "1";
-          // Everything arrived and the copy stays: «Повторить» only completes the upload once the cause (a provider key,
-          // for example) is fixed; after completion_uncertain «Сохранить всё равно» sends it once the list was checked.
+          // Everything arrived and the copy stays: «Повторить» only completes the upload once the cause (a full disk,
+          // for example) is fixed; after no answer «Сохранить всё равно» completes it once the list was checked.
           // «Убрать» drops the copy.
           if (err && err.completion && err.uploadId) {
             keepUpload(err.uploadId);
@@ -820,10 +544,6 @@ window.fetchVectorStores = function () {
     loadFiles();
   };
   window.LogosCoreAPI.ui.actions.register("file-manager.close", function (payload) {
-    var modal = payload.element.closest(".modal");
-    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
-  });
-  window.LogosCoreAPI.ui.actions.register("file-manager.add.close", function (payload) {
     var modal = payload.element.closest(".modal");
     if (modal) window.LogosCoreAPI.ui.modal.close(modal);
   });
