@@ -89,7 +89,7 @@ python -m scripts.rotate_cloudru_provider_key
 
 Run these commands from the repository root with the application's dependencies
 and environment configured. Schedule the appropriate worker at least hourly;
-starting Flask does not schedule it. The Cloud.ru worker uses a one-day
+starting the web server does not schedule it. The Cloud.ru worker uses a one-day
 key lifetime and rotates during the final hour of that daily lifetime. Each
 worker validates the new/reissued secret before promoting it in the database.
 

@@ -9,7 +9,7 @@ import time
 
 import requests
 
-from flask import Blueprint, jsonify, request, send_file
+from webframe import Blueprint, jsonify, request, send_file
 
 from chat._error_details import DETAILS, error_body
 from chat.mcp_routes import logos_client_type

@@ -1,6 +1,6 @@
 """HTTP API for the Logos 3D-printing business MVP."""
 
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 
 from forge.binding import printing_store as _store
 from forge.host import get_current_owner_id

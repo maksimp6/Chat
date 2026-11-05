@@ -48,7 +48,7 @@ client. Static files at the current `?v=` fingerprint are cached as
 immutable, so a repeat visit downloads none of them.
 
 `templates/index.html` is measured as the template file on disk, not a
-Jinja-rendered response. The only runtime substitutions are the
+template-rendered response (webframe.templating). The only runtime substitutions are the
 `static_version` cache-busting query parameter and, on preview deployments,
 a `preview_base_path` prefix; both add at most a few dozen bytes and do not
 change the conclusion below.

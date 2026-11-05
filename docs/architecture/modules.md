@@ -49,7 +49,9 @@ flowchart LR
 
 1. A unit imports only the standard library, third-party packages (`requirements*.txt`,
    or a `requirements.txt` next to the unit's files) and its own modules. Lazy imports,
-   `importlib` strings and embedded `-c` programs count too.
+   `importlib` strings and embedded `-c` programs count too. The web framework
+   `webframe/` is such a library: it lives in the repository, is listed under
+   `third-party` in `pyproject.toml` and is not a unit.
 2. What a unit needs from another unit is a **port**: a field of the frozen `Host`
    dataclass in the unit's `host.py` (`scripts/<cluster>_host.py` for a script cluster).
    A composition root provides it. A unit reads its ports only when a function runs,
@@ -109,7 +111,7 @@ The binding mechanism is `core/host_binding.py`, vendored into each such unit as
 | `composition/web.py` | What the web process serves, in order: the ChatGPT bridge tools, the RDC pairing route, the blueprints, the web shell and the units' own routes; the durable tables storage start-up creates. |
 | `composition/tool_sources.py` | Tool categories other units contribute to the shared tool registry, after its own. |
 | `composition/application.py` | `initialize()`: the web application as a library, for command-line roots that need its state. |
-| `app.py` | `process.start()`, `wiring.register_all()`, `Flask(__name__)`, `web.install(app)`; `python app.py` runs it. |
+| `app.py` | `process.start()`, `wiring.register_all()`, `Application(__name__)` (webframe), `web.install(app)`; `python app.py` runs it. |
 | `scripts/rotate_*.py`, CLI `__main__` blocks | Register the hosts, then call the unit's `main()`. |
 
 ## Adding a dependency between units

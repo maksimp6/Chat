@@ -1,6 +1,6 @@
 """Small API helpers for session/invocation lifecycle endpoints."""
 
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 
 from runtime.host import (
     bound,

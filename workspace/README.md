@@ -16,7 +16,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 
 | Module | Purpose |
 | --- | --- |
-| [`workspace.file_routes`](file_routes.py) | Flask routes of the file manager (`/api/files`): files kept on the phone. |
+| [`workspace.file_routes`](file_routes.py) | HTTP routes of the file manager (`/api/files`): files kept on the phone. |
 | [`workspace.project_tree`](project_tree.py) | Functional project tree API with safe, bounded filesystem traversal. |
 | [`workspace.stored_files`](stored_files.py) | The file manager's files in `files/` next to the memory file, each a document of the vector database collection `files`. |
 | [`workspace.upload_routes`](upload_routes.py) | Uploads that survive a broken connection: a file or a photo sent in pieces at an offset (`/api/uploads`). |

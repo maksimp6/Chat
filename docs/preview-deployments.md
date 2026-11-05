@@ -1,7 +1,7 @@
 # Host-managed preview validation
 
 Preview validation uses the running Logos host. It does **not** build or start a
-per-preview container, Flask subprocess, localhost proxy, or runtime port.
+per-preview container, web-server subprocess, localhost proxy, or runtime port.
 
 The GitHub workflow checks out and tests the exact requested commit, then follows
 this lifecycle:

@@ -8,7 +8,7 @@ import os
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
 from cloud.host import secret_storage_ready, store_secret

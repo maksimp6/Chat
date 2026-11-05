@@ -21,7 +21,7 @@ ledger without treating unknown or partially priced usage as confirmed debt.
 Treasury never accepts owner_id from the JSON body or query string.
 
 When authentication is present, the authentication layer should populate
-Flask g.user_id or g.authenticated_user_id. For the current single-user
+a request-scoped user_id or authenticated_user_id. For the current single-user
 deployment, set the server-side LOGOS_OWNER_ID value in .env together with
 LOGOS_SINGLE_USER=true. LOGOS_OWNER_ID alone is ignored, so a multi-user deployment
 cannot give every request one shared owner by mistake. This is a temporary

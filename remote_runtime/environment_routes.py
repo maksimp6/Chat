@@ -1,6 +1,6 @@
 """REST API for branch-aware application environments."""
 
-from flask import Blueprint, Response, current_app, jsonify, request
+from webframe import Blueprint, Response, current_app, jsonify, request
 
 from remote_runtime.environments import (
     GitUnavailable,

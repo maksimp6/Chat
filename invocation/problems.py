@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from flask import Response, jsonify
+from webframe import Response, jsonify
 
 PROBLEM_MIMETYPE = "application/problem+json"
 PROBLEM_TYPE_BASE = "https://logos.pro/problems/"

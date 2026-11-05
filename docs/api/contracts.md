@@ -80,7 +80,7 @@ API tests must cover all of these levels:
    values, enums, nested structures, and invalid payloads.
 2. **Architecture tests**: routes cannot bypass contract helpers and every
    referenced contract name must exist.
-3. **Route tests**: real Flask requests and responses are validated against the
+3. **Route tests**: real in-process requests and responses (webframe test client) are validated against the
    named contract.
 4. **Negative route tests**: unexpected fields, wrong types, missing required
    fields, and invalid values must produce the documented error contract.

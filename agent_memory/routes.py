@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Flask, jsonify
+from webframe import Application, jsonify
 
 from agent_memory.extractor import list_global_memory_facts
 from agent_memory.manager import load_memory_config
@@ -14,7 +14,7 @@ def api_memory_panel_data():
     return jsonify({"config": cfg, "facts": facts})
 
 
-def install(app: Flask) -> None:
+def install(app: Application) -> None:
     """Serve the memory panel API; endpoints keep the view names."""
     app.add_url_rule(
         "/api/memory/manage", view_func=api_memory_panel_data, methods=["GET"]

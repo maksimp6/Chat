@@ -9,10 +9,10 @@ mkdir -p logs
 
 # Проверяем зависимости
 echo "🔍 Проверка зависимостей..."
-python3 -c "import flask, requests, websockets" 2>/dev/null
+python3 -c "import requests, websockets" 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "⚠️  Устанавливаю зависимости..."
-    pip install flask requests websockets
+    pip install requests websockets
 fi
 
 echo ""

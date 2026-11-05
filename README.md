@@ -6,7 +6,7 @@
 
 <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
 <a href=".python-version"><img alt="Python 3.14" src="https://img.shields.io/badge/python-3.14-3776AB.svg?logo=python&logoColor=white"></a>
-<a href="requirements.txt"><img alt="Flask 3.1+" src="https://img.shields.io/badge/Flask-3.1%2B-000000.svg?logo=flask&logoColor=white"></a>
+<a href="webframe/README.md"><img alt="webframe" src="https://img.shields.io/badge/web-webframe-000000.svg"></a>
 <a href="docs/models/yandex-models.md"><img alt="Yandex AI Studio" src="https://img.shields.io/badge/Yandex%20AI%20Studio-Responses%20API-FC3F1D.svg"></a>
 
 [Quick start](#quick-start) ·
@@ -25,7 +25,7 @@
 
 ## Why Logos
 
-Logos is one Flask backend (`app.py`) with a browser interface that puts a model
+Logos is one Python web backend (`app.py`, on its own framework `webframe/`) with a browser interface that puts a model
 provider, tools, agents and accounting behind a single
 [canonical execution path](docs/architecture/ai-execution-pipeline.md):
 
@@ -182,7 +182,7 @@ python app.py
 
 Open `http://localhost:8080` when using the template's `PORT=8080`; without
 `PORT`, `app.py` defaults to `5000`. `start.sh` is a wrapper that creates `logs/`,
-installs `flask`, `requests` and `websockets` if they are missing, and runs
+installs `requests` and `websockets` if they are missing, and runs
 `python3 app.py`.
 
 ### 4. Add the provider key
@@ -211,7 +211,7 @@ application on `develop` pushes. The independent native updater has been removed
 
 ## Project structure
 
-Top-level directories, grouped by area. Root entry points: `app.py` (Flask
+Top-level directories, grouped by area. Root entry points: `app.py` (web
 application; what it serves is assembled in `composition/web.py`), `start.sh`,
 `requirements*.txt` and `.env.example`.
 
@@ -221,7 +221,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | Path              | Contents                                                                                       |
 | ----------------- | ---------------------------------------------------------------------------------------------- |
 | `core/`           | Configuration, environment access, clock, model profiles and Wikifunctions-derived helpers     |
-| `chat/`           | Flask routes for chat (`/api/chat`), voice, images, embeddings and classification              |
+| `chat/`           | HTTP routes for chat (`/api/chat`), voice, images, embeddings and classification              |
 | `conversations/`  | Conversation ownership and metadata                                                            |
 | `sessions/`       | Durable runtime sessions stored as Kristall journal records                                    |
 | `invocation/`     | Invocation lifecycle, `InvocationContext`, trace persistence on Kristall, problem responses     |
@@ -318,7 +318,8 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | Path         | Contents                                                                                               |
 | ------------ | ------------------------------------------------------------------------------------------------------ |
 | `static/`    | Web interface JavaScript, CSS, icons and repository-local vendored libraries                           |
-| `templates/` | Flask page template (`index.html`)                                                                     |
+| `templates/` | Page template (`index.html`), rendered by `webframe.templating`                                        |
+| `webframe/`  | The web framework: application, routing, request and response, templates, HTTP server ([README](webframe/README.md)) |
 | `website/`   | Static project website                                                                                 |
 
 </details>

@@ -13,8 +13,8 @@ import re
 import zlib
 from typing import Any, Iterable, Iterator
 
-from flask import Flask, Response, request
-from flask.json.provider import DefaultJSONProvider
+from webframe import Application, Response, request
+from webframe.json import JSONProvider
 
 # Media types worth compressing; everything else (pictures, audio, archives, fonts) is
 # already compressed or binary.
@@ -116,7 +116,7 @@ def compress_response(response: Response) -> Response:
     return response
 
 
-class Utf8JSONProvider(DefaultJSONProvider):
+class Utf8JSONProvider(JSONProvider):
     """JSON as UTF-8 text instead of ASCII escapes, so a Cyrillic letter costs 2 bytes, not 6.
 
     A text that cannot be UTF-8 (a lone surrogate, as in a file name that was not UTF-8
@@ -134,7 +134,7 @@ class Utf8JSONProvider(DefaultJSONProvider):
         return text
 
 
-def install(app: Flask) -> None:
+def install(app: Application) -> None:
     """JSON without ASCII escapes, and gzip for every compressible response."""
     app.json = Utf8JSONProvider(app)
     app.after_request(compress_response)

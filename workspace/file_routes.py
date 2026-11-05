@@ -1,4 +1,4 @@
-"""Flask routes of the file manager: files kept on the phone (``workspace.stored_files``).
+"""HTTP routes of the file manager: files kept on the phone (``workspace.stored_files``).
 
 Logos has no Yandex API (the owner deleted the Yandex project on 05.11.2026), so there are
 no Yandex Files and Vector Stores any more: Logos keeps the files itself and writes each
@@ -11,7 +11,7 @@ import os
 import re
 from urllib.parse import quote
 
-from flask import Blueprint, jsonify, request, send_file
+from webframe import Blueprint, jsonify, request, send_file
 
 from workspace import stored_files
 

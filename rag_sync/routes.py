@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 
 from rag_sync.sync import reset, start, status
 

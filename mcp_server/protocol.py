@@ -7,7 +7,7 @@ import os
 from collections.abc import Mapping
 from typing import Any
 
-from flask import Response, request
+from webframe import Response, request
 
 MCP_PATH = "/mcp"
 SUPPORTED_PROTOCOL_VERSIONS = {

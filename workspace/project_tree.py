@@ -3,7 +3,7 @@
 import heapq
 import os
 
-from flask import Blueprint, jsonify
+from webframe import Blueprint, jsonify
 
 project_tree_bp = Blueprint("project_tree", __name__)
 PROJECT_ROOT = os.path.realpath(

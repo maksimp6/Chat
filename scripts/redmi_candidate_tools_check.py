@@ -728,7 +728,7 @@ def main():
         server_env.update(
             HOST="127.0.0.1",
             PORT=str(PORT),
-            FLASK_DEBUG="0",
+            LOGOS_DEBUG="0",
             LOGOS_MEMORY_PATH=str(private / "logos.memory"),
             ALICE_MEMORY_PATH=str(private / "logos.memory"),
             LOGOS_PROVIDER_CREDENTIAL_KEY=secret,

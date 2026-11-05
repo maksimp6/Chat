@@ -70,18 +70,18 @@ def traced_operation(operation: str, *, include_request: bool = True):
             }
             if include_request:
                 try:
-                    from flask import request as flask_request
+                    from webframe import request as http_request
 
                     payload.update(
                         {
-                            "method": flask_request.method,
-                            "path": flask_request.path,
+                            "method": http_request.method,
+                            "path": http_request.path,
                         }
                     )
-                    if flask_request.is_json:
-                        payload["body"] = flask_request.get_json(silent=True) or {}
-                    elif flask_request.form:
-                        payload["form_keys"] = sorted(flask_request.form.keys())
+                    if http_request.is_json:
+                        payload["body"] = http_request.get_json(silent=True) or {}
+                    elif http_request.form:
+                        payload["form_keys"] = sorted(http_request.form.keys())
                 except Exception:
                     logger.debug("[TRACE] request body not captured", exc_info=True)
             trace.set_request(payload)
@@ -90,7 +90,7 @@ def traced_operation(operation: str, *, include_request: bool = True):
             try:
                 result = fn(*args, **kwargs)
                 try:
-                    from flask import has_request_context, make_response
+                    from webframe import has_request_context, make_response
 
                     if has_request_context():
                         response = make_response(result)

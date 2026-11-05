@@ -1,6 +1,6 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 
-from flask import Blueprint, copy_current_request_context, request, jsonify, Response
+from webframe import Blueprint, copy_current_request_context, request, jsonify, Response
 import contextlib
 import contextvars
 import json as _json

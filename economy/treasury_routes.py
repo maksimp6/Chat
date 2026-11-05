@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from flask import Flask, jsonify, request
+from webframe import Application, jsonify, request
 
 from economy.host import get_store
 from economy.treasury import demo_top_up, get_account
@@ -38,7 +38,7 @@ def treasury_top_up():
         return jsonify({"error": str(exc)}), 400
 
 
-def install(app: Flask) -> None:
+def install(app: Application) -> None:
     """Serve the treasury API; endpoints keep the view names."""
     app.add_url_rule(
         "/api/treasury/account", view_func=treasury_account, methods=["GET"]

@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from flask import jsonify, redirect
+from webframe import jsonify, redirect
 
 
 def verification_url(path, now=None):

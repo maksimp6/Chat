@@ -70,14 +70,14 @@ standalone-downloads = [
 ]
 data-reads = ["scripts/validate_ultra_profiles.py -> core/config.py"]
 third-party = [
-    "flask", "werkzeug", "requests", "urllib3", "websockets", "dotenv", "PIL",
+    "webframe", "requests", "urllib3", "websockets", "dotenv", "PIL",
     "cryptography", "yaml", "jsonschema", "referencing", "razdel", "unidiff",
     "numpy", "matplotlib", "mpl_toolkits", "trimesh",
 ]
 optional-third-party = ["cadquery", "paho"]
 per-file-dirs = ["scripts", "tools"]
 tool-dirs = ["scripts", "tools"]
-exclude = ["docs/", "datasets/"]
+exclude = ["docs/", "datasets/", "webframe/"]
 effect-calls = ["ToolRegistry"]
 system-log-module = "observability.system_log"
 tool-registry-file = "tool_providers/registry.py"

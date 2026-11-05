@@ -6,7 +6,7 @@ import math
 from types import SimpleNamespace
 
 import requests
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 from chat._error_details import DETAILS, error_body
 from chat.host import (
     bound,

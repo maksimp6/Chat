@@ -17,7 +17,7 @@ import time
 import uuid
 from typing import Any
 
-from flask import Response, jsonify, stream_with_context
+from webframe import Response, jsonify, stream_with_context
 
 from chat._error_details import error_body
 from chat.host import check_access, get_current_owner_id, get_store

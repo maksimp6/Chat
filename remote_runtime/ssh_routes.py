@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import Flask, jsonify
+from webframe import Application, jsonify
 
 from remote_runtime.host import bound
 from remote_runtime.ssh_settings import public_settings
@@ -32,7 +32,7 @@ def get_ssh_runtime_settings():
         ), 400
 
 
-def install(app: Flask) -> None:
+def install(app: Application) -> None:
     """Serve the SSH runtime API; endpoints keep the view names."""
     app.add_url_rule(
         "/api/ssh-runtime/settings", view_func=get_ssh_runtime_settings, methods=["GET"]

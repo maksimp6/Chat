@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import requests
-from flask import (
+from webframe import (
     Blueprint,
     Response,
     copy_current_request_context,

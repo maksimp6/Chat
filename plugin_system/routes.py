@@ -1,6 +1,6 @@
 """HTTP API for shared local plugin discovery and lifecycle management."""
 
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 
 from plugin_system.manager import PluginError, plugin_manager
 

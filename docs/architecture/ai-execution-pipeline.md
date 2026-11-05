@@ -42,7 +42,7 @@ response
 
 К адаптерам относятся:
 
-- веб-чат / Flask;
+- веб-чат / веб-сервер (webframe);
 - MCP / ChatGPT;
 - browser;
 - Android / local tool agent;

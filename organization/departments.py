@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 
 from organization.host import create_session, get_session, get_store
 

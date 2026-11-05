@@ -7,7 +7,7 @@ import os
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 
 from provider_accounts.credentials import (
     CLOUDRU,

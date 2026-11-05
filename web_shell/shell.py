@@ -6,8 +6,14 @@ import logging
 import os
 from typing import Any
 
-from flask import Flask, current_app, jsonify, render_template, request
-from werkzeug.exceptions import HTTPException
+from webframe import (
+    Application,
+    HTTPError,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+)
 
 from web_shell.host import (
     bound,
@@ -42,7 +48,7 @@ def preview_base_path():
 
 
 def _handle_unexpected_error(exc):
-    if isinstance(exc, HTTPException):
+    if isinstance(exc, HTTPError):
         return exc.get_response()
     logger.exception("[ERROR] Unhandled application exception")
     return problem(
@@ -169,7 +175,7 @@ def client_diagnostic():
     return "", 204
 
 
-def install(app: Flask) -> None:
+def install(app: Application) -> None:
     """Install the shell: version, error and cache policy, storage start-up, shell routes."""
     global STATIC_ASSET_VERSION
     STATIC_FILE_STATES.update(static_file_states(app.root_path))

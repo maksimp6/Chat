@@ -84,7 +84,7 @@ def _resolve_request_session_id(session_id: str, conversation_id: str) -> str:
     if session_id != conversation_id:
         return session_id
     try:
-        from flask import has_request_context, request
+        from webframe import has_request_context, request
 
         if has_request_context():
             data = request.get_json(silent=True) or {}

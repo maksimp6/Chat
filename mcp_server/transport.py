@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, Response, request
+from webframe import Blueprint, Response, request
 
 from mcp_server.auth import _auth_user_from_request
 from mcp_server.protocol import (

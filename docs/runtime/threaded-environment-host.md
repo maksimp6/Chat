@@ -16,7 +16,7 @@ HTTP request
 ```
 
 The gateway does not proxy to a localhost port and the manager does not spawn a
-Flask process for each environment. Runtime HTTP responses are streamed through
+web-server process for each environment. Runtime HTTP responses are streamed through
 a bounded queue so slow clients apply backpressure instead of forcing the whole
 response into memory.
 
@@ -92,7 +92,7 @@ Preview CI should build/test the requested commit, then authenticate to the
 running Logos host and request creation of an environment for that exact
 commit. It should poll the environment lifecycle and exercise the rendered shell
 through the environment gateway. Cleanup should delete that environment. It
-must not deploy a preview container, wait for a container-local Flask server, or
+must not deploy a preview container, wait for a container-local web server, or
 discover/use a `runtime_port`. The host response and lifecycle trace should be
 the CI evidence tying the tested commit to the runtime.
 

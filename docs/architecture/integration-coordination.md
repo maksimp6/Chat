@@ -11,7 +11,7 @@ it does not recreate a historical candidate queue.
   constrained revision entry point; `RuntimeDispatcher` owns scoped resources.
 - Revision loading must not mutate process-global imports, environment variables
   or preview paths. In-process threads are execution units, not hostile-code sandboxes.
-- Host-managed preview traffic must not introduce a second Flask/container
+- Host-managed preview traffic must not introduce a second web-server/container
   transport or process-global preview configuration.
 - Tool and MCP calls converge on `UniversalToolExecutor` and preserve
   `InvocationContext`, `ExecutionTrace` and runtime correlation.

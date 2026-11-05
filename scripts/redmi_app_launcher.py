@@ -50,7 +50,7 @@ def main():
         if not k.startswith(("GITHUB_", "ACTIONS_", "RUNNER_", "GH_"))
     }
     env.update(
-        HOST=host, PORT=str(port), FLASK_DEBUG="0", PYTHONPATH=str(native[0].parent)
+        HOST=host, PORT=str(port), LOGOS_DEBUG="0", PYTHONPATH=str(native[0].parent)
     )
     try:
         secret = (state / "provider-encryption.key").read_text().strip()

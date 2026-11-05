@@ -37,7 +37,7 @@ import zlib
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 
 from workspace import stored_files
 from workspace.file_routes import ALLOWED_EXTENSIONS, MAX_FILE_SIZE

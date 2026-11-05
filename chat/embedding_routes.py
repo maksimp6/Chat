@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 
 from chat._error_details import DETAILS, error_body
 from chat.host import (

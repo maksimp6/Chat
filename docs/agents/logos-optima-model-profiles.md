@@ -94,7 +94,7 @@ node --test tests/test_optima_ui.js tests/test_ui_settings_params.js tests/test_
 ```
 
 The isolated HTTP tests compile the actual handler/helpers from the route source
-and use Flask with recording substitutes for persistence, provider and tool
+and use the webframe test client with recording substitutes for persistence, provider and tool
 execution. The tool-loop test executes the actual continuation closure. A negative
 control removes `model_profile` from the allowlist and demonstrates that the
 Optima contract detects the resulting Ultra/high payload.

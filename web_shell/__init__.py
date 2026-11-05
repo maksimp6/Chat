@@ -1,6 +1,6 @@
 """The web shell of Logos: the page, health and version endpoints, request policy
 (caching, unexpected errors) and storage start-up. ``install(app)`` adds it to a
-Flask application; the composition root decides what else the application serves."""
+web application; the composition root decides what else the application serves."""
 
 from __future__ import annotations
 

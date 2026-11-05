@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify, request
 
 from vector_db.tools import vectors
 

@@ -80,7 +80,7 @@ ExecutionTrace.
 
 The production service must be reachable over HTTPS. In ChatGPT developer mode, create an app/connector using the public URL ending in `/mcp`.
 
-For local development, expose the Flask service through a public HTTPS tunnel such as an approved development tunnel. Do not publish provider API keys or backend-only credentials.
+For local development, expose the Logos web service through a public HTTPS tunnel such as an approved development tunnel. Do not publish provider API keys or backend-only credentials.
 
 ## Validation
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from functools import partial
 
-from flask import Flask
+from webframe import Application
 
 from agent_memory.routes import install as install_memory_routes
 from agent_runtime.local_gateway import prepare_local_agent_records, local_agent_bp
@@ -114,7 +114,7 @@ STORAGE_INITIALIZERS = (
 )
 
 
-def install(app: Flask) -> None:
+def install(app: Application) -> None:
     """Add every unit the web process serves to ``app``."""
     register_mcp_tools()
     install_rdc_pairing(app)

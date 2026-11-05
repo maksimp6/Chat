@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Flask, jsonify, request
+from webframe import Application, jsonify, request
 
 from conversations.ownership import _conversation_record, check_access, delete_owner
 from conversations.host import (
@@ -81,7 +81,7 @@ def get_ollama_settings():
     return jsonify(ollama_status())
 
 
-def install(app: Flask) -> None:
+def install(app: Application) -> None:
     """Serve the conversation API; endpoints keep the view names."""
     app.add_url_rule(
         "/api/conversations/<conv_id>", view_func=patch_conversation, methods=["PATCH"]

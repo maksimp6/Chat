@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Flask, jsonify, request
+from webframe import Application, jsonify, request
 
 from provider_accounts.host import annotate_catalog
 from provider_accounts.model_discovery import (
@@ -31,7 +31,7 @@ def list_models():
         return jsonify(catalog)
 
 
-def install(app: Flask) -> None:
+def install(app: Application) -> None:
     """Create the model discovery and serve the catalog; the endpoint keeps the view name."""
     global MODEL_DISCOVERY
     MODEL_DISCOVERY = get_model_discovery()
