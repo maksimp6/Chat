@@ -60,3 +60,6 @@ build/
 .idea/
 .vscode/
 *.swp
+
+# Research binaries
+research/asmrun/build/
