@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from vector_db import store
+from vector_db import sense, store
 
 __all__ = ["REMEMBER_TOOLS", "VECTOR_TOOLS"]
 
-# Chunks the remember tool gives back (up to 5 x 2000 characters); the local model's context is 16384 tokens
-# (ollama_client.settings.CONTEXT).
-REMEMBER_RESULTS = 5
+# The answer when everything found was already given in this turn.
+REMEMBER_NOTHING_NEW = "Новых частей памяти нет: всё найденное уже дано выше в этом ходе."
 
 
 def _metadata_of(cfg) -> dict:
@@ -26,20 +25,51 @@ def _trace_of(cfg) -> Any:
     return _metadata_of(cfg).get("execution_trace")
 
 
+def _piece_key(piece: dict) -> tuple:
+    """One stored chunk: the chunks of a document share its id."""
+    return (piece.get("collection"), piece.get("id"), piece.get("chunk"))
+
+
+def _given_in_turn(trace: Any) -> set:
+    """The chunks remember gave earlier in this turn: its remember_results events in the turn's trace."""
+    record = getattr(trace, "trace", None)
+    events = record.get("events") if isinstance(record, dict) else None
+    return {
+        _piece_key(piece)
+        for event in events or ()
+        if isinstance(event, dict) and event.get("type") == "remember_results"
+        for piece in (event.get("payload") or {}).get("given") or ()
+        if isinstance(piece, dict)
+    }
+
+
 def remember(args, cfg=None):
-    """Memory by meaning: the vector database searched with what the model was thinking."""
+    """Memory by meaning: the vector database searched with what the model was thinking.
+
+    ``context`` is the sense of the best chunks as one short text (vector_db.sense), without a
+    chunk already given in this turn (the turn's prompt still holds its sense); ids, chunks and
+    scores go into the trace (remember_results)."""
     thought = str(_metadata_of(cfg).get("thought") or "").strip()
     if not thought:
         return {"success": False, "error": "нет текста размышления: подумай о том, что нужно вспомнить, и вызови снова"}
-    found = store.search(thought, None, REMEMBER_RESULTS, trace=_trace_of(cfg))
-    return {
-        "success": True,
-        "context": [
-            {key: hit.get(key) for key in ("text", "score", "collection", "id")}
-            for hit in found["results"]
-        ],
-        "searched": found["searched"],
-    }
+    trace = _trace_of(cfg)
+    found = store.search(thought, None, None, trace=trace)
+    picked = sense.best_documents(found["results"])
+    given = _given_in_turn(trace)
+    new = [hit for hit in picked if _piece_key(hit) not in given]
+    extracted = sense.extract(thought, new, trace=trace)
+    if trace is not None and hasattr(trace, "add_event"):
+        trace.add_event("remember_results", {
+            "searched": found["searched"],
+            "given": [
+                {key: hit.get(key) for key in ("collection", "id", "chunk", "score")} for hit in new
+            ],
+            "repeats_left_out": len(picked) - len(new),
+        })
+    result = {"success": True, "context": extracted["text"], "searched": found["searched"]}
+    if picked and not new:
+        result["note"] = REMEMBER_NOTHING_NEW
+    return result
 
 
 def _add(args, cfg=None):
@@ -133,7 +163,8 @@ REMEMBER_TOOLS = {
     "remember": {
         "title": "Remember",
         "description": "Вспомнить. Без параметров: сначала подумай, что именно нужно вспомнить, "
-        "затем вызови. Память ищется по смыслу твоего размышления и возвращается как context.",
+        "затем вызови. Память ищется по смыслу твоего размышления; context — короткий текст "
+        "из самых близких по смыслу фраз памяти, не целые предложения.",
         # Open: a small model adds arguments of its own ({"what": ...}, seen 05.11.2026 on
         # qwen3:1.7b), and a closed schema refused the call. They are ignored: memory is
         # searched by the thinking text.

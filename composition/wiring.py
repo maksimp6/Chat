@@ -205,6 +205,7 @@ def _chat():
     from observability.trace_manager import traced_operation
     from api.contracts import validate_api_contract
     from provider_accounts.model_discovery import validate_dialog_model
+    from vector_db.sense import answer as vector_sense
     from vector_db.store import add as vector_add
     from yandex_client_modules.request_builder import validate_generation_params
 
@@ -303,6 +304,7 @@ def _chat():
         validate_api_contract=validate_api_contract,
         validate_dialog_model=validate_dialog_model,
         vector_add=vector_add,
+        vector_sense=vector_sense,
         validate_generation_params=validate_generation_params,
     )
 

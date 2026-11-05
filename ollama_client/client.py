@@ -8,6 +8,7 @@ settings (ollama_client.settings), instructions and tool list.
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from collections.abc import Callable
@@ -180,14 +181,19 @@ class OllamaClient:
         settings_id = settings_conversation_id or conversation_id
         if settings_id and execution_policy is None:
             ask_params["instructions"] = settings.INSTRUCTIONS
-            # The chat's own id: tools that take a conversation_id need it.
-            ask_params["input"] = [
-                {
-                    "role": "system",
-                    "content": f"[ТЕКУЩИЙ ДИАЛОГ]\nconversation_id этого диалога Logos: {settings_id}",
-                },
-                *response_input(ask_params, message),
-            ]
+            # The chat's own id, only for a function that takes a conversation_id: remember
+            # (settings.TOOLS) takes none, and the line cost 57 prompt tokens in every request
+            # (traces of 04-05.11.2026; owner, 05.11.2026: cut the waste found in traces).
+            if '"conversation_id"' in json.dumps(
+                [tool.get("parameters") for tool in ask_params["tools"]], default=str
+            ):
+                ask_params["input"] = [
+                    {
+                        "role": "system",
+                        "content": f"[ТЕКУЩИЙ ДИАЛОГ]\nconversation_id этого диалога Logos: {settings_id}",
+                    },
+                    *response_input(ask_params, message),
+                ]
         if _traced(trace):
             trace.add_event("ollama_tools", {"tools": [tool.get("name") for tool in ask_params["tools"]]})
         return self.ask(message, model_key, conversation_id, ask_params, execution_trace=trace)

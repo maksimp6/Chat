@@ -1,11 +1,11 @@
-"""Vector database of the app: texts embedded by Yandex and searched by meaning on the server."""
+"""Vector database of the app: texts embedded by Ollama, searched by meaning on the server, their sense as text."""
 
 from __future__ import annotations
 
 from importlib import import_module
 from typing import Any
 
-__all__ = ["routes", "store", "tools"]
+__all__ = ["routes", "sense", "store", "tools"]
 
 
 def __getattr__(name: str) -> Any:

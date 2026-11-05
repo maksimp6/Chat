@@ -27,6 +27,8 @@ class OllamaError(Exception):
         super().__init__(message)
         self.status_code = status_code
         self.reached = reached
+        # An embedding failure reaches the chat as this error: the pinned embeddings dialog says why.
+        self.user_text = settings.USER_TEXT_UNREACHABLE
 
 
 def _text(content: Any) -> str:

@@ -32,7 +32,7 @@ from typing import Any
 
 from vector_db.host import embed_texts, get_store
 
-__all__ = ["CHUNK_CHARS", "add", "collections", "delete", "drop", "search"]
+__all__ = ["CHUNK_CHARS", "add", "collections", "delete", "drop", "search", "unit_vectors"]
 
 logger = logging.getLogger("logos.vector_db")
 
@@ -144,6 +144,12 @@ def _embed(texts: list[str], model: str, trace: Any) -> tuple[list[list[float]],
         vectors += result["vectors"]
         tokens += int(result.get("tokens") or 0)
     return vectors, tokens, model
+
+
+def unit_vectors(texts: list[str], trace: Any = None) -> tuple[list[array], int]:
+    """The texts' vectors at unit length and stored precision, as a search compares them, and the tokens spent."""
+    vectors, tokens, _ = _embed(texts, QUERY_MODEL, trace)
+    return [_unpack(_pack(vector)) for vector in vectors], tokens
 
 
 def _trace(trace: Any, event: str, payload: dict[str, Any]) -> None:

@@ -55,6 +55,7 @@ from chat.host import (
     record_court_reply,
     record_yandex_mcp_activity,
     vector_add,
+    vector_sense,
     reset_current_trace,
     set_owner,
     set_yandex_conversation,
@@ -1449,8 +1450,36 @@ class _ChatReply:
     partial_output: Any
 
 
+def _vector_dialog_reply(message, trace) -> _ChatReply:
+    """A turn of the pinned embeddings dialog: the sense the vector database holds on the
+    message, as text. Only the embedding model runs, so no chat model is loaded for it."""
+    found = vector_sense(str(message), exclude_conversation=VECTOR_CONVERSATION_ID, trace=trace)
+    diagnostics: dict[str, Any] = {}
+    capture_provider_diagnostics(diagnostics, {"status": "completed"})
+    return _ChatReply(
+        reply=found["text"] or "В векторной базе нет ничего для поиска.",
+        reasoning="",
+        usage={
+            "input_tokens": found["tokens"],
+            "output_tokens": 0,
+            "total_tokens": found["tokens"],
+            "cached_tokens": 0,
+            "tool_tokens": 0,
+            "reasoning_tokens": 0,
+        },
+        timings=[],
+        provider_diagnostics=diagnostics,
+        provider_failed=False,
+        provider_error=None,
+        provider_message=None,
+        partial_output=None,
+    )
+
+
 def _execute_chat_model(message, model_key, invocation, params, trace):
     """Run one provider/tool turn and collect its terminal response."""
+    if invocation.conversation_id == VECTOR_CONVERSATION_ID:
+        return _vector_dialog_reply(message, trace)
     client = chat_client(model_key)
     local = is_local_model(model_key)
     if local:
@@ -1897,8 +1926,9 @@ def _finalize_chat_turn(
     trace_data.setdefault("billing", {})["settlement"] = settlement
     billing = trace_data.get("billing") or {}
     cost = _settled_turn_cost(billing, settlement)
-    if billing.get("items"):
+    if billing.get("items") and billing.get("total_tokens"):
         # The reply shows the tokens of the whole turn, every model call, the same total its cost is billed on.
+        # A turn of the embeddings dialog makes no model call: it keeps the embedding tokens it reports.
         usage = {
             **(usage if isinstance(usage, dict) else {}),
             "input_tokens": billing.get("input_tokens", 0),
@@ -1974,7 +2004,8 @@ def _finalize_chat_turn(
                 name="logos-embed-turn",
                 daemon=True,
             ).start()
-        if reply and model_key:
+        # The facts are read out by the chat model, which the embeddings dialog must not wake.
+        if reply and model_key and invocation.conversation_id != VECTOR_CONVERSATION_ID:
             threading.Thread(
                 target=_remember_turn_facts,
                 args=(invocation.user_id, invocation.conversation_id, model_key),
@@ -2451,6 +2482,9 @@ def _chat_turn(*, t_start, admission=None, live=None):
         )
         if invalid_payload is not None:
             return invalid_payload
+        if conv_id == VECTOR_CONVERSATION_ID:
+            # The trace and the invocation name the model that really runs in this dialog.
+            model_key = VECTOR_DIALOG_MODEL
 
         owner_id = get_current_owner_id(required=False)
         if not check_access(conv_id, owner_id):
@@ -2768,6 +2802,12 @@ def mcp_oauth_callback():
 # The Court's own dialog: always there, first in the list, never deleted.
 COURT_CONVERSATION_ID = "logos-court"
 COURT_CONVERSATION_TITLE = "⚖️ Суд Логоса"
+# The dialog with the embeddings database, pinned under the Court's: no chat model answers in
+# it, only the embedding model (owner, 05.11.2026: "turn off qwen and run embeddings and create
+# one pinned dialog with embeddings db"). It is always there and never deleted.
+VECTOR_CONVERSATION_ID = "logos-vectors"
+VECTOR_CONVERSATION_TITLE = "🧬 База эмбеддингов"
+VECTOR_DIALOG_MODEL = "qwen3-embedding:0.6b"
 _COURT_DIALOG_LOCK = threading.Lock()
 
 
@@ -2781,6 +2821,18 @@ def ensure_court_dialog(owner_id: str) -> None:
                 provider_pending=True,
             )
         set_owner(COURT_CONVERSATION_ID, owner_id)
+
+
+def ensure_vector_dialog(owner_id: str) -> None:
+    with _COURT_DIALOG_LOCK:
+        if get_conversation_title(VECTOR_CONVERSATION_ID) is None:
+            create_conversation(
+                VECTOR_CONVERSATION_ID,
+                VECTOR_CONVERSATION_TITLE,
+                bound.CHAT_MODEL,
+                provider_pending=True,
+            )
+        set_owner(VECTOR_CONVERSATION_ID, owner_id)
 
 
 @mcp_bp.route("/api/conversations", methods=["GET", "POST"])
@@ -2828,11 +2880,16 @@ def conversations():
         ), 201
 
     ensure_court_dialog(owner_id)
+    ensure_vector_dialog(owner_id)
     rows = [
-        {**row, "court": True} if row["id"] == COURT_CONVERSATION_ID else row
+        {**row, "court": True}
+        if row["id"] == COURT_CONVERSATION_ID
+        else {**row, "pinned": True}
+        if row["id"] == VECTOR_CONVERSATION_ID
+        else row
         for row in list_owned_conversations(owner_id)
     ]
-    rows.sort(key=lambda row: row["id"] != COURT_CONVERSATION_ID)
+    rows.sort(key=lambda row: (row["id"] != COURT_CONVERSATION_ID, row["id"] != VECTOR_CONVERSATION_ID))
     return jsonify({"conversations": rows})
 
 

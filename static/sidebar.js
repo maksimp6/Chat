@@ -161,6 +161,11 @@ function sidebarMonthName(month) {
 }
 
 // The group of a dialog by its last activity (unix seconds). `order` sorts the groups, newest first.
+// The dialogs that are always there: the Court's and the one with the embeddings database.
+function isPinnedConv(conv) {
+  return conv.court === true || conv.pinned === true;
+}
+
 function sidebarGroupOf(conv, now) {
   var seconds = Number(conv.updated_at) || Number(conv.created_at);
   // A dialog created in this tab has no server time yet: it is new.
@@ -221,13 +226,13 @@ function renderSidebar() {
     return;
   }
 
-  // The Court's dialog is always first, in its own group; the rest keep the list's order inside their group.
+  // The pinned dialogs are always first, in their own group; the rest keep the list's order inside their group.
   var now = new Date();
   var groups = [];
   var byKey = {};
   shown.forEach(function (conv) {
     var group =
-      conv.court === true ? { key: "pinned", label: "Закреплено", order: 1e9 } : sidebarGroupOf(conv, now);
+      isPinnedConv(conv) ? { key: "pinned", label: "Закреплено", order: 1e9 } : sidebarGroupOf(conv, now);
     var bucket = byKey[group.key];
     if (!bucket) {
       bucket = byKey[group.key] = { label: group.label, order: group.order, items: [] };
@@ -258,7 +263,7 @@ function renderSidebar() {
 function renderSidebarRow(conv) {
   var div = document.createElement("div");
   div.className =
-    "conv-item" + (conv.id === currentConvId ? " active" : "") + (conv.court === true ? " conv-court" : "");
+    "conv-item" + (conv.id === currentConvId ? " active" : "") + (isPinnedConv(conv) ? " conv-court" : "");
   // The full name for a title that the row cuts short.
   div.title = conv.title || "";
 
@@ -386,7 +391,7 @@ function renderSidebarRow(conv) {
   var actions = document.createElement("span");
   actions.className = "conv-actions";
   actions.appendChild(renameBtn);
-  if (conv.court !== true) actions.appendChild(delBtn);
+  if (!isPinnedConv(conv)) actions.appendChild(delBtn);
 
   div.appendChild(link);
   div.appendChild(actions);
@@ -447,9 +452,9 @@ function deleteConv(id) {
   localStorage.removeItem("messages_" + id);
 
   if (currentConvId === id) {
-    // The next dialog opens, never the Court's own.
+    // The next dialog opens, never a pinned one.
     var next = conversations.find(function (c) {
-      return c.court !== true;
+      return !isPinnedConv(c);
     });
     currentConvId = next ? next.id : null;
     if (currentConvId) {
