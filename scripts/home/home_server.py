@@ -10,6 +10,8 @@ Port 80 opens without root because the boot hook ``10-unprivileged-ports`` sets
 ``chat.maxxxpavlov.ru`` is the Logos server (port 8080), proxied here only for
 addresses inside the home network: Logos has no login and its tools run on the
 phone, so from outside that name answers 404 (owner, 04.11.2026: LAN only).
+Since 05.11.2026 it also answers every IPv4 address RIPE NCC lists for Russia
+(owner: "now open for all russian ips").
 
 HTTPS: port 443 serves the same pages with the Let's Encrypt certificate that
 acme_cert.py keeps fresh (owner, 05.11.2026: "make ssl for chat domain"); port 80
@@ -18,6 +20,7 @@ answers the ACME challenge to anyone.
 
 from __future__ import annotations
 
+import bisect
 import html
 import http.client
 import ipaddress
@@ -84,6 +87,7 @@ def _state() -> dict[str, object]:
         "disk_total": disk.f_blocks * disk.f_frsize,
         "page_uptime_hours": round((time.time() - STARTED) / 3600, 1),
         "certificate": _certificate_status(),
+        "russia_blocks": len(_russia["table"][0]),
     }
 
 
@@ -216,13 +220,69 @@ def _home_public_ip() -> str | None:
 OWNER_PROXY_ADDRESSES = frozenset({"157.228.161.121"})
 
 
+# Russia's IPv4 blocks from the RIPE NCC delegation file, refreshed daily and kept on
+# disk, so a restart opens for Russia at once (owner, 05.11.2026: all Russian IPs).
+RIPE_DELEGATED = "https://ftp.ripe.net/pub/stats/ripencc/delegated-ripencc-latest"
+RUSSIA_CACHE = Path.home() / ".cache/ripe-ru-ipv4.json"
+_russia: dict[str, tuple[list[int], list[int]]] = {"table": ([], [])}
+
+
+def _load_russia(ranges: list[list[int]]) -> None:
+    ranges = sorted(ranges)
+    # One assignment, so a request never sees new starts with old ends.
+    _russia["table"] = ([start for start, _ in ranges], [end for _, end in ranges])
+
+
+def _refresh_russia() -> None:
+    try:
+        cached = json.loads(RUSSIA_CACHE.read_text(encoding="utf-8"))
+        _load_russia(cached["ranges"])
+        age = time.time() - cached["at"]
+    except (OSError, ValueError, KeyError, TypeError):
+        age = float("inf")
+    while True:
+        if age > 86400:
+            try:
+                ranges = []
+                with urllib.request.urlopen(RIPE_DELEGATED, timeout=120) as response:
+                    for line in response:
+                        parts = line.decode("ascii", "replace").split("|")
+                        if len(parts) >= 7 and parts[1] == "RU" and parts[2] == "ipv4":
+                            start = int(ipaddress.IPv4Address(parts[3]))
+                            ranges.append([start, start + int(parts[4]) - 1])
+                if not ranges:
+                    raise ValueError("no RU ipv4 records")
+                _load_russia(ranges)
+                RUSSIA_CACHE.parent.mkdir(parents=True, exist_ok=True)
+                RUSSIA_CACHE.write_text(
+                    json.dumps({"at": time.time(), "ranges": ranges}), encoding="utf-8"
+                )
+                print(time.strftime("%Y-%m-%d %H:%M:%S"), f"Russia: {len(ranges)} IPv4 blocks", flush=True)
+                age = 0.0
+            except (OSError, ValueError) as exc:
+                print(time.strftime("%Y-%m-%d %H:%M:%S"), "Russia list failed:", exc, flush=True)
+        time.sleep(3600)
+        age += 3600
+
+
+def _russian(address: str) -> bool:
+    try:
+        value = int(ipaddress.IPv4Address(address))
+    except ValueError:
+        return False
+    starts, ends = _russia["table"]
+    index = bisect.bisect_right(starts, value) - 1
+    return index >= 0 and value <= ends[index]
+
+
 def _home(address: str) -> bool:
     """Inside the home network, directly or through the router's own public address,
-    or coming from the owner's proxy server."""
+    from the owner's proxy server, or from any Russian address."""
     return (
         _local(address)
         or address in OWNER_PROXY_ADDRESSES
         or address == _home_public_ip()
+        or _russian(address)
     )
 
 
@@ -254,12 +314,12 @@ class Handler(BaseHTTPRequestHandler):
         return host == CHAT_HOST
 
     def _proxy(self) -> None:
-        """Logos for the home network only; from outside chat.maxxxpavlov.ru does not exist."""
+        """Logos for the home network and Russian addresses; elsewhere the name does not exist."""
         if not _home(self.client_address[0]):
             # Says which address was refused, so a device that should be at home shows why.
             self.send_error(
                 404,
-                explain=f"Logos открыт только из домашней сети. Ваш адрес: {self.client_address[0]}; "
+                explain=f"Logos открыт только из домашней сети и с российских адресов. Ваш адрес: {self.client_address[0]}; "
                 f"адрес дома: {_home_public_ip() or 'неизвестен'}.",
             )
             return
@@ -399,6 +459,7 @@ def main() -> None:
     BOOT_HOOK.chmod(0o700)
     threading.Thread(target=_restart_on_change, args=(script,), daemon=True).start()
     threading.Thread(target=_certificates, args=(script,), daemon=True).start()
+    threading.Thread(target=_refresh_russia, daemon=True).start()
     _serve_tls()
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 
