@@ -56,11 +56,47 @@
     return true;
   }
 
+  // On a slow link (10 KB/s) the buttons are on screen 30-40 s before the deferred scripts that serve them have run
+  // (owner, 05.11.2026: the header icons do not respond to taps). Until core_api.js mounts its click dispatcher, the
+  // last tapped action button is kept here and marked as waiting; the dispatcher takes it when it mounts.
+  var earlyTap = null;
+
+  function markTapPending(button, pending) {
+    if (!button || !button.classList) return;
+    button.classList.toggle("logos-action-pending", pending);
+    if (pending) button.setAttribute("aria-busy", "true");
+    else button.removeAttribute("aria-busy");
+  }
+
+  function recordEarlyTap(event) {
+    var target = event && event.target;
+    var button =
+      target && typeof target.closest === "function" ? target.closest("button[data-action]") : null;
+    if (!button || button.disabled) return;
+    if (earlyTap && earlyTap.button !== button) markTapPending(earlyTap.button, false);
+    earlyTap = { button: button, event: event };
+    markTapPending(button, true);
+  }
+
+  function takeEarlyTap() {
+    if (typeof document.removeEventListener === "function") {
+      document.removeEventListener("click", recordEarlyTap, true);
+    }
+    var tap = earlyTap;
+    earlyTap = null;
+    return tap;
+  }
+
+  if (typeof document.addEventListener === "function") {
+    document.addEventListener("click", recordEarlyTap, true);
+  }
+
   window.LogosBoot = Object.freeze({
     markShellReady: markShellReady,
     failedCriticalScripts: function () {
       return failedCriticalScripts.slice();
     },
+    takeEarlyTap: takeEarlyTap,
   });
 
   function emitDiagnostic(level, event, error, extra) {

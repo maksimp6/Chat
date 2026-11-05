@@ -3043,3 +3043,24 @@ body {
 .logos-pro-app #header {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
+
+/* A tapped button whose script has not run yet answers the tap at once: static/core_api.js keeps the tap and runs it
+   once the page's scripts have run, 30-40 s after a deploy on a 10 KB/s link (owner, 05.11.2026: icons do not respond). */
+.logos-pro-app .logos-action-pending {
+  cursor: progress;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  animation: logos-action-pending 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes logos-action-pending {
+  to {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-pro-app .logos-action-pending {
+    animation: none;
+  }
+}

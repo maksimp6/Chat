@@ -422,6 +422,66 @@
     return null;
   }
 
+  // A tap that comes before the page's scripts have all run is kept, its button marked as waiting, and run once they
+  // have, instead of being dropped as an unknown action (owner, 05.11.2026: the header icons do not respond). On a
+  // 10 KB/s link the ~45 deferred scripts run 30-40 s after the buttons show; most actions are registered only by
+  // header_actions.js near the end or at DOMContentLoaded, and a window opened earlier (🤖 models, 🧠 memory) would
+  // show before its script fills it. Only the latest such tap is kept: it is the owner's latest intent.
+  var pageScriptsRan = document.readyState === "complete";
+  var heldTap = null;
+
+  function markTapPending(button, pending) {
+    if (!button || !button.classList) return;
+    button.classList.toggle("logos-action-pending", pending);
+    if (pending) button.setAttribute("aria-busy", "true");
+    else button.removeAttribute("aria-busy");
+  }
+
+  function runTap(button, event) {
+    try {
+      dispatchAction(button.dataset.action, actionPayload(button, event), event);
+    } catch (error) {
+      console.error("[UI ACTION]", error);
+    }
+  }
+
+  function takeTap(button, event) {
+    if (!pageScriptsRan) {
+      if (heldTap && heldTap.button !== button) markTapPending(heldTap.button, false);
+      heldTap = { button: button, event: event };
+      markTapPending(button, true);
+      return;
+    }
+    runTap(button, event);
+  }
+
+  function runHeldTap() {
+    if (pageScriptsRan) return;
+    pageScriptsRan = true;
+    var tap = heldTap;
+    heldTap = null;
+    if (!tap) return;
+    markTapPending(tap.button, false);
+    if (tap.button.isConnected === false || tap.button.disabled) return;
+    runTap(tap.button, tap.event);
+  }
+
+  if (!pageScriptsRan) {
+    // DOMContentLoaded listeners of later scripts run after this one, so the held tap waits one more turn for them.
+    if (typeof document.addEventListener === "function") {
+      document.addEventListener(
+        "DOMContentLoaded",
+        function () {
+          setTimeout(runHeldTap, 0);
+        },
+        { once: true },
+      );
+    }
+    if (typeof window.addEventListener === "function") {
+      window.addEventListener("load", runHeldTap, { once: true });
+    }
+  }
+
   function mountClickDispatcher(root) {
     if (!root || typeof root.addEventListener !== "function") {
       throw new Error("UI click dispatcher root is required");
@@ -432,11 +492,7 @@
     function onClick(event) {
       var button = findActionButton(event.target, root);
       if (!button || button.disabled) return;
-      try {
-        dispatchAction(button.dataset.action, actionPayload(button, event), event);
-      } catch (error) {
-        console.error("[UI ACTION]", error);
-      }
+      takeTap(button, event);
     }
 
     root.addEventListener("click", onClick);
@@ -447,6 +503,15 @@
       uiClickRoot = null;
       uiClickUnmount = null;
     };
+    // A tap from before this mount (static/boot.js kept it) is taken as if it came now.
+    var early =
+      window.LogosBoot && typeof window.LogosBoot.takeEarlyTap === "function"
+        ? window.LogosBoot.takeEarlyTap()
+        : null;
+    if (early) {
+      markTapPending(early.button, false);
+      if (findActionButton(early.button, root) && !early.button.disabled) takeTap(early.button, early.event);
+    }
     return uiClickUnmount;
   }
 
