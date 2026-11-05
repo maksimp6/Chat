@@ -27,7 +27,23 @@
     actions.register("header.court.open", call("openCourtHall"));
     actions.register("header.group.open", call("openGroupChatModal"));
     actions.register("header.credentials.open", call("openProviderCredentialsModal"));
-
+    // 🖥️ connects Logos to RDC: the OAuth connect of its «RDC — Desktop Commander» server, as «🖥 Подключить RDC» in
+    // «Внешние MCP шлюзы» does (owner, 05.11.2026: a link to the RDC site did not connect Logos).
+    actions.register("header.rdc.connect", function () {
+      if (typeof window.startMcpOAuth !== "function" || typeof window.fetchMcpServers !== "function") {
+        console.error("[RDC] The MCP script is unavailable");
+        return;
+      }
+      window.startMcpOAuth(
+        window.fetchMcpServers().then(function (servers) {
+          var rdc = servers.filter(function (server) {
+            return server && server.server_label === "rdc";
+          })[0];
+          if (!rdc) throw new Error("сервер RDC не найден");
+          return rdc.id;
+        }),
+      );
+    });
   }
 
   if (document.readyState === "loading") {

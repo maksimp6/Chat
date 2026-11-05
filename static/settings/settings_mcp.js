@@ -26,6 +26,38 @@
     return mcpFetchPromise;
   };
 
+  // The OAuth connect of one MCP server (``serverId`` may be a promise of it). The window for the provider's sign-in
+  // opens now, inside the tap, so the browser lets it open, and goes to the sign-in page once the server has started
+  // the connect; with that window blocked, this page itself goes there.
+  window.startMcpOAuth = function (serverId) {
+    var popup = window.open("", "mcp_oauth", "width=520,height=680");
+    var redirectUri = window.location.origin + "/api/mcp/oauth/callback";
+    return Promise.resolve(serverId)
+      .then(function (sid) {
+        return window.LogosDispatcher.request("/api/mcp-servers/" + encodeURIComponent(sid) + "/oauth/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ redirect_uri: redirectUri }),
+        });
+      })
+      .then(function (r) {
+        return r.json().then(function (body) {
+          if (!r.ok || !body.authorize_url) {
+            throw new Error((body && (body.message || body.error)) || "HTTP " + r.status);
+          }
+          return body.authorize_url;
+        });
+      })
+      .then(function (url) {
+        if (popup && !popup.closed) popup.location = url;
+        else window.location = url;
+      })
+      .catch(function (e) {
+        if (popup && !popup.closed) popup.close();
+        LogosToast.error("Не удалось начать OAuth: " + (e.message || e));
+      });
+  };
+
 
   function closeMcpManagerModal(modal) {
     if (!modal) return;
@@ -105,36 +137,11 @@
 
       list.querySelectorAll(".mcp-oauth-btn").forEach(function (btn) {
         btn.addEventListener("click", function () {
-          var sid = this.getAttribute("data-id");
           var self = this;
           self.disabled = true;
-          // Open the popup synchronously so the browser does not block it.
-          var popup = window.open("", "mcp_oauth", "width=520,height=680");
-          var redirectUri = window.location.origin + "/api/mcp/oauth/callback";
-          window.LogosDispatcher.request("/api/mcp-servers/" + encodeURIComponent(sid) + "/oauth/start", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ redirect_uri: redirectUri }),
-          })
-            .then(function (r) {
-              return r.json().then(function (body) {
-                if (!r.ok || !body.authorize_url) {
-                  throw new Error((body && (body.message || body.error)) || "HTTP " + r.status);
-                }
-                return body.authorize_url;
-              });
-            })
-            .then(function (url) {
-              if (popup && !popup.closed) popup.location = url;
-              else window.location = url;
-            })
-            .catch(function (e) {
-              if (popup && !popup.closed) popup.close();
-              LogosToast.error("Не удалось начать OAuth: " + (e.message || e));
-            })
-            .then(function () {
-              self.disabled = false;
-            });
+          window.startMcpOAuth(this.getAttribute("data-id")).then(function () {
+            self.disabled = false;
+          });
         });
       });
     }
