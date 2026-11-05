@@ -140,6 +140,8 @@ CATEGORY_GLYPHS = {
     "chatgpt_bridge": "chat",
     # Logos's memory: no keyword rule matches the name, and it is drawn like vectors and rag.
     "remember": "stack",
+    # The Python tool runs code: a terminal, like run_command.
+    "python": "terminal",
 }
 
 # Tool files of the other units that contribute categories through composition/tool_sources.py.
