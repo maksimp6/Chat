@@ -208,6 +208,17 @@ body {
   color: var(--text-faint);
   opacity: 1;
 }
+/* Number fields drop the browser's spinner: a light box of arrows inside a dark field; typing and the arrow keys
+   still change the value. */
+:where(input[type="number"]) {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+:where(input[type="number"])::-webkit-inner-spin-button,
+:where(input[type="number"])::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 :where(
     input:is([type="text"], [type="number"], [type="password"], [type="search"], [type="email"], [type="url"], [type="tel"], :not([type])):focus,
     select:focus,
@@ -776,18 +787,21 @@ body {
   flex: none;
   display: block;
 }
-/* A narrow phone keeps only the mark, so the header never runs past the screen; the name stays for screen readers. */
+/* A narrow phone: both rows flow as one wrapped group, so the 21 tiles fill three full rows of seven instead of
+   four rows with one tile alone on the last (the header took a quarter of an 812px screen). The brand leaves the
+   header here; the empty chat still shows the mark and the name. Every button stays visible (#1718). */
 @media (max-width: 480px) {
-  .logos-pro-app #header .header-brand {
-    padding-right: 0;
+  .logos-pro-app #header {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
   }
-  .logos-pro-app #header .brand-name {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
+  .logos-pro-app #header .header-row {
+    display: contents;
+  }
+  .logos-pro-app #header .header-brand {
+    display: none;
   }
 }
 
