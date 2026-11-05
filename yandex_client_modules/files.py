@@ -123,7 +123,7 @@ class YandexFileManagerMixin:
                 status_code=502,
                 user_text=(
                     f"Yandex AI Studio не принял ключ API (HTTP {status}): файлы и векторные хранилища Yandex "
-                    "недоступны, пока в «Ключи провайдеров» нет действующего ключа."
+                    "недоступны."
                 ),
             )
         if status == 429:
