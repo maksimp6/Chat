@@ -40,7 +40,7 @@
   }
 
   function emptyLine(text) {
-    return h("div", { style: "font-size:12px;padding:6px 0;opacity:.72;" }, text);
+    return h("div", { class: "logos-partner-empty" }, text);
   }
 
   function openPartnerRelationsModal() {
@@ -57,12 +57,12 @@
 
     var notice = h(
       "div",
-      { style: "font-size:12px;opacity:.72;margin:8px 0 12px;" },
+      { class: "logos-partner-note" },
       "Партнёры и история принадлежат текущему пользователю. Отправка внешних сообщений выполняется через AI tool с подтверждением.",
     );
     card.appendChild(notice);
 
-    var form = h("form", { style: "display:grid;gap:8px;margin-bottom:14px;" });
+    var form = h("form", { class: "logos-partner-form" });
     var name = h("input", {
       required: "required",
       placeholder: "Имя / компания",
@@ -71,9 +71,9 @@
     var organization = h("input", { placeholder: "Организация", "aria-label": "Организация" });
     var email = h("input", { type: "email", placeholder: "Email", "aria-label": "Email" });
     var phone = h("input", { placeholder: "Телефон", "aria-label": "Телефон" });
-    var create = h("button", { type: "submit" }, "Добавить партнёра");
+    var create = h("button", { type: "submit", class: "logos-btn btn-primary" }, "Добавить партнёра");
     function field(title, input) {
-      var wrap = h("label", { style: "display:grid;gap:4px;font-size:12px;" });
+      var wrap = h("label", { class: "logos-partner-field" });
       wrap.appendChild(h("span", {}, title));
       wrap.appendChild(input);
       return wrap;
@@ -102,6 +102,8 @@
           });
         })
         .then(function (data) {
+          // A later load after a failed one clears the failure's note look.
+          list.classList.remove("logos-error-note");
           list.textContent = "";
           var partners = Array.isArray(data.partners) ? data.partners : [];
           if (!partners.length) {
@@ -160,13 +162,8 @@
     function showDetails(partner) {
       var detail = document.getElementById("partner-relations-detail");
       if (detail) detail.remove();
-      detail = h("div", {
-        id: "partner-relations-detail",
-        style: "margin-top:14px;padding-top:14px;border-top:1px solid rgba(127,127,127,.25);",
-      });
-      detail.appendChild(
-        h("h4", { style: "margin:0 0 8px;" }, partner.name + " · " + statusLabel(partner.status)),
-      );
+      detail = h("div", { id: "partner-relations-detail", class: "logos-partner-detail" });
+      detail.appendChild(h("h4", {}, partner.name + " · " + statusLabel(partner.status)));
 
       var status = h("select", { "aria-label": "Статус партнёра" });
       ["lead", "active", "negotiating", "paused", "completed", "archived"].forEach(
@@ -176,7 +173,7 @@
           status.appendChild(option);
         },
       );
-      var statusButton = h("button", { type: "button" }, "Сохранить статус");
+      var statusButton = h("button", { type: "button", class: "logos-btn" }, "Сохранить статус");
       statusButton.onclick = function () {
         window.LogosDispatcher.request(
           "/api/partners/" + encodeURIComponent(partner.id) + "/status",
@@ -197,22 +194,19 @@
             LogosToast.error(window.LogosErrorText("Не удалось сменить статус", err));
           });
       };
-      detail.appendChild(status);
-      detail.appendChild(statusButton);
+      // The select and its button share one row.
+      var statusRow = h("div", { class: "logos-partner-status-row" });
+      statusRow.appendChild(status);
+      statusRow.appendChild(statusButton);
+      detail.appendChild(statusRow);
 
-      detail.appendChild(
-        h(
-          "h5",
-          { style: "margin:14px 0 6px;" },
-          "Контакты (" + (partner.contacts || []).length + ")",
-        ),
-      );
+      detail.appendChild(h("h5", {}, "Контакты (" + (partner.contacts || []).length + ")"));
       if (!(partner.contacts || []).length) detail.appendChild(emptyLine("Пока пусто."));
       (partner.contacts || []).forEach(function (contact) {
         detail.appendChild(
           h(
             "div",
-            { style: "font-size:12px;padding:6px 0;" },
+            { class: "logos-partner-line" },
             [contact.name, contact.role, contact.email || contact.phone]
               .filter(Boolean)
               .join(" · "),
@@ -220,19 +214,13 @@
         );
       });
 
-      detail.appendChild(
-        h(
-          "h5",
-          { style: "margin:14px 0 6px;" },
-          "Переписка (" + (partner.messages || []).length + ")",
-        ),
-      );
+      detail.appendChild(h("h5", {}, "Переписка (" + (partner.messages || []).length + ")"));
       if (!(partner.messages || []).length) detail.appendChild(emptyLine("Пока пусто."));
       (partner.messages || []).forEach(function (message) {
         detail.appendChild(
           h(
             "div",
-            { style: "font-size:12px;padding:6px 0;" },
+            { class: "logos-partner-line" },
             "[" +
               (DIRECTION_LABELS[message.direction] || message.direction) +
               "] " +
@@ -242,21 +230,13 @@
         );
       });
 
-      detail.appendChild(
-        h(
-          "h5",
-          { style: "margin:14px 0 6px;" },
-          "Follow-up (" + (partner.followups || []).length + ")",
-        ),
-      );
+      detail.appendChild(h("h5", {}, "Follow-up (" + (partner.followups || []).length + ")"));
       if (!(partner.followups || []).length) detail.appendChild(emptyLine("Пока пусто."));
       (partner.followups || []).forEach(function (followup) {
-        var line = h("div", {
-          style: "display:flex;gap:8px;align-items:center;font-size:12px;padding:6px 0;",
-        });
+        var line = h("div", { class: "logos-partner-line" });
         line.appendChild(h("span", {}, followup.title + " · " + followup.status));
         if (followup.status === "open") {
-          var done = h("button", { type: "button" }, "Готово");
+          var done = h("button", { type: "button", class: "logos-btn" }, "Готово");
           done.onclick = function () {
             window.LogosDispatcher.request(
               "/api/partners/followups/" + encodeURIComponent(followup.id) + "/complete",
@@ -319,6 +299,8 @@
     });
 
     load().catch(function (err) {
+      // A failure is the shared calm note (static/style.css .logos-error-note).
+      list.classList.add("logos-error-note");
       list.textContent = "Ошибка: " + err.message;
     });
   }

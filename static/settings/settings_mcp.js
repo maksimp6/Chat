@@ -83,7 +83,7 @@
     var md = document.createElement("div");
     md.className = "settings-mcp-body";
     md.innerHTML =
-      '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:10px;">Настройки только для чтения: серверы показаны без изменения.</div>' +
+      '<div class="mcp-manager-note">Настройки только для чтения: серверы показаны без изменения.</div>' +
       '<div id="mcp-mgr-list"></div>';
 
     var ov = CoreUI.modal.create({
@@ -95,9 +95,7 @@
       body: md,
     });
     ov._onClose = onClose;
-    var modalContent = ov.querySelector(".modal-content");
-    modalContent.style.cssText =
-      "background:var(--m-bg,#fff);border-radius:12px;padding:24px;box-shadow:0 8px 32px var(--m-shadow,rgba(0,0,0,0.3));color:var(--m-text,#222);";
+    // The window wears the shared modal shell (static/style.css), so no look is set inline here.
     (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
@@ -108,23 +106,22 @@
     function renderList(servers) {
       var list = document.getElementById("mcp-mgr-list");
       if (!servers || servers.length === 0) {
-        list.innerHTML =
-          '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Нет MCP серверов.</div>';
+        list.innerHTML = '<div class="mcp-manager-empty">Нет MCP серверов.</div>';
         return;
       }
       list.innerHTML = servers
         .map(function (srv) {
           var connInfo = srv.connector_id ? srv.connector_id : srv.server_url || "(нет URL)";
           return (
-            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0;padding:10px;border:1px solid var(--m-section-border,#eee);border-radius:6px;margin-bottom:8px;background:var(--m-card,#fff);">' +
-            '<div style="min-width:0;overflow-wrap:anywhere"><div style="font-weight:bold;font-size:14px;color:var(--m-text,#222);">' +
+            '<div class="mcp-server-row">' +
+            '<div class="mcp-server-info"><div class="mcp-server-name">' +
             UI.escapeHtml(srv.name) +
             "</div>" +
-            '<div style="font-size:12px;color:var(--m-muted,#666);">' +
+            '<div class="mcp-server-meta">' +
             UI.escapeHtml(connInfo) +
             "</div></div>" +
             (srv.server_url
-              ? '<div style="display:flex;gap:6px;"><button class="logos-btn mcp-oauth-btn settings-contract-btn" data-id="' +
+              ? '<div class="mcp-server-actions"><button type="button" class="logos-btn mcp-oauth-btn" data-id="' +
                 UI.escapeHtml(srv.id) +
                 '">' +
                 (srv.server_label === "rdc" ? "🖥 Подключить RDC" : "⚡ OAuth") +
@@ -150,14 +147,17 @@
       var list = document.getElementById("mcp-mgr-list");
       if (!list) return;
       list.replaceChildren();
-      var message = document.createElement("p");
+      // The shared calm note, with the retry under its text.
+      var message = document.createElement("div");
+      message.className = "logos-error-note";
       message.textContent = "Не удалось загрузить MCP серверы. Проверьте соединение.";
       var retry = document.createElement("button");
       retry.type = "button";
       retry.className = "logos-btn";
       retry.textContent = "Повторить";
       retry.addEventListener("click", refreshList);
-      list.append(message, retry);
+      message.appendChild(retry);
+      list.append(message);
     }
 
     function refreshList() {

@@ -68,7 +68,8 @@
       if (x === 0) waveCtx.moveTo(x, y);
       else waveCtx.lineTo(x, y);
     }
-    waveCtx.strokeStyle = "#4a90d9";
+    // The theme's neutral ink (gold is kept for primary, selected and focus); read per frame so a theme switch applies.
+    waveCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text-muted").trim() || "#a0a3ab";
     waveCtx.lineWidth = 2;
     waveCtx.stroke();
   }

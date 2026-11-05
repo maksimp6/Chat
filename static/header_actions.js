@@ -1,10 +1,12 @@
 (function () {
   "use strict";
 
-  function call(name, fallbackMessage) {
+  // Every opener shows its window at once with its loading line and fills it when the data arrives. A tap whose window
+  // script did not load is named in the console instead of doing nothing silently.
+  function call(name) {
     return function () {
       if (typeof window[name] === "function") return window[name]();
-      if (fallbackMessage) console.error(fallbackMessage);
+      console.error("[HEADER] " + name + " is unavailable: its script did not load");
     };
   }
 
@@ -14,10 +16,7 @@
 
     var actions = window.LogosCoreAPI.ui.actions;
     actions.register("header.tools.open", call("openToolsModal"));
-    actions.register(
-      "header.ssh.open",
-      call("openSshRuntimeModal", "[SSH Runtime] Modal script is unavailable"),
-    );
+    actions.register("header.ssh.open", call("openSshRuntimeModal"));
     actions.register("header.mcp.open", call("openMcpManagerModal"));
     actions.register("header.settings.open", call("openSettingsModal"));
     actions.register("header.files.open", call("openFileManagerModal"));

@@ -68,7 +68,9 @@
     return node;
   }
 
-  var INPUT_STYLE = "width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--m-border,#ddd);border-radius:6px;font-size:13px;background:var(--m-input-bg,#f5f5f5);color:var(--m-input-text,#222);";
+  // Width only: height, padding, radius, colours and the gold focus edge come from the shared field rule in
+  // style.css. An inline border would block that focus edge, and 13px text makes iOS zoom in on focus.
+  var INPUT_STYLE = "width:100%;box-sizing:border-box;";
 
   function inp(id, type, val, extra) {
     var node = element("input", INPUT_STYLE, extra);
@@ -92,9 +94,10 @@
   }
 
   function chk(id, checked, text, extra, hint) {
-    var label = element("label", "font-size:13px;display:flex;align-items:flex-start;gap:4px;color:var(--m-text,#222);");
+    // Top-aligned so a wrapped caption keeps the box on its first line; size and spacing match the shared checkbox.
+    var label = element("label", "font-size:13px;display:flex;align-items:flex-start;gap:8px;color:var(--m-text,#222);");
     if (hint) label.title = String(hint);
-    var input = element("input", "margin:2px 0 0;flex:0 0 auto;", extra);
+    var input = element("input", "", extra);
     input.id = String(id);
     input.type = "checkbox";
     if (checked) input.setAttribute("checked", "");
@@ -127,7 +130,7 @@
   }
 
   function ta(id, val, extra) {
-    var node = element("textarea", "width:100%;padding:8px;border:1px solid var(--m-border,#ddd);border-radius:6px;background:var(--m-input-bg,#f5f5f5);color:var(--m-input-text,#222);box-sizing:border-box;" + String(extra || ""));
+    var node = element("textarea", INPUT_STYLE + String(extra || ""));
     node.id = String(id);
     node.textContent = val === null || val === undefined ? "" : String(val);
     return node.outerHTML;
@@ -283,6 +286,28 @@
         if (event.key !== "Escape" || event.isComposing) return;
         event.preventDefault();
         event.stopPropagation();
+        finish(false);
+      });
+      // A click on the dimmed area around the question cancels it, as Escape does. A press that starts on the card
+      // and ends outside it (selecting the typed text) is not such a click.
+      // While the prompt's field has focus, that tap only leaves the field (a phone hides its keyboard this way), so
+      // the typed text is not lost; the next tap cancels.
+      var pressedBackdrop = false;
+      var fieldAtPress = false;
+      dialog.addEventListener(typeof window.PointerEvent === "function" ? "pointerdown" : "mousedown", function (event) {
+        pressedBackdrop = event.target === dialog;
+        fieldAtPress = pressedBackdrop && !!field && document.activeElement === field;
+      });
+      dialog.addEventListener("click", function (event) {
+        var fromBackdrop = event.target === dialog && pressedBackdrop;
+        var leaveField = fieldAtPress;
+        pressedBackdrop = false;
+        fieldAtPress = false;
+        if (!fromBackdrop) return;
+        if (leaveField) {
+          if (document.activeElement === field) field.blur();
+          return;
+        }
         finish(false);
       });
 

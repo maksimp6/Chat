@@ -136,31 +136,32 @@ window.fetchVectorStores = function () {
     });
     var md = body;
 
+    // Upload is the window's one primary (gold) action; every other button is secondary.
     md.innerHTML = [
       '<div class="file-manager-toolbar">',
       '    <div class="file-manager-toolbar-actions">',
-      '        <input type="file" id="file-upload" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none" multiple>',
-      '        <label for="file-upload" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;cursor:pointer;padding:8px 16px;background:#1f6feb;color:#fff;border-radius:6px;font-size:13px;">Загрузить файлы</label>',
+      '        <input type="file" id="file-upload" class="file-manager-upload-input" multiple>',
+      '        <label for="file-upload" class="btn-primary file-manager-upload-btn">Загрузить файлы</label>',
       "    </div>",
       "</div>",
       // === Секция Vector Stores ===
-      '<div style="margin-bottom:20px;padding:16px;border:1px solid var(--m-section-border,#eee);border-radius:8px;background:var(--m-editor,#f8f9fa);">',
-      '    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">',
-      '        <h3 style="margin:0;font-size:15px;color:var(--m-text,#222);">Векторные хранилища</h3>',
-      '        <div style="display:flex;gap:8px;">',
-      '            <input id="vs-name-input" type="text" placeholder="Название..." style="padding:6px 10px;border:1px solid var(--m-border,#ddd);border-radius:4px;font-size:12px;background:var(--m-input-bg,#fff);color:var(--m-text,#222);width:160px;">',
+      '<section class="file-manager-section">',
+      '    <div class="file-manager-section-head">',
+      '        <h3 class="file-manager-section-title">Векторные хранилища</h3>',
+      '        <div class="file-manager-vs-controls">',
+      '            <input id="vs-name-input" class="file-manager-vs-name-input" type="text" placeholder="Название...">',
       '            <button id="btn-create-vs" type="button" class="logos-btn file-manager-vs-create-btn">+ Создать</button>',
       '            <button id="btn-refresh-vs" type="button" class="logos-btn file-manager-vs-refresh-btn">Обновить</button>',
       "        </div>",
       "    </div>",
-      '    <div id="vs-manager-list" style="max-height:200px;overflow-y:auto;"></div>',
-      "</div>",
+      '    <div id="vs-manager-list" class="file-manager-vs-list"></div>',
+      "</section>",
       // === Секция файлов ===
-      '<h3 style="margin:0 0 10px;font-size:15px;color:var(--m-text,#222);">Файлы</h3>',
+      '<h3 class="file-manager-section-title file-manager-files-title">Файлы</h3>',
       // Upload rows and their errors live here, not in #file-list, which is rebuilt on every refresh.
       '<div id="file-upload-status"></div>',
-      '<div id="file-list" style="max-height:400px;overflow-y:auto;">',
-      '    <div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Загрузка списка файлов...</div>',
+      '<div id="file-list" class="file-manager-file-list">',
+      '    <div class="file-manager-state">Загрузка списка файлов...</div>',
       "</div>",
     ].join("");
 
@@ -312,9 +313,7 @@ window.fetchVectorStores = function () {
 
     function loadVsList() {
       var cont = document.getElementById("vs-manager-list");
-      if (cont)
-        cont.innerHTML =
-          '<div style="padding:10px;text-align:center;color:var(--m-muted,#999);font-size:12px;">Загрузка...</div>';
+      if (cont) cont.innerHTML = '<div class="file-manager-state">Загрузка...</div>';
       window
         .fetchVectorStores()
         .then(function (list) {
@@ -327,15 +326,15 @@ window.fetchVectorStores = function () {
           // A timeout says nothing about the provider key, so the key hint is shown for real answers only.
           var keyHint = isNoAnswer(error)
             ? ""
-            : '<div style="margin-bottom:8px;color:var(--m-muted,#666);">Проверьте ключ провайдера и доступ к векторным хранилищам в настройках.</div>';
+            : '<div class="logos-error-note-hint">Проверьте ключ провайдера и доступ к векторным хранилищам в настройках.</div>';
           cont.innerHTML =
-            '<div style="padding:12px;color:var(--m-danger,#c33);font-size:12px;">' +
-            '<div style="font-weight:600;margin-bottom:6px;">Не удалось загрузить векторные хранилища</div>' +
-            '<div style="margin-bottom:8px;word-break:break-word;">' +
+            '<div class="logos-error-note">' +
+            '<div class="logos-error-note-title">Не удалось загрузить векторные хранилища</div>' +
+            "<div>" +
             window.SettingsUI.escapeHtml(message) +
             "</div>" +
             keyHint +
-            '<button class="logos-btn file-manager-vs-refresh-btn" id="btn-retry-vs">Повторить</button>' +
+            '<button class="logos-btn file-manager-secondary-btn" id="btn-retry-vs" type="button">Повторить</button>' +
             "</div>";
           var retry = document.getElementById("btn-retry-vs");
           if (retry) retry.addEventListener("click", loadVsList);
@@ -418,6 +417,7 @@ window.fetchVectorStores = function () {
         state.className = "file-manager-state" + (isError ? " file-manager-state-error" : "");
         state.textContent = message;
         fileListEl.appendChild(state);
+        return state;
       }
 
       // Loads the files that can be added. A failure leaves a retry button in the panel.
@@ -462,13 +462,14 @@ window.fetchVectorStores = function () {
             });
           })
           .catch(function (e) {
-            renderAddFilesState("Не удалось загрузить список файлов. " + describeError(e), true);
+            var note = renderAddFilesState("Не удалось загрузить список файлов. " + describeError(e), true);
             var retry = document.createElement("button");
             retry.type = "button";
             retry.className = "logos-btn file-manager-secondary-btn";
             retry.textContent = "Повторить";
             retry.addEventListener("click", loadAddableFiles);
-            fileListEl.appendChild(retry);
+            // The retry sits under the text, inside the note.
+            note.appendChild(retry);
           });
       }
 
@@ -538,16 +539,13 @@ window.fetchVectorStores = function () {
 
       var div = document.createElement("div");
       div.id = "file-row-" + file.id;
-      div.style.cssText =
-        "padding:10px;border-bottom:1px solid var(--m-section-border,#eee);display:flex;align-items:center;gap:12px;";
+      div.className = "file-manager-file-row";
       div.innerHTML = [
-        '<div style="flex:1;min-width:0;">',
-        '    <div style="font-weight:bold;color:var(--m-text,#222);word-break:break-all;">' +
-          UI.escapeHtml(file.filename) +
-          "</div>",
-        '    <div style="font-size:12px;color:var(--m-muted,#666);">' +
+        '<div class="file-manager-file-info">',
+        '    <div class="file-manager-file-name">' + UI.escapeHtml(file.filename) + "</div>",
+        '    <div class="file-manager-file-meta">' +
           formatBytes(file.bytes) +
-          ' · ID: <code style="cursor:pointer;color:var(--m-accent,#4a90d9);" class="file-id-copy" data-id="' +
+          ' · ID: <code class="file-id-copy file-manager-copy-id" data-id="' +
           UI.escapeHtml(file.id) +
           '">' +
           UI.escapeHtml(file.id.substring(0, 12)) +
@@ -556,7 +554,7 @@ window.fetchVectorStores = function () {
         '<a class="logos-btn file-manager-secondary-btn" href="/api/files/' +
           encodeURIComponent(file.id) +
           '/content" download>Скачать</a>',
-        '<button class="logos-btn fm-delete-btn" data-id="' +
+        '<button type="button" class="logos-btn fm-delete-btn file-manager-danger-btn" data-id="' +
           UI.escapeHtml(file.id) +
           '">Удалить</button>',
       ].join("");
@@ -581,8 +579,7 @@ window.fetchVectorStores = function () {
     function loadFiles() {
       var list = document.getElementById("file-list");
       if (!list) return;
-      list.innerHTML =
-        '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Загрузка списка файлов...</div>';
+      list.innerHTML = '<div class="file-manager-state">Загрузка списка файлов...</div>';
 
       window.LogosDispatcher.request("/api/files", undefined, { timeoutMs: LIST_TIMEOUT_MS })
         .then(function (r) {
@@ -595,8 +592,7 @@ window.fetchVectorStores = function () {
         .then(function (data) {
           list.innerHTML = "";
           if (!data.data || data.data.length === 0) {
-            list.innerHTML =
-              '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Нет загруженных файлов.</div>';
+            list.innerHTML = '<div class="file-manager-state">Нет загруженных файлов.</div>';
             return;
           }
           data.data.forEach(function (file) {
@@ -631,8 +627,7 @@ window.fetchVectorStores = function () {
                     var row = document.getElementById("file-row-" + fileId);
                     if (row) row.remove();
                     if (list.children.length === 0) {
-                      list.innerHTML =
-                        '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Нет загруженных файлов.</div>';
+                      list.innerHTML = '<div class="file-manager-state">Нет загруженных файлов.</div>';
                     }
                   })
                   .catch(function () {
@@ -646,8 +641,8 @@ window.fetchVectorStores = function () {
         })
         .catch(function (e) {
           list.innerHTML =
-            '<div style="padding:20px;text-align:center;color:var(--m-danger,#c33);">' +
-            '<div style="margin-bottom:10px;">Не удалось загрузить список файлов. ' +
+            '<div class="logos-error-note">' +
+            "<div>Не удалось загрузить список файлов. " +
             UI.escapeHtml(describeError(e)) +
             "</div>" +
             '<button class="logos-btn file-manager-secondary-btn" id="btn-retry-files" type="button">Повторить</button>' +
@@ -674,16 +669,13 @@ window.fetchVectorStores = function () {
       // The copy is used now: the send's own hold keeps the page until it ends.
       if (uploadId) releaseKept(uploadId);
       var div = document.createElement("div");
-      div.style.cssText =
-        "padding:10px;border-bottom:1px solid var(--m-section-border,#eee);display:flex;align-items:center;gap:12px;opacity:0.6;";
+      div.className = "file-manager-file-row is-uploading";
       div.innerHTML = [
-        '<div style="flex:1;min-width:0;">',
-        '    <div style="font-weight:bold;color:var(--m-text,#222);word-break:break-all;">' +
+        '<div class="file-manager-file-info">',
+        '    <div class="file-manager-file-name">' +
           UI.escapeHtml(file.name) +
-          ' <span class="file-upload-progress" style="font-size:11px;color:var(--m-accent,#4a90d9);">(загрузка...)</span></div>',
-        '    <div style="font-size:12px;color:var(--m-muted,#666);">' +
-          formatBytes(file.size) +
-          "</div>",
+          ' <span class="file-upload-progress">(загрузка...)</span></div>',
+        '    <div class="file-manager-file-meta">' + formatBytes(file.size) + "</div>",
         "</div>",
       ].join("");
       // The window open now, also when this is «Повторить» on a row carried from an earlier window.
@@ -703,7 +695,7 @@ window.fetchVectorStores = function () {
       var controller = new AbortController();
       var cancel = document.createElement("button");
       cancel.type = "button";
-      cancel.className = "logos-btn";
+      cancel.className = "logos-btn file-manager-secondary-btn";
       cancel.textContent = "Отменить";
       cancel.addEventListener("click", function () {
         controller.abort();
@@ -753,17 +745,17 @@ window.fetchVectorStores = function () {
           var text = uncertain
             ? "Сервер не ответил вовремя: файл мог сохраниться. Проверьте список, прежде чем загружать его снова."
             : err.message;
+          // A failed upload is a calm note: the red edge marks it, the name and the reason stay readable.
           div.innerHTML = [
-            '<div style="flex:1;min-width:0;">',
-            '    <div style="font-weight:bold;color:var(--m-danger,#c33);word-break:break-all;">' +
+            '<div class="file-manager-file-info">',
+            '    <div class="file-manager-file-name">' +
               UI.escapeHtml(file.name) +
-              ' <span style="font-size:11px;">(ошибка)</span></div>',
-            '    <div style="font-size:12px;color:var(--m-muted,#666);">' +
-              UI.escapeHtml(text) +
-              "</div>",
+              ' <span class="file-manager-error-tag">(ошибка)</span></div>',
+            '    <div class="file-manager-file-meta">' + UI.escapeHtml(text) + "</div>",
             "</div>",
           ].join("");
-          div.style.opacity = "1";
+          div.classList.remove("is-uploading");
+          div.classList.add("is-failed");
           // Everything arrived and the copy stays: «Повторить» only completes the upload once the cause (a provider key,
           // for example) is fixed; after completion_uncertain «Сохранить всё равно» sends it once the list was checked.
           // «Убрать» drops the copy.
@@ -771,7 +763,7 @@ window.fetchVectorStores = function () {
             keepUpload(err.uploadId);
             var again = document.createElement("button");
             again.type = "button";
-            again.className = "logos-btn";
+            again.className = "logos-btn file-manager-secondary-btn";
             again.textContent = uncertain ? "Сохранить всё равно" : "Повторить";
             again.addEventListener("click", function () {
               forgetRow();
@@ -779,7 +771,7 @@ window.fetchVectorStores = function () {
             });
             var drop = document.createElement("button");
             drop.type = "button";
-            drop.className = "logos-btn";
+            drop.className = "logos-btn file-manager-secondary-btn";
             drop.textContent = "Убрать";
             drop.addEventListener("click", function () {
               // The copy stays known (and dropped on the way out of the page) until the server confirms.

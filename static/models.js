@@ -17,7 +17,8 @@ function formatUltraSummary(summary) {
     parts.push("снята");
     return parts.join(" · ");
   }
-  if (summary.default_profile === "ultra") parts.push("профиль по умолчанию");
+  // The card already starts with «Ultra», so the fact reads as the profile being applied.
+  if (summary.default_profile === "ultra") parts.push("профиль применяется");
   if (summary.context_window_tokens) {
     parts.push("контекст " + Number(summary.context_window_tokens).toLocaleString("ru-RU") + "\u00a0ток.");
   }

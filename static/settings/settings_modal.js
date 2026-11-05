@@ -121,23 +121,18 @@
     disableControls(md);
     var ov = CoreUI.modal.create({
       id: "tools-modal-custom",
-      title: "🧰 Инструменты",
+      title: "Инструменты",
       className: "tools-modal-custom",
       contentClassName: "settings-tools-modal-content",
       body: md,
     });
     var modalContent = ov.querySelector(".modal-content");
-    modalContent.style.cssText =
-      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
+    // Layout only: background, border, radius and shadow come from the shared window shell (style.css).
+    modalContent.style.cssText = "padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;";
+    // Shown at once with its loading line; the categories fill it when they arrive. A click on the backdrop and Escape
+    // close it through LogosCoreAPI.ui.modal.
     (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
-
-    function closeModal() {
-      CoreUI.modal.close(ov);
-    }
-    ov.addEventListener("click", function (e) {
-      if (e.target === ov) closeModal();
-    });
 
     var categoryLabels = {
       termux: "📱 Termux Hardware (батарея, буфер, сенсоры, TTS, тосты)",
@@ -267,7 +262,7 @@
       });
     }
     document.getElementById("tools-status").textContent = unknownAtOpen
-      ? "Общие настройки не загружены с сервера: показаны значения по умолчанию. " + READ_ONLY_NOTE
+      ? "Общие настройки не загружены с сервера: показаны значения, встроенные в интерфейс. " + READ_ONLY_NOTE
       : READ_ONLY_NOTE;
     loadCategories();
   };
@@ -303,7 +298,7 @@
       : defaults.reasoning_effort;
     return (
       '<div style="margin-bottom:12px;font-size:13px;color:var(--m-text,#222);">' +
-      "<strong>Профиль: Ultra — по умолчанию</strong><br>" +
+      "<strong>Профиль: Ultra</strong><br>" +
       "Ответ — максимум провайдера, если поле токенов пустое или 0; контекст не обрезается; " +
       "глубина размышлений — " + window.SettingsUI.escapeHtml(depth) + "." +
       "</div>"
@@ -532,15 +527,16 @@
 
     var ov = CoreUI.modal.create({
       id: "settings-modal-custom",
-      title: "⚙️ Конфигурация LLM & Responses API",
+      title: "Конфигурация LLM & Responses API",
       contentClassName: "settings-modal-panel",
     });
     ov.style.zIndex = "10002";
     var md = ov.querySelector(".modal-content");
-    md.style.cssText =
-      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);display:flex;flex-direction:column;";
+    // Layout only: background, border, radius and shadow come from the shared window shell (style.css).
+    md.style.cssText = "padding:20px;max-width:720px;overflow-y:auto;display:flex;flex-direction:column;";
     var title = md.querySelector(".modal-title");
-    title.style.cssText = "margin:0;font-size:18px;color:var(--m-text,#222);";
+    // Size, weight and colour come from the shared window-title rule (static/style.css).
+    title.style.cssText = "margin:0;";
     var closeButton = md.querySelector(".modal-close");
     closeButton.id = "set-close-btn";
     closeButton.classList.add("settings-contract-btn");
@@ -587,7 +583,7 @@
     var tabsHeader = [
       '<div class="settings-modal-top">',
       '<div class="settings-modal-heading" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"></div>',
-      '<div class="llm-tabs" style="display:flex;gap:6px;border-bottom:1px solid var(--m-border,#ddd);flex-wrap:wrap;">',
+      '<div class="llm-tabs">',
       '    <button class="logos-btn llm-tab-btn active settings-contract-btn" data-tab="tab-ollama">Ollama</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-output">Формат вывода</button>',
@@ -690,15 +686,9 @@
     (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
-    function closeModal() {
-      CoreUI.modal.close(ov);
-    }
     md.querySelector("#set-status").textContent = unknownAtOpen
-      ? "Общие настройки не загружены с сервера: показаны значения по умолчанию. " + READ_ONLY_NOTE
+      ? "Общие настройки не загружены с сервера: показаны значения, встроенные в интерфейс. " + READ_ONLY_NOTE
       : READ_ONLY_NOTE;
-    ov.addEventListener("click", function (e) {
-      if (e.target === ov) closeModal();
-    });
 
     // Every parameter is read-only; only the colour scheme (kept on this device) can be chosen.
     disableControls(md);

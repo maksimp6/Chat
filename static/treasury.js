@@ -72,7 +72,7 @@
     treasuryAmount.setAttribute("aria-label", "Сумма DEMO-пополнения");
 
     const topUpButton = UI.button({
-      className: "treasury-action-btn",
+      className: "treasury-action-btn btn-primary",
       text: "Пополнить DEMO",
       action: "treasury.top-up",
     });
@@ -102,10 +102,43 @@
     treasuryStatus.classList.toggle("is-error", Boolean(isError));
   }
 
+  // Up to 4 decimals: a model call costs a fraction of a kopeck, and rounding to 2 would show 0.
+  function formatMoney(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return String(value);
+    try {
+      return new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: treasuryCurrency,
+        maximumFractionDigits: 4,
+      }).format(number);
+    } catch (error) {
+      // A code Intl does not know (or none) is written as it came, after the number.
+      return (
+        number.toLocaleString("ru-RU", { maximumFractionDigits: 4 }) +
+        (treasuryCurrency ? " " + treasuryCurrency : "")
+      );
+    }
+  }
+
+  // The server writes ISO time with microseconds; the standard Date format has three fraction digits (more is up to
+  // each browser), so the rest is cut before parsing. Shown in the viewer's local time.
+  function formatDate(value) {
+    if (!value) return "";
+    const date = new Date(String(value).replace(/(\.\d{3})\d+/, "$1"));
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
   function renderTreasuryAccount(account) {
     treasuryCurrency = account.currency || "";
-    treasuryBalance.textContent =
-      String(account.balance) + (treasuryCurrency ? " " + treasuryCurrency : "");
+    treasuryBalance.textContent = formatMoney(account.balance);
 
     const expenses = (account.ledger || []).filter(function (item) {
       return item.kind === "debit";
@@ -130,11 +163,15 @@
       description.className = "treasury-expense-description";
       description.textContent = item.description || "Расход";
 
+      const amount = document.createElement("span");
+      amount.className = "treasury-expense-amount";
+      amount.textContent = formatMoney(item.amount);
+
       const meta = document.createElement("span");
       meta.className = "treasury-expense-meta";
-      meta.textContent = (item.created_at || "") + " · " + item.amount + " " + treasuryCurrency;
+      meta.textContent = formatDate(item.created_at);
 
-      entry.append(description, meta);
+      entry.append(description, amount, meta);
       list.appendChild(entry);
     });
     treasuryExpenses.appendChild(list);

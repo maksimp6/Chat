@@ -87,6 +87,8 @@
         }
       })
       .catch(function (error) {
+        // A failure is the shared calm note (static/style.css .logos-error-note).
+        list.classList.add("logos-error-note");
         list.textContent = "Ошибка: " + error.message;
       });
   }

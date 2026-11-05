@@ -18,18 +18,19 @@
   pointer-events: auto;
   padding: 10px 16px;
   border-radius: 12px;
-  background: var(--text-main);
-  color: var(--bg-app);
+  /* The toast is the page's colours swapped, so it stands out in every theme. */
+  background: var(--text);
+  color: var(--bg);
   font-size: 14px;
   line-height: 1.4;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 20px var(--shadow-color);
   overflow-wrap: anywhere;
   opacity: 1;
 }
 
 .logos-toast-error {
-  background: #b00020;
-  color: #ffffff;
+  background: var(--danger);
+  color: var(--danger-ink);
 }
 
 .logos-toast-hide {

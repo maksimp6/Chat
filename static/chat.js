@@ -866,18 +866,25 @@ function takeEarlyHistory(convId) {
   return null;
 }
 
+// The «Л» line mark, the same drawing as the header brand and the first empty screen in templates/index.html.
+const EMPTY_CHAT_MARK =
+  '<svg viewBox="0 0 20 20" focusable="false" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="16" height="16" rx="5"/><path d="M7 14c1.1 0 1.6-.9 1.6-2.6V6H13v8"/></svg>';
+
 function showEmptyChat(chatbox, before) {
   const empty = document.createElement("div");
   empty.className = "empty-state";
+  const mark = document.createElement("div");
+  mark.className = "empty-mark";
+  mark.setAttribute("aria-hidden", "true");
+  mark.innerHTML = EMPTY_CHAT_MARK;
+  empty.appendChild(mark);
   for (const [cls, text] of [
-    ["empty-mark", "Λ"],
     ["empty-title", "Логос"],
     ["empty-sub", "Начните диалог"],
   ]) {
     const part = document.createElement("div");
     part.className = cls;
     part.textContent = text;
-    if (cls === "empty-mark") part.setAttribute("aria-hidden", "true");
     empty.appendChild(part);
   }
   if (before && before.isConnected) chatbox.insertBefore(empty, before);
@@ -2290,6 +2297,25 @@ document.addEventListener("DOMContentLoaded", function () {
     if (typeof renderSidebar === "function") renderSidebar();
   }
 
+  // The list groups dialogs by last activity: a sent question puts its chat under «Сегодня» and at the top, as the
+  // server's list will after a reload (the Court stays pinned by renderSidebar).
+  function touchConversation(convId) {
+    if (typeof conversations === "undefined" || !Array.isArray(conversations)) return;
+    const index = conversations.findIndex((item) => item.id === convId);
+    if (index < 0) return;
+    const conversation = conversations[index];
+    conversation.updated_at = Math.floor(Date.now() / 1000);
+    conversations.splice(index, 1);
+    conversations.unshift(conversation);
+    // Runs inside the send: a full or blocked storage must not stop the question.
+    try {
+      localStorage.setItem("conversations", JSON.stringify(conversations));
+    } catch (storageError) {
+      console.warn("[CHAT] Conversation list cache not saved:", storageError);
+    }
+    if (typeof renderSidebar === "function") renderSidebar();
+  }
+
   // One request of a turn. «Стоп» aborts it, also while its body is read; with idleMs, a request whose headers do not
   // come in time is abandoned. That ends only the connection: the turn on the server goes on.
   async function turnRequest(path, init, stopSignal, idleMs, timeoutMs) {
@@ -3028,6 +3054,7 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
       }
+      touchConversation(turn.conversationId);
 
       if (currentConvId === turn.conversationId) {
         // A retry already has its user message in the chat, so it is not painted twice.

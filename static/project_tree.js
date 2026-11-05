@@ -59,7 +59,7 @@
     body.textContent = "Загрузка...";
     var modal = UI.modal.create({
       id: "project-tree-modal",
-      title: "🌳 Структура проекта",
+      title: "Структура проекта",
       titleTag: "h3",
       closeAction: "project-tree.close",
       body: body,
@@ -81,12 +81,14 @@
       })
       .catch(function (error) {
         log("load_failed", { code: error.code || "PROJECT_TREE_ERROR", message: error.message });
+        // A failure is the shared calm note with its retry under the text.
+        state.classList.add("logos-error-note");
         state.textContent = "Ошибка структуры проекта: " + error.message;
         var retry = UI.button({
           text: "Повторить",
           action: "project-tree.retry",
         });
-        modal.querySelector(".modal-content").appendChild(retry);
+        state.appendChild(retry);
       });
   }
 

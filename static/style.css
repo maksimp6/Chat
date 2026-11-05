@@ -5,133 +5,254 @@
   padding: 0;
 }
 
+/* Design tokens. One palette per theme; every other name below is an alias of these.
+   Gold (--accent) is only for a primary fill, a selected state, the focus ring and links: flat, no gradient or glow. */
 :root {
-  --bg-app: #f5f5f7;
-  --bg-sidebar: #ffffff;
-  --bg-header: #0062cc;
-  --bg-input: #ffffff;
-  --bg-bubble-user: #0062cc;
-  --bg-bubble-bot: #f2f2f7;
-  --text-main: #1c1c1e;
-  --text-header: #ffffff;
-  --text-bubble-user: #ffffff;
-  --text-bubble-bot: #1c1c1e;
-  --text-secondary: #6e6e73;
-  --border-color: #e5e5ea;
-  --accent: #007aff;
-  --accent-text: #0062cc;
-  --btn-bg: #f0f0f5;
-  --code-bg: #f6f8fa;
-  --code-border: #e1e4e8;
-  --danger: #ff3b30;
-  --control-border: #8e8e93;
-  --accent-strong: #0062cc;
-  --danger-strong: #d70015;
-  --bg-hover: #e5e5ea;
+  color-scheme: light;
+  --font-ui: Inter, "SF Pro Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --bg: #f6f6f7;
+  --surface-1: #ffffff;
+  --surface-2: #f0f0f2;
+  --surface-3: #e5e6ea;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+  --text: #18191c;
+  --text-muted: #5b5e66;
+  --text-faint: #80838b;
+  --accent: #94743a;
+  --accent-hover: #7f6230;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(148, 116, 58, 0.12);
+  --danger: #c4382f;
+  --danger-ink: #ffffff;
+  --success: #1a6b2c;
+  --warning: #8a5a00;
+  --focus-ring: 0 0 0 3px rgba(148, 116, 58, 0.35);
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --shadow-color: rgba(16, 18, 24, 0.16);
+  --shadow-modal: 0 20px 60px var(--shadow-color);
+  --radius-modal: 14px;
+  --msg-user-bg: var(--surface-3);
+  --msg-user-border: transparent;
   --code-text: #b0124a;
-  --danger-text: #d70015;
-  --accent-soft: rgba(0, 122, 255, 0.12);
   --chip-bg: rgba(127, 127, 127, 0.14);
-  --success-text: #1a6b2c;
 }
 
 [data-theme="dark"] {
-  --bg-app: #000000;
-  --bg-sidebar: #1c1c1e;
-  --bg-header: #1c1c1e;
-  --bg-input: #2c2c2e;
-  --bg-bubble-user: #0062cc;
-  --bg-bubble-bot: #2c2c2e;
-  --text-main: #f5f5f7;
-  --text-header: #f5f5f7;
-  --text-bubble-user: #ffffff;
-  --text-bubble-bot: #f5f5f7;
-  --text-secondary: #8e8e93;
-  --border-color: #3a3a3c;
-  --accent: #0a84ff;
-  --accent-text: #0a84ff;
-  --btn-bg: #2c2c2e;
-  --code-bg: #1e1e1e;
-  --code-border: #444444;
-  --danger: #ff453a;
-  --control-border: #8e8e93;
-  --accent-strong: #0062cc;
-  --danger-strong: #d70015;
-  --bg-hover: #2c2c2e;
-  --code-text: #ff7aa2;
-  --danger-text: #ff6961;
-  --accent-soft: rgba(10, 132, 255, 0.18);
-  --chip-bg: rgba(127, 127, 127, 0.14);
-  --success-text: #6fd38a;
+  color-scheme: dark;
+  --bg: #0b0c0f;
+  --surface-1: #111317;
+  --surface-2: #171a1f;
+  --surface-3: #1e2228;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --text: #ececef;
+  --text-muted: #a0a3ab;
+  --text-faint: #72757d;
+  --accent: #c9a96e;
+  --accent-hover: #d6b984;
+  --accent-ink: #17140e;
+  --accent-soft: rgba(201, 169, 110, 0.12);
+  --danger: #e5675f;
+  --danger-ink: #17140e;
+  --success: #6fd38a;
+  --warning: #e0b45a;
+  --focus-ring: 0 0 0 3px rgba(201, 169, 110, 0.35);
+  --shadow-color: rgba(0, 0, 0, 0.45);
+  --msg-user-bg: var(--surface-2);
+  --code-text: #ff8fb0;
 }
 
 [data-theme="dim"] {
-  --bg-app: #1f2329;
-  --bg-sidebar: #24292f;
-  --bg-header: #30363d;
-  --bg-input: #2d333b;
-  --bg-bubble-user: #0062cc;
-  --bg-bubble-bot: #2d333b;
-  --text-main: #e6edf3;
-  --text-header: #ffffff;
-  --text-bubble-user: #ffffff;
-  --text-bubble-bot: #e6edf3;
-  --text-secondary: #8b949e;
-  --border-color: #444c56;
-  --accent: #58a6ff;
-  --accent-text: #58a6ff;
-  --btn-bg: #30363d;
-  --code-bg: #161b22;
-  --code-border: #444c56;
-  --danger: #f85149;
-  --control-border: #8b949e;
-  --accent-strong: #1f6feb;
-  --danger-strong: #d70015;
-  --bg-hover: #30363d;
-  --code-text: #ff7aa2;
-  --danger-text: #ff7b72;
-  --accent-soft: rgba(88, 166, 255, 0.14);
-  --chip-bg: rgba(127, 127, 127, 0.14);
-  --success-text: #6fd38a;
+  color-scheme: dark;
+  --bg: #16181d;
+  --surface-1: #1b1e24;
+  --surface-2: #22262d;
+  --surface-3: #2a2f37;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text: #e6e7ea;
+  --text-muted: #a3a6ad;
+  --text-faint: #7a7d85;
+  --accent: #c9a96e;
+  --accent-hover: #d6b984;
+  --accent-ink: #17140e;
+  --accent-soft: rgba(201, 169, 110, 0.14);
+  --danger: #e8736b;
+  --danger-ink: #17140e;
+  --success: #6fd38a;
+  --warning: #e0b45a;
+  --focus-ring: 0 0 0 3px rgba(201, 169, 110, 0.35);
+  --shadow-color: rgba(0, 0, 0, 0.4);
+  --msg-user-bg: var(--surface-2);
+  --code-text: #ff8fb0;
 }
 
+/* Black on white, every edge a 1px line in the text colour; text and accent stay at 7:1 or more. */
 [data-theme="high-contrast"] {
-  --bg-app: #ffffff;
-  --bg-sidebar: #ffffff;
-  --bg-header: #000000;
-  --bg-input: #ffffff;
-  --bg-bubble-user: #005fcc;
-  --bg-bubble-bot: #ffffff;
-  --text-main: #000000;
-  --text-header: #ffffff;
-  --text-bubble-user: #ffffff;
-  --text-bubble-bot: #000000;
-  --text-secondary: #333333;
-  --border-color: #000000;
-  --accent: #004c99;
-  --accent-text: #004c99;
-  --btn-bg: #e6e6e6;
-  --code-bg: #ffffff;
-  --code-border: #000000;
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #ffffff;
+  --surface-3: #e6e6e6;
+  --border: #000000;
+  --border-strong: #000000;
+  --text: #000000;
+  --text-muted: #333333;
+  --text-faint: #4d4d4d;
+  --accent: #6b4f12;
+  --accent-hover: #574010;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(107, 79, 18, 0.14);
   --danger: #b00020;
-  --control-border: #000000;
-  --accent-strong: #004c99;
-  --danger-strong: #b00020;
-  --bg-hover: #e6e6e6;
-  --code-text: #b0124a;
-  --danger-text: #b00020;
-  --accent-soft: rgba(0, 76, 153, 0.14);
-  --chip-bg: rgba(127, 127, 127, 0.14);
-  --success-text: #1a6b2c;
+  --danger-ink: #ffffff;
+  --success: #0b5d1e;
+  --warning: #6b4f12;
+  --focus-ring: 0 0 0 3px #6b4f12;
+  --shadow-color: rgba(0, 0, 0, 0.2);
+  --msg-user-bg: var(--surface-2);
+  --msg-user-border: var(--text);
+  --code-text: #8a0f3d;
+}
+
+/* The names the older rules and scripts (trace_viewer.js) use, kept as aliases so there is one palette. */
+:root {
+  --bg-app: var(--bg);
+  --bg-header: var(--bg);
+  --bg-sidebar: var(--surface-1);
+  --bg-input: var(--surface-2);
+  --bg-hover: var(--surface-3);
+  --btn-bg: var(--surface-2);
+  --bg-bubble-user: var(--msg-user-bg);
+  --bg-bubble-bot: var(--surface-1);
+  --text-main: var(--text);
+  --text-header: var(--text);
+  --text-bubble-user: var(--text);
+  --text-bubble-bot: var(--text);
+  --text-secondary: var(--text-muted);
+  --border-color: var(--border);
+  --control-border: var(--border-strong);
+  --accent-text: var(--accent);
+  --accent-strong: var(--accent);
+  --danger-strong: var(--danger);
+  --danger-text: var(--danger);
+  --success-text: var(--success);
+  --code-bg: var(--surface-2);
+  --code-border: var(--border);
+  --msg-user-text: var(--text);
+}
+
+/* Settings, MCP and file-manager windows read the --m-* names that settings/ui_helpers.js injects after this sheet;
+   html:root outranks that injected :root/[data-theme] block, so those windows use the same tokens. */
+html:root {
+  --m-bg: var(--surface-1);
+  --m-text: var(--text);
+  --m-border: var(--border-strong);
+  --m-input-bg: var(--surface-2);
+  --m-input-text: var(--text);
+  --m-section: var(--text-muted);
+  --m-section-border: var(--border);
+  --m-card: var(--surface-2);
+  --m-editor: var(--surface-2);
+  --m-muted: var(--text-muted);
+  --m-accent: var(--accent);
+  --m-danger: var(--danger);
+  --m-success: var(--success);
+  --m-overlay: var(--backdrop);
+  --m-shadow: var(--shadow-color);
 }
 
 html,
 body {
   height: 100%;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: var(--bg-app);
-  color: var(--text-main);
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Native controls take the page font and colour (the browser would draw Arial in black).
+   :where() keeps this at zero specificity, so every component rule still wins. */
+:where(button, input, select, textarea) {
+  font: inherit;
+  color: inherit;
+}
+
+/* Text fields everywhere, windows appended to <body> included. A list box (select with multiple or size) keeps
+   its own height. */
+:where(
+    input:is([type="text"], [type="number"], [type="password"], [type="search"], [type="email"], [type="url"], [type="tel"], :not([type])),
+    select,
+    textarea
+  ) {
+  box-sizing: border-box;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+:where(textarea, select[multiple], select[size]) {
+  height: auto;
+  min-height: 40px;
+  padding: 8px 12px;
+  line-height: 1.5;
+}
+:where(input, textarea)::placeholder {
+  color: var(--text-faint);
+  opacity: 1;
+}
+:where(
+    input:is([type="text"], [type="number"], [type="password"], [type="search"], [type="email"], [type="url"], [type="tel"], :not([type])):focus,
+    select:focus,
+    textarea:focus
+  ) {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+:where(input[type="checkbox"], input[type="radio"]) {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: none;
+  vertical-align: middle;
+  accent-color: var(--accent);
+}
+:where(label:has(> input:is([type="checkbox"], [type="radio"]))) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (pointer: coarse) {
+  :where(
+      input:is([type="text"], [type="number"], [type="password"], [type="search"], [type="email"], [type="url"], [type="tel"], :not([type])),
+      select:not([multiple], [size])
+    ) {
+    height: 44px;
+  }
+}
+
+/* Scrollbars: a thin neutral thumb in every theme. */
+:where(*) {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 22%, transparent) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* === ISOLATED APP STYLES === */
@@ -161,137 +282,379 @@ body {
   display: none;
 }
 
-/* Sidebar */
+/* Sidebar: the dialog list slides in over the chat behind a scrim. One surface with a hairline edge; a row is one
+   quiet line and the open dialog a raised tile. Gold is only «Новый чат» and the focus ring. */
 .logos-pro-app #sidebar {
-  width: min(280px, 85vw);
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border-color);
   position: fixed !important;
   top: 0;
   left: 0;
-  height: 100%;
-  height: 100dvh;
   z-index: 200;
-  transform: translateX(-100%);
   display: flex;
   flex-direction: column;
+  width: calc(min(280px, 85vw) + env(safe-area-inset-left, 0px));
+  height: 100%;
+  height: 100dvh;
+  padding-left: env(safe-area-inset-left, 0px);
+  background: var(--surface-1);
+  color: var(--text);
+  border-right: 1px solid var(--border);
+  transform: translateX(-100%);
+  /* Hidden once it has slid away, so Tab never lands on a control off the screen. */
+  visibility: hidden;
+  transition:
+    transform 0.2s ease,
+    visibility 0s linear 0.2s;
 }
 .logos-pro-app #sidebar.open {
   transform: translateX(0);
+  visibility: visible;
+  transition:
+    transform 0.2s ease,
+    visibility 0s;
 }
 
 .logos-pro-app #sidebar-header {
-  padding: 14px;
-  border-bottom: 1px solid var(--border-color);
   display: flex;
-  gap: 10px;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 12px 8px;
 }
 
 .logos-pro-app #new-chat-btn {
   flex: 1;
-  background: var(--accent-strong);
-  color: #fff;
-  border: none;
+  min-width: 0;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid transparent;
   border-radius: 10px;
-  padding: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
   font-size: 14px;
   font-weight: 600;
-  cursor: pointer;
+}
+.logos-pro-app #new-chat-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.logos-pro-app #new-chat-btn .new-chat-icon {
+  display: block;
+  flex: none;
 }
 
+/* The panel's icon buttons: a muted line icon drawn with a mask in the text colour; the glyph (×, ✎) is the
+   fallback text that font-size 0 hides. */
+.logos-pro-app #close-sidebar-btn,
+.logos-pro-app #sidebar .rename-btn,
+.logos-pro-app #sidebar .delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+.logos-pro-app #close-sidebar-btn::before,
+.logos-pro-app #sidebar .rename-btn::before,
+.logos-pro-app #sidebar .delete-btn::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
+}
 .logos-pro-app #close-sidebar-btn {
-  background: var(--btn-bg);
-  border: none;
+  --ico: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M6 6l12 12M18 6 6 18'/></svg>");
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   border-radius: 8px;
-  width: 44px;
-  height: 44px;
-  font-size: 18px;
-  cursor: pointer;
-  color: var(--text-main);
+}
+.logos-pro-app #close-sidebar-btn::before {
+  width: 18px;
+  height: 18px;
+}
+.logos-pro-app #close-sidebar-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Search filters the list by name as you type (sidebar.js); the magnifier lets clicks through to the field. */
+.logos-pro-app .conv-search {
+  position: relative;
+  padding: 0 12px 8px;
+}
+.logos-pro-app .conv-search::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 8px;
+  left: 24px;
+  width: 16px;
+  height: 16px;
+  margin: auto 0;
+  background-color: var(--text-faint);
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><path d='m20 20-4.2-4.2'/></svg>")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><path d='m20 20-4.2-4.2'/></svg>")
+    center / contain no-repeat;
+  pointer-events: none;
+}
+/* The shared text-field look; Safari's own search styling would ignore the padding. */
+.logos-pro-app #conv-search {
+  width: 100%;
+  padding-left: 36px;
+  font-size: 14px;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .logos-pro-app #conv-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 8px;
+  overscroll-behavior: contain;
+  padding: 0 8px max(12px, env(safe-area-inset-bottom, 0px));
+}
+.logos-pro-app .conv-group + .conv-group {
+  margin-top: 12px;
+}
+.logos-pro-app .conv-group-title {
+  padding: 8px 10px 4px;
+  /* --text-muted, not --text-faint: 12px text needs 4.5:1, which faint misses on every sidebar. */
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
 }
 
+/* One line per dialog; the name takes the whole row. On a mouse screen the rename and delete buttons lie over the
+   row's right end while it is hovered, focused or open, and the name fades out under them. --conv-fade is the
+   width they cover inside the name: two 28px buttons, or one on the Court's row, which cannot be deleted. */
 .logos-pro-app .conv-item {
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-bottom: 2px;
-  font-size: 14px;
+  --conv-fade: 52px;
+  position: relative;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-}
-.logos-pro-app .conv-item:hover {
-  background: var(--btn-bg);
-}
-.logos-pro-app .conv-item.active {
-  background: var(--accent-soft);
-  color: var(--text-main);
-  box-shadow: inset 3px 0 0 var(--accent);
-  font-weight: 500;
+  min-height: 36px;
+  margin-bottom: 1px;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
 }
 .logos-pro-app .conv-item.conv-court {
-  font-weight: 600;
-  border: 1px solid var(--accent);
-  margin-bottom: 8px;
+  --conv-fade: 22px;
+}
+.logos-pro-app .conv-item:hover {
+  background: var(--surface-2);
+}
+.logos-pro-app .conv-item.active {
+  background: var(--surface-3);
+  font-weight: 500;
+}
+/* The focus ring is drawn outside the row; lifted, the next row does not paint over it. */
+.logos-pro-app .conv-item:focus-within {
+  z-index: 1;
+}
+.logos-pro-app .conv-link {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: inherit;
+  color: inherit;
+  text-decoration: none;
+}
+.logos-pro-app .conv-link:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: var(--focus-ring);
 }
 .logos-pro-app .conv-title {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.logos-pro-app .delete-btn {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 0 4px;
-  min-width: 44px;
-  min-height: 44px;
+.logos-pro-app .conv-actions {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 }
-
-/* Rename on touch screens: the same 44px target as the delete button. */
-.logos-pro-app .rename-btn {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 0 4px;
-  min-width: 44px;
-  min-height: 44px;
+.logos-pro-app .conv-item:is(:hover, :focus-within, .active) .conv-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.logos-pro-app .conv-item:is(:hover, :focus-within, .active) .conv-title {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - var(--conv-fade) - 16px),
+    transparent calc(100% - var(--conv-fade))
+  );
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - var(--conv-fade) - 16px),
+    transparent calc(100% - var(--conv-fade))
+  );
+}
+/* While the name is edited the field takes the whole row. */
+.logos-pro-app .conv-item.is-renaming .conv-actions {
+  display: none;
+}
+.logos-pro-app #sidebar .rename-btn,
+.logos-pro-app #sidebar .delete-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 6px;
+}
+.logos-pro-app #sidebar .rename-btn {
+  --ico: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19zM14 7l3 3'/></svg>");
+}
+.logos-pro-app #sidebar .delete-btn {
+  --ico: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M4 7h16M9 7V4.5h6V7M6.5 7l.8 12.2a2 2 0 0 0 2 1.8h5.4a2 2 0 0 0 2-1.8L17.5 7M10 11v6M14 11v6'/></svg>");
+}
+.logos-pro-app #sidebar .rename-btn:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+}
+.logos-pro-app #sidebar .delete-btn:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
 }
 .logos-pro-app .conv-rename-input {
   width: 100%;
-  box-sizing: border-box;
-  font: inherit;
-  padding: 4px 6px;
+  min-width: 0;
+  height: 28px;
+  margin: -4px 0;
+  padding: 0 8px;
   border-radius: 6px;
-  border: 1px solid var(--text-secondary);
-  background: transparent;
-  color: inherit;
+  font-size: inherit;
+  font-weight: 400;
 }
 
-/* Overlay */
+.logos-pro-app .conv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 12px;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+.logos-pro-app .conv-empty .logos-btn {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+/* High contrast: a tile is white on the white panel, so a hovered or open row and a hovered button show an edge. */
+[data-theme="high-contrast"] .logos-pro-app .conv-item:hover,
+[data-theme="high-contrast"] .logos-pro-app .conv-item.active {
+  box-shadow: inset 0 0 0 1px var(--text);
+}
+[data-theme="high-contrast"] .logos-pro-app #close-sidebar-btn:hover,
+[data-theme="high-contrast"] .logos-pro-app #sidebar .rename-btn:hover {
+  border-color: var(--text);
+}
+
+/* Rename on touch screens: a finger gets 44px targets, and the buttons stay in view beside the name, since there is
+   no hover to reveal them. The wider panel gives the name back the room they take. */
+@media (pointer: coarse) {
+  .logos-pro-app #sidebar {
+    width: calc(min(320px, 88vw) + env(safe-area-inset-left, 0px));
+  }
+  .logos-pro-app #new-chat-btn {
+    height: 44px;
+  }
+  .logos-pro-app #close-sidebar-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* iOS zooms the page into a field whose text is under 16px. */
+  .logos-pro-app #conv-search,
+  .logos-pro-app .conv-rename-input {
+    font-size: 16px;
+  }
+  .logos-pro-app .conv-item {
+    min-height: 44px;
+  }
+  .logos-pro-app .conv-link {
+    padding-right: 4px;
+  }
+  .logos-pro-app .conv-actions {
+    position: static;
+    gap: 0;
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .logos-pro-app .conv-item:is(:hover, :focus-within, .active) .conv-title {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .logos-pro-app #sidebar .rename-btn,
+  .logos-pro-app #sidebar .delete-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .logos-pro-app .conv-empty .logos-btn {
+    height: 44px;
+  }
+}
+
+/* Overlay: the scrim under the open panel; a click on it closes the panel (sidebar.js). */
 .logos-pro-app #overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
   z-index: 150;
+  background: rgba(0, 0, 0, 0.45);
   opacity: 0;
   pointer-events: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.2s ease;
 }
 .logos-pro-app #overlay.visible {
   opacity: 1;
   pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-pro-app #sidebar,
+  .logos-pro-app #sidebar.open,
+  .logos-pro-app #overlay,
+  .logos-pro-app .conv-item,
+  .logos-pro-app .conv-actions {
+    transition: none;
+  }
 }
 
 /* Main Layout */
@@ -305,35 +668,87 @@ body {
   background: var(--bg-app);
 }
 
-/* Header */
+/* Header: the page colour with one hairline under it, no gradient or heavy shadow. Two rows of 44px icon tiles;
+   the brand ends the first row. */
 .logos-pro-app #header {
-  background: var(--bg-header);
-  color: var(--text-header);
-  padding: 12px 15px;
+  position: relative;
+  z-index: 2;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  font-weight: 600;
-  font-size: 17px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   flex-shrink: 0;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) max(15px, env(safe-area-inset-right, 0px)) 10px
+    max(15px, env(safe-area-inset-left, 0px));
+  background: var(--bg);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
 }
 
+.logos-pro-app #header .header-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+/* The wide screen scrolls the second row sideways; the padding keeps the tiles' focus ring inside the scroll box. */
+.logos-pro-app #header .header-row-secondary {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 3px;
+  margin: -3px;
+}
+
+/* Phone width: the second button row wraps instead of scrolling sideways, so every button is visible (#1718). */
+@media (max-width: 768px) {
+  .logos-pro-app #header {
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+  }
+  .logos-pro-app #header .header-row-secondary {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+
+/* One tile for every header action: a muted line icon on a clear tile, a raised tile on hover, gold when open. */
 .logos-pro-app .header-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  border-radius: 8px;
+  box-sizing: border-box;
+  flex: 0 0 44px;
   width: 44px;
   height: 44px;
-  font-size: 20px;
-  cursor: pointer;
-  color: var(--text-header);
-  display: flex;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.logos-pro-app a.header-btn {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
   text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+.logos-pro-app .header-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.logos-pro-app .header-btn:is([aria-expanded="true"], [aria-pressed="true"], .active) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+/* White tiles on a white page: the hovered tile is outlined instead. */
+[data-theme="high-contrast"] .logos-pro-app .header-btn:hover {
+  border-color: var(--text);
 }
 
 .logos-pro-app .donate-btn img,
@@ -342,20 +757,38 @@ body {
   pointer-events: none;
 }
 
-.logos-pro-app .model-btn {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  flex: 0 0 44px;
-  font-size: 20px;
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  border-radius: 8px;
-  color: var(--text-header);
-  cursor: pointer;
-  display: flex;
+/* Brand: the «Л» mark and the name in the UI font. */
+.logos-pro-app #header .header-brand {
+  margin-left: auto;
+  padding-right: 4px;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.logos-pro-app #header .brand-mark {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: block;
+}
+/* A narrow phone keeps only the mark, so the header never runs past the screen; the name stays for screen readers. */
+@media (max-width: 480px) {
+  .logos-pro-app #header .header-brand {
+    padding-right: 0;
+  }
+  .logos-pro-app #header .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
 
 /* Chatbox */
@@ -369,13 +802,40 @@ body {
   background: var(--bg-app);
 }
 
+/* Empty state: one look for every place (chat, conversation list, a failed load). */
 .logos-pro-app .empty-state {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--text-secondary);
+  gap: 8px;
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
   font-size: 15px;
+}
+/* The empty chat: the «Л» mark, the name and one line, quiet and in the UI font. */
+.logos-pro-app .empty-state .empty-mark {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+  color: var(--text-faint);
+}
+.logos-pro-app .empty-state .empty-mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.logos-pro-app .empty-state .empty-title {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.logos-pro-app .empty-state .empty-sub {
+  color: var(--text-muted);
+  font-size: 14px;
 }
 
 /* Messages */
@@ -478,77 +938,147 @@ body {
   min-height: 20px;
 }
 
+/* The microphone is the voice screen's primary action: a flat gold circle, red while it records. */
 .logos-pro-app #mic-btn {
   width: 70px;
   height: 70px;
   border-radius: 50%;
   border: none;
-  background: var(--accent-strong);
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
   font-size: 30px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.15s ease;
+}
+.logos-pro-app #mic-btn:hover {
+  background: var(--accent-hover);
 }
 .logos-pro-app #mic-btn.recording {
-  background: var(--danger-strong);
+  background: var(--danger);
+  color: var(--danger-ink);
 }
 
-/* Text Input */
+/* Composer: one rounded bar in the message column's width; the field and the send button sit inside it. */
 .logos-pro-app #text-ui {
   display: flex;
-  padding: 10px;
-  background: var(--bg-input);
-  border-top: 1px solid var(--border-color);
-  gap: 10px;
-  align-items: flex-end;
-  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
+  margin: 6px max(12px, env(safe-area-inset-right, 0px), calc((100% - 780px) / 2))
+    calc(12px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px), calc((100% - 780px) / 2));
+  padding: 6px 6px 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface-1);
+  transition: border-color 0.15s ease;
+}
+.logos-pro-app #text-ui:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border-strong));
+}
+.logos-pro-app #text-ui #image-previews:not([hidden]) {
+  flex: 1 1 100%;
 }
 
-.logos-pro-app #msg-input {
-  flex: 1;
-  padding: 12px 16px;
-  border: 1px solid var(--control-border);
-  border-radius: 20px;
-  font-size: 16px;
+/* The field has no box of its own: the bar is its frame and shows its focus. */
+.logos-pro-app #text-ui #msg-input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 40px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   outline: none;
-  resize: none;
-  height: 44px;
-  max-height: 120px;
-  background: var(--bg-app);
-  color: var(--text-main);
-  overflow-y: auto;
+  color: var(--text);
+  caret-color: var(--accent);
+  font-size: 16px;
+  line-height: 22px;
+}
+.logos-pro-app #text-ui #msg-input::placeholder {
+  color: var(--text-faint);
+  opacity: 1;
 }
 
-.logos-pro-app #msg-input:focus-visible {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-.logos-pro-app #send-btn {
-  background: var(--accent-strong);
-  color: #fff;
-  border: none;
-  border-radius: 50%;
-  width: 44px;
-  height: 44px;
-  font-size: 20px;
-  cursor: pointer;
+.logos-pro-app #attach-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+.logos-pro-app #attach-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 
-/* Modals */
+/* Send: the primary action, a flat gold circle with a dark arrow. */
+.logos-pro-app #send-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+}
+.logos-pro-app #send-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.logos-pro-app #send-btn:disabled,
+.logos-pro-app #send-btn[aria-disabled="true"] {
+  opacity: 0.45;
+}
+@media (pointer: coarse) {
+  .logos-pro-app #attach-btn,
+  .logos-pro-app #send-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Modals: one shell for every window and popover. :where() gives it to windows appended to <body> as well, at zero
+   specificity, so a window's own rule (width, padding) still wins. */
+:where(.modal, .logos-dept-overlay) {
+  background: var(--backdrop);
+}
+:where(.modal-content, .logos-dept-card, .logos-system-status-content) {
+  background: var(--surface-1);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-modal);
+}
 .logos-pro-app .modal {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--backdrop);
   z-index: 1000;
   align-items: center;
   justify-content: center;
@@ -574,8 +1104,11 @@ body {
 }
 
 .logos-pro-app .modal-content {
-  background: var(--bg-sidebar);
-  border-radius: 16px;
+  background: var(--surface-1);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-modal);
   padding: 24px;
   width: min(500px, calc(100vw - 24px));
   max-width: 100%;
@@ -611,11 +1144,16 @@ body {
   height: 44px;
   margin: -8px -8px 0 8px;
   border: 0;
+  border-radius: 10px;
   background: transparent;
-  color: var(--text-main);
+  color: var(--text-muted);
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
+}
+.logos-pro-app .modal-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 .logos-pro-app .modal-content h3 {
   margin-top: 0;
@@ -640,7 +1178,8 @@ body {
   gap: 4px;
 }
 .logos-pro-app .model-option:hover {
-  border-color: var(--accent);
+  border-color: var(--border-strong);
+  background: var(--surface-3);
 }
 .logos-pro-app .model-option.active {
   border-color: var(--accent);
@@ -651,26 +1190,6 @@ body {
 .logos-pro-app .model-price {
   font-size: 12px;
   color: var(--text-secondary);
-}
-
-.logos-pro-app #close-modal {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  margin: 0;
-  background: var(--btn-bg);
-  border: none;
-  border-radius: 8px;
-  color: var(--text-main);
-  font-size: 24px;
-  line-height: 44px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* Markdown */
@@ -797,48 +1316,6 @@ body {
   color: var(--text-main);
 }
 
-/* Header rows */
-.logos-pro-app #header {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding-top: calc(12px + env(safe-area-inset-top, 0px));
-}
-
-.logos-pro-app .header-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.logos-pro-app .header-row-secondary {
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-bottom: 1px;
-}
-
-.logos-pro-app .header-row-secondary::-webkit-scrollbar {
-  height: 4px;
-}
-
-.logos-pro-app .header-row-secondary .header-btn {
-  flex: 0 0 auto;
-}
-
-@media (max-width: 768px) {
-  .logos-pro-app #header {
-    gap: 6px;
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-  .logos-pro-app .header-row {
-    gap: 8px;
-  }
-  .logos-pro-app .header-row-primary .model-btn {
-    min-width: 0;
-  }
-}
 /* Treasury modal */
 .logos-pro-app .treasury-modal {
   z-index: 1100;
@@ -856,19 +1333,21 @@ body {
   gap: 16px;
   padding: 16px;
   margin-bottom: 20px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--btn-bg);
+  background: var(--surface-2);
 }
 
 .logos-pro-app .treasury-balance-label {
-  color: var(--text-secondary);
-  font-size: 14px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .logos-pro-app .treasury-balance-value {
-  color: var(--text-main);
+  color: var(--text);
   font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
@@ -878,78 +1357,88 @@ body {
 
 .logos-pro-app .treasury-action-section h4 {
   margin: 0 0 10px;
-  color: var(--text-main);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .logos-pro-app .treasury-top-up-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
+/* The field's look is the shared text field; only its place in the row is set here. */
 .logos-pro-app .treasury-amount-input {
   min-width: 0;
   flex: 1;
-  padding: 11px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: var(--bg-input);
-  color: var(--text-main);
-  font: inherit;
 }
 
+/* The button is .btn-primary (flat gold); this only keeps it at the field's height (44px for a finger). */
 .logos-pro-app .treasury-action-btn {
   flex: 0 0 auto;
-  padding: 11px 14px;
-  border: none;
-  border-radius: 10px;
-  background: var(--accent-strong);
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
+  min-height: 40px;
+  white-space: nowrap;
 }
-
-.logos-pro-app .treasury-action-btn:active {
-  transform: translateY(1px);
+@media (pointer: coarse) {
+  .logos-pro-app .treasury-action-btn {
+    min-height: 44px;
+  }
 }
 
 .logos-pro-app .treasury-expenses-list {
   min-height: 40px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
+/* Expenses: calm list rows on one hairline each, the label on the left, the amount on the right, the date under the
+   label. */
 .logos-pro-app .treasury-expense-items {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .logos-pro-app .treasury-expense-item {
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: var(--btn-bg);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 16px;
+  row-gap: 2px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.logos-pro-app .treasury-expense-item:last-child {
+  border-bottom: 0;
 }
 
 .logos-pro-app .treasury-expense-description {
-  color: var(--text-main);
+  grid-column: 1;
+  color: var(--text);
   font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.logos-pro-app .treasury-expense-amount {
+  grid-column: 2;
+  grid-row: 1;
+  color: var(--text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .logos-pro-app .treasury-expense-meta {
-  color: var(--text-secondary);
+  grid-column: 1;
+  color: var(--text-muted);
   font-size: 12px;
-  overflow-wrap: anywhere;
 }
 
 .logos-pro-app .treasury-empty-state,
 .logos-pro-app .treasury-status {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -958,8 +1447,13 @@ body {
   margin-top: 8px;
 }
 
+/* A failure is the shared calm note (see .logos-error-note). */
 .logos-pro-app .treasury-status.is-error {
-  color: var(--danger);
+  padding: 10px 12px;
+  border-left: 3px solid var(--danger);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 @media (max-width: 520px) {
@@ -971,7 +1465,6 @@ body {
   .logos-pro-app .treasury-modal-content {
     width: 100%;
     padding: 20px;
-    border-radius: 14px;
   }
 
   .logos-pro-app .treasury-top-up-row {
@@ -982,149 +1475,151 @@ body {
     width: 100%;
   }
 }
-/* Header icon wrapping */
-.logos-pro-app #header > .header-actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 38px);
-  grid-auto-rows: 38px;
-  grid-auto-flow: row;
-  align-items: center;
-  justify-content: start;
-  gap: 8px 12px;
-  min-width: 0;
-  width: 100%;
-}
-
-.logos-pro-app #header > .header-actions > .header-btn {
-  width: 44px;
-  height: 44px;
-  flex: none;
-}
-
-@media (max-width: 768px) {
-  .logos-pro-app #header > .header-actions {
-    grid-template-columns: repeat(auto-fill, 44px);
-    grid-auto-rows: 44px;
-    gap: 6px 8px;
-  }
-
-  .logos-pro-app #header > .header-actions > .header-btn {
-    width: 44px;
-    height: 44px;
-  }
-}
-
 /* Memory panel: HTML-first structure, presentation owned by CSS. */
 .logos-pro-app .memory-modal {
   z-index: 100000;
   padding: 20px;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--backdrop);
 }
 
 .logos-pro-app .memory-modal[hidden] {
   display: none;
 }
 
+/* The window wears the shared modal shell (surface, edge, radius, shadow, UI font). */
 .logos-pro-app .memory-modal-content {
-  padding: 20px;
-  border-radius: 8px;
-  background: var(--bg-sidebar);
-  color: var(--text-main);
-  font-family: sans-serif;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  width: min(560px, calc(100vw - 24px));
 }
 
+/* The close button is the same clear 44px square as .modal-close, and stays in view while the window scrolls. */
 .logos-pro-app .memory-modal-close {
-  position: absolute;
-  top: 10px;
-  right: 15px;
+  position: sticky;
+  top: 0;
+  float: right;
   width: 44px;
   height: 44px;
+  margin: -8px -8px 0 8px;
+  padding: 0;
   border: 0;
+  border-radius: 10px;
   background: transparent;
-  color: #aaa;
+  color: var(--text-muted);
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
 }
-
-.logos-pro-app .memory-modal-title {
-  margin: 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #444;
-  font-size: 18px;
+.logos-pro-app .memory-modal-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 
+.logos-pro-app .memory-modal-title {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* The two read-only settings: each control sits inline with its label. */
 .logos-pro-app .memory-config {
-  margin: 15px 0;
-  padding: 10px;
-  border-radius: 5px;
-  background: #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
 }
 
 .logos-pro-app .memory-config-option {
-  display: block;
-  margin-bottom: 8px;
-  cursor: pointer;
-}
-
-.logos-pro-app .memory-config-option:last-child {
-  margin-bottom: 0;
-}
-
-.logos-pro-app .memory-limit {
-  width: 60px;
-  padding: 3px;
-  border: 1px solid #555;
-  border-radius: 4px;
-  background: #333;
-  color: #fff;
-}
-
-.logos-pro-app .memory-facts-title {
-  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
   font-size: 14px;
 }
 
+/* The number field is the shared text field on the panel's own surface, so it does not sink into it. */
+.logos-pro-app .memory-limit {
+  width: 88px;
+  background: var(--surface-1);
+}
+
+.logos-pro-app .memory-config :disabled {
+  cursor: default;
+}
+
+/* Outranks the window-title rule for h3 in .modal-content (its 16px gap and room for the close button). */
+.logos-pro-app .memory-modal-content .memory-facts-title {
+  margin: 0 0 8px;
+  padding-right: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* The facts get most of the window; the scrollbar is the thin themed one and its corner stays clear. */
 .logos-pro-app .memory-facts-list {
-  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 55vh;
   overflow-y: auto;
-  padding-top: 8px;
-  border-top: 1px solid #444;
+  padding-right: 2px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.logos-pro-app .memory-facts-list::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .logos-pro-app .memory-fact {
-  margin-bottom: 6px;
-  padding: 8px;
-  border-radius: 4px;
-  background: #2a2a2a;
-  font-size: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
+/* The category is a small gold chip before the fact. */
 .logos-pro-app .memory-fact-category {
-  color: #4da6ff;
-  font-weight: 700;
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+  vertical-align: 1px;
 }
 
 .logos-pro-app .memory-empty {
-  color: #888;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
 .logos-pro-app .memory-status {
-  min-height: 18px;
-  margin: 8px 0;
-  color: #e0a0a0;
+  margin: 0;
   font-size: 13px;
+}
+/* A failure is the shared calm note (see .logos-error-note); an empty status takes no room. */
+.logos-pro-app .memory-status:not(:empty) {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--danger);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  line-height: 1.45;
 }
 
 /* Progressive enhancement: state previously carried by inline styles. */
-.logos-pro-app .conv-empty {
-  padding: 20px;
-  color: var(--text-secondary);
-  text-align: center;
-}
 .logos-pro-app .model-list-note {
   font-size: 13px;
   color: var(--text-secondary);
@@ -1142,6 +1637,8 @@ body {
   opacity: 0.55;
   cursor: not-allowed;
 }
+/* «Отключение: <date>» is one more meta line of the card, sized and coloured like the price and Ultra lines. */
+.logos-pro-app .model-option-lifecycle,
 .logos-pro-app .model-option-ultra {
   font-size: 12px;
   color: var(--text-secondary);
@@ -1177,20 +1674,6 @@ body {
 .logos-pro-app #response-mode-wrap[aria-hidden="true"],
 .logos-pro-app #mic-btn[aria-hidden="true"] {
   display: none;
-}
-
-.logos-pro-app .conv-link {
-  display: block;
-  flex: 1;
-  min-width: 0;
-  color: inherit;
-  text-decoration: none;
-}
-
-.logos-pro-app .conv-link:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
 }
 
 .logos-pro-app .copy-btn {
@@ -1297,6 +1780,22 @@ body {
 .logos-pro-app .error-state {
   color: var(--danger);
 }
+/* «Повторить» after a failed history or tools-list load: the reset leaves a bare button text-tall, so it gets a
+   real target (44px on touch). */
+.logos-pro-app :is(.error-state, #tools-category-list) > .logos-btn {
+  display: inline-flex;
+  align-items: center;
+  /* Not auto, so the tools list's column does not stretch it; the empty chat still centres it. */
+  width: fit-content;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+@media (pointer: coarse) {
+  .logos-pro-app :is(.error-state, #tools-category-list) > .logos-btn {
+    min-height: 44px;
+  }
+}
 
 .logos-pro-app .trace-viewer-auto-button {
   font-size: 12px;
@@ -1330,37 +1829,33 @@ body {
   cursor: pointer;
 }
 
+/* Providers (provider_credentials.js): the fields are the shared text field, so focus shows the same gold edge. */
 .logos-pro-app .provider-field {
   margin: 14px 0;
 }
 .logos-pro-app .provider-field-label {
   display: block;
+  font-size: 13px;
   font-weight: 600;
   margin-bottom: 6px;
 }
 .logos-pro-app .provider-field-input {
   width: 100%;
-  box-sizing: border-box;
-  padding: 10px;
-  border: 1px solid var(--control-border);
-  border-radius: 7px;
-  background: var(--bg-input);
-  color: var(--text-main);
 }
 .logos-pro-app .provider-field-input.has-error {
-  border-color: #ff6b6b;
+  border-color: var(--danger);
 }
 .logos-pro-app .provider-field-help {
   margin-top: 5px;
+  color: var(--text-muted);
   font-size: 12px;
-  opacity: 0.7;
   line-height: 1.35;
 }
 .logos-pro-app .provider-field-error {
   display: none;
   margin-top: 6px;
   font-size: 12px;
-  color: #ff6b6b;
+  color: var(--danger);
   line-height: 1.35;
 }
 .logos-pro-app .provider-field-error.is-visible {
@@ -1369,33 +1864,30 @@ body {
 .logos-pro-app .provider-status-card {
   padding: 12px;
   margin: 8px 0;
-  border: 1px solid #444;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 14px;
 }
 .logos-pro-app .provider-status-title {
-  font-weight: 700;
+  font-weight: 600;
 }
 .logos-pro-app .provider-status-line {
-  margin-top: 5px;
+  margin-top: 4px;
 }
 .logos-pro-app .provider-status-meta {
-  margin-top: 7px;
+  margin-top: 6px;
+  color: var(--text-muted);
   font-size: 12px;
-  opacity: 0.65;
+  overflow-wrap: anywhere;
 }
+/* The window wears the shared modal shell and backdrop. */
 .logos-pro-app .provider-credentials-modal {
   z-index: 100002;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--backdrop);
 }
 .logos-pro-app .provider-credentials-modal.visible {
   display: flex;
-}
-.logos-pro-app .provider-credentials-box {
-  background: var(--bg-sidebar);
-  color: var(--text-main);
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 .logos-pro-app .provider-credentials-title {
   margin-top: 0;
@@ -1407,30 +1899,22 @@ body {
 }
 .logos-pro-app .provider-credentials-status {
   margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
+/* File manager windows: the shared modal shell and backdrop; the main window is wide enough for the store row. */
 .logos-pro-app .file-manager-modal,
 .logos-pro-app .file-manager-add-modal {
-  background: var(--m-overlay, rgba(0, 0, 0, 0.6));
+  background: var(--backdrop);
   z-index: 10001;
 }
 .logos-pro-app .file-manager-add-modal {
-  background: rgba(0, 0, 0, 0.5);
   z-index: 10002;
 }
 .logos-pro-app .file-manager-box {
-  background: var(--m-bg, #fff);
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 8px 32px var(--m-shadow, rgba(0, 0, 0, 0.3));
-  color: var(--m-text, #222);
-}
-.logos-pro-app .file-manager-add-box {
-  background: var(--m-bg, #fff);
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  color: var(--m-text, #222);
+  width: min(720px, calc(100vw - 24px));
 }
 
 /* Chat markdown and reasoning presentation. */
@@ -1518,54 +2002,235 @@ body {
   opacity: 0.85;
 }
 
-/* File manager vector-store rendering. */
-.logos-pro-app .file-manager-state {
-  padding: 10px;
-  text-align: center;
-  color: var(--m-muted, #999);
-  font-size: 12px;
+/* A failure is a calm note, not a red block: a red edge on the left, the text in the body colour, and its retry as a
+   secondary button under the text. Shared by the panels; :where() reaches windows appended to <body> too. */
+:where(.logos-error-note, .file-manager-state-error) {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--danger);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
-.logos-pro-app .file-manager-state-error {
-  color: var(--m-danger, #c33);
+:where(.logos-error-note-title) {
+  margin-bottom: 4px;
+  font-weight: 600;
 }
-.logos-pro-app .file-manager-vs-row {
+:where(.logos-error-note-hint) {
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+:where(.logos-error-note, .file-manager-state-error) > :where(button),
+.logos-pro-app :is(.logos-error-note, .file-manager-state-error) > .logos-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border-bottom: 1px solid var(--m-section-border, #eee);
-  font-size: 12px;
+  width: fit-content;
+  min-height: 36px;
+  margin-top: 8px;
+  padding: 0 12px;
+  font-size: 13px;
 }
-.logos-pro-app .file-manager-vs-details {
+@media (pointer: coarse) {
+  .logos-pro-app :is(.logos-error-note, .file-manager-state-error) > .logos-btn {
+    min-height: 44px;
+  }
+}
+
+/* File manager vector-store rendering. Upload is the one gold button; the rest are secondary, and «Удалить» is
+   red text on no fill. A button's icon («+») sits inline with its text. */
+.logos-pro-app .file-manager-upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.logos-pro-app .file-manager-toolbar {
+  margin-bottom: 16px;
+}
+.logos-pro-app .file-manager-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.logos-pro-app .file-manager-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.logos-pro-app .file-manager-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.logos-pro-app .file-manager-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+/* Outranks the window-title rule for h3 in .modal-content (its 16px gap and room for the close button). */
+.logos-pro-app .file-manager-box .file-manager-section-title {
+  margin: 0;
+  padding-right: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+.logos-pro-app .file-manager-box .file-manager-files-title {
+  margin-bottom: 10px;
+}
+.logos-pro-app .file-manager-vs-controls {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+.logos-pro-app .file-manager-vs-name-input {
+  flex: 1 1 160px;
+  min-width: 0;
+  max-width: 240px;
+}
+.logos-pro-app .file-manager-vs-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+.logos-pro-app .file-manager-file-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.logos-pro-app .file-manager-state {
+  padding: 16px 10px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.logos-pro-app .file-manager-state.file-manager-state-error {
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--text);
+}
+.logos-pro-app .file-manager-vs-row,
+.logos-pro-app .file-manager-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.logos-pro-app .file-manager-vs-row:last-child,
+.logos-pro-app .file-manager-file-row:last-child {
+  border-bottom: 0;
+}
+.logos-pro-app .file-manager-vs-details,
+.logos-pro-app .file-manager-file-info {
   flex: 1;
   min-width: 0;
 }
-.logos-pro-app .file-manager-vs-name {
-  font-weight: 700;
-  color: var(--m-text, #222);
+.logos-pro-app .file-manager-vs-name,
+.logos-pro-app .file-manager-file-name {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-all;
 }
-.logos-pro-app .file-manager-vs-meta {
+.logos-pro-app .file-manager-vs-meta,
+.logos-pro-app .file-manager-file-meta {
+  margin-top: 2px;
+  color: var(--text-muted);
   font-size: 12px;
-  color: var(--m-muted, #666);
+  overflow-wrap: anywhere;
 }
+/* The ID copies on a tap, so it reads as a link. */
 .logos-pro-app .file-manager-copy-id {
+  color: var(--accent);
   cursor: pointer;
-  color: var(--m-accent, #4a90d9);
+}
+.logos-pro-app .file-manager-copy-id:hover {
+  text-decoration: underline;
+}
+.logos-pro-app .file-upload-progress {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+/* An upload in progress is faded; its «Отменить» stays fully readable. */
+.logos-pro-app .file-manager-file-row.is-uploading .file-manager-file-info {
+  opacity: 0.6;
+}
+.logos-pro-app .file-manager-file-row.is-failed {
+  margin: 6px 0;
+  padding: 10px 12px;
+  border-bottom: 0;
+  border-left: 3px solid var(--danger);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.logos-pro-app .file-manager-error-tag {
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 600;
 }
 .logos-pro-app .file-manager-secondary-btn,
-.logos-pro-app .file-manager-danger-btn {
-  padding: 4px 8px;
-  border: 1px solid var(--m-border, #ddd);
-  background: var(--m-card, #fff);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
+.logos-pro-app .file-manager-danger-btn,
+.logos-pro-app .file-manager-vs-create-btn,
+.logos-pro-app .file-manager-vs-refresh-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
 }
-.logos-pro-app .file-manager-secondary-btn {
-  color: var(--m-text, #222);
+/* The display above would beat the browser's own [hidden] rule: «Отменить» is hidden while a file is being stored. */
+.logos-pro-app :is(
+    .file-manager-secondary-btn,
+    .file-manager-danger-btn,
+    .file-manager-vs-create-btn,
+    .file-manager-vs-refresh-btn,
+    .mcp-oauth-btn
+  )[hidden] {
+  display: none;
+}
+/* Beside the 40px name field, the store controls are as tall as it. */
+.logos-pro-app .file-manager-vs-create-btn,
+.logos-pro-app .file-manager-vs-refresh-btn {
+  min-height: 40px;
+  padding: 0 14px;
 }
 .logos-pro-app .file-manager-danger-btn {
-  color: var(--m-danger, #c33);
+  border-color: transparent;
+  background: transparent;
+  color: var(--danger);
+}
+.logos-pro-app .file-manager-danger-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+@media (pointer: coarse) {
+  .logos-pro-app .file-manager-secondary-btn,
+  .logos-pro-app .file-manager-danger-btn,
+  .logos-pro-app .file-manager-vs-create-btn,
+  .logos-pro-app .file-manager-vs-refresh-btn {
+    min-height: 44px;
+  }
 }
 
 /* File manager vector-store file picker. */
@@ -1577,90 +2242,196 @@ body {
 .logos-pro-app .file-manager-add-title {
   margin: 0;
   font-size: 14px;
-  color: var(--m-text, #222);
+  color: var(--text);
 }
 .logos-pro-app .file-manager-close-btn {
   border: 0;
   background: none;
   font-size: 20px;
   cursor: pointer;
-  color: var(--m-muted, #666);
+  color: var(--text-muted);
 }
 .logos-pro-app .file-manager-add-list {
   max-height: 300px;
   overflow-y: auto;
   margin-bottom: 12px;
 }
+/* One file per row: the checkbox inline left of the name, the size on the right; the row is the label. */
 .logos-pro-app .file-manager-add-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px;
-  border-bottom: 1px solid var(--m-section-border, #eee);
-  font-size: 12px;
+  min-height: 44px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
   cursor: pointer;
 }
+.logos-pro-app .file-manager-add-row:last-child {
+  border-bottom: 0;
+}
 .logos-pro-app .file-manager-add-name {
-  color: var(--m-text, #222);
+  min-width: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
 }
 .logos-pro-app .file-manager-add-size {
   margin-left: auto;
-  color: var(--m-muted, #666);
+  color: var(--text-muted);
   font-size: 12px;
+  white-space: nowrap;
 }
+/* The picker's one primary action: flat gold across the window. */
 .logos-pro-app .file-manager-primary-btn {
   width: 100%;
-  padding: 8px;
-  background: var(--m-accent, #4a90d9);
-  color: #fff;
-  border: 0;
-  border-radius: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-color: transparent;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
+}
+.logos-pro-app .file-manager-primary-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+/* MCP servers window (settings/settings_mcp.js): one row per server, its connect button on the right. */
+.logos-pro-app .mcp-manager-note {
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.logos-pro-app .mcp-server-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-width: 0;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.logos-pro-app .mcp-server-info {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.logos-pro-app .mcp-server-name {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.logos-pro-app .mcp-server-meta {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.logos-pro-app .mcp-server-actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+.logos-pro-app .mcp-oauth-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .logos-pro-app .mcp-oauth-btn {
+    min-height: 44px;
+  }
+}
+.logos-pro-app .mcp-manager-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
-/* Header actions keep their existing rows and wrap secondary actions instead of scrolling. */
-.logos-pro-app #header {
-  flex-direction: column;
-  align-items: stretch;
-  flex-wrap: nowrap;
-  overflow-x: visible;
-  overflow-y: visible;
+/* Project structure (project_tree.js): one line per entry, a folder's entries indented under it. */
+.logos-pro-app .project-tree {
+  font-size: 13px;
+  line-height: 1.4;
 }
-
-.logos-pro-app #header .header-row {
-  flex: 0 1 auto;
-  min-width: 0;
+.logos-pro-app .project-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
 }
-
-.logos-pro-app #header .header-row-secondary {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  padding-bottom: 4px;
+.logos-pro-app .project-tree-icon {
+  flex: none;
+}
+.logos-pro-app .project-tree-children {
+  padding-left: 18px;
+  border-left: 1px solid var(--border);
+  margin-left: 7px;
+}
+.logos-pro-app .project-tree-state {
+  font-size: 13px;
+}
+.logos-pro-app .project-tree-state:not(.logos-error-note) {
+  color: var(--text-muted);
 }
 
 /* === UNIFIED BUTTON CONTRACT === */
-/* Общие цвета кнопок вне .logos-pro-app (окна, добавленные в body). :where() даёт нулевую специфичность,
-   поэтому любое более конкретное правило (.header-btn, .settings-btn-accent) по-прежнему выигрывает. */
+/* Общие цвета кнопок, в том числе вне .logos-pro-app (окна, добавленные в body). :where() даёт нулевую
+   специфичность, поэтому любое более конкретное правило (.header-btn, .settings-btn-accent) по-прежнему выигрывает.
+   Default = secondary: a raised surface with a hairline; primary = flat gold; danger = red text on no fill. */
 :where(.logos-btn) {
-  background: var(--btn-bg);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+}
+:where(.logos-btn:hover:not(:disabled, [aria-disabled="true"])) {
+  background: var(--surface-3);
+}
+.settings-btn-accent,
+.settings-btn-success,
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
+  font-weight: 600;
+}
+.settings-btn-accent:hover:not(:disabled),
+.settings-btn-success:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.settings-btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: transparent;
+}
+.settings-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 .logos-pro-app .logos-btn {
   box-sizing: border-box;
-  border: 1px solid transparent;
   font-family: inherit;
   line-height: 1;
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.logos-pro-app .logos-btn:focus-visible {
-  outline: 2px solid var(--accent);
+/* The focus ring is the shared gold ring; the transparent outline still shows in Windows forced colours. */
+.logos-btn:focus-visible {
+  outline: 2px solid transparent;
   outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
 .logos-pro-app .logos-btn:disabled,
 .logos-pro-app .logos-btn[aria-disabled="true"] {
@@ -1670,58 +2441,27 @@ body {
 .logos-pro-app .logos-btn:active:not(:disabled) {
   transform: translateY(1px);
 }
-.logos-pro-app .header-btn.logos-btn {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.2);
-  color: var(--text-header);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 44px;
-}
-.logos-pro-app .header-btn.logos-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-@media (max-width: 768px) {
-  .logos-pro-app .header-btn.logos-btn {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-    min-height: 44px;
-    flex-basis: 44px;
-  }
-}
 
 /* === SYSTEM STATUS MODULE === */
+/* The header mark is muted like the other icons while all is well; a problem colours it. */
 .logos-pro-app #system-status-btn {
   position: relative;
   font-size: 18px;
 }
-.logos-pro-app #system-status-btn[data-state="ready"] {
-  color: var(--text-header);
-}
-.logos-pro-app #system-status-btn[data-state="running"],
-.logos-pro-app #system-status-btn[data-state="waiting"] {
-  color: var(--text-header);
-}
 .logos-pro-app #system-status-btn[data-state="degraded"] {
-  color: var(--text-header);
+  color: var(--warning);
 }
 .logos-pro-app #system-status-btn[data-state="blocked"],
 .logos-pro-app #system-status-btn[data-state="revoked"],
 .logos-pro-app #system-status-btn[data-state="error"] {
-  color: var(--text-header);
+  color: var(--danger);
 }
 
+/* system_status.js sets --status-panel-top to the header's real bottom edge, so the dimmed layer never covers (and
+   swallows taps on) a wrapped header row. */
 .logos-pro-app .logos-system-status-panel {
   position: fixed;
-  inset: var(--header-h) 0 0 0;
+  inset: var(--status-panel-top, var(--header-h)) 0 0 0;
   z-index: 100020;
   display: flex;
   align-items: flex-start;
@@ -1733,16 +2473,18 @@ body {
   display: none;
 }
 
+/* The popover wears the modal shell: same surface, edge, radius and shadow. */
 .logos-pro-app .logos-system-status-content {
   width: min(360px, 100%);
-  max-height: calc(100dvh - 92px);
+  /* The panel's own height: it already ends at the screen's bottom edge, whatever the header's height. */
+  max-height: 100%;
   overflow-y: auto;
   padding: 16px;
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  background: var(--bg-sidebar);
-  color: var(--text-main);
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.24);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-modal);
+  background: var(--surface-1);
+  color: var(--text);
+  box-shadow: var(--shadow-modal);
 }
 .logos-pro-app .logos-system-status-header {
   display: flex;
@@ -1759,9 +2501,6 @@ body {
   width: 44px;
   height: 44px;
   padding: 0;
-  border-radius: 8px;
-  background: var(--btn-bg);
-  color: var(--text-main);
 }
 .logos-pro-app .logos-system-status-list {
   display: flex;
@@ -1774,9 +2513,9 @@ body {
   align-items: center;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--bg-app);
+  background: var(--surface-2);
 }
 .logos-pro-app .logos-system-status-row[data-status="error"],
 .logos-pro-app .logos-system-status-row[data-status="revoked"],
@@ -1788,19 +2527,17 @@ body {
   line-height: 1;
 }
 .logos-pro-app .logos-system-status-row[data-status="ready"] .logos-system-status-indicator {
-  color: #34c759;
+  color: var(--success);
 }
 .logos-pro-app .logos-system-status-row[data-status="running"] .logos-system-status-indicator,
-.logos-pro-app .logos-system-status-row[data-status="waiting"] .logos-system-status-indicator {
-  color: #ffcc00;
-}
+.logos-pro-app .logos-system-status-row[data-status="waiting"] .logos-system-status-indicator,
 .logos-pro-app .logos-system-status-row[data-status="degraded"] .logos-system-status-indicator {
-  color: #ff9500;
+  color: var(--warning);
 }
 .logos-pro-app .logos-system-status-row[data-status="error"] .logos-system-status-indicator,
 .logos-pro-app .logos-system-status-row[data-status="revoked"] .logos-system-status-indicator,
 .logos-pro-app .logos-system-status-row[data-status="blocked"] .logos-system-status-indicator {
-  color: #ff3b30;
+  color: var(--danger);
 }
 .logos-pro-app .logos-system-status-text {
   min-width: 0;
@@ -1818,27 +2555,8 @@ body {
 }
 .logos-pro-app .logos-system-status-revoke {
   padding: 6px 8px;
-  border-radius: 7px;
-  background: var(--btn-bg);
-  color: var(--text-main);
+  border-radius: 8px;
   font-size: 12px;
-}
-
-.logos-pro-app .file-manager-vs-create-btn,
-.logos-pro-app .file-manager-vs-refresh-btn {
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-.logos-pro-app .file-manager-vs-create-btn {
-  border: 0;
-  background: var(--m-accent, #4a90d9);
-  color: #fff;
-}
-.logos-pro-app .file-manager-vs-refresh-btn {
-  border: 1px solid var(--m-border, #ddd);
-  background: var(--m-card, #fff);
-  color: var(--m-text, #222);
 }
 
 .logos-pro-app .execution-surface {
@@ -1873,41 +2591,62 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* Кнопки окон настроек и основная кнопка (пункты 40, 90) */
-.settings-btn-accent {
-  background: var(--accent-strong);
-  color: #fff;
-}
-.settings-btn-danger {
-  background: var(--danger-strong);
-  color: #fff;
-}
-.settings-btn-success {
-  background: #1e7e34;
-  color: #fff;
-}
+/* Кнопки окон настроек и основная кнопка (пункты 40, 90); их цвета задаёт UNIFIED BUTTON CONTRACT. */
 .settings-contract-btn {
   background: transparent;
-  border: 1px solid var(--control-border);
+  border: 1px solid var(--border-strong);
 }
 .btn-primary {
-  background: var(--accent-strong);
-  color: #fff;
-  border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   min-height: 44px;
   padding: 0 16px;
 }
 
-/* Вкладки окна LLM-настроек: состояние задаётся классом, а не инлайн-стилями (пункты 25, 39). */
+/* Window titles: plain text in the UI font, 17px/600, with one 12px gap under them (the emoji are gone from the
+   titles). :where() keeps this at zero specificity and reaches windows appended to <body> as well. */
+:where(.modal-content > .modal-title, .settings-modal-heading > .modal-title, #model-modal-title, #memoryModalTitle) {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: normal;
+}
+
+/* Вкладки окна LLM-настроек: состояние задаётся классом, а не инлайн-стилями (пункты 25, 39).
+   One row of tabs; a row wider than the window scrolls sideways with no visible bar, so no tab drops to a second
+   row. A tab is marked by its gold underline only, never by a box. */
+.logos-pro-app .llm-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.logos-pro-app .llm-tabs::-webkit-scrollbar {
+  display: none;
+}
 .logos-pro-app .llm-tab-btn {
-  color: var(--m-muted, var(--text-secondary));
+  color: var(--text-muted);
+  border: 1px solid transparent;
   border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
   font-weight: normal;
   flex: 0 0 auto;
   min-height: 44px;
-  padding: 0 14px;
+  padding: 0 12px;
   white-space: nowrap;
+}
+.logos-pro-app .llm-tab-btn:hover:not(.active) {
+  color: var(--text);
+}
+/* The scroll box would clip an outer ring, so a focused tab is ringed inside. */
+.logos-pro-app .llm-tab-btn:focus-visible {
+  box-shadow: inset var(--focus-ring);
 }
 .logos-pro-app #set-close-btn {
   min-width: 44px;
@@ -1916,7 +2655,7 @@ body {
   font-size: 24px;
 }
 .logos-pro-app .llm-tab-btn.active {
-  color: var(--text-main);
+  color: var(--text);
   border-bottom-color: var(--accent);
   font-weight: 600;
 }
@@ -1927,34 +2666,19 @@ body {
   top: 0;
   z-index: 1;
   padding-bottom: 14px;
-  background: var(--m-bg, #fff);
+  background: var(--surface-1);
 }
 
-/* Высокий контраст: контуры кнопок и ховер диалога (пункт 52) */
-[data-theme="high-contrast"] .logos-btn {
-  border: 2px solid #000;
-}
-/* Icon-only buttons are identified by their glyph; a box around each one only adds noise. */
-[data-theme="high-contrast"] .logos-btn.copy-btn,
-[data-theme="high-contrast"] .logos-btn.delete-btn {
-  border-color: transparent;
-}
-/* Settings tabs are marked by their underline, not by a box around every label. */
-[data-theme="high-contrast"] .logos-btn.llm-tab-btn {
-  border-width: 0 0 2px;
-  border-color: transparent;
-}
-[data-theme="high-contrast"] .logos-btn.llm-tab-btn.active {
-  border-bottom-color: var(--accent);
-}
-[data-theme="high-contrast"] .conv-item:hover {
-  outline: 2px solid #000;
-}
+/* Высокий контраст (пункт 52): the theme's border tokens are the text colour, so every outlined button already
+   shows a black edge; icon-only buttons (copy, delete, rename, trace) and the tabs keep no box, as before. The
+   dialog rows' edge is in the Sidebar section. */
 
-/* Кнопка загрузки файлов получает фокус с клавиатуры (пункт 77) */
+/* Кнопка загрузки файлов получает фокус с клавиатуры (пункт 77): the shared gold ring; the transparent outline
+   still shows in Windows forced colours. */
 #file-upload:focus-visible + label {
-  outline: 2px solid var(--accent);
+  outline: 2px solid transparent;
   outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
 
 /* Пузыри и markdown (пункты 3-5, 13-15, 18-19, 35) */
@@ -2014,38 +2738,12 @@ body {
   width: 100%;
 }
 
-/* Шапка, сайдбар и безопасные зоны (пункты 54, 55, 57, 59, 60) */
+/* Шапка, сайдбар и безопасные зоны (пункты 54, 55, 57, 59, 60). The header's own safe-area padding is in the
+   header section; this is its two-row height (10 + 44 + 6 + 44 + 10 + 1), where the status popover starts. */
 :root {
-  --header-h: 108px;
-}
-@media (max-width: 768px) {
-  :root {
-    --header-h: 102px;
-  }
-}
-.logos-pro-app #header {
-  padding-left: max(15px, env(safe-area-inset-left, 0px));
-  padding-right: max(15px, env(safe-area-inset-right, 0px));
-}
-.logos-pro-app #chatbox {
-  padding-left: max(15px, env(safe-area-inset-left, 0px));
-  padding-right: max(15px, env(safe-area-inset-right, 0px));
-}
-.logos-pro-app #text-ui {
-  padding-left: max(10px, env(safe-area-inset-left, 0px));
-  padding-right: max(10px, env(safe-area-inset-right, 0px));
-}
-.logos-pro-app #sidebar-header {
-  padding-top: max(14px, env(safe-area-inset-top, 0px));
-}
-.logos-pro-app #close-sidebar-btn {
-  min-width: 44px;
-  min-height: 44px;
+  --header-h: 115px;
 }
 /* Размеры подписей кнопок, которые перебивались общим правилом (пункт 54) */
-.logos-pro-app #header .header-btn {
-  font-size: 20px;
-}
 .logos-pro-app .logos-trace-open-viewer {
   font-size: 12px;
 }
@@ -2090,40 +2788,27 @@ body {
   flex-direction: column;
   gap: 6px;
 }
+/* «Повторить» is a secondary button: raised surface, hairline edge, 44px tall. */
 .logos-pro-app .model-option-retry {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: var(--bg-input);
-  color: var(--text-main);
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
 }
-/* Пустое состояние: одно оформление для всех мест (пункт 17) */
-.logos-pro-app .empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 32px;
-  text-align: center;
+.logos-pro-app .model-option-retry:hover:not(:disabled) {
+  background: var(--surface-3);
 }
-/* Название диалога обрезается многоточием (пункт 22) */
-.logos-pro-app .conv-link {
-  display: flex;
-  min-width: 0;
-}
-.logos-pro-app .conv-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* Пустое состояние (пункт 17): one look for every place, defined once next to #chatbox. */
 /* Наведение на кнопки окружений (пункт 76) */
-.logos-pro-app .environments-create button:hover,
+.logos-pro-app .environments-create button:not(.btn-primary):hover,
 .logos-pro-app .environments-refresh:hover,
-.logos-pro-app .environment-card-actions button:hover,
+.logos-pro-app .environment-card-actions button:not(.environment-delete):hover,
 .logos-pro-app .environment-card-actions a:hover {
-  background: var(--bg-hover);
+  background: var(--surface-3);
 }
 /* Нет движения для тех, кто его отключил в системе (пункт 98) */
 
@@ -2135,6 +2820,7 @@ body {
   font-size: 12px;
   line-height: 1.4;
   overflow-wrap: anywhere;
+  opacity: 0.6;
 }
 .logos-pro-app .app-version[data-update-state="pending"],
 .logos-pro-app .app-version[data-update-state="unknown"] {
@@ -2150,23 +2836,8 @@ body {
 .image-preview-progress { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; line-height: 14px; text-align: center; color: #fff; background: rgba(0, 0, 0, 0.55); border-radius: 0 0 6px 6px; pointer-events: none; }
 .image-preview-item button { position: absolute; top: -6px; right: -6px; border: 0; border-radius: 50%; width: 20px; height: 20px; line-height: 18px; padding: 0; cursor: pointer; }
 
-/* Attach button matches the input and send button height (visual fix) */
-/* The photo button is shown only for a model that reads photos */
+/* The photo button is shown only for a model that reads photos (its look is in the composer section). */
 .logos-pro-app:not(.logos-model-multimodal) #attach-btn { display: none; }
-
-.logos-pro-app #attach-btn {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  padding: 0;
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--control-border);
-  border-radius: 22px;
-  background: var(--bg-input);
-}
 
 /* Settings dialog: one height for every tab, so switching tabs does not move the dialog.
    The status line and the buttons stay at the bottom (margin-top:auto in settings_modal.js). */
@@ -2177,9 +2848,9 @@ body {
 .logos-pro-app .settings-modal-footer .logos-btn {
   min-height: 44px;
   padding: 0 16px;
-  border-radius: 8px;
+  border-radius: 10px;
 }
-/* The three dialog close buttons look the same: a 44px square with the glyph and no outline. */
+/* The dialog close buttons look the same as .modal-close: a clear 44px square with the glyph, raised on hover. */
 .logos-pro-app #close-modal,
 .logos-pro-app #set-close-btn,
 .logos-pro-app button.logos-system-status-close {
@@ -2188,12 +2859,22 @@ body {
   min-width: 44px;
   min-height: 44px;
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
-  border-radius: 8px;
-  background: var(--btn-bg);
-  color: var(--text-main);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
   font-size: 24px;
   line-height: 1;
+  cursor: pointer;
+}
+.logos-pro-app #close-modal:hover,
+.logos-pro-app #set-close-btn:hover,
+.logos-pro-app button.logos-system-status-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 /* The model picker scrolls as a whole; its close button stays at the top like .modal-close. */
 .logos-pro-app #close-modal {
@@ -2208,11 +2889,6 @@ body {
 .logos-pro-app .logos-trace-open-viewer {
   min-height: 44px;
   padding: 0 8px;
-}
-/* Rename and the trace action are identified by their glyph or label, like copy and delete. */
-[data-theme="high-contrast"] .logos-btn.rename-btn,
-[data-theme="high-contrast"] .logos-btn.logos-trace-open-viewer {
-  border-color: transparent;
 }
 /* A failed stage is marked in colour as well as by its glyph. */
 .logos-pro-app .execution-surface-stages li[data-status="error"] {
@@ -2230,18 +2906,11 @@ body {
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
+/* The field's look is the shared text field; 16px text keeps a phone from zooming in on focus. */
 .logos-pro-app .logos-dialog-input {
   display: block;
   width: 100%;
-  box-sizing: border-box;
-  min-height: 44px;
   margin: 0 0 16px;
-  padding: 8px 10px;
-  border: 1px solid var(--control-border);
-  border-radius: 8px;
-  background: var(--bg-input);
-  color: var(--text-main);
-  font: inherit;
   font-size: 16px;
 }
 .logos-pro-app .logos-dialog-actions {
@@ -2254,7 +2923,7 @@ body {
   min-width: 44px;
   min-height: 44px;
   padding: 0 16px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 15px;
 }
 
@@ -2288,14 +2957,6 @@ body {
   cursor: pointer;
 }
 
-/* Phone width: the second button row wraps instead of scrolling sideways, so every button is visible (#1718). */
-@media (max-width: 768px) {
-  .logos-pro-app #header .header-row-secondary {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
-}
-
 /* Court: the judge's word (source court) wears a rainbow frame and rainbow text, the user's words carry a side
    mark, and the proofs the court names are marked. The frame is the bubble's own border; the text is one gradient
    across the whole bubble, clipped to the glyphs, in shades that stay readable on the theme's bubble. */
@@ -2313,7 +2974,10 @@ body {
     linear-gradient(var(--bg-bubble-bot), var(--bg-bubble-bot)) padding-box,
     var(--court-rainbow-frame) border-box;
 }
-.logos-pro-app .msg.msg-court .bubble {
+/* The #chatbox selector outranks the plain answer's "background: none" in the Messages section below, which
+   otherwise removed the gradient and left the transparent glyphs invisible. */
+.logos-pro-app .msg.msg-court .bubble,
+.logos-pro-app #chatbox > .msg.bot.msg-court > .bubble {
   background: var(--court-rainbow-text);
   -webkit-background-clip: text;
   background-clip: text;
@@ -2328,7 +2992,7 @@ body {
   -webkit-text-fill-color: currentColor;
 }
 .logos-pro-app .msg.user .bubble {
-  border-left: 3px solid #4aa3ff;
+  border-left: 3px solid var(--border-strong);
   padding-left: 8px;
 }
 .logos-pro-app .msg-proof {
@@ -2338,328 +3002,30 @@ body {
   padding: 0 2px;
 }
 
-/* Visual polish: header as one raised bar, calmer buttons, a real empty screen, a floating composer. */
-.logos-pro-app #header {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-header) 92%, #fff 8%), var(--bg-header));
-  border-bottom: 1px solid var(--border-color);
-  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.28);
-  position: relative;
-  z-index: 2;
-}
-.logos-pro-app #header .header-btn.logos-btn,
-.logos-pro-app #header a.header-btn {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
-  flex: 0 0 40px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.07);
-  font-size: 19px;
-  transition:
-    background 0.15s ease,
-    transform 0.15s ease,
-    border-color 0.15s ease;
-}
-.logos-pro-app #header .header-btn.logos-btn:hover,
-.logos-pro-app #header a.header-btn:hover {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  transform: translateY(-1px);
-}
-.logos-pro-app #header .header-row-secondary {
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-}
-.logos-pro-app #header .header-row-primary {
-  gap: 8px;
-}
-.logos-pro-app #header .header-brand {
-  margin-left: auto;
-  padding-right: 4px;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.logos-pro-app #header .header-brand::before {
-  content: "Λ";
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  color: #fff;
-  background: linear-gradient(135deg, #0a84ff, #7c4dff);
-}
-.logos-pro-app .empty-state .empty-mark {
-  width: 72px;
-  height: 72px;
-  border-radius: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 38px;
-  font-weight: 700;
-  color: #fff;
-  background: linear-gradient(135deg, #0a84ff, #7c4dff);
-  box-shadow: 0 10px 30px rgba(10, 132, 255, 0.35);
-  margin-bottom: 8px;
-}
-.logos-pro-app .empty-state .empty-title {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: var(--text-main);
-}
-.logos-pro-app .empty-state .empty-sub {
-  font-size: 15px;
-  color: var(--text-secondary);
-}
-.logos-pro-app #chatbox {
-  background: radial-gradient(ellipse at 50% 0%, var(--accent-soft), transparent 60%), var(--bg-app);
-}
-.logos-pro-app #text-ui {
-  border-top: 1px solid var(--border-color);
-  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.18);
-}
-.logos-pro-app #msg-input {
-  border-radius: 22px;
-  background: var(--bg-app);
-  border-color: var(--border-color);
-}
-.logos-pro-app #send-btn {
-  background: linear-gradient(135deg, #0a84ff, #0062cc);
-  box-shadow: 0 4px 12px rgba(10, 132, 255, 0.4);
-}
-.logos-pro-app .app-version {
-  opacity: 0.6;
-}
-
-/* Luxury pass: obsidian surfaces, hairline borders, champagne-gold accent, serif wordmark. */
-:root {
-  --lux-gold: #d9b877;
-  --lux-gold-deep: #a8802f;
-  --lux-gold-grad: linear-gradient(135deg, #f3dfae 0%, #d9b877 45%, #a8802f 100%);
-  --lux-serif: "Cormorant Garamond", "Playfair Display", Georgia, "Times New Roman", serif;
-  --lux-hair: rgba(217, 184, 119, 0.28);
-}
-[data-theme="dark"] {
-  --bg-app: #07080b;
-  --bg-sidebar: #0c0e13;
-  --bg-header: #0c0e13;
-  --bg-input: #0f1218;
-  --bg-bubble-bot: #12151c;
-  --bg-bubble-user: #1a2236;
-  --border-color: #232734;
-  --btn-bg: #151922;
-  --bg-hover: #171b25;
-  --text-secondary: #8d93a2;
-  --accent: #d9b877;
-  --accent-text: #e6c98f;
-  --accent-soft: rgba(217, 184, 119, 0.14);
-}
-.logos-pro-app {
-  font-family: Inter, "SF Pro Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  letter-spacing: 0.005em;
-}
-.logos-pro-app #header {
-  background: linear-gradient(180deg, rgba(22, 25, 33, 0.92), rgba(10, 12, 17, 0.96));
-  backdrop-filter: blur(18px) saturate(1.3);
-  border-bottom: 1px solid transparent;
-  border-image: linear-gradient(90deg, transparent, var(--lux-hair), transparent) 1;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
-}
-.logos-pro-app #header .header-btn.logos-btn,
-.logos-pro-app #header a.header-btn {
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-.logos-pro-app #header .header-btn.logos-btn:hover,
-.logos-pro-app #header a.header-btn:hover {
-  background: rgba(217, 184, 119, 0.1);
-  border-color: var(--lux-hair);
-  box-shadow:
-    0 0 0 3px rgba(217, 184, 119, 0.08),
-    0 8px 20px rgba(0, 0, 0, 0.45);
-}
-.logos-pro-app #header .header-row-secondary {
-  border-top: 1px solid transparent;
-  border-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.09), transparent) 1;
-}
-.logos-pro-app #header .header-brand {
-  font-family: var(--lux-serif);
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  background: var(--lux-gold-grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.logos-pro-app #header .header-brand::before {
-  font-family: var(--lux-serif);
-  font-weight: 700;
-  font-size: 17px;
-  color: #1a1305;
-  -webkit-text-fill-color: #1a1305;
-  background: var(--lux-gold-grad);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.25) inset,
-    0 4px 14px rgba(217, 184, 119, 0.35);
-}
-.logos-pro-app #chatbox {
-  background:
-    radial-gradient(ellipse at 50% -10%, rgba(217, 184, 119, 0.12), transparent 55%),
-    radial-gradient(ellipse at 50% 110%, rgba(80, 100, 160, 0.08), transparent 55%), var(--bg-app);
-}
-.logos-pro-app .empty-state .empty-mark {
-  width: 84px;
-  height: 84px;
-  border-radius: 26px;
-  font-family: var(--lux-serif);
-  font-size: 46px;
-  font-weight: 600;
-  background:
-    linear-gradient(145deg, #1a1d26, #0b0d12) padding-box, var(--lux-gold-grad) border-box;
-  border: 1.5px solid transparent;
-  color: transparent;
-  -webkit-background-clip: padding-box, border-box;
-  position: relative;
-  box-shadow:
-    0 0 60px rgba(217, 184, 119, 0.22),
-    0 18px 40px rgba(0, 0, 0, 0.6);
-  margin-bottom: 18px;
-}
-.logos-pro-app .empty-state .empty-mark::after {
-  content: "Λ";
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--lux-gold-grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.logos-pro-app .empty-state .empty-title {
-  font-family: var(--lux-serif);
-  font-size: 30px;
-  font-weight: 500;
-  letter-spacing: 0.34em;
-  text-transform: uppercase;
-  padding-left: 0.34em;
-}
-.logos-pro-app .empty-state .empty-title::after {
-  content: "";
-  display: block;
-  width: 56px;
-  height: 1px;
-  margin: 14px auto 0;
-  background: linear-gradient(90deg, transparent, var(--lux-gold), transparent);
-}
-.logos-pro-app .empty-state .empty-sub {
-  margin-top: 6px;
-  font-size: 13px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-.logos-pro-app #text-ui {
-  background: linear-gradient(0deg, rgba(8, 9, 13, 0.98), rgba(8, 9, 13, 0.8));
-  backdrop-filter: blur(14px);
-  border-top: 1px solid transparent;
-  border-image: linear-gradient(90deg, transparent, var(--lux-hair), transparent) 1;
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
-}
-.logos-pro-app #msg-input {
-  background: #0d1016;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: inset 0 1px 6px rgba(0, 0, 0, 0.5);
-}
-.logos-pro-app #msg-input:focus-visible {
-  border-color: var(--lux-hair);
-  box-shadow:
-    inset 0 1px 6px rgba(0, 0, 0, 0.5),
-    0 0 0 3px rgba(217, 184, 119, 0.14);
-}
-.logos-pro-app #send-btn {
-  background: var(--lux-gold-grad);
-  color: #1a1305;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.3) inset,
-    0 6px 18px rgba(217, 184, 119, 0.35);
-}
-.logos-pro-app #new-chat-btn {
-  background: var(--lux-gold-grad);
-  color: #1a1305;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  border: none;
-  box-shadow: 0 6px 18px rgba(217, 184, 119, 0.25);
-}
-.logos-pro-app #sidebar {
-  border-right: 1px solid rgba(217, 184, 119, 0.14);
-  box-shadow: 18px 0 60px rgba(0, 0, 0, 0.6);
-}
-.logos-pro-app .msg .bubble {
-  border-radius: 16px;
-}
-.logos-pro-app .msg.user .bubble {
-  border-left: 2px solid var(--lux-gold);
-}
-.logos-pro-app *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-.logos-pro-app *::-webkit-scrollbar-thumb {
-  background: rgba(217, 184, 119, 0.25);
-  border-radius: 8px;
-}
-.logos-pro-app *::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* Line icons: one gold-gradient set drawn with masks, so the emoji stay only as text fallback. */
-.logos-pro-app #header .header-btn:not(#system-status-btn):not(.donate-btn),
+/* Line icons: one monochrome set drawn with masks in the button's own text colour, so a tile's muted, hover and
+   open colours colour its icon too; the emoji stay only as text fallback (font-size 0 hides them). The sidebar's
+   close, rename and delete icons are drawn the same way in the Sidebar section. */
+.logos-pro-app #header .header-btn:not(#system-status-btn),
 .logos-pro-app #attach-btn,
 .logos-pro-app #mic-btn,
-.logos-pro-app #send-btn,
-.logos-pro-app #close-sidebar-btn,
-.logos-pro-app .rename-btn,
-.logos-pro-app .delete-btn {
+.logos-pro-app #send-btn {
   font-size: 0 !important;
-  color: transparent !important;
   position: relative;
 }
-.logos-pro-app #header .header-btn:not(#system-status-btn):not(.donate-btn)::before,
+.logos-pro-app #header .header-btn:not(#system-status-btn)::before,
 .logos-pro-app #attach-btn::before,
 .logos-pro-app #mic-btn::before,
-.logos-pro-app #send-btn::before,
-.logos-pro-app #close-sidebar-btn::before,
-.logos-pro-app .rename-btn::before,
-.logos-pro-app .delete-btn::before {
+.logos-pro-app #send-btn::before {
   content: "";
-  width: 22px;
-  height: 22px;
-  background: var(--ico-bg, var(--lux-gold-grad));
+  flex: none;
+  width: 20px;
+  height: 20px;
+  background-color: currentColor;
   -webkit-mask: var(--ico) center / contain no-repeat;
   mask: var(--ico) center / contain no-repeat;
-  transition: transform 0.15s ease, filter 0.15s ease;
 }
-.logos-pro-app #header .header-btn:hover::before { transform: scale(1.1); filter: drop-shadow(0 0 6px rgba(217, 184, 119, 0.55)); }
-.logos-pro-app .rename-btn::before, .logos-pro-app .delete-btn::before { width: 15px; height: 15px; }
-.logos-pro-app #send-btn::before { background: #1a1305; width: 20px; height: 20px; }
+.logos-pro-app #send-btn::before { width: 18px; height: 18px; }
+.logos-pro-app #mic-btn::before { width: 28px; height: 28px; }
 .logos-pro-app #menu-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M4 7h16M4 12h16M4 17h16'/></svg>");}
 .logos-pro-app #model-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><rect x='6' y='6' width='12' height='12' rx='2'/><path d='M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4'/></svg>");}
 .logos-pro-app #tools-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.2-.5-.5-2.2z'/></svg>");}
@@ -2679,168 +3045,21 @@ body {
 .logos-pro-app #provider-credentials-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='8' cy='15' r='4'/><path d='M10.8 12.2 20 3M16 7l3 3M14 9l2 2'/></svg>");}
 .logos-pro-app #memory-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><ellipse cx='12' cy='5' rx='8' ry='3'/><path d='M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3'/></svg>");}
 .logos-pro-app #theme-toggle{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M12 3a9 9 0 0 1 0 18z' fill='black'/></svg>");}
+/* The donate tile wears the same line heart as its neighbours; its coloured img stays in the markup for no-CSS. */
+.logos-pro-app #donate-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M12 20s-7-4.4-8.8-8.6C1.9 8.3 3.8 5 7 5c2 0 3.3 1 4.1 2.3h1.8C13.7 6 15 5 17 5c3.2 0 5.1 3.3 3.8 6.4C19 15.6 12 20 12 20z'/></svg>");}
+.logos-pro-app #header .donate-btn img { display: none; }
 .logos-pro-app #attach-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='16' rx='2'/><circle cx='9' cy='10' r='1.5'/><path d='M21 15l-4.5-4.5L8 19'/></svg>");}
 .logos-pro-app #mic-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><rect x='9' y='3' width='6' height='11' rx='3'/><path d='M5 11a7 7 0 0 0 14 0M12 18v3'/></svg>");}
 .logos-pro-app #mic-btn.recording{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><rect x='6' y='6' width='12' height='12' rx='2' fill='black'/></svg>");}
-.logos-pro-app #send-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M4 12 20 4l-6 16-3-7z'/><path d='M11 13l9-9'/></svg>");}
+.logos-pro-app #send-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 19V5M5.5 11.5 12 5l6.5 6.5'/></svg>");}
 .logos-pro-app #send-btn.is-stop{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><rect x='6' y='6' width='12' height='12' rx='2' fill='black'/></svg>");}
-.logos-pro-app #close-sidebar-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M6 6l12 12M18 6 6 18'/></svg>");}
-.logos-pro-app .rename-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19zM14 7l3 3'/></svg>");}
-.logos-pro-app .delete-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M6 6l12 12M18 6 6 18'/></svg>");}
-
-/* Composer: one floating capsule, the field sits inside it with the send button, no separate bar. */
-.logos-pro-app #text-ui {
-  margin: 6px max(12px, env(safe-area-inset-left, 0px)) calc(12px + env(safe-area-inset-bottom, 0px));
-  padding: 6px 6px 6px 8px;
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
-  border: 1px solid transparent;
-  border-image: none;
-  border-radius: 30px;
-  background:
-    linear-gradient(180deg, #121620, #0b0d12) padding-box,
-    linear-gradient(135deg, rgba(217, 184, 119, 0.55), rgba(255, 255, 255, 0.06) 40%, rgba(217, 184, 119, 0.25)) border-box;
-  backdrop-filter: none;
-  box-shadow:
-    0 14px 40px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(0, 0, 0, 0.4);
-  transition: box-shadow 0.2s ease;
-}
-.logos-pro-app #text-ui:focus-within {
-  box-shadow:
-    0 14px 40px rgba(0, 0, 0, 0.6),
-    0 0 0 4px rgba(217, 184, 119, 0.14),
-    0 0 28px rgba(217, 184, 119, 0.12);
-}
-.logos-pro-app #text-ui #image-previews:not([hidden]) {
-  flex: 1 1 100%;
-}
-.logos-pro-app #text-ui #msg-input {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 40px;
-  padding: 9px 10px;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  font-size: 16px;
-  line-height: 22px;
-  /* The composer capsule is dark in every theme, so its text is light in every theme:
-     the theme's --text-main is near-black in the light themes and was invisible here. */
-  color: #f5f5f7;
-  caret-color: #f5f5f7;
-}
-.logos-pro-app #text-ui #msg-input::placeholder {
-  color: #a3adc8;
-  opacity: 0.85;
-}
-.logos-pro-app #text-ui #msg-input:focus-visible {
-  border: none;
-  box-shadow: none;
-}
-.logos-pro-app #text-ui #send-btn {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  border-radius: 50%;
-  border: none;
-  background: var(--lux-gold-grad);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    0 4px 14px rgba(217, 184, 119, 0.35);
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease,
-    filter 0.15s ease;
-}
-.logos-pro-app #text-ui #send-btn:hover:not(:disabled) {
-  transform: translateY(-1px) scale(1.05);
-  filter: brightness(1.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    0 8px 22px rgba(217, 184, 119, 0.5);
-}
-.logos-pro-app #text-ui #send-btn:disabled {
-  opacity: 0.45;
-  filter: saturate(0.5);
-}
-.logos-pro-app #text-ui #attach-btn {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-/* Each icon has its own colour; the tile carries a faint tint of it. */
-.logos-pro-app #menu-btn{--c1:#e5e9f5;--c2:#a3adc8;--ico-bg:linear-gradient(135deg,#e5e9f5,#a3adc8);}
-.logos-pro-app #model-btn{--c1:#b9a4ff;--c2:#6f6cf5;--ico-bg:linear-gradient(135deg,#b9a4ff,#6f6cf5);}
-.logos-pro-app #tools-btn{--c1:#ffb067;--c2:#f4476b;--ico-bg:linear-gradient(135deg,#ffb067,#f4476b);}
-.logos-pro-app #ssh-runtime-btn{--c1:#7df0a0;--c2:#22c55e;--ico-bg:linear-gradient(135deg,#7df0a0,#22c55e);}
-.logos-pro-app #environments-btn{--c1:#5eead4;--c2:#14b8a6;--ico-bg:linear-gradient(135deg,#5eead4,#14b8a6);}
-.logos-pro-app #mcp-btn{--c1:#6dd0ff;--c2:#3b82f6;--ico-bg:linear-gradient(135deg,#6dd0ff,#3b82f6);}
-.logos-pro-app #settings-btn{--c1:#ffd166;--c2:#f59e0b;--ico-bg:linear-gradient(135deg,#ffd166,#f59e0b);}
-.logos-pro-app #file-manager-btn{--c1:#ffe27a;--c2:#f5a30b;--ico-bg:linear-gradient(135deg,#ffe27a,#f5a30b);}
-.logos-pro-app #treasury-btn{--c1:#4ade80;--c2:#0fb981;--ico-bg:linear-gradient(135deg,#4ade80,#0fb981);}
-.logos-pro-app #dozzle-btn{--c1:#7cb8ff;--c2:#06c2d9;--ico-bg:linear-gradient(135deg,#7cb8ff,#06c2d9);}
-.logos-pro-app #rdc-btn{--c1:#67e8f9;--c2:#8b5cf6;--ico-bg:linear-gradient(135deg,#67e8f9,#8b5cf6);}
-.logos-pro-app #project-tree-btn{--c1:#bef264;--c2:#65c21d;--ico-bg:linear-gradient(135deg,#bef264,#65c21d);}
-.logos-pro-app #departments-btn{--c1:#9ba4ff;--c2:#5b4fe6;--ico-bg:linear-gradient(135deg,#9ba4ff,#5b4fe6);}
-.logos-pro-app button#court-btn{--c1:#f5b5ff;--c2:#c63bdc;--ico-bg:linear-gradient(135deg,#f5b5ff,#c63bdc);}
-.logos-pro-app a#court-btn{--c1:#ffe9a0;--c2:#e08a1e;--ico-bg:linear-gradient(135deg,#ffe9a0,#e08a1e);}
-.logos-pro-app #group-chat-btn{--c1:#ff8ac1;--c2:#ec4899;--ico-bg:linear-gradient(135deg,#ff8ac1,#ec4899);}
-.logos-pro-app #provider-credentials-btn{--c1:#ffc247;--c2:#f0541e;--ico-bg:linear-gradient(135deg,#ffc247,#f0541e);}
-.logos-pro-app #memory-btn{--c1:#d4a5ff;--c2:#9a3ff0;--ico-bg:linear-gradient(135deg,#d4a5ff,#9a3ff0);}
-.logos-pro-app #theme-toggle{--c1:#ffe66d;--c2:#ff8a3d;--ico-bg:linear-gradient(135deg,#ffe66d,#ff8a3d);}
-.logos-pro-app .rename-btn{--c1:#7cc4ff;--c2:#3b82f6;--ico-bg:linear-gradient(135deg,#7cc4ff,#3b82f6);}
-.logos-pro-app .delete-btn{--c1:#ff8f8f;--c2:#ef4444;--ico-bg:linear-gradient(135deg,#ff8f8f,#ef4444);}
-.logos-pro-app #mic-btn{--c1:#ff9a9a;--c2:#ef4444;--ico-bg:linear-gradient(135deg,#ff9a9a,#ef4444);}
-.logos-pro-app #attach-btn{--c1:#7cd8ff;--c2:#3b9cf0;--ico-bg:linear-gradient(135deg,#7cd8ff,#3b9cf0);}
-.logos-pro-app #close-sidebar-btn{--c1:#e5e9f5;--c2:#a3adc8;--ico-bg:linear-gradient(135deg,#e5e9f5,#a3adc8);}
-.logos-pro-app #header .header-btn:not(#system-status-btn):not(.donate-btn) {
-  background-image: linear-gradient(180deg, color-mix(in srgb, var(--c1) 20%, transparent), color-mix(in srgb, var(--c2) 7%, transparent)) !important;
-  border-color: color-mix(in srgb, var(--c1) 30%, transparent) !important;
-}
-.logos-pro-app #header .header-btn:not(#system-status-btn):not(.donate-btn):hover {
-  border-color: var(--c1) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c1) 16%, transparent), 0 8px 22px rgba(0, 0, 0, 0.5) !important;
-}
-.logos-pro-app #header .header-btn:not(#system-status-btn):not(.donate-btn):hover::before {
-  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--c1) 70%, transparent));
-}
-.logos-pro-app #system-status-btn {
-  color: #4ade80;
-  border-color: rgba(74, 222, 128, 0.35) !important;
-  background-image: linear-gradient(180deg, rgba(74, 222, 128, 0.2), rgba(74, 222, 128, 0.06)) !important;
-}
-.logos-pro-app #attach-btn,
-.logos-pro-app #mic-btn {
-  background-image: linear-gradient(180deg, color-mix(in srgb, var(--c1) 20%, transparent), color-mix(in srgb, var(--c2) 7%, transparent));
-}
-.logos-pro-app #text-ui {
-  background:
-    linear-gradient(180deg, #131824, #0b0d13) padding-box,
-    linear-gradient(135deg, #6dd0ff, #b9a4ff 35%, #ff8ac1 70%, #ffd166) border-box;
-}
-.logos-pro-app #text-ui:focus-within {
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(185, 164, 255, 0.16), 0 0 30px rgba(109, 208, 255, 0.14);
-}
 
 /* Messages (owner, 05.11.2026: "messages design are disgusting and awful"). One calm design over the
    earlier passes: the answer is text on the page, the question a soft bubble on the right, and the
-   time, copy and details sit in one quiet row under each message. No frames, glows or side stripes. */
-:root {
-  --msg-user-bg: var(--bg-bubble-user);
-  --msg-user-text: var(--text-bubble-user);
-}
-[data-theme="dark"] {
-  --msg-user-bg: #252d40;
-  --msg-user-text: #f2f4f8;
-}
+   time, copy and details sit in one quiet row under each message. No frames, glows or side stripes.
+   The question's bubble colour is --msg-user-bg from the theme blocks: a neutral surface in every theme. */
 .logos-pro-app #chatbox {
-  background: var(--bg-app);
+  background: var(--bg);
   gap: 22px;
   padding-top: 20px;
   padding-bottom: 28px;
@@ -2910,6 +3129,8 @@ body {
   border-radius: 20px 20px 6px 20px;
   background: var(--msg-user-bg);
   color: var(--msg-user-text);
+  /* Only the high-contrast theme draws this edge: its bubble is white on white. */
+  box-shadow: inset 0 0 0 1px var(--msg-user-border);
 }
 .logos-pro-app #chatbox > .msg.user > .msg-actions {
   grid-column: 1 / -1;
@@ -2929,7 +3150,7 @@ body {
   color: var(--danger-text);
 }
 
-/* The row under a message: time, copy, details. */
+/* The row under a message: time, copy, details, at 12px in --text-muted (4.5:1 or more in every theme). */
 .logos-pro-app #chatbox .msg-actions {
   position: static;
   display: inline-flex;
@@ -2940,7 +3161,7 @@ body {
 .logos-pro-app #chatbox .msg-time {
   padding: 0 4px;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -2958,21 +3179,41 @@ body {
   border-radius: 9px;
   background: transparent;
   box-shadow: none;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 .logos-pro-app #chatbox .msg .copy-btn:hover,
 .logos-pro-app #chatbox .msg .copy-btn:focus-visible {
   background: color-mix(in srgb, var(--text-main) 8%, transparent);
   color: var(--text-main);
 }
+/* The rules above clear the shadow, so the keyboard ring is put back here; later at equal specificity, it also shows
+   while hovered. */
+.logos-pro-app #chatbox .msg .copy-btn:focus-visible {
+  box-shadow: var(--focus-ring);
+}
 .logos-pro-app #chatbox .msg .copy-btn svg {
   width: 17px;
   height: 17px;
 }
+/* A finger gets the full 44px target; the mouse keeps the compact row. */
+@media (pointer: coarse) {
+  .logos-pro-app #chatbox .msg .copy-btn,
+  .logos-pro-app #chatbox .msg .copy-btn:hover {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .logos-pro-app #chatbox .msg-details-summary {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
 .logos-pro-app #chatbox > .msg > .msg-details {
   margin: 4px 0 0;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 .logos-pro-app #chatbox .msg-details-summary {
   display: inline-block;
@@ -3017,33 +3258,16 @@ body {
 .logos-pro-app #chatbox .msg .reasoning-details[open] > .reasoning-summary::after {
   transform: rotate(90deg);
 }
+/* A long chain of thought scrolls inside its own box instead of pushing the answer far down. */
 .logos-pro-app #chatbox .msg .reasoning-content {
   margin: 8px 0 0;
   padding: 0 0 0 12px;
-  border-left: 2px solid var(--border-color);
-  color: var(--text-secondary);
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-muted);
   font-size: 13.5px;
   opacity: 1;
-}
-
-/* A narrow phone keeps only the mark of the name, so the header never runs past the screen. */
-@media (max-width: 480px) {
-  .logos-pro-app #header .header-brand {
-    font-size: 0;
-    letter-spacing: 0;
-    gap: 0;
-    padding-right: 0;
-  }
-}
-
-/* The closed sidebar waits off the screen; its shadow fell on the chat's left edge as a dark band. */
-.logos-pro-app #sidebar:not(.open) {
-  box-shadow: none;
-}
-
-/* The header's heavy shadow darkened the first message under it; a soft one keeps the edge. */
-.logos-pro-app #header {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  max-height: 320px;
+  overflow: auto;
 }
 
 /* A tapped button whose script has not run yet answers the tap at once: static/core_api.js keeps the tap and runs it

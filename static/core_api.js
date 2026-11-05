@@ -581,6 +581,40 @@
   }
 
   var preparedModals = new WeakSet();
+  // Windows shown through openModal, oldest first: the last one still open is the top-most.
+  var shownModals = [];
+  var POINTER_DOWN = typeof window.PointerEvent === "function" ? "pointerdown" : "mousedown";
+
+  function forgetShownModal(modal) {
+    shownModals = shownModals.filter(function (item) {
+      return item !== modal && item.open && item.isConnected;
+    });
+  }
+
+  // Escape, a click on the backdrop and the close button take one path, the close button's action, so a window's own
+  // cleanup runs. A failing action still closes the window: its cancel event is already prevented by then, and the
+  // window would otherwise stay open.
+  function requestModalClose(modal, event) {
+    var button = modal.querySelector(".modal-close") ||
+      modal.querySelector('button[data-action="modal.close"]');
+    if (button && button.dataset.action) {
+      try {
+        dispatchAction(button.dataset.action, actionPayload(button, event), event);
+        return;
+      } catch (error) {
+        console.error("[UI MODAL]", error);
+      }
+    }
+    closeModal(modal);
+  }
+
+  // The text field in this window that has focus, or null. A phone hides its keyboard by a tap outside the field; on
+  // the backdrop that tap must not close the window and lose the typed text (🔑 wipes a pasted key on close).
+  var TEXT_FIELD = "input:not([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=file]), textarea";
+  function focusedTextField(modal) {
+    var field = document.activeElement;
+    return field && field !== modal && modal.contains(field) && field.matches(TEXT_FIELD) ? field : null;
+  }
 
   function prepareModal(modal) {
     if (!modal || modal.tagName !== "DIALOG" || !modal.classList.contains("modal") ||
@@ -589,20 +623,40 @@
     }
     if (preparedModals.has(modal)) return;
     preparedModals.add(modal);
-    // Escape follows the same action as the close button, including module cleanup.
     modal.addEventListener("cancel", function (event) {
       event.preventDefault();
-      var button = modal.querySelector(".modal-close") ||
-        modal.querySelector('button[data-action="modal.close"]');
-      if (button && button.dataset.action) {
-        dispatchAction(button.dataset.action, actionPayload(button, event), event);
-      } else {
-        closeModal(modal);
+      requestModalClose(modal, event);
+    });
+    // Every window fills the screen and the page behind it is inert, so a click outside the card lands on the window
+    // itself. It was dropped before: with 🤖 open, taps on 🧰 and 🔐 seen through the dimmed layer did nothing. Now it
+    // closes the window. A press that starts in the card and ends outside it (selecting text) is not such a click.
+    var pressedBackdrop = false;
+    // Read at the press: by the click the browser has already moved focus off the field.
+    var fieldAtPress = null;
+    modal.addEventListener(POINTER_DOWN, function (event) {
+      pressedBackdrop = event.target === modal;
+      fieldAtPress = pressedBackdrop ? focusedTextField(modal) : null;
+    });
+    modal.addEventListener("click", function (event) {
+      if (event.target !== modal) return;
+      var fromBackdrop = pressedBackdrop;
+      var field = fieldAtPress;
+      pressedBackdrop = false;
+      fieldAtPress = null;
+      // A window's own backdrop handler, added after this one, must not close it a second time.
+      event.stopImmediatePropagation();
+      if (!fromBackdrop) return;
+      // The first tap only leaves the field (and hides the keyboard); the next one closes the window.
+      if (field) {
+        if (document.activeElement === field) field.blur();
+        return;
       }
+      requestModalClose(modal, event);
     });
     modal.addEventListener("close", function () {
       // A close event can be queued immediately before a dialog is reopened.
       if (modal.open) return;
+      forgetShownModal(modal);
       modal.classList.remove("visible");
       modal.hidden = true;
       modal.setAttribute("aria-hidden", "true");
@@ -611,6 +665,8 @@
 
   function openModal(modal) {
     prepareModal(modal);
+    // A window covers the page, so a panel left open under it (the status popover) closes first: one at a time.
+    closeOpenPanels(modal);
     modal.hidden = false;
     modal.classList.add("visible");
     modal.setAttribute("aria-hidden", "false");
@@ -622,16 +678,114 @@
       modal.setAttribute("aria-hidden", "true");
       throw error;
     }
+    forgetShownModal(modal);
+    shownModals.push(modal);
     return modal;
   }
 
   function closeModal(modal) {
     prepareModal(modal);
     if (modal.open) modal.close();
+    forgetShownModal(modal);
     modal.classList.remove("visible");
     modal.hidden = true;
     modal.setAttribute("aria-hidden", "true");
     return modal;
+  }
+
+  // Panels outside the browser's top layer: the status popover (registered through ui.panel) and the plain overlays
+  // the court hall and partner relations put on <body> (div.logos-dept-overlay, closed by a click on their backdrop).
+  // Nothing closed them: they stayed open under every window opened later, and Escape did nothing. Now a window or a
+  // panel that opens closes them, and Escape closes the top-most.
+  var openPanels = [];
+
+  function isShown(element) {
+    return element.isConnected && !element.hidden;
+  }
+
+  function forgetPanel(element) {
+    openPanels = openPanels.filter(function (entry) {
+      return entry.element !== element && isShown(entry.element);
+    });
+  }
+
+  function plainOverlays() {
+    return Array.prototype.filter.call(document.querySelectorAll("div.logos-dept-overlay"), isShown);
+  }
+
+  function closePanelEntry(entry) {
+    forgetPanel(entry.element);
+    try {
+      entry.close();
+    } catch (error) {
+      console.error("[UI PANEL]", error);
+    }
+  }
+
+  function closeOverlay(overlay) {
+    // The overlay's own backdrop handler closes it (court.js, partner_relations.js).
+    overlay.click();
+  }
+
+  function closeOpenPanels(keep) {
+    openPanels.slice().forEach(function (entry) {
+      if (entry.element !== keep && isShown(entry.element)) closePanelEntry(entry);
+    });
+    plainOverlays().forEach(function (overlay) {
+      if (overlay !== keep) closeOverlay(overlay);
+    });
+  }
+
+  function panelOpened(element, close) {
+    if (!element || typeof close !== "function") {
+      throw new Error("UI panel requires an element and a close function");
+    }
+    closeOpenPanels(element);
+    forgetPanel(element);
+    openPanels.push({ element: element, close: close });
+  }
+
+  // The window Escape is for. Focus is only ever inside the top-most window (the browser makes the ones under it
+  // inert); with focus elsewhere it is the newest window opened here. A window shown another way (the confirm and
+  // prompt questions) is left to its own handler and the browser's Escape.
+  function escapeDialog(target) {
+    var focused = target && typeof target.closest === "function" ? target.closest("dialog[open]") : null;
+    if (focused) return focused;
+    var open = document.querySelectorAll("dialog[open]");
+    for (var index = 0; index < open.length; index += 1) {
+      if (!preparedModals.has(open[index])) return null;
+    }
+    forgetShownModal(null);
+    return shownModals.length ? shownModals[shownModals.length - 1] : null;
+  }
+
+  // Escape closes the top-most open thing: a window, else a plain overlay, else the newest panel.
+  function onEscapeKey(event) {
+    if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+    if (document.querySelector("dialog[open]")) {
+      var dialog = escapeDialog(event.target);
+      if (!dialog) return;
+      // Prevented, the key does not also reach the browser's own Escape, which would then close a second window.
+      event.preventDefault();
+      // The cancel event is the path the browser's Escape takes, so the window's own handlers run.
+      if (dialog.dispatchEvent(new Event("cancel", { cancelable: true })) && dialog.open) dialog.close();
+      return;
+    }
+    var overlays = plainOverlays();
+    if (overlays.length) {
+      event.preventDefault();
+      closeOverlay(overlays[overlays.length - 1]);
+      return;
+    }
+    forgetPanel(null);
+    var entry = openPanels[openPanels.length - 1];
+    if (!entry) return;
+    event.preventDefault();
+    closePanelEntry(entry);
+  }
+
+  if (typeof document.addEventListener === "function") {
+    document.addEventListener("keydown", onEscapeKey);
   }
 
   function modalFromPayload(payload) {
@@ -696,6 +850,8 @@
       actions: Object.freeze({ register: registerAction, dispatch: dispatchAction }),
       events: Object.freeze({ mountClicks: mountClickDispatcher }),
       modal: Object.freeze({ create: createModal, open: openModal, close: closeModal }),
+      // A non-modal panel reports itself shown (with its close function) and hidden.
+      panel: Object.freeze({ opened: panelOpened, closed: forgetPanel }),
     }),
   });
 

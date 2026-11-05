@@ -83,18 +83,19 @@
     var body = el("div", { class: "logos-dept-list" });
     body.appendChild(
       el(
-        "div",
-        {},
+        "p",
+        { class: "group-chat-intro" },
         "Отметьте двух участников или больше: модели и Суд Логоса. Каждое сообщение получат все отмеченные, по очереди, в этом же чате; суд говорит последним.",
       ),
     );
     var chosen = new Set(models());
     var keys = dialogModels();
-    if (!keys.length) body.appendChild(el("div", {}, "Каталог моделей ещё не загружен."));
+    if (!keys.length) body.appendChild(el("div", { class: "group-chat-intro" }, "Каталог моделей ещё не загружен."));
     // The Court is listed last: it speaks after the models, over what they said.
     keys = keys.concat([COURT]);
     keys.forEach(function (key) {
-      var row = el("label", { class: "logos-dept-row" });
+      // The whole row is the label: a tap on the name or the description ticks the box on its left.
+      var row = el("label", { class: "logos-dept-row group-chat-row" });
       var box = el("input", { type: "checkbox" });
       box.checked = chosen.has(key);
       box.addEventListener("change", function () {
@@ -105,15 +106,19 @@
         status.textContent = summary();
       });
       row.appendChild(box);
-      row.appendChild(el("strong", {}, " " + label(key)));
+      row.appendChild(el("strong", { class: "group-chat-name" }, label(key)));
       if (key === COURT) {
         row.appendChild(
-          el("span", {}, "судит реплики по записи: вердикт, цитата, правило; заседание над диалогом ведётся в зале ⚖️"),
+          el(
+            "span",
+            { class: "group-chat-desc" },
+            "судит реплики по записи: вердикт, цитата, правило; заседание над диалогом ведётся в зале ⚖️",
+          ),
         );
       }
       body.appendChild(row);
     });
-    var status = el("div", {}, "");
+    var status = el("div", { class: "group-chat-status", role: "status" }, "");
     function summary() {
       var count = models().length;
       return count >= 2

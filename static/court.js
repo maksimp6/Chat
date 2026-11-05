@@ -31,8 +31,19 @@
 
   function when(ts) {
     if (!ts) return "";
-    var date = typeof ts === "number" ? new Date(ts * 1000) : new Date(ts);
-    return isNaN(date.getTime()) ? String(ts) : date.toLocaleString();
+    // The standard Date format has three fraction digits (more is up to each browser), so microseconds are cut first.
+    var date =
+      typeof ts === "number" ? new Date(ts * 1000) : new Date(String(ts).replace(/(\.\d{3})\d+/, "$1"));
+    // One date look across the app's windows (the treasury writes its dates the same way).
+    return isNaN(date.getTime())
+      ? String(ts)
+      : date.toLocaleString("ru-RU", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
   }
 
   function badge(verdict) {
@@ -91,7 +102,7 @@
     var overlay = h("div", { id: MODAL_ID, class: "logos-dept-overlay" });
     var card = h("div", { class: "logos-dept-card logos-court-card" });
     var head = h("div", { class: "logos-dept-head" });
-    head.appendChild(h("h3", {}, "⚖️ Зал заседаний"));
+    head.appendChild(h("h3", {}, "Зал заседаний"));
     var close = h("button", { type: "button", "aria-label": "Закрыть" }, "×");
     close.onclick = closeModal;
     head.appendChild(close);
@@ -129,6 +140,8 @@
         });
       })
       .catch(function (err) {
+        // A failure is the shared calm note (static/style.css .logos-error-note).
+        list.classList.add("logos-error-note");
         list.textContent = "Ошибка: " + err.message;
       });
   }

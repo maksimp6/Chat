@@ -74,14 +74,14 @@
 
     var ov = CoreUI.modal.create({
       id: "ssh-runtime-modal-custom",
-      title: "🔐 SSH Runtime",
+      title: "SSH Runtime",
       className: "ssh-runtime-modal-custom",
       contentClassName: "ssh-runtime-modal-content",
       body: content,
     });
     var modalContent = ov.querySelector(".modal-content");
-    modalContent.style.cssText =
-      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
+    // Layout only: background, border, radius and shadow come from the shared window shell (style.css).
+    modalContent.style.cssText = "padding:20px;";
     (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
@@ -142,9 +142,6 @@
       .catch(function (err) {
         setSshStatus(err.message, true);
       });
-
-    ov.addEventListener("click", function (e) {
-      if (e.target === ov) CoreUI.modal.close(ov);
-    });
+    // A click on the backdrop and Escape close the window through LogosCoreAPI.ui.modal.
   };
 })();

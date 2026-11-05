@@ -3,7 +3,7 @@
   position: fixed;
   inset: 0;
   z-index: 100010;
-  background: rgba(0, 0, 0, 0.68);
+  background: var(--backdrop);
   align-items: center;
   justify-content: center;
 }
@@ -19,10 +19,11 @@
   width: min(760px, 94vw);
   max-height: 88vh;
   overflow: auto;
-  background: var(--bg-sidebar);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
+  background: var(--surface-1);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-modal);
   padding: 18px;
 }
 .logos-pro-app .environments-head,
@@ -41,71 +42,93 @@
 }
 .logos-pro-app .environments-head p {
   margin: 3px 0 0;
-  color: var(--text-secondary);
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 .logos-pro-app .environments-create {
   display: flex;
   gap: 8px;
   margin-bottom: 12px;
 }
+/* The field is the shared text field; only its place in the row is set here. */
 .logos-pro-app .environments-create input {
   flex: 1;
   min-width: 0;
-  padding: 9px;
-  border: 1px solid var(--control-border);
-  border-radius: 8px;
-  background: var(--bg-input);
-  color: var(--text-main);
 }
+/* Sizes only: the colours come from the shared buttons (secondary .logos-btn, gold .btn-primary). */
 .logos-pro-app .environments-create button,
 .logos-pro-app .environments-refresh,
 .logos-pro-app .environment-card-actions button,
 .logos-pro-app .environment-card-actions a {
-  border: 1px solid var(--control-border);
-  border-radius: 8px;
-  padding: 7px 10px;
-  background: var(--btn-bg);
-  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 13px;
   text-decoration: none;
+  white-space: nowrap;
   cursor: pointer;
 }
-.logos-pro-app .environments-status {
-  padding: 8px;
-  margin-bottom: 10px;
-  border: 1px solid var(--danger);
-  border-radius: 8px;
+@media (pointer: coarse) {
+  .logos-pro-app .environments-create button,
+  .logos-pro-app .environments-refresh,
+  .logos-pro-app .environment-card-actions button,
+  .logos-pro-app .environment-card-actions a {
+    min-height: 44px;
+  }
+}
+/* «Удалить» is red text on no fill. */
+.logos-pro-app .environment-card-actions .environment-delete {
+  border-color: transparent;
+  background: transparent;
   color: var(--danger);
+}
+.logos-pro-app .environment-card-actions .environment-delete:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+/* A failure is the shared calm note: a red edge on the left, the text in the body colour. */
+.logos-pro-app .environments-status {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--danger);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
 }
 .logos-pro-app .environment-card {
   padding: 12px;
   margin: 8px 0;
-  border: 1px solid var(--control-border);
-  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
 }
 .logos-pro-app .environment-card-main {
   flex-wrap: wrap;
 }
 .logos-pro-app .environment-card-main code {
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 .logos-pro-app .environment-card-meta {
   margin: 6px 0;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font: 11px monospace;
   overflow-wrap: anywhere;
 }
 .logos-pro-app .environment-status {
   padding: 3px 7px;
   border-radius: 999px;
-  background: var(--btn-bg);
+  background: var(--chip-bg);
   font-size: 12px;
 }
 .logos-pro-app .environment-status-running {
-  color: var(--success-text);
+  color: var(--success);
 }
 .logos-pro-app .environment-status-failed {
-  color: var(--danger-text);
+  color: var(--danger);
 }
 .logos-pro-app .environment-card-actions {
   flex-wrap: wrap;
@@ -113,5 +136,5 @@
 .logos-pro-app .environments-empty {
   padding: 24px;
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }

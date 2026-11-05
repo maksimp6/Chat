@@ -107,7 +107,8 @@
     body.innerHTML = [
       '<div class="environments-head"><div><p>Неизменяемые окружения веток</p></div>',
       '<button class="logos-btn environments-refresh" type="button">Обновить</button></div>',
-      '<form class="environments-create"><input name="branch" placeholder="feature/my-branch" autocomplete="off" required><button class="logos-btn" type="submit">Создать</button></form>',
+      // «Создать» is the window's one primary (gold) action.
+      '<form class="environments-create"><input name="branch" placeholder="feature/my-branch" autocomplete="off" required><button class="logos-btn btn-primary" type="submit">Создать</button></form>',
       '<div class="environments-status" aria-live="polite" hidden></div><div class="environments-list"></div>',
     ].join("");
 
@@ -192,7 +193,7 @@
                   "</details></div>"
                 : "",
               '<div class="environment-card-actions">',
-              '<a href="',
+              '<a class="logos-btn" href="',
               esc(safeHref(env.url)),
               '" target="_blank" rel="noopener">Открыть</a>',
               '<button class="logos-btn" data-op="',
@@ -207,7 +208,7 @@
                 : '<button class="logos-btn" data-op="restart" data-id="' +
                   esc(env.environment_id) +
                   '">Перезапуск</button>',
-              '<button class="logos-btn" data-op="delete" data-id="',
+              '<button class="logos-btn environment-delete" data-op="delete" data-id="',
               esc(env.environment_id),
               '">Удалить</button>',
               "</div></article>",

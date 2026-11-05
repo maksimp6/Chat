@@ -6,11 +6,16 @@
   width: min(880px, 100%);
   max-width: 880px;
 }
+/* Muted text in the theme's muted colour, not by fading: it stays at 4.5:1 or more. */
 .logos-court-note,
 .logos-court-muted {
   font-size: 12px;
-  opacity: 0.72;
+  color: var(--text-muted);
+  line-height: 1.45;
   margin: 8px 0;
+}
+.logos-court-note {
+  font-size: 13px;
 }
 .logos-court-open {
   display: flex;
@@ -50,7 +55,7 @@
 }
 .logos-court-table td {
   padding: 4px 6px;
-  border-top: 1px solid rgba(127, 127, 127, 0.18);
+  border-top: 1px solid var(--border);
   vertical-align: top;
 }
 .logos-court-row strong {
@@ -68,44 +73,30 @@
   border: 1px solid transparent;
   white-space: nowrap;
 }
+/* Each verdict is a theme token; the fill and edge are that colour, faint, so they follow the app theme
+   (data-theme), not the system's light or dark setting. */
+.logos-court-badge-ok,
+.logos-court-badge-useless,
+.logos-court-badge-slippery,
+.logos-court-badge-grave {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  border-color: color-mix(in srgb, currentColor 40%, transparent);
+}
 .logos-court-badge-ok {
-  color: #1c7c3b;
-  background: rgba(46, 160, 67, 0.14);
-  border-color: rgba(46, 160, 67, 0.4);
+  color: var(--success);
 }
 .logos-court-badge-useless {
-  color: #5e6673;
-  background: rgba(110, 118, 129, 0.16);
-  border-color: rgba(110, 118, 129, 0.4);
+  color: var(--text-muted);
 }
 .logos-court-badge-slippery {
-  color: #9a6700;
-  background: rgba(212, 167, 44, 0.18);
-  border-color: rgba(212, 167, 44, 0.5);
+  color: var(--warning);
 }
 .logos-court-badge-grave {
-  color: #b42318;
-  background: rgba(248, 81, 73, 0.16);
-  border-color: rgba(248, 81, 73, 0.5);
+  color: var(--danger);
 }
 .logos-court-badge-none {
-  color: inherit;
-  opacity: 0.6;
-  border-color: rgba(127, 127, 127, 0.3);
-}
-@media (prefers-color-scheme: dark) {
-  .logos-court-badge-ok {
-    color: #56d364;
-  }
-  .logos-court-badge-useless {
-    color: #b1bac4;
-  }
-  .logos-court-badge-slippery {
-    color: #e3b341;
-  }
-  .logos-court-badge-grave {
-    color: #ff7b72;
-  }
+  color: var(--text-muted);
+  border-color: var(--border-strong);
 }
 .logos-court-detail {
   margin-top: 14px;
@@ -126,7 +117,7 @@
   align-items: center;
 }
 .logos-court-case {
-  border: 1px solid rgba(127, 127, 127, 0.25);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: 10px 12px;
   margin: 8px 0;
@@ -151,14 +142,14 @@
 .logos-court-case blockquote {
   margin: 4px 0 4px 8px;
   padding-left: 8px;
-  border-left: 3px solid rgba(127, 127, 127, 0.4);
+  border-left: 3px solid var(--border-strong);
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-word;
 }
 .logos-court-entry {
   padding: 6px 0;
-  border-top: 1px solid rgba(127, 127, 127, 0.18);
+  border-top: 1px solid var(--border);
   font-size: 12px;
 }
 .logos-court-entry-head {
@@ -169,10 +160,10 @@
 }
 .logos-court-n {
   font-family: monospace;
-  opacity: 0.7;
+  color: var(--text-muted);
 }
 .logos-court-flare {
-  color: #b42318;
+  color: var(--danger);
   font-weight: 600;
 }
 .logos-court-finding {

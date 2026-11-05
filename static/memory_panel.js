@@ -61,12 +61,15 @@
       facts.forEach(function (fact) {
         var item = document.createElement("div");
         item.className = "memory-fact";
+        // The category is drawn as a chip, so it needs no brackets around it.
         var category = document.createElement("span");
         category.className = "memory-fact-category";
-        category.textContent =
-          "[" + (CATEGORY_LABELS[fact.category] || String(fact.category || "общее")) + "]";
+        category.textContent = CATEGORY_LABELS[fact.category] || String(fact.category || "общее");
+        var text = document.createElement("span");
+        text.className = "memory-fact-text";
+        text.textContent = String(fact.fact || "");
         item.appendChild(category);
-        item.appendChild(document.createTextNode(" " + String(fact.fact || "")));
+        item.appendChild(text);
         list.appendChild(item);
       });
     } catch (error) {
