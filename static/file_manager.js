@@ -586,8 +586,11 @@ window.fetchVectorStores = function () {
 
       window.LogosDispatcher.request("/api/files", undefined, { timeoutMs: LIST_TIMEOUT_MS })
         .then(function (r) {
-          if (!r.ok) throw statusError(r);
-          return r.json();
+          if (r.ok) return r.json();
+          // The server's reason (a rejected provider key) is shown, as the list of files to add shows it.
+          return readJson(r).then(function (data) {
+            throw statusError(r, data && typeof data.error === "string" ? data.error : "");
+          });
         })
         .then(function (data) {
           list.innerHTML = "";
