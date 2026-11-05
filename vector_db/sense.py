@@ -3,9 +3,13 @@
 Owner, 05.11.2026: "we don't need full sentences from remember just do sense extraction, and
 convert it to text". Only the embedding model runs. The best chunk of each of the DOCUMENTS
 best-matching documents is cut into short phrases at its punctuation, words that carry no
-meaning are dropped from the ends of each phrase, every phrase is embedded, and the
-SENSE_PHRASES phrases nearest in meaning to the question, without near-repeats, are joined
-into one line of text, best first.
+meaning are dropped from the ends of each phrase, a phrase the question itself holds is left
+out, every other phrase is embedded, and SENSE_PHRASES phrases are chosen one by one: the
+nearest in meaning to the question, each losing REPEAT_PENALTY of its likeness to the phrases
+already chosen (maximal marginal relevance). They are joined into one line of text, best
+first. Tried on the owner's dialogs on 05.11.2026: nearness alone gave eight rewordings of the
+question; this rule brought the facts up ("функция remember не требует параметров", "2+2=4"),
+and scoring by the likeness to the whole chunk instead of the question gave noise.
 
 Nothing is generated: every word of the text is a stored word, so a vector is turned into
 text by finding the stored phrases nearest to it. ``remember`` gives this text to the model
@@ -29,8 +33,8 @@ DOCUMENTS = 3
 # Phrases in the text, and the most words in one phrase.
 SENSE_PHRASES = 8
 PHRASE_WORDS = 6
-# Two phrases this close in meaning say the same thing: the later one is left out.
-REPEAT_SIMILARITY = 0.9
+# What a phrase loses for its likeness to the phrases already chosen.
+REPEAT_PENALTY = 0.6
 
 # The speakers' labels of a stored turn (chat.mcp_routes._embed_turn) are no part of what was said.
 _LABEL = re.compile(r"(?:Пользователь|Мысли Логоса|Логос):\s")
@@ -102,35 +106,36 @@ def best_documents(hits: list[dict[str, Any]], count: int = DOCUMENTS) -> list[d
 
 def extract(query: str, hits: list[dict[str, Any]], trace: Any = None) -> dict[str, Any]:
     """The sense of the chunks ``hits`` for ``query``: ``{"text", "candidates", "tokens"}``."""
+    asked_text = query.casefold()
     candidates: dict[str, str] = {}
     for hit in hits:
         for phrase in phrases(str(hit.get("text") or "")):
-            candidates.setdefault(phrase.casefold(), phrase)
+            # What the question itself says adds nothing to it.
+            if phrase.casefold() not in asked_text:
+                candidates.setdefault(phrase.casefold(), phrase)
     found = list(candidates.values())
     if not found:
         return {"text": "", "candidates": 0, "tokens": 0}
     vectors, tokens = store.unit_vectors([query, *found], trace=trace)
-    asked = vectors[0]
-    ranked = sorted(
-        ((math.sumprod(asked, vector), phrase, vector) for phrase, vector in zip(found, vectors[1:], strict=True)),
-        key=lambda item: item[0],
-        reverse=True,
-    )
-    chosen: list[tuple[float, str, Any]] = []
-    for score, phrase, vector in ranked:
-        if any(math.sumprod(vector, other[2]) >= REPEAT_SIMILARITY for other in chosen):
-            continue
-        chosen.append((score, phrase, vector))
-        if len(chosen) == SENSE_PHRASES:
-            break
-    text = "; ".join(phrase for _, phrase, _ in chosen)
+    asked, units = vectors[0], vectors[1:]
+    scores = [math.sumprod(asked, unit) for unit in units]
+    pool, chosen = list(range(len(found))), []
+    while pool and len(chosen) < SENSE_PHRASES:
+        best = max(
+            pool,
+            key=lambda i: scores[i]
+            - REPEAT_PENALTY * max((math.sumprod(units[i], units[j]) for j in chosen), default=0.0),
+        )
+        pool.remove(best)
+        chosen.append(best)
+    text = "; ".join(found[i] for i in chosen)
     if trace is not None and hasattr(trace, "add_event"):
         trace.add_event("sense_extracted", {
             "documents": [
                 {key: hit.get(key) for key in ("collection", "id", "chunk", "score")} for hit in hits
             ],
             "candidates": len(found),
-            "phrases": [{"phrase": phrase, "score": round(score, 6)} for score, phrase, _ in chosen],
+            "phrases": [{"phrase": found[i], "score": round(scores[i], 6)} for i in chosen],
             "tokens": tokens,
         })
     return {"text": text, "candidates": len(found), "tokens": tokens}
