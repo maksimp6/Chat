@@ -300,6 +300,31 @@ function russianPlural(count, one, few, many) {
   return many;
 }
 
+// How long a reply took: seconds under a minute, minutes and seconds above.
+function formatReplyDuration(ms) {
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1).replace(".", ",")} с`;
+  const total = Math.round(seconds);
+  return `${Math.floor(total / 60)} мин ${total % 60} с`;
+}
+
+// The clock time of a message (seconds since the epoch, as the server stores it): the time today, the date before.
+function formatMessageTime(seconds) {
+  const date = new Date(seconds * 1000);
+  if (!Number.isFinite(date.getTime())) return "";
+  const time = date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  if (date.toDateString() === new Date().toDateString()) return time;
+  return date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) + ", " + time;
+}
+
+// Line icons of the copy button (drawn in the text colour; the emoji looked foreign in the chat).
+const CHAT_COPY_ICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"/></svg>';
+const CHAT_COPIED_ICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const CHAT_COPY_FAILED_ICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.5"/></svg>';
+
 // Folds the per-message diagnostics into one line, so the answer keeps the focus.
 function buildDetails(content, usage, totalDurationMs, cost) {
   const parts = [];
@@ -309,7 +334,7 @@ function buildDetails(content, usage, totalDurationMs, cost) {
     );
   }
   if (cost && cost > 0) parts.push(`≈ ${cost.toFixed(2)} ₽`);
-  if (totalDurationMs) parts.push(`${(totalDurationMs / 1000).toFixed(1)} с`);
+  if (totalDurationMs) parts.push(formatReplyDuration(totalDurationMs));
   // The cost is shown once, in this line; with nothing else to unfold it is a plain line.
   if (!content.children.length) {
     const line = document.createElement("div");
@@ -368,6 +393,7 @@ function addMessage({
   id: messageId,
   onRetry,
   editText,
+  createdAt,
 }) {
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return null;
@@ -387,7 +413,7 @@ function addMessage({
   bubble.className = "bubble";
   let htmlContent = "";
   if (reasoning && reasoning.trim() !== "") {
-    htmlContent += `<details class="reasoning-details"><summary class="reasoning-summary">🧠 Ход мыслей модели</summary><div class="reasoning-content">${parseMarkdown(reasoning)}</div></details>`;
+    htmlContent += `<details class="reasoning-details"><summary class="reasoning-summary">Ход мыслей</summary><div class="reasoning-content">${parseMarkdown(reasoning)}</div></details>`;
   }
   htmlContent += parseMarkdown(text);
   bubble.innerHTML = htmlContent;
@@ -432,13 +458,24 @@ function addMessage({
     msg.appendChild(editBtn);
   }
 
-  // Copy sits beside the bubble, by its last line, so it covers no text and takes no row of its own.
+  // One quiet row under the message: its time and the copy button (the details line joins it).
   const actions = document.createElement("div");
   actions.className = "msg-actions";
+  // A stored message keeps the time the server stored it; a new one is from now.
+  const sentAt = Number(createdAt) > 0 ? Number(createdAt) : Date.now() / 1000;
+  const timeText = formatMessageTime(sentAt);
+  if (timeText) {
+    const timeEl = document.createElement("time");
+    timeEl.className = "msg-time";
+    timeEl.dateTime = new Date(sentAt * 1000).toISOString();
+    timeEl.title = new Date(sentAt * 1000).toLocaleString("ru-RU");
+    timeEl.textContent = timeText;
+    actions.appendChild(timeEl);
+  }
   const copyBtn = document.createElement("button");
   copyBtn.type = "button";
   copyBtn.className = "logos-btn copy-btn";
-  copyBtn.textContent = "📋";
+  copyBtn.innerHTML = CHAT_COPY_ICON;
   copyBtn.title = "Копировать";
   copyBtn.setAttribute("aria-label", "Копировать сообщение");
 
@@ -447,17 +484,17 @@ function addMessage({
     // The result shows on the button, where the tap was, and in a toast; a refused copy says so.
     window.LogosClipboard.copy(text).then(
       function () {
-        copyBtn.textContent = "✓";
+        copyBtn.innerHTML = CHAT_COPIED_ICON;
         window.LogosToast.show("Скопировано");
       },
       function (error) {
-        copyBtn.textContent = "⚠";
+        copyBtn.innerHTML = CHAT_COPY_FAILED_ICON;
         window.LogosToast.error(window.LogosErrorText("Не удалось скопировать", error));
       },
     ).then(function () {
       clearTimeout(copyMarkTimer);
       copyMarkTimer = setTimeout(function () {
-        copyBtn.textContent = "📋";
+        copyBtn.innerHTML = CHAT_COPY_ICON;
       }, 1500);
     });
   });
@@ -778,6 +815,7 @@ function renderStoredMessage(convId, msg, owner, hasImage) {
     usage: msg.usage,
     trace: msg.trace,
     id: msg.id,
+    createdAt: msg.created_at,
     onRetry: retryText === null ? undefined : function () {
       return window.logosRetryTurn({
         text: retryText,
@@ -2087,7 +2125,9 @@ document.addEventListener("DOMContentLoaded", function () {
       typingEl.className = "typing";
       typingEl.innerHTML = "<span></span><span></span><span></span>";
       if (chatbox) chatbox.appendChild(typingEl);
-      turn.status = createTurnStatus(chatbox, Date.now());
+      // The time counts from the question, not from this page: a reload or another chat must not start it at 00:00.
+      const askedAt = question && Number(question.created_at) > 0 ? Number(question.created_at) * 1000 : Date.now();
+      turn.status = createTurnStatus(chatbox, Math.min(askedAt, Date.now()));
       turn.typingEl = typingEl;
     }
     // A live answer read again keeps the page busy until it ends, as the send that started it did.
@@ -2417,7 +2457,7 @@ document.addEventListener("DOMContentLoaded", function () {
     details.hidden = true;
     const summary = document.createElement("summary");
     summary.className = "reasoning-summary";
-    summary.textContent = "🧠 Ход мыслей модели";
+    summary.textContent = "Ход мыслей";
     const reasoningEl = document.createElement("div");
     reasoningEl.className = "reasoning-content";
     details.append(summary, reasoningEl);

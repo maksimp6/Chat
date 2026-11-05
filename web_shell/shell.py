@@ -154,6 +154,21 @@ def bootstrap_local_user():
     return jsonify({"user_id": get_current_owner_id(), "status": "local"})
 
 
+def client_diagnostic():
+    """A browser's report of why its page did not fully load (static/boot.js).
+
+    It goes to the backend log, so a failure on the owner's phone is read on the server
+    (owner, 05.11.2026: buttons do not respond on the phone, the page says it degraded)."""
+    report = request.get_data(cache=False, as_text=True)[:4000]
+    logger.warning(
+        "[CLIENT] %s | ua=%s | from=%s",
+        report,
+        (request.headers.get("User-Agent") or "")[:300],
+        request.headers.get("X-Forwarded-For") or request.remote_addr,
+    )
+    return "", 204
+
+
 def install(app: Flask) -> None:
     """Install the shell: version, error and cache policy, storage start-up, shell routes."""
     global STATIC_ASSET_VERSION
@@ -174,4 +189,7 @@ def install(app: Flask) -> None:
     app.add_url_rule("/api/version", view_func=loaded_version, methods=["GET"])
     app.add_url_rule(
         "/api/users/bootstrap", view_func=bootstrap_local_user, methods=["POST"]
+    )
+    app.add_url_rule(
+        "/api/client-diagnostics", view_func=client_diagnostic, methods=["POST"]
     )

@@ -69,6 +69,7 @@
         component: "boot",
         event: event,
         message: error && error.message ? error.message : String(error || ""),
+        stack: error && error.stack ? String(error.stack).slice(0, 1500) : "",
         timestamp: new Date().toISOString(),
       },
       extra || {},
@@ -76,6 +77,26 @@
     var logger = console[level] || console.error;
     logger.call(console, "[BOOT]", details);
     window.dispatchEvent(new CustomEvent("logos:diagnostic", { detail: details }));
+    if (level === "error") reportDiagnostic(details);
+  }
+
+  // A page that broke on the owner's phone is read on the server: errors go to the backend log
+  // (POST /api/client-diagnostics), at most a few per page so a looping error cannot flood it.
+  var reportsLeft = 20;
+  function reportDiagnostic(details) {
+    if (reportsLeft <= 0 || !navigator.sendBeacon) return;
+    reportsLeft -= 1;
+    try {
+      var report = JSON.stringify(
+        Object.assign({}, details, {
+          page: location.pathname + location.search,
+          revision: window.__LOGOS_APP_REVISION || "",
+        }),
+      );
+      navigator.sendBeacon(basePath + "/api/client-diagnostics", report.slice(0, 4000));
+    } catch (_) {
+      // A report that cannot be sent changes nothing on the page.
+    }
   }
 
   console.info("[BOOT] hello: Logos frontend boot loaded");

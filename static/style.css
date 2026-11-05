@@ -2825,3 +2825,211 @@ body {
 .logos-pro-app #text-ui:focus-within {
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(185, 164, 255, 0.16), 0 0 30px rgba(109, 208, 255, 0.14);
 }
+
+/* Messages (owner, 05.11.2026: "messages design are disgusting and awful"). One calm design over the
+   earlier passes: the answer is text on the page, the question a soft bubble on the right, and the
+   time, copy and details sit in one quiet row under each message. No frames, glows or side stripes. */
+:root {
+  --msg-user-bg: var(--bg-bubble-user);
+  --msg-user-text: var(--text-bubble-user);
+}
+[data-theme="dark"] {
+  --msg-user-bg: #252d40;
+  --msg-user-text: #f2f4f8;
+}
+.logos-pro-app #chatbox {
+  background: var(--bg-app);
+  gap: 22px;
+  padding-top: 20px;
+  padding-bottom: 28px;
+  /* One readable column on a wide screen; the phone keeps its edges. */
+  padding-left: max(14px, env(safe-area-inset-left, 0px), calc((100% - 780px) / 2));
+  padding-right: max(14px, env(safe-area-inset-right, 0px), calc((100% - 780px) / 2));
+}
+.logos-pro-app #chatbox > .msg {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 2px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+/* A live reply waits hidden until its first text (the grid above must not show it). */
+.logos-pro-app #chatbox > .msg[hidden] {
+  display: none;
+}
+.logos-pro-app #chatbox > .msg:not(.msg-court) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.logos-pro-app #chatbox > .msg > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.logos-pro-app #chatbox > .msg > .msg-actions {
+  grid-column: 1;
+}
+.logos-pro-app #chatbox > .msg > .msg-details {
+  grid-column: 2;
+}
+.logos-pro-app #chatbox > .msg > .msg-retry-btn {
+  grid-column: auto;
+  justify-self: start;
+  margin: 8px 8px 0 0;
+}
+
+/* The answer: plain text across the column. */
+.logos-pro-app #chatbox > .msg.bot {
+  align-self: stretch;
+  max-width: 100%;
+  color: var(--text-main);
+}
+.logos-pro-app #chatbox > .msg.bot > .bubble,
+.logos-pro-app #chatbox > .msg.error > .bubble {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+/* The question: a soft bubble on the right, its row under it. */
+.logos-pro-app #chatbox > .msg.user {
+  align-self: flex-end;
+  max-width: min(85%, 640px);
+  margin-left: auto;
+  justify-items: end;
+}
+.logos-pro-app #chatbox > .msg.user > .bubble {
+  padding: 10px 15px;
+  border: 0;
+  border-radius: 20px 20px 6px 20px;
+  background: var(--msg-user-bg);
+  color: var(--msg-user-text);
+}
+.logos-pro-app #chatbox > .msg.user > .msg-actions {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+/* An error: the same text, on a light red card. */
+.logos-pro-app #chatbox > .msg.error {
+  align-self: stretch;
+  max-width: 100%;
+}
+.logos-pro-app #chatbox > .msg.error > .bubble {
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  color: var(--danger-text);
+}
+
+/* The row under a message: time, copy, details. */
+.logos-pro-app #chatbox .msg-actions {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 4px 0 0;
+}
+.logos-pro-app #chatbox .msg-time {
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.logos-pro-app #chatbox .msg .copy-btn,
+.logos-pro-app #chatbox .msg .copy-btn:hover {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-secondary);
+}
+.logos-pro-app #chatbox .msg .copy-btn:hover,
+.logos-pro-app #chatbox .msg .copy-btn:focus-visible {
+  background: color-mix(in srgb, var(--text-main) 8%, transparent);
+  color: var(--text-main);
+}
+.logos-pro-app #chatbox .msg .copy-btn svg {
+  width: 17px;
+  height: 17px;
+}
+.logos-pro-app #chatbox > .msg > .msg-details {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.logos-pro-app #chatbox .msg-details-summary {
+  display: inline-block;
+  padding: 6px 8px;
+  border-radius: 9px;
+  cursor: pointer;
+  list-style: none;
+}
+.logos-pro-app #chatbox .msg-details-summary:hover,
+.logos-pro-app #chatbox .msg-details[open] > .msg-details-summary {
+  background: color-mix(in srgb, var(--text-main) 6%, transparent);
+  color: var(--text-main);
+}
+
+/* The model's thinking: a small pill that opens into a quiet quote. */
+.logos-pro-app #chatbox .msg .reasoning-details {
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 13px;
+}
+.logos-pro-app #chatbox .msg .reasoning-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-main) 7%, transparent);
+  color: var(--text-secondary);
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+.logos-pro-app #chatbox .msg .reasoning-summary::after {
+  content: "›";
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.logos-pro-app #chatbox .msg .reasoning-details[open] > .reasoning-summary::after {
+  transform: rotate(90deg);
+}
+.logos-pro-app #chatbox .msg .reasoning-content {
+  margin: 8px 0 0;
+  padding: 0 0 0 12px;
+  border-left: 2px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  opacity: 1;
+}
+
+/* A narrow phone keeps only the mark of the name, so the header never runs past the screen. */
+@media (max-width: 480px) {
+  .logos-pro-app #header .header-brand {
+    font-size: 0;
+    letter-spacing: 0;
+    gap: 0;
+    padding-right: 0;
+  }
+}
