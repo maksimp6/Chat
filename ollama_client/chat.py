@@ -151,6 +151,8 @@ def _response(data: dict[str, Any], model_key: str, started: float) -> dict[str,
         )
     input_tokens = int(data.get("prompt_eval_count") or 0)
     output_tokens = int(data.get("eval_count") or 0)
+    # Ollama counts the thinking inside eval_count; the streamed thinking pieces (one per token) give its share.
+    reasoning_tokens = min(int(data.get("thinking_pieces") or 0), output_tokens)
     cut = data.get("done_reason") == "length"
     result = {
         "id": "ollama_" + uuid.uuid4().hex,
@@ -165,7 +167,7 @@ def _response(data: dict[str, Any], model_key: str, started: float) -> dict[str,
             "output_tokens": output_tokens,
             "total_tokens": input_tokens + output_tokens,
             "input_tokens_details": {"cached_tokens": 0},
-            "output_tokens_details": {"reasoning_tokens": 0},
+            "output_tokens_details": {"reasoning_tokens": reasoning_tokens},
         },
     }
     if cut:
@@ -205,17 +207,19 @@ def ask(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """(request body, Responses-shaped answer) of one /api/chat request to Ollama at ``url``.
 
-    With ``on_event`` the answer streams: every piece of thinking and text is reported
-    as it arrives ({"kind": "reasoning_delta" | "text_delta", "text"}), and every tool
-    call as soon as the model makes it ({"kind": "tool_call_requested", "name",
-    "arguments"}). ``timeout`` then bounds the wait between pieces, not the whole answer.
+    The answer always streams from Ollama: its pieces (one per generated token) give the
+    thinking's share of the output tokens, which Ollama counts only inside eval_count.
+    With ``on_event`` every piece of thinking and text is reported as it arrives
+    ({"kind": "reasoning_delta" | "text_delta", "text"}), and every tool call as soon as
+    the model makes it ({"kind": "tool_call_requested", "name", "arguments"}).
+    ``timeout`` bounds the wait between pieces, not the whole answer.
     """
     body = build_body(upstream, items, params)
-    body["stream"] = on_event is not None
+    body["stream"] = True
     endpoint = url.rstrip("/") + "/api/chat"
     started = time.time()
     try:
-        resp = requests.post(endpoint, json=body, timeout=timeout, stream=on_event is not None)
+        resp = requests.post(endpoint, json=body, timeout=timeout, stream=True)
     except requests.RequestException as exc:
         raise OllamaError(
             f"Ollama {endpoint} unreachable: {type(exc).__name__}: {exc}", reached=False
@@ -224,18 +228,13 @@ def ask(
         raise OllamaError(
             f"Ollama HTTP {resp.status_code}: {resp.text[:500]}", status_code=resp.status_code
         )
-    if on_event is None:
-        try:
-            data = resp.json()
-        except ValueError as exc:
-            raise OllamaError("Ollama returned a response that is not valid JSON", status_code=200) from exc
-    else:
-        data = _read_stream(resp, on_event)
+    data = _read_stream(resp, on_event if on_event is not None else (lambda _event: None))
     return body, _response(data if isinstance(data, dict) else {}, model_key, started)
 
 
 def _read_stream(resp: requests.Response, on_event: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
-    """The streamed /api/chat answer joined into one, reported piece by piece."""
+    """The streamed /api/chat answer joined into one, reported piece by piece; ``thinking_pieces``
+    counts the pieces of thinking (Ollama streams one per generated token)."""
     thinking: list[str] = []
     content: list[str] = []
     calls: list[dict[str, Any]] = []
@@ -279,5 +278,6 @@ def _read_stream(resp: requests.Response, on_event: Callable[[dict[str, Any]], N
         resp.close()
     return {
         **last,
+        "thinking_pieces": len(thinking),
         "message": {"role": "assistant", "thinking": "".join(thinking), "content": "".join(content), "tool_calls": calls},
     }

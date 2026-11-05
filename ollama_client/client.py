@@ -225,9 +225,10 @@ class OllamaClient:
         if not isinstance(data, dict):
             return None
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+        details = usage.get("output_tokens_details") if isinstance(usage.get("output_tokens_details"), dict) else {}
 
-        def count(name: str) -> int:
-            value = usage.get(name)
+        def count(name: str, source: dict[str, Any] = usage) -> int:
+            value = source.get(name)
             return int(value) if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
 
         return {
@@ -236,7 +237,7 @@ class OllamaClient:
             "total_tokens": count("total_tokens"),
             "cached_tokens": 0,
             "tool_tokens": 0,
-            "reasoning_tokens": 0,
+            "reasoning_tokens": count("reasoning_tokens", details),
             "created_at": data.get("created_at"),
             "completed_at": data.get("completed_at"),
             "incomplete_details": data.get("incomplete_details"),
