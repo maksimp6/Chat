@@ -407,10 +407,11 @@ model_fill_sums:
   sub  rsp, 48                  ; [rsp+32]=x, [rsp+40]=n
   mov  [rsp+32], rcx
   mov  [rsp+40], rdx
-  mov  rcx, [rel g_xsum32]
-  mov  rdx, [rsp+32]
-  mov  r8, [rsp+40]
-  call k_sum32
+  ; quantize x to int8 (g_q8/g_d8/g_bsums) for the int8 Q4_K matvec
+  mov  rcx, [rsp+32]
+  mov  rdx, [rsp+40]
+  call k_quant_x
+  ; per-16 f32 sums (g_xsum16) for the Q6_K fold-sc matvec
   mov  rcx, [rel g_xsum16]
   mov  rdx, [rsp+32]
   mov  r8, [rsp+40]
@@ -569,6 +570,23 @@ model_load:
   shl  rcx, 2
   call rt_alloc
   mov  [rel g_xsum16], rax
+  ; int8 activation buffers (maxcols is a multiple of 256): q8[maxcols],
+  ; d8[maxcols/256] f32, bsums[maxcols/16] i32.
+  mov  rcx, rbx
+  call rt_alloc
+  mov  [rel g_q8], rax
+  mov  rcx, rbx
+  shr  rcx, 8
+  add  rcx, 1
+  shl  rcx, 2
+  call rt_alloc
+  mov  [rel g_d8], rax
+  mov  rcx, rbx
+  shr  rcx, 4
+  add  rcx, 1
+  shl  rcx, 2
+  call rt_alloc
+  mov  [rel g_bsums], rax
 
   ; attention scores: f32[n_threads][n_ctx].
   mov  rax, [r15 + Model.n_threads]
@@ -1428,8 +1446,11 @@ g_att_out:      dq 0           ; f32[n_head*head_dim]  attention output
 g_g:            dq 0           ; f32[n_ff]  ffn gate
 g_u:            dq 0           ; f32[n_ff]  ffn up
 g_logits:       dq 0           ; f32[n_vocab]
-g_xsum32:       dq 0           ; f32[maxcols/32]  per-32 sums of the current x
-g_xsum16:       dq 0           ; f32[maxcols/16]  per-16 sums of the current x
+g_xsum32:       dq 0           ; f32[maxcols/32]  per-32 sums of the current x (unused since int8 Q4_K)
+g_xsum16:       dq 0           ; f32[maxcols/16]  per-16 sums of the current x (Q6_K fold-sc)
+g_q8:           dq 0           ; int8[maxcols]      activations quantized for the int8 Q4_K matvec
+g_d8:           dq 0           ; f32[maxcols/256]   per-256-block activation scale
+g_bsums:        dq 0           ; i32[maxcols/16]    per-16 sums of g_q8
 g_scores:       dq 0           ; f32[n_threads*n_ctx]  attention score scratch
 g_n_ctx:        dq 0           ; per-thread score-row stride read by k_attn_job
 g_weight_bytes: dq 0           ; total tensor bytes, for the bandwidth statistic
