@@ -10,6 +10,7 @@ from conversations.host import (
     delete_conversation,
     get_current_owner_id,
     global_settings,
+    ollama_status,
     update_conversation_model,
     update_conversation_title,
     validate_dialog_model,
@@ -73,6 +74,13 @@ def get_settings():
     return jsonify(global_settings())
 
 
+def get_ollama_settings():
+    """Ollama's own settings and what Ollama reports now; read-only like /api/settings."""
+    if not get_current_owner_id(required=False):
+        return jsonify({"error": "owner_required"}), 401
+    return jsonify(ollama_status())
+
+
 def install(app: Flask) -> None:
     """Serve the conversation API; endpoints keep the view names."""
     app.add_url_rule(
@@ -86,3 +94,4 @@ def install(app: Flask) -> None:
     )
     # Settings are global and read-only: shown, never saved through the API.
     app.add_url_rule("/api/settings", view_func=get_settings, methods=["GET"])
+    app.add_url_rule("/api/ollama/settings", view_func=get_ollama_settings, methods=["GET"])

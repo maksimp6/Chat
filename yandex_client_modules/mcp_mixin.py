@@ -1,10 +1,8 @@
 """MCP mixin of the Responses client: requests with MCP and hosted tools (ask_with_mcp), including file search."""
 
-import json
 from typing import Any
 
 
-from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
 from yandex_client_modules.request_builder import response_input
 from yandex_client_modules.tool_config import (
@@ -94,142 +92,6 @@ FILE_SEARCH_ON_NOTE = (
 )
 
 class YandexMcpMixin:
-    def _execute_single_tool(
-        self, tc, all_servers, trace=None, *, execution_policy=None
-    ):
-        import time as _t
-
-        function = tc.get("function")
-        if not isinstance(function, dict):
-            function = {}
-        name = tc.get("name") or function.get("name")
-
-        args = tc["arguments"] if "arguments" in tc else function.get("arguments", {})
-
-        call_id = tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or name
-
-        start_timestamp = _t.time()
-        t_start = _t.perf_counter()
-
-        trace_id = trace.trace_id if isinstance(trace, bound.ExecutionTrace) else None
-        user_id = None
-        invocation_id = None
-        if isinstance(trace, bound.ExecutionTrace):
-            user_id = (trace.trace.get("context") or {}).get("user_id")
-            invocation_id = (trace.trace.get("context") or {}).get("invocation_id")
-
-        try:
-            try:
-                if not isinstance(name, str) or not name.strip():
-                    raise ValueError("Invalid tool name: expected a non-empty string")
-                name = name.split("<|", 1)[0].strip()
-                if not name:
-                    raise ValueError("Invalid tool name: expected a non-empty string")
-                if isinstance(args, str):
-                    try:
-                        args = json.loads(args)
-                    except ValueError:
-                        raise ValueError(
-                            "Invalid tool arguments: expected a valid JSON object"
-                        ) from None
-                if not isinstance(args, dict):
-                    raise ValueError("Invalid tool arguments: expected a JSON object")
-                # A tool's one function names its action in "tool" (one tool, one function).
-                inner_name, args = bound.registry.unwrap_call(name, args)
-                if inner_name != name and isinstance(trace, bound.ExecutionTrace):
-                    trace.add_event(
-                        "tool_group_call",
-                        {"group": name, "tool": inner_name, "call_id": call_id},
-                    )
-                name = inner_name
-                if not isinstance(args, dict):
-                    raise ValueError("Invalid tool arguments: expected a JSON object")
-            except ValueError as exc:
-                if isinstance(trace, bound.ExecutionTrace):
-                    trace.add_event(
-                        "tool_arguments_rejected",
-                        {"tool": name, "call_id": call_id, "error": str(exc)},
-                    )
-                raise
-
-            call = bound.UniversalToolCall(
-                tool_name=name,
-                arguments=args,
-                call_id=call_id,
-                transport="responses_api",
-                trace_id=trace_id,
-                invocation_id=invocation_id,
-                user_id=user_id,
-                metadata={
-                    "source": "yandex_responses",
-                    "server_count": len(all_servers or []),
-                    # What the model was thinking when it made the call (the remember tool searches by it).
-                    "thought": tc.get("thought") or "",
-                },
-            )
-            executor = bound.UniversalToolExecutor(bound.registry)
-            if isinstance(trace, bound.ExecutionTrace):
-                universal_result = executor.execute_with_trace(
-                    call, trace, server_configs=all_servers
-                )
-            else:
-                universal_result = executor.execute(call, server_configs=all_servers)
-
-            if universal_result.get("success"):
-                result = universal_result.get("data")
-                error = None
-            else:
-                result = None
-                error = universal_result.get("error") or "Tool execution failed"
-            api_logger.debug(
-                "[LOCAL TOOL RESULT] name=%s call_id=%s\\n%s",
-                name,
-                call_id,
-                json.dumps(
-                    _sanitize_for_log(result), ensure_ascii=False, indent=2, default=str
-                )
-                if isinstance(result, (dict, list))
-                else str(result),
-            )
-
-        except Exception as exc:
-            result = None
-            error = str(exc) or type(exc).__name__
-
-            api_logger.exception("[LOCAL TOOL ERROR] name=%s call_id=%s", name, call_id)
-
-        t_end = _t.perf_counter()
-        end_timestamp = _t.time()
-
-        duration_ms = round((t_end - t_start) * 1000, 2)
-
-        content_str = (
-            json.dumps(result, ensure_ascii=False, default=str)
-            if isinstance(result, (dict, list))
-            else str(result)
-            if result is not None
-            else ""
-        )
-
-        timing = {
-            "name": f"Tool: {name}",
-            "duration_ms": duration_ms,
-            "server_type": "local",
-            "server_label": "Local Registry",
-            "start_timestamp": start_timestamp,
-            "end_timestamp": end_timestamp,
-            "success": error is None,
-        }
-
-        return {
-            "call_id": call_id,
-            "name": name,
-            "content": content_str,
-            "result": result,
-            "error": error,
-            "timing": timing,
-        }
-
     def ask_with_mcp(
         self,
         message: Any,
@@ -439,13 +301,7 @@ class YandexMcpMixin:
         # (invocation 9114cb20: 7 rounds, 70 RUB).
         if settings_id and execution_policy is None:
             try:
-                # A local model calls remember for its memory: the 100 facts (~8,000 tokens)
-                # alone would fill its 8192-token context.
-                memory_summary = (
-                    ""
-                    if model_key in bound.Config.OLLAMA_MODELS
-                    else get_controlled_memory_summary()
-                )
+                memory_summary = get_controlled_memory_summary()
             except Exception as e:
                 api_logger.exception("[MEMORY] Память не подключена к ответу")
                 note("memory", f"memory left out of the reply: {type(e).__name__}: {e}")

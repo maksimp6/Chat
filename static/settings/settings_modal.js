@@ -403,6 +403,117 @@
     },
   };
 
+  function gib(bytes) {
+    return typeof bytes === "number" ? (bytes / 1073741824).toFixed(1) + " ГиБ" : "—";
+  }
+
+  function ollamaRows(rows, UI) {
+    return (
+      '<table style="width:100%;border-collapse:collapse;">' +
+      rows
+        .map(function (row) {
+          return (
+            '<tr><td style="color:var(--m-muted,#666);padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap;">' +
+            UI.escapeHtml(row[0]) +
+            '</td><td style="padding:4px 0;word-break:break-word;">' +
+            UI.escapeHtml(row[1] === undefined || row[1] === null ? "—" : String(row[1])) +
+            "</td></tr>"
+          );
+        })
+        .join("") +
+      "</table>"
+    );
+  }
+
+  // GET /api/ollama/settings: the settings and the server's live state, all read-only.
+  function loadOllamaSettings(box, UI) {
+    if (!box) return;
+    window.LogosDispatcher.request("/api/ollama/settings", null, { timeoutMs: 30000 })
+      .then(function (r) {
+        if (!r.ok) return window.LogosHttpError(r).then(function (e) { throw e; });
+        return r.json();
+      })
+      .then(function (data) {
+        var s = data.settings || {};
+        var options = s.options || {};
+        var models = s.models || {};
+        var html = ollamaRows(
+          [
+            ["Сервер", s.url],
+            ["Версия Ollama", data.version],
+            [
+              "Модели",
+              Object.keys(models)
+                .map(function (key) { return key + " → " + models[key]; })
+                .join(", "),
+            ],
+            ["Контекст (num_ctx)", options.num_ctx],
+            ["Длина ответа (num_predict)", options.num_predict === -1 ? "без ограничения (-1)" : options.num_predict],
+            ["Мышление (think)", s.think ? "включено" : "выключено"],
+            ["Потоковый вывод", s.stream ? "включён" : "выключен"],
+            ["Инструменты", (s.tools || []).join(", ") || "нет"],
+          ],
+          UI,
+        );
+        var running = data.running || [];
+        html += UI.section("Загружено в память сейчас");
+        html += running.length
+          ? running
+              .map(function (m) {
+                return ollamaRows(
+                  [
+                    ["Модель", m.name],
+                    ["Память", gib(m.size) + " (из них в видеопамяти " + gib(m.size_vram) + ")"],
+                    ["Контекст", m.context_length],
+                    ["Выгрузится", m.expires_at ? new Date(m.expires_at).toLocaleString() : "—"],
+                  ],
+                  UI,
+                );
+              })
+              .join("")
+          : '<div style="color:var(--m-muted,#666);">Ни одна модель не загружена.</div>';
+        Object.keys(data.models || {}).forEach(function (key) {
+          var model = data.models[key];
+          var details = model.details || {};
+          html += UI.section("Модель " + model.upstream);
+          html += ollamaRows(
+            [
+              ["Размер", details.parameter_size],
+              ["Квантование", details.quantization_level],
+              ["Семейство", details.family],
+            ],
+            UI,
+          );
+          if (model.parameters) {
+            html +=
+              '<pre style="white-space:pre-wrap;font-size:12px;margin:6px 0 0;">' +
+              UI.escapeHtml(model.parameters) +
+              "</pre>";
+          }
+        });
+        html += UI.section("Инструкции модели");
+        html +=
+          '<pre style="white-space:pre-wrap;font-size:12px;margin:0;">' +
+          UI.escapeHtml(s.instructions || "") +
+          "</pre>";
+        var errors = data.errors || {};
+        var errorKeys = Object.keys(errors);
+        if (errorKeys.length) {
+          html +=
+            '<div style="color:var(--m-danger,#b3412e);margin-top:8px;">Ollama не ответила: ' +
+            UI.escapeHtml(
+              errorKeys.map(function (k) { return k + ": " + errors[k]; }).join("; "),
+            ) +
+            "</div>";
+        }
+        box.innerHTML = html;
+      })
+      .catch(function (error) {
+        box.textContent =
+          "Настройки Ollama не загружены: " + (error && error.message ? error.message : error);
+      });
+  }
+
   window.openSettingsModal = function () {
     var UI = window.SettingsUI;
     var CoreUI = window.LogosCoreAPI.ui;
@@ -476,7 +587,8 @@
       '<div class="settings-modal-top">',
       '<div class="settings-modal-heading" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"></div>',
       '<div class="llm-tabs" style="display:flex;gap:6px;border-bottom:1px solid var(--m-border,#ddd);flex-wrap:wrap;">',
-      '    <button class="logos-btn llm-tab-btn active settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',
+      '    <button class="logos-btn llm-tab-btn active settings-contract-btn" data-tab="tab-ollama">Ollama</button>',
+      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-output">Формат вывода</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-routing">Маршрутизация вызовов</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-adv">Промпты & Кэш</button>',
@@ -485,8 +597,17 @@
       "</div>",
     ].join("");
 
+    // Ollama's own settings (ollama_client.settings) and what Ollama reports now: the
+    // chat model runs there, and nothing of the Yandex tabs below reaches it.
+    var tabOllama = [
+      '<div id="tab-ollama" class="llm-tab-content">',
+      UI.section("Ollama на ПК владельца"),
+      '<div id="ollama-settings-body" style="font-size:13px;line-height:1.5;">Загружаю…</div>',
+      "</div>",
+    ].join("");
+
     var tabGen = [
-      '<div id="tab-gen" class="llm-tab-content">',
+      '<div id="tab-gen" class="llm-tab-content" style="display:none;">',
       UI.section("Базовый сэмплинг"),
       ultraProfileNote(ultra),
       row(["temperature", "top_p"]),
@@ -558,7 +679,9 @@
       '<div id="set-status" role="status" style="color:var(--m-muted,#666);font-size:12px;min-height:16px;margin-top:auto;"></div>',
     ].join("");
 
-    md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabAdv + tabTheme + footer;
+    md.innerHTML =
+      tabsHeader + tabOllama + tabGen + tabOutput + tabRouting + tabAdv + tabTheme + footer;
+    loadOllamaSettings(md.querySelector("#ollama-settings-body"), UI);
     var heading = md.querySelector(".settings-modal-heading");
     heading.appendChild(title);
     heading.appendChild(closeButton);

@@ -27,6 +27,7 @@ class Host:
     update_conversation_model: Any  # storage.records.update_conversation_model
     update_conversation_title: Any  # storage.records.update_conversation_title
     global_settings: Any  # yandex_client_modules.tool_config.global_settings
+    ollama_status: Any  # ollama_client.status.status
     validate_dialog_model: (
         Any  # provider_accounts.model_discovery.validate_dialog_model
     )
@@ -87,6 +88,10 @@ def update_conversation_title(*args: Any, **kwargs: Any) -> Any:
 
 def global_settings(*args: Any, **kwargs: Any) -> Any:
     return current().global_settings(*args, **kwargs)
+
+
+def ollama_status(*args: Any, **kwargs: Any) -> Any:
+    return current().ollama_status(*args, **kwargs)
 
 
 def validate_dialog_model(*args: Any, **kwargs: Any) -> Any:

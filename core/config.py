@@ -6,6 +6,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from core.env import env_get
+from ollama_client import settings as ollama_settings
 
 logger = logging.getLogger("logos.core.config")
 
@@ -136,43 +137,14 @@ TEXT_MODELS: dict[str, dict[str, Any]] = {
         "tool": 0.05,
         "output": 0.30,
     },
-    # Served by Ollama on the owner's PC, not by Yandex (owner, 04.11.2026: no Yandex API).
-    # The key is not a Yandex catalog key (qwen3-4b is), so no Yandex price or profile
-    # applies. qwen3:1.7b was tried on 05.11.2026 (~34/~9 tokens/s read/write against
-    # ~14/~4.5): it called remember but answered with the call as text, so the owner
-    # chose qwen3:4b.
-    "ollama-qwen3-4b": {
-        "name": "Qwen3 4B (Ollama)",
-        "upstream": "qwen3:4b",
-        "provider": "ollama",
-        "type": "text",
-        "capabilities": {"tools": True, "function_calling": True, "multimodal": None},
-        "context_window": 8192,
-        "input": 0.0,
-        "cached": 0.0,
-        "tool": 0.0,
-        "output": 0.0,
-    },
+    # The models served by Ollama on the owner's PC come from Ollama's own settings
+    # (owner, 04.11.2026: no Yandex API; 05.11.2026: Ollama independent of Yandex).
+    **ollama_settings.MODELS,
 }
 
 # The one text model of every Logos dialog.
 # A dialog has no text model of its own; image and voice dialogs keep their model.
 CHAT_MODEL = "ollama-qwen3-4b"
-
-# Ollama on the owner's PC (Intel N100, 8 GB RAM). The context is the whole room for the
-# prompt, the thinking and the answer (no output cap is sent). 16384 fits in the memory
-# 8192 took because the PC's Ollama compresses its context cache (OLLAMA_FLASH_ATTENTION=1,
-# OLLAMA_KV_CACHE_TYPE=q8_0; owner, 05.11.2026: reasoning and output at maximum).
-OLLAMA_URL = "http://192.168.10.6:11434"
-OLLAMA_CONTEXT = 16384
-# The tools a local model is given. All tool schemas together are ~33,000 tokens: they
-# do not fit its 8192-token context, and the N100 reads a prompt at ~14 tokens/s.
-OLLAMA_TOOLS = ("remember",)
-OLLAMA_MODELS = {
-    key: info["upstream"]
-    for key, info in TEXT_MODELS.items()
-    if info.get("provider") == "ollama"
-}
 
 VOICE_MODELS = {
     "speech-realtime-deepseek-v4-flash": {
@@ -290,10 +262,6 @@ class Config:
     CLOUDRU_API_KEY_ID = CLOUDRU_API_KEY_ID
     HOST = HOST
     PORT = PORT
-    OLLAMA_URL = OLLAMA_URL
-    OLLAMA_CONTEXT = OLLAMA_CONTEXT
-    OLLAMA_TOOLS = OLLAMA_TOOLS
-    OLLAMA_MODELS = OLLAMA_MODELS
 
 
 # Keys renamed in #1316. Stored conversations and older clients may still send the old id.

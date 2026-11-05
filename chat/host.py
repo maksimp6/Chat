@@ -35,6 +35,8 @@ class Host:
     NoActiveCredentialError: (
         Any  # provider_accounts.credentials.NoActiveCredentialError
     )
+    OLLAMA_MODELS: Any  # ollama_client.settings.MODELS
+    OllamaClient: Any  # ollama_client.client.OllamaClient
     OUTPUT_RATE: Any  # yandex_client_modules.realtime.OUTPUT_RATE
     ProviderQuotaExceeded: Any  # provider_accounts.quotas.ProviderQuotaExceeded
     REQUEST_TIMEOUT_SECONDS: (

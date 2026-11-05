@@ -209,96 +209,6 @@ def provider_request_headers(credential) -> dict[str, str]:
     }
 
 
-def _ask_local(message, model_key, params, execution_trace, trace_step, timeout):
-    """One request of a local model to Ollama, traced like a provider request."""
-    from ollama_client import OllamaError, ask as ollama_ask
-
-    trace = execution_trace if isinstance(execution_trace, bound.ExecutionTrace) else None
-    step = trace_step
-    if trace is not None and step is None:
-        step = len(trace.trace.get("api_requests", [])) + 1
-    url = bound.Config.OLLAMA_URL
-    started = time.time()
-    perf = time.perf_counter()
-    if trace is not None:
-        trace.add_event("api_request_sent", {"method": "POST", "url": url, "step": step})
-    sink = params.get("on_stream_event")
-    live = None
-    if callable(sink):
-        emit_event(sink, {"kind": "response_status", "status": "in_progress", "response_id": None})
-        # One reasoning part per request: the live view joins its pieces without breaks.
-        part = f"ollama-{step or 0}-{started}"
-
-        def live(event):
-            kind = event.get("kind")
-            if kind == "reasoning_delta":
-                emit_event(sink, {"kind": "reasoning_delta", "text": event["text"], "summary": False, "part": part})
-            elif kind == "text_delta":
-                emit_event(sink, {"kind": "text_delta", "text": event["text"]})
-            elif kind == "tool_call_requested":
-                # A tool's one function names its action in "tool": show the action.
-                arguments = event.get("arguments")
-                name = event.get("name")
-                if isinstance(arguments, dict) and isinstance(arguments.get("tool"), str):
-                    name = arguments["tool"]
-                emit_event(
-                    sink,
-                    {"kind": "tool_progress", "tool": "function", "phase": "requested", "name": name, "server_label": None},
-                )
-
-    # Only the local model's own tools: all the schemas would not fit its context.
-    tools = [
-        tool
-        for tool in params.get("tools") or []
-        if isinstance(tool, dict) and tool.get("name") in bound.Config.OLLAMA_TOOLS
-    ]
-    try:
-        body, result = ollama_ask(
-            url,
-            bound.Config.OLLAMA_MODELS[model_key],
-            model_key,
-            _response_input(params, message),
-            {**params, "tools": tools},
-            context=bound.Config.OLLAMA_CONTEXT,
-            timeout=timeout or None,
-            on_event=live,
-        )
-    except OllamaError as exc:
-        error = YandexClientError(
-            str(exc),
-            status_code=exc.status_code,
-            user_text="Локальная модель не ответила: проверьте, что Ollama запущена на ПК.",
-        )
-        error.request_not_accepted = not exc.reached
-        raise error from exc
-    if trace is not None:
-        ended = time.time()
-        trace.add_api_request(
-            _sanitize_for_log(body), step_index=step, start_timestamp=started, provider_key_id=None
-        )
-        trace.add_response(
-            result,
-            step_index=step,
-            start_timestamp=started,
-            end_timestamp=ended,
-            timing_ms=round((time.perf_counter() - perf) * 1000, 2),
-            kind="initial_response",
-            provider_key_id=None,
-        )
-        trace.add_event(
-            "api_request_completed",
-            {"method": "POST", "url": url, "step": step, "response_id": result["id"], "status": result["status"]},
-        )
-    on_provider_response = params.get("on_provider_response")
-    if callable(on_provider_response):
-        on_provider_response(result)
-    emit_event(
-        params.get("on_stream_event"),
-        {"kind": "response_status", "status": result["status"], "response_id": result["id"]},
-    )
-    return result
-
-
 class YandexRequestMixin:
     def ask(
         self,
@@ -312,9 +222,6 @@ class YandexRequestMixin:
         params = validate_generation_params(params)
         request_timeout = _transport_timeout(params, "request_timeout", 90, 900)
         poll_timeout = _transport_timeout(params, "poll_timeout", 180, 7200)
-        if model_key in bound.Config.OLLAMA_MODELS:
-            # A local model: Ollama on the owner's PC, no credential, quota or conversation.
-            return _ask_local(message, model_key, params, execution_trace, trace_step, poll_timeout)
         on_provider_response = params.get("on_provider_response")
         if on_provider_response is not None and not callable(on_provider_response):
             raise ValueError("on_provider_response must be callable or None")

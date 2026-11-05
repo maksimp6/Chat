@@ -133,6 +133,8 @@ def _chat():
     )
     from core.config import VOICE_MODELS
     from yandex_client_modules.client import YandexResponsesClient
+    from ollama_client import OllamaClient
+    from ollama_client.settings import MODELS as OLLAMA_MODELS
     from yandex_client_modules.request_mixin import (
         record_quota_usage as _record_quota_usage,
     )
@@ -236,6 +238,8 @@ def _chat():
         V2_EMBEDDING_DIMENSIONS=V2_EMBEDDING_DIMENSIONS,
         VOICE_MODELS=VOICE_MODELS,
         YandexResponsesClient=YandexResponsesClient,
+        OLLAMA_MODELS=OLLAMA_MODELS,
+        OllamaClient=OllamaClient,
         _record_quota_usage=_record_quota_usage,
         _resolve_global_provider_credential=_resolve_global_provider_credential,
         _resolve_quota_user_id=_resolve_quota_user_id,
@@ -347,8 +351,10 @@ def _conversations():
     from storage.records import update_conversation_title
     from yandex_client_modules.tool_config import global_settings
     from provider_accounts.model_discovery import validate_dialog_model
+    from ollama_client import status as ollama_status
 
     return host.Host(
+        ollama_status=ollama_status,
         ConversationOwnershipStore=ConversationOwnershipStore,
         ModelDiscoveryError=ModelDiscoveryError,
         delete_conversation=delete_conversation,
@@ -918,13 +924,12 @@ def _tool_providers():
 
 def _vector_db():
     from vector_db import host
-    from core.config import OLLAMA_URL
-    from ollama_client import embed
+    from ollama_client import embed, settings as ollama_settings
     from storage.records import get_store
 
     def embed_texts(texts, *, model, trace=None):
         # The vector database embeds with Ollama on the owner's PC (no Yandex API).
-        return embed(OLLAMA_URL, model, texts)
+        return embed(ollama_settings.URL, model, texts)
 
     return host.Host(embed_texts=embed_texts, get_store=get_store)
 

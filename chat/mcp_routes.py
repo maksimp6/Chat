@@ -600,6 +600,112 @@ def _define_logos_client(base: type) -> type:
         def _ask_provider(self, **kwargs: Any) -> Any:
             return super().ask_with_mcp(**kwargs)
 
+        def _execute_single_tool(self, tc, all_servers, trace=None, *, execution_policy=None):
+            """Run one function call of the model through the tool registry. The same for
+            every provider: Yandex and Ollama models call the same tools."""
+            import time as _t
+
+            function = tc.get("function")
+            if not isinstance(function, dict):
+                function = {}
+            name = tc.get("name") or function.get("name")
+            args = tc["arguments"] if "arguments" in tc else function.get("arguments", {})
+            call_id = tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or name
+            start_timestamp = _t.time()
+            t_start = _t.perf_counter()
+            traced = isinstance(trace, bound.ExecutionTrace)
+            context = (trace.trace.get("context") or {}) if traced else {}
+            try:
+                try:
+                    if not isinstance(name, str) or not name.strip():
+                        raise ValueError("Invalid tool name: expected a non-empty string")
+                    name = name.split("<|", 1)[0].strip()
+                    if not name:
+                        raise ValueError("Invalid tool name: expected a non-empty string")
+                    if isinstance(args, str):
+                        try:
+                            args = _json.loads(args)
+                        except ValueError:
+                            raise ValueError(
+                                "Invalid tool arguments: expected a valid JSON object"
+                            ) from None
+                    if not isinstance(args, dict):
+                        raise ValueError("Invalid tool arguments: expected a JSON object")
+                    # A tool's one function names its action in "tool" (one tool, one function).
+                    inner_name, args = bound.registry.unwrap_call(name, args)
+                    if inner_name != name and traced:
+                        trace.add_event(
+                            "tool_group_call",
+                            {"group": name, "tool": inner_name, "call_id": call_id},
+                        )
+                    name = inner_name
+                    if not isinstance(args, dict):
+                        raise ValueError("Invalid tool arguments: expected a JSON object")
+                except ValueError as exc:
+                    if traced:
+                        trace.add_event(
+                            "tool_arguments_rejected",
+                            {"tool": name, "call_id": call_id, "error": str(exc)},
+                        )
+                    raise
+                call = bound.UniversalToolCall(
+                    tool_name=name,
+                    arguments=args,
+                    call_id=call_id,
+                    transport="responses_api",
+                    trace_id=trace.trace_id if traced else None,
+                    invocation_id=context.get("invocation_id"),
+                    user_id=context.get("user_id"),
+                    metadata={
+                        "source": "logos_chat",
+                        "server_count": len(all_servers or []),
+                        # What the model was thinking when it made the call (the remember
+                        # tool searches by it).
+                        "thought": tc.get("thought") or "",
+                    },
+                )
+                executor = bound.UniversalToolExecutor(bound.registry)
+                if traced:
+                    universal_result = executor.execute_with_trace(
+                        call, trace, server_configs=all_servers
+                    )
+                else:
+                    universal_result = executor.execute(call, server_configs=all_servers)
+                if universal_result.get("success"):
+                    result = universal_result.get("data")
+                    error = None
+                else:
+                    result = None
+                    error = universal_result.get("error") or "Tool execution failed"
+            except Exception as exc:
+                result = None
+                error = str(exc) or type(exc).__name__
+                logger.exception("[LOCAL TOOL ERROR] name=%s call_id=%s", name, call_id)
+            duration_ms = round((_t.perf_counter() - t_start) * 1000, 2)
+            content_str = (
+                _json.dumps(result, ensure_ascii=False, default=str)
+                if isinstance(result, (dict, list))
+                else str(result)
+                if result is not None
+                else ""
+            )
+            return {
+                "call_id": call_id,
+                "name": name,
+                "content": content_str,
+                "result": result,
+                "error": error,
+                "timing": {
+                    "name": f"Tool: {name}",
+                    "duration_ms": duration_ms,
+                    "server_type": "local",
+                    "server_label": "Local Registry",
+                    "start_timestamp": start_timestamp,
+                    "end_timestamp": _t.time(),
+                    "success": error is None,
+                },
+            }
+
         # Logos Pro shopping policy: never source recommendations from Yandex Market.
         # Keep Yandex AI Studio and unrelated Yandex services available.
         mandatory_blocked_web_domains = (
@@ -759,8 +865,10 @@ def _define_logos_client(base: type) -> type:
                 if not describers:
                     return {"error": "no_image_model: ни одна модель не принимает изображения"}
                 describer = describers[0]
+                # The describer's own provider: the turn's client may be another one.
+                describer_client = chat_client(describer)
                 try:
-                    response = self.ask(
+                    response = describer_client.ask(
                         "Опиши эти снимки экрана телефона.",
                         describer,
                         params={
@@ -774,7 +882,7 @@ def _define_logos_client(base: type) -> type:
                     # Reported to the model in the tool output, which names it to the owner.
                     logger.warning("[CHAT] Снимок экрана не описан: %s", exc)
                     return {"model": describer, "error": f"{type(exc).__name__}: {exc}"}
-                _, text = self.extract_reasoning_and_text(response)
+                _, text = describer_client.extract_reasoning_and_text(response)
                 return {
                     "model": describer,
                     "status": response.get("status"),
@@ -1011,6 +1119,30 @@ def logos_client_type() -> type:
         if _logos_client_type is None:
             _logos_client_type = _define_logos_client(bound.YandexResponsesClient)
         return _logos_client_type
+
+
+_ollama_client_type = None
+
+
+def ollama_client_type() -> type:
+    """The chat client class of the models Ollama serves (the same tool loop)."""
+    global _ollama_client_type
+    with _lazy_lock:
+        if _ollama_client_type is None:
+            _ollama_client_type = _define_logos_client(bound.OllamaClient)
+        return _ollama_client_type
+
+
+def is_local_model(model_key: Any) -> bool:
+    """Served by Ollama on the owner's PC, not by the Yandex API."""
+    return model_key in bound.OLLAMA_MODELS
+
+
+def chat_client(model_key: Any) -> Any:
+    """The chat client of the provider that serves ``model_key``."""
+    if is_local_model(model_key):
+        return ollama_client_type()(registry=bound.registry)
+    return logos_client_type()(bound.Config)
 
 
 def __getattr__(name: str) -> Any:
@@ -1319,8 +1451,8 @@ class _ChatReply:
 
 def _execute_chat_model(message, model_key, invocation, params, trace):
     """Run one provider/tool turn and collect its terminal response."""
-    client = logos_client_type()(bound.Config)
-    local = model_key in bound.Config.OLLAMA_MODELS
+    client = chat_client(model_key)
+    local = is_local_model(model_key)
     if local:
         # Ollama keeps no conversation: every turn sends the chat's stored dialog.
         provider_conversation_id = None
@@ -1672,7 +1804,7 @@ def _remember_turn_facts(owner_id, conv_id, model_key):
         ]
         if not lines:
             return
-        client = logos_client_type()(bound.Config)
+        client = chat_client(model_key)
         trace = bound.ExecutionTrace()
         trace.trace.setdefault("context", {})["user_id"] = owner_id
         response = client.ask(
@@ -2796,7 +2928,7 @@ def fork_dialog(
     ]
     # A local chat model keeps no provider conversation: the copy's stored messages are its history.
     provider_id = None
-    if bound.CHAT_MODEL not in bound.Config.OLLAMA_MODELS:
+    if not is_local_model(bound.CHAT_MODEL):
         client = logos_client_type()(bound.Config)
         trace = bound.ExecutionTrace()
         try:
@@ -3017,7 +3149,7 @@ def execute_approved():
             ) else 400
 
         execution_data = exec_res.get("data")
-        client = logos_client_type()(bound.Config)
+        client = chat_client(model_key)
         prompt = (
             f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
             f"Результат: {execution_data}.\nДай краткий ответ о завершении."
@@ -3027,7 +3159,7 @@ def execute_approved():
                 prompt,
                 model_key,
                 None
-                if model_key in bound.Config.OLLAMA_MODELS
+                if is_local_model(model_key)
                 else _provider_conversation_id(client, conv_id, bound.ExecutionTrace()),
                 {"instructions": "Ты системный ассистент."},
             )

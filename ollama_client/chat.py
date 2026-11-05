@@ -13,6 +13,8 @@ from typing import Any
 
 import requests
 
+from ollama_client import settings
+
 __all__ = ["OllamaError", "ask", "chat_messages", "chat_tools"]
 
 _TEXT_PARTS = ("input_text", "output_text", "text")
@@ -171,21 +173,15 @@ def _response(data: dict[str, Any], model_key: str, started: float) -> dict[str,
     return result
 
 
-def build_body(upstream: str, items: Any, params: dict[str, Any], context: int) -> dict[str, Any]:
-    """The /api/chat body for Responses-style ``params`` (instructions, tools, text format)."""
-    options: dict[str, Any] = {"num_ctx": int(context)}
-    if params.get("temperature") is not None:
-        options["temperature"] = float(params["temperature"])
-    if params.get("top_p") is not None:
-        options["top_p"] = float(params["top_p"])
-    if params.get("max_output_tokens"):
-        options["num_predict"] = int(params["max_output_tokens"])
+def build_body(upstream: str, items: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """The /api/chat body: instructions, tools and text format of ``params``; the options
+    and thinking are Ollama's own settings (ollama_client.settings)."""
     body: dict[str, Any] = {
         "model": upstream,
         "messages": chat_messages(params.get("instructions"), items),
         "stream": False,
-        "think": True,
-        "options": options,
+        "think": settings.THINK,
+        "options": settings.options(),
     }
     tools = chat_tools(params.get("tools"))
     if tools:
@@ -204,7 +200,6 @@ def ask(
     items: Any,
     params: dict[str, Any],
     *,
-    context: int,
     timeout: float | None,
     on_event: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -215,7 +210,7 @@ def ask(
     call as soon as the model makes it ({"kind": "tool_call_requested", "name",
     "arguments"}). ``timeout`` then bounds the wait between pieces, not the whole answer.
     """
-    body = build_body(upstream, items, params, context)
+    body = build_body(upstream, items, params)
     body["stream"] = on_event is not None
     endpoint = url.rstrip("/") + "/api/chat"
     started = time.time()
