@@ -240,6 +240,12 @@ function renderSidebar() {
     }
     bucket.items.push(conv);
   });
+  // A sent question moves its dialog to the top of the list; the Court's stays first among the pinned.
+  if (byKey.pinned) {
+    byKey.pinned.items.sort(function (a, b) {
+      return (b.court === true) - (a.court === true);
+    });
+  }
   groups.sort(function (a, b) {
     return b.order - a.order;
   });

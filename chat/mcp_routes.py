@@ -1457,7 +1457,11 @@ def _vector_dialog_reply(message, trace) -> _ChatReply:
     diagnostics: dict[str, Any] = {}
     capture_provider_diagnostics(diagnostics, {"status": "completed"})
     return _ChatReply(
-        reply=found["text"] or "В векторной базе нет ничего для поиска.",
+        reply=found["text"] or (
+            "В базе есть записи, но к этому вопросу они ничего не добавляют."
+            if found["searched"]
+            else "В векторной базе нет ничего для поиска."
+        ),
         reasoning="",
         usage={
             "input_tokens": found["tokens"],
@@ -1939,7 +1943,8 @@ def _finalize_chat_turn(
 
     persist_invocation_trace(invocation.invocation_id, trace_data)
     judged = None
-    if not provider_failed and reply:
+    # The Court judges a model's reply; no model speaks in the embeddings dialog, its answer is stored words.
+    if not provider_failed and reply and invocation.conversation_id != VECTOR_CONVERSATION_ID:
         judged = _court_censor(
             invocation.conversation_id,
             str(reply),

@@ -8,8 +8,8 @@ from vector_db import sense, store
 
 __all__ = ["REMEMBER_TOOLS", "VECTOR_TOOLS"]
 
-# The answer when everything found was already given in this turn.
-REMEMBER_NOTHING_NEW = "Новых частей памяти нет: всё найденное уже дано выше в этом ходе."
+# The answer when every phrase chosen for this thought was already given in this turn.
+REMEMBER_NOTHING_NEW = "Новых фраз нет: всё, что память дала на эту мысль, уже дано выше в этом ходе."
 
 
 def _metadata_of(cfg) -> dict:
@@ -25,21 +25,16 @@ def _trace_of(cfg) -> Any:
     return _metadata_of(cfg).get("execution_trace")
 
 
-def _piece_key(piece: dict) -> tuple:
-    """One stored chunk: the chunks of a document share its id."""
-    return (piece.get("collection"), piece.get("id"), piece.get("chunk"))
-
-
-def _given_in_turn(trace: Any) -> set:
-    """The chunks remember gave earlier in this turn: its remember_results events in the turn's trace."""
+def _shown_in_turn(trace: Any) -> set:
+    """The phrases remember gave earlier in this turn: the sense_extracted events of the turn's trace."""
     record = getattr(trace, "trace", None)
     events = record.get("events") if isinstance(record, dict) else None
     return {
-        _piece_key(piece)
+        str(given.get("phrase")).casefold()
         for event in events or ()
-        if isinstance(event, dict) and event.get("type") == "remember_results"
-        for piece in (event.get("payload") or {}).get("given") or ()
-        if isinstance(piece, dict)
+        if isinstance(event, dict) and event.get("type") == "sense_extracted"
+        for given in (event.get("payload") or {}).get("phrases") or ()
+        if isinstance(given, dict)
     }
 
 
@@ -47,27 +42,25 @@ def remember(args, cfg=None):
     """Memory by meaning: the vector database searched with what the model was thinking.
 
     ``context`` is the sense of the best chunks as one short text (vector_db.sense), without a
-    chunk already given in this turn (the turn's prompt still holds its sense); ids, chunks and
-    scores go into the trace (remember_results)."""
+    phrase already given in this turn: a new thought can bring up other phrases of the same
+    chunks, and the same thought gets an empty ``context`` and a ``note``. Ids, chunks and scores
+    go into the trace (remember_results)."""
     thought = str(_metadata_of(cfg).get("thought") or "").strip()
     if not thought:
         return {"success": False, "error": "нет текста размышления: подумай о том, что нужно вспомнить, и вызови снова"}
     trace = _trace_of(cfg)
     found = store.search(thought, None, None, trace=trace)
-    picked = sense.best_documents(found["results"])
-    given = _given_in_turn(trace)
-    new = [hit for hit in picked if _piece_key(hit) not in given]
-    extracted = sense.extract(thought, new, trace=trace)
+    picked = sense.best_documents(thought, found["results"])
+    extracted = sense.extract(thought, picked, trace=trace, shown=_shown_in_turn(trace))
     if trace is not None and hasattr(trace, "add_event"):
         trace.add_event("remember_results", {
             "searched": found["searched"],
             "given": [
-                {key: hit.get(key) for key in ("collection", "id", "chunk", "score")} for hit in new
+                {key: hit.get(key) for key in ("collection", "id", "chunk", "score")} for hit in picked
             ],
-            "repeats_left_out": len(picked) - len(new),
         })
     result = {"success": True, "context": extracted["text"], "searched": found["searched"]}
-    if picked and not new:
+    if picked and not extracted["text"]:
         result["note"] = REMEMBER_NOTHING_NEW
     return result
 
