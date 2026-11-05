@@ -61,13 +61,13 @@ def _jwk() -> dict[str, str]:
 
 class Acme:
     def __init__(self) -> None:
+        self.kid: str | None = None
+        self.nonce: str | None = None
         self.directory = self._request(DIRECTORY)[0]
         self.jwk = _jwk()
         self.thumbprint = _b64(
             hashlib.sha256(json.dumps(self.jwk, sort_keys=True, separators=(",", ":")).encode()).digest()
         )
-        self.kid: str | None = None
-        self.nonce: str | None = None
 
     def _request(self, url: str, body: bytes | None = None) -> tuple[dict, dict, bytes]:
         request = urllib.request.Request(url, data=body, method="POST" if body is not None else "GET")
