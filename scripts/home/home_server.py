@@ -10,6 +10,10 @@ Port 80 opens without root because the boot hook ``10-unprivileged-ports`` sets
 ``chat.maxxxpavlov.ru`` is the Logos server (port 8080), proxied here only for
 addresses inside the home network: Logos has no login and its tools run on the
 phone, so from outside that name answers 404 (owner, 04.11.2026: LAN only).
+
+HTTPS: port 443 serves the same pages with the Let's Encrypt certificate that
+acme_cert.py keeps fresh (owner, 05.11.2026: "make ssl for chat domain"); port 80
+answers the ACME challenge to anyone.
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ import http.client
 import ipaddress
 import json
 import os
+import ssl
 import sys
 import threading
 import time
@@ -28,9 +33,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import acme_cert  # noqa: E402 (sibling script)
 import ddns_regru  # noqa: E402 (sibling script)
 
 PORT = int(os.environ.get("HOME_PAGE_PORT", "80"))
+TLS_PORT = int(os.environ.get("HOME_PAGE_TLS_PORT", "443"))
+CHALLENGE_PREFIX = "/.well-known/acme-challenge/"
 BOOT_HOOK = Path.home() / ".termux/boot/70-home-page"
 STARTED = time.time()
 CHAT_HOST = "chat." + ddns_regru.DOMAIN
@@ -75,7 +83,15 @@ def _state() -> dict[str, object]:
         "disk_free": disk.f_bavail * disk.f_frsize,
         "disk_total": disk.f_blocks * disk.f_frsize,
         "page_uptime_hours": round((time.time() - STARTED) / 3600, 1),
+        "certificate": _certificate_status(),
     }
+
+
+def _certificate_status() -> dict:
+    try:
+        return json.loads(acme_cert.STATUS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
 
 
 PAGE = """<!doctype html>
@@ -252,6 +268,7 @@ class Handler(BaseHTTPRequestHandler):
         headers = {k: v for k, v in self.headers.items() if k.lower() not in _HOP_HEADERS}
         headers["X-Forwarded-For"] = self.client_address[0]
         headers["X-Forwarded-Host"] = CHAT_HOST
+        headers["X-Forwarded-Proto"] = "https" if isinstance(self.connection, ssl.SSLSocket) else "http"
         # A chat turn can run for many minutes on the local model.
         upstream = http.client.HTTPConnection(*LOGOS, timeout=3600)
         try:
@@ -316,7 +333,22 @@ class Handler(BaseHTTPRequestHandler):
             )
         self._send(_ddns_page(message))
 
+    def _challenge(self) -> None:
+        """Let's Encrypt reads the HTTP-01 answer here from the internet, for every name."""
+        token = self.path[len(CHALLENGE_PREFIX):]
+        try:
+            if not acme_cert.TOKEN.fullmatch(token):
+                raise OSError
+            body = (acme_cert.CHALLENGES / token).read_bytes()
+        except OSError:
+            self.send_error(404)
+            return
+        self._send(body, "application/octet-stream")
+
     def do_GET(self) -> None:  # noqa: N802 (http.server API)
+        if self.path.startswith(CHALLENGE_PREFIX):
+            self._challenge()
+            return
         if self._for_chat():
             self._proxy()
             return
@@ -366,12 +398,43 @@ def main() -> None:
     )
     BOOT_HOOK.chmod(0o700)
     threading.Thread(target=_restart_on_change, args=(script,), daemon=True).start()
+    threading.Thread(target=_certificates, args=(script,), daemon=True).start()
+    _serve_tls()
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+
+
+def _serve_tls() -> None:
+    """Port 443 with the current certificate; without one yet, HTTPS waits for it."""
+    if not (acme_cert.CERT.exists() and acme_cert.KEY.exists()):
+        return
+    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    try:
+        context.load_cert_chain(str(acme_cert.CERT), str(acme_cert.KEY))
+        server = ThreadingHTTPServer(("0.0.0.0", TLS_PORT), Handler)
+    except (OSError, ssl.SSLError) as exc:
+        print(time.strftime("%Y-%m-%d %H:%M:%S"), "HTTPS did not start:", exc, flush=True)
+        return
+    # The handshake runs on the first read, in the request's own thread, so one slow
+    # client never holds up the others.
+    server.socket = context.wrap_socket(
+        server.socket, server_side=True, do_handshake_on_connect=False
+    )
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+
+
+def _certificates(script: Path) -> None:
+    """Issue or renew twice a day; a new certificate restarts the server to load it."""
+    time.sleep(5)  # port 80 is listening by then, for the challenge
+    while True:
+        if acme_cert.ensure():
+            print(time.strftime("%Y-%m-%d %H:%M:%S"), "new certificate, restarting", flush=True)
+            os.execv(sys.executable, [sys.executable, str(script)])
+        time.sleep(12 * 3600)
 
 
 def _restart_on_change(script: Path) -> None:
     """A deploy rewrites the scripts: the server restarts on the new code by itself."""
-    sources = [script, Path(ddns_regru.__file__).resolve()]
+    sources = [script, Path(ddns_regru.__file__).resolve(), Path(acme_cert.__file__).resolve()]
     loaded = [path.stat().st_mtime for path in sources]
     while True:
         time.sleep(30)
