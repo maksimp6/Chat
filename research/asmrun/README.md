@@ -23,27 +23,43 @@ addresses in `tokenizer.asm` (x86-64 allows only base+index) and one bitwise `&`
 on a label-relative value in the hand-written PE header (`inc/pe.inc`, NASM
 `-f bin` forbids it). The compute kernels assembled clean.
 
-Performance (qwen3:1.7b, 4 threads), generation always correct:
+Performance (qwen3:1.7b, 4 threads, `-n 16`), generation always correct:
 
 | version | gen tok/s | Q6_K matvec | effective GB/s |
 | --- | --- | --- | --- |
-| v1: scalar fused dequant | 0.69 | 0.49 GB/s | 0.94 |
-| v2: AVX2-vectorised dequant+dot | 2.17 | 4.03 GB/s | 2.93 |
-| v3: fold scale + 4 FMA accumulators | 4.83 | 6.29 GB/s | 6.54 |
-| Ollama (llama.cpp), same model | 12.5–14.5 | — | — |
+| v1: scalar fused dequant | 0.69 | 0.49 | 0.94 |
+| v2: AVX2 vectorised dequant+dot | 2.17 | 4.03 | 2.93 |
+| v3: fold scale + 4 FMA accumulators | 4.83 | 6.29 | 6.54 |
+| v4: int8 `vpdpbusd` for Q4_K | 6.81 | 4.03\* | 9.22 |
+| v5: int8 `vpdpbusd` for Q4_K and Q6_K | 8.3 | 9.87 | 11.25 |
+| Ollama (llama.cpp), same model | ~15–18 | — | ~20–24 |
+
+\* v4 left Q6_K (the output projection the `--kernels` column measures) on the v3 float path.
 
 Generation is matvec-bound: 1.353 GB of weights are read per token, so
-tok/s ≈ effective_GB/s ÷ 1.353. v1 was badly compute-bound (scalar int→float
-convert and a dependent add per 4-bit weight). v2 unpacks the 4-bit (Q4_K) and
-6-bit (Q6_K, assembled from `ql`/`qh` with SIMD masks/shifts) codes with AVX2 and
-dots them with 8-wide FMA. v3 folds each sub-block's scale into its values and
-accumulates the whole 256-value block into four FMA accumulators, reducing just
-once per block instead of once per sub-block — 7× over v1, and ~47% of the
-~13.9 GB/s bus (`--bw`). The float path now plateaus there because it still does
-an int→float convert per 8 weights. Closing the rest of the gap to Ollama needs
-the int8 `vpdpbusd` path (this CPU reports `avx_vnni=1`): quantise the activations
-to int8 once per matvec, then do 32 integer MACs per instruction with no float
-convert. That is the next step.
+tok/s ≈ effective_GB/s ÷ 1.353. The arc:
+
+- **v1** was badly compute-bound: a scalar int→float convert and a dependent add
+  per 4-bit weight.
+- **v2** unpacks the 4-bit (Q4_K) and 6-bit (Q6_K, assembled from `ql`/`qh` with
+  SIMD masks/shifts) codes with AVX2 and dots them 8-wide with FMA.
+- **v3** folds each sub-block's scale into its values and accumulates the whole
+  256-value block into four FMA accumulators, reducing once per block. This is
+  the ceiling of the float path (an int→float convert per 8 weights).
+- **v4/v5** quantise the activations to int8 once per matvec (`k_quant_x` →
+  `g_q8`/`g_d8`/`g_bsums`) and use AVX-VNNI `vpdpbusd` (32 u8×s8 MACs per
+  instruction, no float convert), `{vex}`-encoded so it uses AVX-VNNI
+  (`avx_vnni=1`), not AVX-512. The Q4_K/Q6_K min and −32 offset terms use the
+  per-16 integer sums. **12× over v1.**
+
+That is as far as this went. Ollama reaches ~18 tok/s here, i.e. ~24 GB/s
+effective — it is **bandwidth-bound** on the ~24 GB/s bus. asmrun at ~11 GB/s is
+still **compute-bound per core**: thread scaling is sub-linear and a single core
+sustains only ~3.5 GB/s of matvec against a ~16 GB/s single-thread bus. So the
+remaining ~2× to Ollama is not algorithmic — it is matching llama.cpp's exact
+per-core kernel scheduling (optimal shuffles, the Q6_K reduction without the slow
+`vpmulld` this Gracemont core has, prefetch, and better work splitting). A tried
+`vpmulld`-based Q6_K reduction was *slower* on this E-core and was reverted.
 
 ## Build
 
