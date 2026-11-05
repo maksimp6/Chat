@@ -10,7 +10,7 @@ It is a research artifact, not a product. It targets exactly one model family
 (Qwen3) and one platform (Windows x64 with AVX2 + FMA + F16C, e.g. the Intel
 N100 this was written for). The architecture is specified in [DESIGN.md](DESIGN.md).
 
-## Status: builds, runs, and generates correct text — but it is slow
+## Status: builds, runs, and generates correct text
 
 It assembles with NASM 3.02 into a 28 KB PE, runs on the Intel N100, and
 generates coherent output ("The capital of France is" → "Paris. The capital of
@@ -23,22 +23,23 @@ addresses in `tokenizer.asm` (x86-64 allows only base+index) and one bitwise `&`
 on a label-relative value in the hand-written PE header (`inc/pe.inc`, NASM
 `-f bin` forbids it). The compute kernels assembled clean.
 
-First measurement (qwen3:1.7b, 4 threads) — **correct but about 20× slower than
-Ollama**:
+Performance (qwen3:1.7b, 4 threads), generation always correct:
 
-| metric | asmrun | reference |
-| --- | --- | --- |
-| generation | 0.69 tok/s | Ollama 12.5–14.5 tok/s |
-| effective matvec bandwidth | 0.94 GB/s | raw bus ~13.9 GB/s (`--bw`) |
+| version | gen tok/s | Q6_K matvec | effective GB/s |
+| --- | --- | --- | --- |
+| v1: scalar fused dequant | 0.69 | 0.49 GB/s | 0.94 |
+| v2: AVX2-vectorised dequant+dot | 2.17 | 4.03 GB/s | 2.93 |
+| Ollama (llama.cpp), same model | 12.5–14.5 | — | — |
 
-The quantized matvec reaches only ~7% of memory bandwidth, so it is
-**compute-bound, not bandwidth-bound**: the fused dequant does scalar work per
-4-bit weight (int→float convert, multiply, dependent add) on a serialized
-accumulator. The win is vectorising that inner dot — and `--cpuid` reports
-`avx_vnni=1`, so this CPU has `vpdpbusd` (int8 dot-product), exactly the
-instruction for an int8 activation path. That is the "second version" noted in
-[DESIGN.md](DESIGN.md), now confirmed necessary by measurement rather than
-assumed.
+Generation is matvec-bound: 1.353 GB of weights are read per token, so
+tok/s ≈ effective_GB/s ÷ 1.353. v1 was badly compute-bound (scalar int→float
+convert and a dependent add per 4-bit weight). v2 unpacks the 4-bit (Q4_K) and
+6-bit (Q6_K) codes with AVX2 and dots them with 8-wide FMA, 3× faster overall
+and ~8× on the big Q6_K output projection — but still only ~21% of the ~13.9 GB/s
+bus (`--bw`). The remaining gap to Ollama is the per-sub-block horizontal sum and
+the float conversion; closing it needs the int8 `vpdpbusd` path (this CPU reports
+`avx_vnni=1`), which does 32 integer MACs per instruction with no float convert
+and no per-sub-block reduction. That is the next step.
 
 ## Build
 
