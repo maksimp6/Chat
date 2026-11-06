@@ -14,7 +14,7 @@ Appends the repository's git history and its GitHub data to the owner's knowledg
 
 An edited issue or comment is appended again as a record of its new version; the record of the old version stays. Secrets, tokens and e-mail addresses are masked (`rag_sync.redact`, moved from the replaced scripts).
 
-**Files.** Records are packed into `logos-rag-<kind>-<UTC time>-NNN.md` of at most `PACK_LIMIT` (4 MiB, the size the replaced ingest used). Each file is uploaded to Files and attached to the store, and only then does its source's cursor move past the records it holds; a file that fails leaves the cursor, so the next sync writes those records again. The ledger (Kristall `rag_sync/ledger`) keeps the cursors and every file written; `rag_sync/state` keeps the running or last sync. One sync runs at a time, in a background thread.
+**Files.** Records are packed into `logos-rag-<kind>-<UTC time>-NNN.md` of at most `PACK_LIMIT` (4 MiB, the size the replaced ingest used). Every record goes into the vector database as it is read. A full file moves its source's cursor past the records it holds, then is uploaded to Files and attached to the store; a file that fails ends the sync, and the next sync goes on after those records, so they are not embedded again. The ledger (Kristall `rag_sync/ledger`) keeps the cursors and every file written; `rag_sync/state` keeps the running or last sync. One sync runs at a time, in a background thread.
 
 **GitHub token.** The token given to `POST /api/rag/sync` (used for that sync only, not stored), else `GITHUB_TOKEN`; without one the public API is used. A rate limit ends the sync with stage `rate_limited`; the next sync goes on from the cursor.
 
@@ -26,7 +26,7 @@ An edited issue or comment is appended again as a record of its new version; the
 
 ## Tool and HTTP
 
-Category `rag`, one function `rag`, field `action`: `sync` (optional `sources`: `git`, `github`, `all`), `status`, `reset`. HTTP (`rag_sync.routes`, `/api/rag`): `POST /sync` (optional JSON `token`, 202, or 409 while a sync runs), `GET /status`, `POST /reset`. Logos uploads by itself: the model calls `rag` (the base instructions in `yandex_client_modules/mcp_mixin.py` name it for the knowledge base); there is no script or workflow for it.
+Category `rag`, one function `rag`, field `action`: `sync` (optional `sources`: `git`, `github`, `all`), `status`, `reset`. HTTP (`rag_sync.routes`, `/api/rag`): `POST /sync` (optional JSON `token`, 202, or 409 while a sync runs), `GET /status`, `POST /reset`. Logos uploads by itself: the model calls `rag` (the base instructions in `yandex_client_modules/mcp_mixin.py` name it for the knowledge base); the job `rag_vectors_check` of `redmi9-app-server.yml` also starts a sync.
 
 ## Ports
 

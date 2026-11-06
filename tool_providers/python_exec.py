@@ -25,10 +25,11 @@ import uuid
 from typing import Any
 
 from tool_providers._vendor.output import limit_output, newline_text, read_output
+from tool_providers.host import vector_add
 
 __all__ = ["PYTHON_TOOLS", "python"]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("logos.tool_providers.python_exec")
 
 # limit_output's bound for the code's output (run_command's bound). Bytes past it are read and dropped.
 _MAX_OUTPUT_BYTES = 1048576
@@ -171,9 +172,7 @@ def _remember(action: str, args: dict, result: dict[str, Any], cfg: dict | None)
 
     def embed() -> None:
         try:
-            from vector_db import store
-
-            store.add(COLLECTION, text, doc_id, document)
+            vector_add(COLLECTION, text, doc_id, document)
         except Exception:
             logger.exception("[VECTORS] The python run %s was not embedded", doc_id)
 

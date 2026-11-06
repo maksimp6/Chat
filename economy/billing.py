@@ -66,6 +66,7 @@ def build_ai_billing_item(
         if model_key
         else None
     )
+    item["provider"] = (pricing or {}).get("provider") or PROVIDER
     if usage_missing or pricing is None or pricing.get("pricing_status") == "unknown":
         item.update(
             {
@@ -180,9 +181,10 @@ def aggregate_billing(items, context: dict[str, Any] | None = None) -> dict[str,
         ),
         6,
     )
+    providers = {item.get("provider") for item in readable if item.get("type") == "ai"}
     result = {
         "currency": PRICING_CURRENCY,
-        "provider": PROVIDER,
+        "provider": providers.pop() if len(providers) == 1 else PROVIDER,
         "pricing_version": PRICING_VERSION,
         "input_tokens": sum(int(item.get("input_tokens") or 0) for item in readable),
         "output_tokens": sum(int(item.get("output_tokens") or 0) for item in readable),

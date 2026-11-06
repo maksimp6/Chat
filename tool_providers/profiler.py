@@ -15,7 +15,7 @@ SORT_KEYS = ("cumulative", "time", "calls")
 
 
 def profile_application_performance(arguments: dict, cfg: dict = None) -> dict:
-    """Запускает экспресс-профайлинг ключевых компонентов системы."""
+    """Запускает сборку мусора и показывает её профиль и число объектов в памяти."""
     sort_by = arguments.get("sort") or "cumulative"
     if sort_by not in SORT_KEYS:
         raise ValueError(f"sort must be one of {', '.join(SORT_KEYS)}")
@@ -24,7 +24,6 @@ def profile_application_performance(arguments: dict, cfg: dict = None) -> dict:
     pr = cProfile.Profile()
     pr.enable()
 
-    # Имитация сбора метрик и инспекции памяти
     gc.collect()
     total_objects = len(gc.get_objects())
 
@@ -74,7 +73,7 @@ _READ_ONLY = {"read_only": True, "requires_approval": False, "risk_level": "low"
 TOOL_REGISTRY = {
     "profile_application_performance": {
         "func": profile_application_performance,
-        "description": "Выполнить профайлинг производительности кода и инспекцию памяти приложения.",
+        "description": "Выполнить сборку мусора и показать её профиль и число объектов в памяти приложения.",
         "parameters": {
             "type": "object",
             "properties": {

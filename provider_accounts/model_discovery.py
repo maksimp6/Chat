@@ -64,31 +64,58 @@ class ModelDiscovery:
         self._cached: dict[str, Any] | None = None
         self._cached_at = 0.0
         self._cached_credential: tuple[str, str, str] | None = None
+        # A failed read is remembered like a catalog: a provider that refuses is not asked
+        # again on every page load, and the same failure is logged once.
+        self._failed_at = 0.0
+        self._failed_credential: tuple[str, str, str] | None = None
+        self._logged_failure: str | None = None
 
     def get_models(self, *, force_refresh: bool = False) -> dict[str, Any]:
         try:
             # Resolve before consulting the cache so a rotated key or folder
             # cannot reuse another credential's catalog, even within its TTL.
             headers, project_id, credential_identity = self._request_auth()
-            now = time.monotonic()
-            with self._lock:
+        except Exception as exc:
+            self._log_failure(exc)
+            raise ModelDiscoveryError("provider model discovery failed") from exc
+        now = time.monotonic()
+        with self._lock:
+            if not force_refresh:
                 if (
-                    not force_refresh
-                    and self._cached is not None
+                    self._cached is not None
                     and self._cached_credential == credential_identity
                     and now - self._cached_at < self.ttl_seconds
                 ):
                     return deepcopy(self._cached)
+                if (
+                    self._failed_credential == credential_identity
+                    and now - self._failed_at < self.ttl_seconds
+                ):
+                    raise ModelDiscoveryError("provider model discovery failed")
+        try:
             catalog = self._fetch(headers=headers, project_id=project_id)
         except Exception as exc:
-            logger.warning("Model discovery failed: %s", self._safe_error(exc))
+            with self._lock:
+                self._failed_at = time.monotonic()
+                self._failed_credential = credential_identity
+            self._log_failure(exc)
             raise ModelDiscoveryError("provider model discovery failed") from exc
 
         with self._lock:
             self._cached = catalog
             self._cached_at = time.monotonic()
             self._cached_credential = credential_identity
+            self._failed_credential = None
+            self._logged_failure = None
         return deepcopy(catalog)
+
+    def _log_failure(self, exc: Exception) -> None:
+        failure = self._safe_error(exc)
+        with self._lock:
+            repeated = failure == self._logged_failure
+            self._logged_failure = failure
+        if not repeated:
+            logger.warning("Model discovery failed: %s", failure)
 
     def _request_auth(self) -> tuple[dict[str, str], str | None, tuple[str, str, str]]:
         if self._credential_resolver is not None:
@@ -319,6 +346,8 @@ def invalidate_model_discovery_cache() -> None:
         discovery._cached = None
         discovery._cached_at = 0.0
         discovery._cached_credential = None
+        discovery._failed_credential = None
+        discovery._logged_failure = None
 
 
 def static_model_catalog() -> dict[str, Any]:

@@ -71,27 +71,27 @@ def list_files():
 @file_bp.route("/api/files", methods=["POST"])
 def upload_file():
     if "file" not in request.files:
-        return jsonify({"error": "No file part in request"}), 400
+        return jsonify({"error": "Файл не получен. Выберите файл и повторите."}), 400
     file = request.files["file"]
     if file.filename == "":
-        return jsonify({"error": "No selected file"}), 400
+        return jsonify({"error": "Файл не выбран. Выберите файл и повторите."}), 400
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         return jsonify(
             {
-                "error": f"File type not allowed. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+                "error": f"Такой тип файла не принимается. Можно: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
             }
         ), 400
     content_length = request.content_length
     if content_length and content_length > MAX_FILE_SIZE:
-        return jsonify({"error": "File too large (max 128 MB)"}), 413
+        return jsonify({"error": "Файл больше 128 МБ: такой файл не принимается."}), 413
     # Read at most one byte past the limit: Content-Length may be absent, so the header
     # check alone does not bound memory use.
     file_content = file.stream.read(MAX_FILE_SIZE + 1)
     if len(file_content) == 0:
-        return jsonify({"error": "File is empty (0 bytes)"}), 400
+        return jsonify({"error": "Файл пустой: в нём нет данных."}), 400
     if len(file_content) > MAX_FILE_SIZE:
-        return jsonify({"error": "File too large (max 128 MB)"}), 413
+        return jsonify({"error": "Файл больше 128 МБ: такой файл не принимается."}), 413
     try:
         client = get_client()
         purpose = request.form.get("purpose", "assistants")
@@ -168,10 +168,10 @@ def create_vector_store():
     try:
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
-            return jsonify({"error": "JSON object is required"}), 400
+            return jsonify({"error": "Сервер не получил данные запроса. Повторите действие."}), 400
         name = data.get("name")
         if not name:
-            return jsonify({"error": "name is required"}), 400
+            return jsonify({"error": "Введите название."}), 400
         file_ids = data.get("file_ids")
         chunking_strategy = data.get("chunking_strategy")
         expires_after = data.get("expires_after")
@@ -227,10 +227,10 @@ def add_file_to_vs(vs_id):
     try:
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
-            return jsonify({"error": "JSON object is required"}), 400
+            return jsonify({"error": "Сервер не получил данные запроса. Повторите действие."}), 400
         file_id = data.get("file_id")
         if not file_id:
-            return jsonify({"error": "file_id is required"}), 400
+            return jsonify({"error": "Файл не выбран. Выберите файл и повторите."}), 400
         chunking_strategy = data.get("chunking_strategy")
         client = get_client()
         result = client.add_file_to_vs(

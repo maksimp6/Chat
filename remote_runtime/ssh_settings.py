@@ -59,9 +59,6 @@ def _env_bootstrap() -> dict[str, Any]:
     return {
         **copy.deepcopy(_DEFAULTS),
         "enabled": bool(targets),
-        # The environment carries no command allowlist, so command execution stays off until one
-        # is configured. Without this, the settings could never be read.
-        "allow_command_execution": False,
         "known_hosts": os.environ.get("LOGOS_SSH_KNOWN_HOSTS") or None,
         "targets": targets,
     }

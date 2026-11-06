@@ -60,11 +60,11 @@
     },
     {
       "id": "a1mini-oem-holder-pr",
-      "name": "logos_stock_spool_replacement_v03_A1mini.3mf",
+      "name": "stock_spool_replacement_v03_A1mini.3mf",
       "kind": "geometry",
       "location": "other_pr",
       "pr": 1110,
-      "path": "printing3d/assets/spool_holder/logos_stock_spool_replacement_v03_A1mini.3mf",
+      "path": "printing3d/assets/spool_holder/stock_spool_replacement_v03_A1mini.3mf",
       "bytes": 106016,
       "sha256": "21fe9c783b15d00421dfb39dd0c79666ac1fe6f8bb672eaec1c0e86decdbbf84",
       "format": "3MF",

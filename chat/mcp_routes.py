@@ -2649,7 +2649,7 @@ def _chat_turn(*, t_start, admission=None, live=None):
             if is_temperature_error
             else (
                 turn_error_text
-                or "Сервер не смог обработать запрос. Повторите его; причина записана в трассе: откройте «Детали» под сообщением."
+                or "Сервер не смог обработать запрос. Повторите его; причина записана в трассировке: откройте «Детали» под сообщением."
             )
         )
 
@@ -2938,6 +2938,9 @@ def fork_dialog(
     Raises ForkError; the original dialog is never changed."""
     if not check_access(conv_id, owner_id):
         raise ForkError("conversation_not_found", 404)
+    # A text dialog has no model of its own, whichever chat model it was created under.
+    if model is None or model in bound.TEXT_MODELS:
+        model = bound.CHAT_MODEL
     try:
         model = validate_dialog_model(model)
     except ValueError:

@@ -119,6 +119,7 @@ def _with_budget(
     return {**result, "budget": budget}
 
 
+@_result
 def cloud_compute(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
     provider = _provider(args)
     operation = str(args.get("operation") or "").strip().lower()

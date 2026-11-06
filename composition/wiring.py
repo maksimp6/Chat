@@ -902,6 +902,7 @@ def _tool_providers():
     from yandex_client_modules.tool_config import knowledge_vector_store_ids
     from storage.records import memory_file_path
     from remote_runtime.ssh_settings import runtime_for_operation
+    from vector_db.store import add as vector_add
     from agent_runtime.local_gateway import wait_for_local_tool_job
 
     return host.Host(
@@ -920,6 +921,7 @@ def _tool_providers():
         knowledge_vector_store_ids=knowledge_vector_store_ids,
         memory_file_path=memory_file_path,
         runtime_for_operation=runtime_for_operation,
+        vector_add=vector_add,
         wait_for_local_tool_job=wait_for_local_tool_job,
     )
 

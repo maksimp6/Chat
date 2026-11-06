@@ -70,6 +70,8 @@ _TEXTS = {
     "piece_incomplete": "Часть файла пришла не целиком: она будет отправлена снова.",
     "completion_uncertain": "Файлы не ответили вовремя: файл мог сохраниться.",
     "upload_incomplete": "Файл пришёл не весь: загрузка продолжится.",
+    "file_too_large": "Файл больше 128 МБ: такой файл не принимается.",
+    "file_type_not_allowed": "Такой тип файла не принимается. Можно: ",
 }
 # Pieces older than this process belong to requests that died with an earlier one.
 _BOOTED_AT = time.time()
@@ -174,14 +176,15 @@ def create_upload():
     if isinstance(size, bool) or not isinstance(size, int) or size < 1:
         return jsonify({"error": "size must be a positive number of bytes"}), 400
     if size > MAX_FILE_SIZE:
-        return jsonify({"error": "File too large (max 128 MB)"}), 413
+        return jsonify({"error": "file_too_large", "message": _TEXTS["file_too_large"]}), 413
     if not isinstance(purpose, str) or not purpose.strip():
         return jsonify({"error": "purpose must be a string"}), 400
     name = os.path.basename(name)
     if kind == "file" and os.path.splitext(name)[1].lower() not in ALLOWED_EXTENSIONS:
         return jsonify(
             {
-                "error": f"File type not allowed. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+                "error": "file_type_not_allowed",
+                "message": _TEXTS["file_type_not_allowed"] + ", ".join(sorted(ALLOWED_EXTENSIONS)),
             }
         ), 400
     upload_id = data.get("id", uuid.uuid4().hex)

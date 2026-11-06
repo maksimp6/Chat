@@ -34,6 +34,7 @@ class Host:
     )
     memory_file_path: Any  # storage.records.memory_file_path
     runtime_for_operation: Any  # remote_runtime.ssh_settings.runtime_for_operation
+    vector_add: Any  # vector_db.store.add
     wait_for_local_tool_job: Any  # agent_runtime.local_gateway.wait_for_local_tool_job
 
 
@@ -57,6 +58,7 @@ __all__ = [
     "memory_file_path",
     "provide",
     "runtime_for_operation",
+    "vector_add",
     "wait_for_local_tool_job",
 ]
 
@@ -87,6 +89,10 @@ def memory_file_path(*args: Any, **kwargs: Any) -> Any:
 
 def runtime_for_operation(*args: Any, **kwargs: Any) -> Any:
     return current().runtime_for_operation(*args, **kwargs)
+
+
+def vector_add(*args: Any, **kwargs: Any) -> Any:
+    return current().vector_add(*args, **kwargs)
 
 
 def wait_for_local_tool_job(*args: Any, **kwargs: Any) -> Any:

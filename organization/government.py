@@ -495,7 +495,7 @@ GOVERNMENT_TOOLS = {
         requires_approval=True,
         schema=object_schema(_CASE, ["case_id"]),
         title="Government Submit",
-        description="Отправить подтверждённое дело через GovGateway.",
+        description="Отметить подтверждённое дело как отправленное. За пределы приложения ничего не уходит.",
     ),
 }
 

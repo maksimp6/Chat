@@ -64,7 +64,6 @@ def _pages(path: str, params: dict[str, str], token: str | None, key: str | None
         url = match.group(1) if match else ""
 
 
-# kind -> (path, cursor field, query builder, listing key)
 KINDS = ("issues", "issue_comments", "review_comments", "runs")
 
 

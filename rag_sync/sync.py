@@ -1,10 +1,11 @@
 """Append new git history and GitHub data to the knowledge store; nothing is rebuilt.
 
 Each sync reads only what is newer than the ledger's cursors (rag_sync.git_source,
-rag_sync.github_source), writes it into new files ``logos-rag-<kind>-<time>-NNN.md`` of
-at most PACK_LIMIT bytes, uploads each file to Files, attaches it to the knowledge store
-and only then moves that source's cursor past the records the file holds. A file that
-fails leaves its cursor where it was, so the next sync writes those records again.
+rag_sync.github_source), embeds every record into the vector database as it is read and
+writes it into new files ``logos-rag-<kind>-<time>-NNN.md`` of at most PACK_LIMIT bytes.
+A full file moves that source's cursor past the records it holds, then goes to Files and
+the knowledge store. A file that fails ends the sync, and the next sync goes on after its
+records: they are in the vector database and are not embedded again.
 
 The ledger (Kristall ``rag_sync/ledger``) holds the cursors and every file written; the
 state of the running or last sync is ``rag_sync/state``. One sync runs at a time, in a
@@ -105,15 +106,15 @@ class _Writer:
         self.part += 1
         name = f"{PREFIX}{self.kind}-{self.stamp}-{self.part:03d}.md"
         body = (f"# {self.kind} · {github_source.repository()}\n\n" + _SEPARATOR.join(self.parts) + "\n").encode()
+        cursor, keys = self.last
+        self.ledger["cursors"][self.kind] = cursor
+        self.ledger["edges"][self.kind] = keys
+        _save_ledger(self.ledger)
         stored = self.client.upload_file(body, name, purpose="assistants")
         file_id = stored.get("id")
         if not isinstance(file_id, str) or not file_id:
             raise RuntimeError(f"Files returned no id for {name}")
         self.client.add_file_to_vs(self.store_id, file_id)
-        # Only a stored and attached file moves the cursor past its records.
-        cursor, keys = self.last
-        self.ledger["cursors"][self.kind] = cursor
-        self.ledger["edges"][self.kind] = keys
         self.ledger["files"].append(
             {"file_id": file_id, "name": name, "kind": self.kind, "records": len(self.parts),
              "bytes": len(body), "cursor": cursor, "at": int(time.time())}

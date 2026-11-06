@@ -973,6 +973,17 @@ def _http_arguments(tool_name: str, body: Any) -> dict[str, Any]:
     return body
 
 
+_PAGE_TEXTS = {
+    "partner not found": "Партнёр не найден: обновите список.",
+    "followup not found": "Напоминание не найдено: откройте партнёра заново.",
+}
+
+
+def _page_text(exc: ValueError) -> str:
+    """What the partner window shows for an error; tools keep the error as it is."""
+    return _PAGE_TEXTS.get(str(exc), str(exc))
+
+
 @partner_relations_bp.get("")
 def partners_list():
     try:
@@ -1001,7 +1012,7 @@ def partners_get(partner_id: str):
         return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
-        return jsonify({"error": str(exc)}), status
+        return jsonify({"error": _page_text(exc)}), status
 
 
 @partner_relations_bp.put("/<partner_id>")
@@ -1134,7 +1145,7 @@ def partner_status_update(partner_id: str):
         return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
-        return jsonify({"error": str(exc)}), status
+        return jsonify({"error": _page_text(exc)}), status
 
 
 @partner_relations_bp.post("/followups/<followup_id>/complete")
@@ -1149,7 +1160,7 @@ def partner_followup_complete(followup_id: str):
         return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "followup not found" else 400
-        return jsonify({"error": str(exc)}), status
+        return jsonify({"error": _page_text(exc)}), status
 
 
 def ensure_partner_department() -> None:
