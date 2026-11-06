@@ -30,17 +30,6 @@ python -m http.server 8765 --bind 127.0.0.1 --directory website
 Относительные CSS/favicon работают и в подпапке `/Chat/`, но SEO-адрес остаётся
 утверждённым корневым доменом. Не индексировать альтернативную копию страницы.
 
-```bash
-python -m unittest discover -s tests -p test_printer_website.py -v
-python tests/validate_runtime_modules.py
-python tests/validate_skills.py
-bash scripts/check_code_rules.sh
-bash scripts/pre_push.sh
-```
-
-Перед push обязателен clean-worktree formatting gate; перед интеграцией —
-действующие проверки защищённого PR на точном head. Форматтер репозитория не
-охватывает `website/`; HTML проверяется отдельно, CI не меняется ради страницы.
 Мобильная эмуляция Chromium не равнозначна проверке на физическом Android.
 
 ## Последующие действия: только после отдельного согласия

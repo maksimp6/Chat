@@ -19,7 +19,7 @@ lands in the Kristall journal. The map below is generated from
 function must exist).
 
 <!-- BEGIN GENERATED: life of a dialog (scripts/check_independence.py --write-docs) -->
-Logos is a dialog assistant. A person opens the page, picks a model and talks; the model answers through Yandex AI Studio and may call tools (local tools, MCP servers, web and file search) during the turn. Every turn is an invocation with an execution trace and a cost, and everything is stored in the native Kristall journal. Following one dialog through the operations below touches almost every unit.
+Logos is a dialog assistant. A person opens the page, picks a model and talks; the model answers through Ollama and may call tools (local tools, MCP servers, web and file search) during the turn. Every turn is an invocation with an execution trace and a cost, and everything is stored in the native Kristall journal. Following one dialog through the operations below touches almost every unit.
 
 ```mermaid
 flowchart LR
@@ -209,6 +209,7 @@ flowchart LR
     web_shell[web_shell]
     workspace[workspace]
     yandex_client_modules[yandex_client_modules]
+    core -->|1| ollama_client
     yandex_client_modules -->|3| api
 ```
 <!-- END GENERATED: unit map -->

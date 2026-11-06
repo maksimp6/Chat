@@ -7,12 +7,9 @@
 
 # Инфраструктура и деплой
 /.github/                          @maksimp6
-/deploy/                           @maksimp6
-docker-compose.postgres.yml        @maksimp6
 
 # Данные и миграции
 /storage/db.py                     @maksimp6
-/db_backend.py                     @maksimp6
 
 
 # Документация и правила репозитория

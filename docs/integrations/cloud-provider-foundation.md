@@ -21,7 +21,7 @@ Logos now exposes a provider-neutral cloud tool surface backed by a Cloud.ru imp
 
 ## Sandbox environments (issue #445, phase 3 of #440)
 
-`environment_manager.py` selects one `EnvironmentAdapter` (`cloud/environment.py`)
+`remote_runtime/environments.py` selects one `EnvironmentAdapter` (`cloud/environment.py`)
 per environment record:
 
 - `local` (default) — today's git worktree + in-process thread runtime. Unchanged

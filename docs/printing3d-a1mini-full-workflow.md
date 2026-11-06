@@ -38,7 +38,6 @@ REQUESTED → CAD_READY → GEOMETRY_VERIFIED → SLICED → AUDITED → STAGED 
 - printing3d/print_workflow.py: атомарный file-native lifecycle/fsync, replay-fence и approval.
 - printing3d/ftps_storage.py: pinned TLS FTPS staging/readback/video-copy. **Не содержит start_print или delete.**
 - printing3d/video_archive.py: Drive quota, bounded spool, resumable chunks, MD5+size+SHA proof, локальная копия не удаляется.
-- tests/test_printing3d_workflow_contract.py: быстрые offline negative tests, не физический принтер.
 
 ## Точные блокеры live
 

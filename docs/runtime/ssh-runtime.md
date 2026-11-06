@@ -9,11 +9,7 @@ When no saved configuration exists, the Runtime bootstraps from:
 - `LOGOS_SSH_TARGETS_JSON`
 - `LOGOS_SSH_KNOWN_HOSTS`
 
-After the settings are saved through the UI/API, the persisted configuration becomes authoritative.
-
 ## Safety defaults
-
-SSH Runtime is disabled unless a target configuration exists or it is explicitly enabled in saved settings.
 
 Strict host-key verification is mandatory. Every enabled target must have either a target-level `known_hosts` reference or the global `known_hosts` reference.
 
@@ -23,7 +19,7 @@ Read-only mode disables command execution and file writes.
 
 Command execution is fail-closed behind `command_allowlist`: when command execution is enabled, at least one full-match regex must be configured. Privileged commands (`sudo`, `su`, `doas`, `pkexec`) are disabled by default and require both explicit enablement and the normal approval gate when configured that way.
 
-File writes require approval by default. These policies are persisted with the Runtime settings and settings changes emit sanitized `ssh_runtime_settings_updated` events in Execution Trace.
+File writes require approval by default.
 
 Command output is bounded by `max_output_bytes` to prevent an SSH call from exhausting memory or flooding the trace.
 

@@ -174,10 +174,6 @@ HTML/CSS/critical-script chain (~89 KiB) has arrived but the remaining
   outline (`.logos-action-pending`), and the latest such tap runs once the
   page's scripts have all run. This added
   1,427 B to `boot.js` and 2,493 B to `core_api.js`.
-- `android_diagnostics.js` and `eruda_init.js` are already explicitly
-  marked `data-optional-script="true"` and are debug/diagnostic tooling,
-  not user-facing functionality — their absence is expected (the check
-  `tests/test_frontend_optional_scripts.py` is not in the repository yet).
 
 In practice, on any connection fast enough to load ~89 KiB at all, the
 remaining ~243 KiB of deferred scripts finish within the same page load and

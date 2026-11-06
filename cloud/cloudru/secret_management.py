@@ -7,11 +7,9 @@ immutable once written and several versions may be active at once, so "switch"
 and "rollback" are purely local operations: which version this app currently
 trusts for a given purpose.
 The rendered API reference is not machine-readable and this repository has no
-mirrored copy yet (``docs/integrations/cloudru-docs-mirror.md`` is still
-"planned"), so the request paths and status-code mapping below are the
+mirrored copy, so the request paths and status-code mapping below are the
 best-known shape, matching the documented concepts. Confirm them on the first
-live connection, the same caveat already recorded for Container Apps in
-``docs/cloudru-container-apps.md``.
+live connection.
 
 Design constraints from issue #477, enforced here rather than left to callers:
 

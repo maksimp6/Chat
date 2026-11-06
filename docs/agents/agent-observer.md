@@ -1,9 +1,11 @@
 # Agent observer
 
+The workflow `agent-observer.yml` was removed by #1592: the code runs only by hand.
+
 `agent_office/observer.py` watches the agent office: Claude, Codex, Copilot and
 Logos working through issues and pull requests in this repository.
 
-Every hour `.github/workflows/agent-observer.yml` runs it. It:
+When run, it:
 
 1. reads open issues and pull requests, plus the ones closed in the last day;
 2. builds one chronological thread per item from its GitHub timeline, naming the

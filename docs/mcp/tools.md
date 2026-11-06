@@ -1,6 +1,6 @@
 # Доступные MCP-инструменты
 
-Справочник составлен по реестру `tool_providers/registry.py` (develop, HEAD 869e0ed58).
+Справочник составлен по реестру `tool_providers/registry.py`.
 Все инструменты автоматически экспортируются в MCP (`mcp_server/tools.py::_tools_list`)
 с метаданными: risk_level, read_only, requires_approval, capabilities.
 
@@ -26,10 +26,16 @@
 | government | organization/government.py | 12 | gov.case.create, gov.requirements, gov.collect_data, gov.validate_data, gov.tax_options, gov.prepare_application, gov.prepare_documents, gov.submit, gov.process_response, gov.request_approval, gov.status, gov.archive_case |
 | partner | organization/partner_relations.py | 15 | partner.create/list/get/update/delete, partner.contact.create/list/update/delete, partner.message.prepare/send, partner.thread.get, partner.followup.create/complete, partner.status.update |
 | cloud | cloud/tools.py | 14 | cloud.resources.list/get, cloud.compute.list/status/start/stop/reboot, cloud.costs.summary, cloud.budget.status, cloud.metrics.query, cloud.logs.query, cloud.backup.create, cloud.ssh.exec, cloud.capabilities |
-| forge | forge/tools.py | 6 | printing3d.quote, printing3d.finance.assess/status/plan.set, printing3d.order.create, printing3d.orders.list, printing3d.treasury.summary |
+| 3d | forge/tools.py, model_editor/tools.py | 14 | printing3d.quote, printing3d.plate.inspect, printing3d.finance.assess/status/plan.set, printing3d.order.create, printing3d.orders.list, printing3d.treasury.summary, model.create/addcube/addcylinder/edit/inspect/export |
 | browser | browser/tools.py (composition/tool_sources.py) | 17 | browser_open, browser_read, browser_find, browser_extract, browser_click, browser_fill_form, browser_act, browser_wait, browser_evaluate, browser_screenshot, browser_history, browser_tabs, browser_session, browser_cookies, browser_search, browser_request, browser_download |
 | rootagent | tool_providers/rootagent.py (composition/tool_sources.py) | 2 | rootagent_run (управление телефоном как юзер: status, probe, capture, tap, swipe, text, key, move, click как задания GitHub Actions на develop), rootagent_result (статус запуска и JSON-результат по run_id). Настройка и границы — [docs/redmi-root-agent.md](../redmi-root-agent.md#logos-tool) |
 | tty | tool_providers/tty.py (composition/tool_sources.py) | 6 | tty_open, tty_write, tty_read, tty_resize, tty_close, tty_list |
+| court | court/tools.py (composition/tool_sources.py) | 1 | court: зал суда, поле `action` выбирает действие ([court/README.md](../../court/README.md)) |
+| rag | rag_sync/tools.py (composition/tool_sources.py) | 1 | rag: поле `action` — sync, status, reset |
+| vectors | vector_db/tools.py (composition/tool_sources.py) | 1 | vectors: поле `action` — add, search, delete, drop, collections |
+| remember | vector_db/tools.py (composition/tool_sources.py) | 1 | remember: поиск в памяти по смыслу размышления модели |
+| python | tool_providers/python_exec.py (composition/tool_sources.py) | 1 | python: поле `action` — run, eval, info |
+| ssl | tool_providers/ssl_server.py (composition/tool_sources.py) | 6 | ssl_cert_check, ssl_server_status, ssl_server_config_test, ssl_cert_issue, ssl_cert_renew, ssl_server_service |
 
 ## Настройки: общие и только для чтения
 
@@ -147,8 +153,6 @@ MCP-сервер (`mcp_server/tools.py::_tools_list`) по-прежнему пе
   → browser_read(section='2'); browser_open → browser_fill_form(fields, submit=true);
   browser_open → browser_click(ref='L5') → browser_download(ref='L7', path='downloads/',
   overwrite=false); browser_request(url, json_body, json_path) для API.
-- **Сохранённый список инструментов.** Если у диалога сохранён список категорий,
-  отметьте «Модуль: browser», иначе инструменты браузера модели не предлагаются.
 - **Безопасность.** Каждый запрос, перенаправление и каждый запрос Chrome проверяются
   тем же запретом адресов link-local (метаданные облака), что и `http_fetch`. Браузер
   не использует профиль, cookies и входы владельца: у каждой сессии чистое состояние.
@@ -165,8 +169,6 @@ MCP-сервер (`mcp_server/tools.py::_tools_list`) по-прежнему пе
 
 Определены в `tool_providers/tty.py` (`TTY_TOOLS`), подключаются через
 `composition/tool_sources.py` после категории `browser`; доступны в диалоге и через MCP.
-Как и у browser, модели они предлагаются только тогда, когда в списке категорий диалога
-отмечен «Модуль: tty».
 
 **Не проверено на Redmi (Termux).** Путь PTY пока проверен только чтением кода; запуска
 на устройстве и тестов не было (NOT_RUN).
@@ -205,20 +207,11 @@ MCP-сервер (`mcp_server/tools.py::_tools_list`) по-прежнему пе
 - logos_list_conversations / logos_get_conversation / logos_get_conversation_messages — переписки;
 - logos_list_project_files / logos_read_project_file / logos_search_project — файлы проекта (read-only).
 
-## Внешние MCP-серверы (deploy/)
-
-- **Remote Desktop Commander (RDC)** — `deploy/remote-desktop-commander/mcp-gateway.mjs`:
-  шлюз MCP поверх Desktop Commander (stdio), streamable-http, OAuth + short-token;
-  все инструменты апстрима, кроме заблокированного `write_pdf` (BLOCKED_TOOLS);
-  дымовые тесты: mcp-gateway-live-smoke.mjs.
-- **Chrome Worker (Playwright MCP)** — `deploy/chrome-worker/mcp.mjs`:
-  браузерные инструменты через `@playwright/mcp`, сессии в памяти, аутентификация на worker'е.
-
 ## Выполнение вызовов
 
 - `tool_providers/universal_tool_platform.py` — единый контракт UniversalToolCall/UniversalToolDefinition;
   transports: responses_api, local_agent, mcp.
-- `yandex_client_modules/mcp_mixin.py` — модель (YandexGPT) вызывает инструменты через реестр; трассировка в observability.
+- `yandex_client_modules/mcp_mixin.py` — клиент провайдера вызывает инструменты через реестр; трассировка в observability.
 - `agent_runtime/gateway.py` — Agent Gateway (A2A-протокол, circuit breaker, permissions, rate limits).
 
 ## Что доступно Logos в раннере (issue_runner)

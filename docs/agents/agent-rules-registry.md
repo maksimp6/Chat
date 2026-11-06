@@ -76,8 +76,3 @@ Before activation: independent review, required exact-head CI, negative adapter 
 (wrong phone, Issues substitution, forged receipt, restart, bypass dispatch), trusted
 host permission checks and explicit owner activation acceptance. Keep this PR Draft,
 without merge. Never treat its tests as proof of live device control or activated rules.
-
-Validation: `python -m pytest -q tests/test_agent_rules.py tests/test_universal_tool_platform.py`.
-The tests include real ExecutionTrace events and fake-tool dispatch counters to prove
-blocked actions do not execute, observer/verifier failures, proposal copy safety,
-existing approval refusal and unchanged-method retry prevention.

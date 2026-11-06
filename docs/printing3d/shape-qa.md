@@ -107,8 +107,7 @@ guard-band rule is **project-local**, not an ISO-mandated tolerance.
 ## Validation
 
 ```
-python -m unittest discover -s tests -p 'test_printing3d_shape_benchmarks.py' -v
 python -m printing3d.shape_benchmarks --out /tmp/logos-shape-coupons
 ```
 
-Test contract covers deterministic hashes, topology, exact source bbox, hole topology, bad normals/winding, NaN, degenerate triangles, duplicate facets, missing faces, malformed lengths, invalid dimensions and out-of-range bounding box. It does **not** validate slicer material, nozzle/bed temperature, printable overhang, FTPS communication, surface roughness, load strength or true roundness. Every unmeasured physical feature remains **UNVERIFIED**. None of the six fixtures may be printed, staged, uploaded or used to spend filament without new specific user authorization.
+This does **not** validate slicer material, nozzle/bed temperature, printable overhang, FTPS communication, surface roughness, load strength or true roundness. Every unmeasured physical feature remains **UNVERIFIED**. None of the six fixtures may be printed, staged, uploaded or used to spend filament without new specific user authorization.

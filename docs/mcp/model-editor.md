@@ -7,7 +7,7 @@ Related: [engineering #1079](https://github.com/maksimp6/Chat/issues/1079),
 ## What works
 
 The editor registers six **local** Universal Tools in Logos's existing `3d` category
-(`tool_registry.py`). They use the same Responses API, local-agent, and MCP
+(`tool_providers/registry.py`). They use the same Responses API, local-agent, and MCP
 transports and normal Invocation/Execution Trace pipeline as other local tools.
 
 | Tool | Operation | Writes data |
@@ -77,16 +77,3 @@ Those are owned by #1096 and need separate staging/start gates.
   belong to #1096. Users must not assume a CAD tool has started a print.
 - The standalone `scripts/model_add_cube.py` remains supported;
   the registry-based tool uses the immutable scene engine instead.
-
-## Local verification
-
-```bash
-python -m unittest discover -s tests -p test_model_editor_tools.py -v
-python -m unittest discover -s tests -p test_model_add_cube.py -v
-ruff check model_editor tests/test_model_editor_tools.py
-ruff format --check model_editor tests/test_model_editor_tools.py
-mypy --config-file pyproject.toml --follow-imports=silent model_editor
-```
-
-CI and exact-head review are required before merging into `develop`;
-there is no direct push to protected `master`.

@@ -10,14 +10,11 @@
 - https://cloud.ru/docs/scsm/ug/topics/overview__limitations
 - https://cloud.ru/docs/scsm/ug/topics/pricing
 
-В репозитории пока нет зеркала этой документации
-(`docs/integrations/cloudru-docs-mirror.md` в статусе "planned"), поэтому
+В репозитории нет зеркала этой документации, поэтому
 точные пути REST API и коды состояний в `cloud/cloudru/secret_management.py`
 — наилучшее известное соответствие документированной модели (секрет → много
-неизменяемых версий), а не подтверждённый на живом проекте контракт. Тот же
-явный disclaimer уже есть для Container Apps в
-`docs/cloudru-container-apps.md`. Проверить и при необходимости поправить
-пути/коды при первом реальном подключении.
+неизменяемых версий), а не подтверждённый на живом проекте контракт. Проверить
+и при необходимости поправить пути/коды при первом реальном подключении.
 
 ## Модель данных
 
@@ -137,13 +134,11 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
   `provider_accounts/credentials.py`; Secret Management становится
   дополнительным источником, а не заменяет это хранилище;
 - `logos_database_url` — retired: строка подключения к PostgreSQL больше не создаётся и не читается
-  (`LOGOS_DATABASE_URL`; хранилище — нативный Kristall journal, см. `docs/database.md`), см. известное ограничение "App secrets are plain
-  container env vars" в `docs/cloudru-container-apps.md`.
+  (`LOGOS_DATABASE_URL`; хранилище — нативный Kristall journal, см. `docs/database.md`).
 
 ## Реальный bootstrap из Container Apps
 
-На сегодня (см. `docs/cloudru-container-apps.md`, раздел "Known
-limitations") секреты Container Apps — обычные переменные окружения
+На сегодня секреты Container Apps — обычные переменные окружения
 контейнера, видимые всем, у кого есть доступ на чтение к Container Apps в
 проекте. Целевая последовательность для перехода на Secret Management:
 
@@ -173,6 +168,4 @@ limitations") секреты Container Apps — обычные переменн�
 
 - `docs/security/key_manager.md` — общий менеджер ключей Logos
   (внутреннее шифрование, независимо от Cloud.ru).
-- `docs/cloudru-container-apps.md` — деплой и известные ограничения по
-  секретам.
 - Issue: #477, #475, #440.

@@ -1,6 +1,8 @@
 # Runner-issued model key on Redmi 9
 
-The workflow `Redmi 9 issue model key` has one Bash step named `logos`.
+Status: the workflow described here was removed; this page is history.
+
+The workflow `Redmi 9 issue model key` had one Bash step named `logos`.
 The runner process issues a Yandex Cloud API key through IAM and delivers it
 to the existing app at `127.0.0.1:8080`. The app never issues the key itself.
 There are no model, tokenization, model-list or paid validation requests.

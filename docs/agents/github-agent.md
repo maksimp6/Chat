@@ -1,8 +1,9 @@
 # Logos as a GitHub agent
 
+The workflow `logos.yml` was removed by #1592: the code runs only by hand, and this page describes the workflow it was built for.
+
 Logos can take a GitHub issue and work on its own code. The headless runner is
-`issue_runner.py`. No workflow in this repository starts it: a person runs it by
-hand, and the workflow named below is the one the runner was built for.
+`issue_runner.py`.
 
 ## How it works
 
@@ -23,16 +24,9 @@ hand, and the workflow named below is the one the runner was built for.
 
 ## Setup
 
-Add these repository secrets under Settings → Secrets and variables → Actions.
 Never paste a token into an issue, a chat or a commit.
 
-| Secret                  | Value                                          |
-| ----------------------- | ---------------------------------------------- |
-| `YANDEX_API_KEY`        | Yandex AI Studio API key for Logos             |
-| `YANDEX_PROJECT_ID`     | Yandex AI Studio project (folder) ID           |
-| `LOGOS_APP_PRIVATE_KEY` | Full PEM private key of the Logos GitHub App   |
-
-And this repository variable:
+The repository variable:
 
 | Variable              | Value                                   |
 | --------------------- | --------------------------------------- |

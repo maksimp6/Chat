@@ -3,7 +3,7 @@
 The repository runner `redmi9-python` (runner ID 21) executes small GitHub Actions
 shell/Python jobs directly in Termux on Redmi 9 (`galahad`, ARM64). Runtime:
 Python standard library and OpenSSL, with no Docker, proot, chroot, .NET, or pip
-runtime packages. Pytest is used only for regression tests.
+runtime packages.
 
 ## Use
 
@@ -81,15 +81,6 @@ the Termux account's access. It does not safely execute hostile contributors'
 code. Output redaction is best effort; jobs must not deliberately print secrets.
 
 ## Verification
-
-```sh
-python -m compileall -q scripts/redmi_python_runner.py tests/test_redmi_python_runner.py
-python -m pytest -q tests/test_redmi_python_runner.py
-```
-
-Regression tests execute real subprocesses and check success/failure wire
-serialization, uppercase GitHub template maps, rejected job types, timeouts
-after stdout closes, cancellation, redaction, and failed result delivery.
 
 The first live negative control exposed an integer-enum serialization bug:
 GitHub reported success despite a local failure. After correcting wire values

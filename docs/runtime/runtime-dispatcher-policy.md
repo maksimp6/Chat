@@ -56,9 +56,7 @@ Therefore runtime code must not rely on thread separation alone. Mutable runtime
 
 ## Static policy
 
-`tests/validate_runtime_modules.py` parses runtime modules with Python AST before execution.
-
-Outside the dispatcher boundary it rejects direct imports/calls for resource primitives such as:
+Outside the dispatcher boundary runtime modules must not import or call resource primitives such as:
 
 - `db/get_conn`;
 - `requests` / `httpx`;
@@ -82,10 +80,3 @@ Every new runtime capability must include:
 5. trace/redaction coverage when the operation emits Execution Trace data.
 
 A green HTTP health check is not sufficient proof of runtime isolation.
-
-## Commands
-
-```bash
-python tests/validate_runtime_modules.py
-pytest -q tests/test_runtime_policy.py tests/test_runtime_dispatcher.py
-```

@@ -2,12 +2,12 @@
 
 # Logos
 
-**Self-hosted AI assistant platform around Yandex AI Studio, MCP/local tools, agent orchestration, execution traces and billing, with a web interface.**
+**Self-hosted AI assistant platform around local Ollama models, MCP/local tools, agent orchestration, execution traces and billing, with a web interface.**
 
 <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
 <a href=".python-version"><img alt="Python 3.14" src="https://img.shields.io/badge/python-3.14-3776AB.svg?logo=python&logoColor=white"></a>
 <a href="webframe/README.md"><img alt="webframe" src="https://img.shields.io/badge/web-webframe-000000.svg"></a>
-<a href="docs/models/yandex-models.md"><img alt="Yandex AI Studio" src="https://img.shields.io/badge/Yandex%20AI%20Studio-Responses%20API-FC3F1D.svg"></a>
+<a href="ollama_client/README.md"><img alt="Ollama" src="https://img.shields.io/badge/models-Ollama-000000.svg"></a>
 
 [Quick start](#quick-start) ·
 [Features](#features) ·
@@ -49,8 +49,8 @@ Shipped behavior. Open scope is listed under [Status and roadmap](#status-and-ro
 
 ### AI execution
 
-- **Yandex AI Studio Responses API** is the primary provider through the backend
-  chat path.
+- **Ollama on the owner's PC** (`ollama_client/`) serves chat and embeddings. The
+  Yandex client stays in the repository as a second provider.
 - **Unified tool execution** through `UniversalToolExecutor`, including MCP and
   local tools.
 - **Invocation context and execution trace** for provider requests, polling, tool
@@ -65,7 +65,7 @@ Shipped behavior. Open scope is listed under [Status and roadmap](#status-and-ro
 - **RuntimeDispatcher** for runtime-scoped invocations and an Agent Gateway that
   lists the registered agents. The target architecture is one Python process with
   managed threads/contexts; threads are not a hostile-code security boundary.
-- **Logos agent tooling:** headless runner, tools and draft PR output. See
+- **Logos agent tooling:** headless runner and tools. See
   [Logos GitHub agent](docs/agents/github-agent.md).
 
 ### Accounting
@@ -94,6 +94,7 @@ Shipped behavior. Open scope is listed under [Status and roadmap](#status-and-ro
 flowchart TD
     U["Web browser<br/>static/ + templates/"] --> O["Chat API / Orchestrator<br/>POST /api/chat"]
     O --> C["InvocationContext"]
+    C --> L["Ollama<br/>chat and embeddings"]
     C --> Y["Yandex AI Studio<br/>Responses API"]
     C --> T["UniversalToolExecutor"]
     T --> M["MCP / local tools"]
@@ -111,6 +112,7 @@ and tool calls retain scoped correlation through `InvocationContext` and
 | --------------------------- | ---------------------------------------------------------- |
 | Chat API (`POST /api/chat`) | `chat/mcp_routes.py`                                       |
 | `InvocationContext`         | `invocation/context.py`                                    |
+| Ollama client               | `ollama_client/`                                           |
 | Yandex AI Studio client     | `yandex_client_modules/`                                   |
 | `UniversalToolExecutor`     | `tool_providers/universal_tool_platform.py`                |
 | Agent Gateway               | `agent_runtime/gateway.py`                                 |
@@ -128,7 +130,7 @@ Logos is easiest to understand by following one dialog («диалог», a conv
 
 1. The page lists the person's dialogs and the available models (`GET /api/conversations`, `GET /api/models`).
 2. A new dialog is created for the chosen model (`POST /api/conversations`); opening one reads its history (`GET /api/conversations/<conv_id>/messages`).
-3. Each message is one turn (`POST /api/chat`): an invocation with an execution trace, a Yandex AI Studio request, tool calls (local tools, MCP servers, web and file search) when the model asks for them, and a cost posted to the treasury.
+3. Each message is one turn (`POST /api/chat`): an invocation with an execution trace, a model request, tool calls (local tools, MCP servers, web and file search) when the model asks for them, and a cost posted to the treasury.
 4. Everything (messages, settings, traces, costs, memory) is stored in the native Kristall journal.
 
 The full map, with every operation, route, unit and Kristall record, is
@@ -140,7 +142,7 @@ Every package, script and tool is an independent unit: no unit imports another o
 What a unit needs from others is a port in its `host.py`, provided by the composition
 roots (`app.py` and `composition/`), and each unit's `README.md` lists its public API,
 ports and installation. The rules, the wiring and the static checker
-(`python3 scripts/check_independence.py --summary`, which prints `TOTAL=0`) are in
+(`python3 scripts/check_independence.py --summary`) are in
 [Modules and their independence](docs/architecture/modules.md).
 
 ## Quick start
@@ -159,7 +161,7 @@ cd Chat
 python3 -m venv venv
 source venv/bin/activate
 python -m pip install -r requirements.txt
-cp .env.example .env
+cp .env.example core/.env
 ```
 
 ### 2. Configure
@@ -185,13 +187,12 @@ Open `http://localhost:8080` when using the template's `PORT=8080`; without
 installs `requests` and `websockets` if they are missing, and runs
 `python3 app.py`.
 
-### 4. Add the provider key
+### 4. The model provider
 
-In **Провайдеры** (Providers), save the Yandex API key together with its Project ID.
-The current web runtime resolves both from the active database credential;
-environment-only `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` values do not configure the
-chat. See the [installation guide](docs/setup/installation.md) and
-[provider-key lifecycle](docs/provider-key-rotation.md).
+Chat and embeddings run on Ollama. Its address, the served models, their context and
+their tools are fixed in [`ollama_client/settings.py`](ollama_client/settings.py) and
+shown read-only on the Ollama tab of ⚙️. See the
+[installation guide](docs/setup/installation.md).
 
 ### Data storage
 
@@ -236,6 +237,9 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 
 | Path                     | Contents                                                                                     |
 | ------------------------ | -------------------------------------------------------------------------------------------- |
+| `ollama_client/`         | Serves chat and embeddings of the local models through Ollama ([README](ollama_client/README.md)) |
+| `vector_db/`             | Embeds texts with the local embedding model and searches them by meaning                     |
+| `rag_sync/`              | Adds new commits and GitHub activity to chat file search                                     |
 | `yandex_client_modules/` | Yandex AI Studio client: request building, response polling, realtime, image generation     |
 | `api/`                   | Yandex request profiles, transport and contract validation                                   |
 | `contracts/`             | Machine-readable Yandex API contracts ([`contracts/yandex`](contracts/yandex/README.md))     |
@@ -261,7 +265,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | `agent_office/`    | Tools that watch the GitHub "agent office": Claude, Codex, Copilot and Logos                    |
 | `repository_index/`| Shared contracts for immutable repository indexes                                               |
 | `.agents/skills/`  | Canonical repository skill tree (`SKILL.md` per skill)                                          |
-| `.codex/`          | Codex defaults and the Cloud.ru management skill                                                |
+| `court/`           | Opens GitHub cases for errors and censors rule-breaking replies                                 |
 
 </details>
 
@@ -305,7 +309,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | `forge/`           | Logos host integration for the `printing3d` domain: routes, tools and binding                    |
 | `printer_service/` | Bambu A1 mini LAN transport, a disabled fail-closed cloud API boundary and Android backend facade |
 | `model_editor/`    | Bounded, local 3D scene editor                                                                   |
-| `3d-models/`       | OpenSCAD and STL model sources                                                                   |
+| `3d-models/`       | OpenSCAD model sources                                                                           |
 | `recovery/`        | Parametric Yandex Drops case model                                                               |
 
 </details>
@@ -318,6 +322,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | `static/`    | Web interface JavaScript, CSS, icons and repository-local vendored libraries                           |
 | `templates/` | Page template (`index.html`), rendered by `webframe.templating`                                        |
 | `webframe/`  | The web framework: application, routing, request and response, templates, HTTP server ([README](webframe/README.md)) |
+| `web_shell/` | Serves the Logos web page and health and readiness endpoints                                           |
 | `website/`   | Static project website                                                                                 |
 
 </details>
@@ -331,6 +336,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | `docs/`        | Architecture and operating instructions ([index](docs/README.md))                                    |
 | `scripts/`     | Developer and diagnostic tools ([scripts guide](scripts/README.md))                                  |
 | `datasets/`    | Synthetic Russian Android message samples                                                            |
+| `exports/`     | Exported dialogs and a dialog summary, read through the git history in RAG                           |
 | `third_party/` | Wikifunctions code reused under Apache-2.0                                                           |
 | `.github/`     | Redmi 9 workflows, issue templates and repository agent role definitions                             |
 
@@ -338,7 +344,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 
 ## Configuration and security
 
-Use `.env` or a deployment secret manager. `.env.example` is the template.
+Use `core/.env` or a deployment secret manager. `.env.example` is the template.
 
 | Variable                              | Purpose                                                                                     |
 | ------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -392,8 +398,9 @@ the self-hosted `redmi9` runner:
 
 - the [phone server workflow](.github/workflows/redmi9-app-server.yml) deploys on
   every push to `develop` and offers the manual `deploy`, `screenshots`,
-  `tools_self_check`, `verify_screenshots`, `rootagent_native_check` and
-  `art_generate` actions. Deployment verifies the process and HTTP readiness and
+  `tools_self_check`, `verify_screenshots`, `rootagent_native_check`,
+  `art_generate`, `rootagent_command` and `rag_vectors_check` actions.
+  Deployment verifies the process and HTTP readiness and
   preserves its backup/rollback behavior;
 - the [candidate tool evidence workflow](.github/workflows/redmi9-tool-evidence.yml)
   runs only for the `fix/tools-execution-evidence` branch, on push or manual
@@ -487,8 +494,8 @@ The documentation is mostly in Russian. Start with the
 | Architecture         | [Canonical AI execution pipeline](docs/architecture/ai-execution-pipeline.md) · [Integration coordination](docs/architecture/integration-coordination.md) · [Current scope](docs/integration/current-scope.md) · [Runtime Dispatcher policy](docs/runtime/runtime-dispatcher-policy.md) |
 | Tracing and billing  | [Execution Trace](docs/architecture/execution_trace.md) · [Execution Trace and system log](docs/backend/logging.md) · [Compute energy billing](docs/compute-energy-billing.md)                                                            |
 | Storage              | [Native Kristall storage contract](docs/database.md)                                                                                                                                                                                      |
-| API and MCP          | [API documentation](docs/api/API_DOCS.md) · [API contracts](docs/api/contracts.md) · [MCP architecture](docs/mcp/architecture.md) · [MCP tools](docs/mcp/tools.md) · [ChatGPT Apps SDK / MCP](docs/mcp/chatgpt_apps.md)                 |
-| Agents               | [Logos runtime agents](docs/agents/overview.md) · [Repository development roles](docs/agents/role-based-agent-office.md) · [Logos GitHub agent](docs/agents/github-agent.md)                                                             |
+| API and MCP          | [API documentation](docs/api/API_DOCS.md) · [API contracts](docs/api/contracts.md) · [MCP tools](docs/mcp/tools.md) · [ChatGPT Apps SDK / MCP](docs/mcp/chatgpt_apps.md)                 |
+| Agents               | [Life of a dialog](docs/architecture/modules.md#life-of-a-dialog) · [Repository development roles](docs/agents/role-based-agent-office.md) · [Logos GitHub agent](docs/agents/github-agent.md)                                                             |
 | 3D printing          | [3D printing tools](docs/mcp/printing3d-tools.md) · [Bambu Lab A1 mini pipeline (draft)](docs/printing3d-a1mini-full-workflow.md)                                                                                                        |
 | Phone and operations | [Redmi 9 application server](docs/redmi-app-server.md) · [Redmi 9 runner updates](docs/setup/redmi9-auto-update.md) · [Redmi 9 checks](docs/architecture/browser-self-testing.md) · [Operations and recovery](docs/production-deployment.md) |
 | Project              | [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Support](SUPPORT.md) · [Code of Conduct](CODE_OF_CONDUCT.md)                                                                                                         |

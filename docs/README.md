@@ -30,7 +30,6 @@
 
 - [Установка](setup/installation.md) — системные требования, установка и конфигурация; Android/Termux — один из вариантов запуска
 - [Запуск в режиме разработки](setup/development.md) — backend, CLI/Termux и навигация для разработчика
-- [P0 local launch smoke](setup/launch-smoke.md) — исторический документ: скрипт и workflow проверки из issue #427 удалены
 - [Cloud.ru и второй Android-телефон](setup/cloudru-local-agent.md) — Logos за HTTPS reverse proxy и подключение телефона
 - [Служебные скрипты](../scripts/README.md) — команды диагностики и разработки
 
@@ -43,7 +42,6 @@
 - [Правила надёжного кода](development/reliability.md) — инженерные рекомендации по идемпотентности и структуре Python/JS
 - [Правила именования](development/naming.md) — рекомендации для UI, модулей, веток и PR
 - [Sprint workflow](development/sprint-workflow.md) — короткие проверяемые итерации с вертикальным приращением
-- [Обновления зависимостей](development/dependency-updates.md) — политика Dependabot по экосистемам и каталогам
 - [Повторно применимые уроки и навыки](lessons/README.md) — источники, границы истории и каталог процедур
 - [Инженерные уроки](lessons/engineering-lessons.md) — границы продукта и исполнения, настройки и доказательства (H01–H18)
 - [Журнал изменений](changelog.md) — история релизов и изменений
@@ -56,7 +54,6 @@
 - [SSH Runtime](architecture/ssh_runtime.md) — команды и файловые операции на удалённых Linux-хостах через OpenSSH
 - [Индекс ревизий репозитория](architecture/repository-revision-index.md) — неизменяемый Python-индекс в `scripts/build_ai_index.py` (#538)
 - [Branch Environments: architecture review](architecture/branch-environments.md) — design review до реализации (#13, PR #330)
-- [ChatGPT Browser Tool](architecture/chatgpt-browser-tool.md) — граница внешнего инструмента для persistent Chrome Worker
 - [Проверки Redmi 9](architecture/browser-self-testing.md) — проверки на реальном Redmi 9, оставшиеся после удаления общих тестов
 
 ## Runtime
@@ -66,7 +63,6 @@
 - [Threaded environment host](runtime/threaded-environment-host.md) — окружения приложения как управляемые потоки с неизменяемым `RuntimeContext`
 - [Настройки SSH Runtime](runtime/ssh-runtime.md) — серверная структурированная конфигурация SSH Runtime
 - [Branch-aware environments](branch-environments.md) — окружение ветки как неизменяемый runtime одного коммита
-- [Host-managed preview validation](preview-deployments.md) — проверка preview на работающем хосте без отдельного контейнера
 - [AI contract: preview runtime isolation](agents/runtime-dispatcher-contract.md) — инструкция для AI-агентов, меняющих preview runtimes и маршрутизацию
 
 ## API и контракты
@@ -79,10 +75,8 @@
 
 ## MCP и инструменты
 
-- [Архитектура MCP и Tool Calling](mcp/architecture.md) — единый реестр инструментов и меры безопасности
 - [Доступные MCP-инструменты](mcp/tools.md) — справочник категорий по реестру `tool_providers/registry.py`
 - [ChatGPT Apps SDK](mcp/chatgpt_apps.md) — подключение Logos к ChatGPT через MCP
-- [Alice Pro MCP control endpoint](mcp-alice-pro.md) — control plane Alice Pro через существующий `/mcp`
 - [Plugin System](plugins.md) — локальные версионированные расширения из `LOGOS_PLUGIN_DIR`
 
 ## Модели и провайдеры
@@ -93,25 +87,24 @@
 - [Yandex classifiers](models/classification.md) — `POST /api/classify` через Text Classification API
 - [Ротация ключей провайдеров](provider-key-rotation.md) — жизненный цикл backend-owned API-ключа провайдера
 - [Голосовой ассистент](voice-assistant.md) — Yandex Realtime и цепочка SpeechKit STT → текстовая модель → TTS
-- [Профили Optima](agents/logos-optima-model-profiles.md) — сбалансированный пресет для существующих моделей Yandex Responses
+- [Профили Optima](agents/logos-optima-model-profiles.md) — сбалансированный пресет для существующих моделей Yandex Responses; в интерфейсе его нет
 - [Профиль Pro 5.1 async](agents/logos-pro51-async-profile.md) — выбранный владельцем YandexGPT Pro 5.1 в асинхронном API
 - [Ultra-профили моделей Logos](agents/logos-ultra-model-profiles.md) — 14 профилей локального реестра
 - [Ultra-профили всех моделей Яндекса](agents/logos-yandex-ultra-model-profiles.md) — каталог по моделям Yandex AI Studio и SpeechKit
 
 ## Агенты
 
-- [Агенты Logos](agents/overview.md) — runtime-агенты и адаптеры приложения (чат, голос, CLI, инструменты)
+- [Жизнь диалога](architecture/modules.md#life-of-a-dialog) — что делает Logos по операциям, от браузера до журнала Kristall
 - [Роли разработки в репозитории](agents/role-based-agent-office.md) — GitHub-роли (Team Lead, Backend, Docs Engineer и др.), не часть runtime Logos
 - [Процедура Суда Логоса](agents/logos-court-procedure.md) — эпизоды дела #1413, доказательства, независимое ревью и приёмка
 - [Суды Логоса над диалогом](agents/court-ideas.md) — суды S2, S4, S5, S3, зал заседаний и инструменты `court` (`court/README.md`)
 - [Native Logos: качество и контекст дела](agents/logos-native-quality.md) — текущие рамки работы и полный контекст дела
-- [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и первая read-only задача для запуска агентов в своём контейнере
+- [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и задача `logos_task` для запуска агентов в своём контейнере
 - [Logos как GitHub-агент](agents/github-agent.md) — работа Logos над GitHub issue в собственном коде
 - [Рассказ Логоса о запуске](agents/logos-runner-narration.md) — рассказ по сохранённому `result.json` раннера без вызова модели
 - [EDS runner](agents/eds-runner.md) — установка официального EDS v0.4.0 с проверкой SHA-256
 - [Departments](agents/departments.md) — доменные контейнеры агента, инструментов и политик с REST API
 - [Partner Relations](agents/partner-relations.md) — отдел с owner-scoped партнёрами, контактами и follow-up
-- [Взаимодействие агентов](agents/communication.md) — обмен сообщениями, координация и контекст
 - [Agent observer](agents/agent-observer.md) — наблюдение за работой агентов в issues и pull requests
 - [Process observation and governance](agents/process-observation-and-governance.md) — наблюдение и улучшение процесса, когда обычный цикл не сходится
 - [Agent Rules Registry](agents/agent-rules-registry.md) — кандидат v1: ошибка → доказательство → правило (#1159)
@@ -121,13 +114,11 @@
 ## Память и данные
 
 - [Хранилище данных](database.md) — нативный `kristall.Kristall` с append-only журналом; SQL-бэкенда нет
-- [Memory DB v1](memory/core-contract.md) — публичный API `MemoryStore` и семантика журнала
 - [Kristall v1: durability и миграция](memory/memory-db-v1-contract.md) — контракт реализации issue #776
 - [Synchronous Kristall](memory/synchronous-store.md) — функциональное ядро и адаптер задач Logos (#1045, #1046)
 - [Replication receiver](memory/replication-receiver.md) — необязательный приёмник репликации с HMAC-аутентификацией
 - [Memory DB: границы](memory/MEMORY_DB_BOUNDARIES.md) — владение и допустимые зависимости `agent_memory → memory_engine`
-- [Memory DB Core](memory/MEMORY_DB_CORE_CONTRACT.md) — локальный функциональный контракт минимального API
-- [Memory DB: решения ревью](memory/MEMORY_DB_REVIEW_DECISIONS.md) — production-клиенты используют только `MemoryStore`
+- [Memory DB Core](memory/MEMORY_DB_CORE_CONTRACT.md) — публичный API `MemoryStore`, семантика журнала и локальный контракт минимального API
 - [Logos Board](project-board.md) — локальная альтернатива GitHub Discussions/Issues на Memory DB, изолированный MVP
 
 ## Фронтенд
@@ -158,10 +149,8 @@
 
 - [Эксплуатация и восстановление](production-deployment.md) — действующий маршрут Redmi 9, сохранность данных и границы восстановления
 - [Выпуск веб-приложения](release.md) — доставка и критерии результата
-- [Cloud.ru Container Apps](cloudru-container-apps.md) — v2 baseline serverless deployment runbook; client contract синхронизирован с `master`, live Cloud.ru rollout пока не подтверждён
 - [Бюджет внешних RDC-вызовов](operations/rdc-call-budget.md) — бюджет внешнего коннектора RDC (#650, #1131)
 - [GitHub Pages](deployment/printer-pages.md) — подготовка страницы проекта; сайт не опубликован
-- [Синхронизация с bare-репозиторием](bare_sync.md) — процесс зеркалирования изменений в `local_bare`
 
 ## Redmi 9
 
@@ -171,7 +160,6 @@
 - [RootAgent CLI](redmi-root-agent.md) — проверка root, снимок экрана и ввод мыши из задания runner
 - [Android diagnostics](redmi-android-diagnostics.md) — сбор logcat и диагностики в Termux
 - [Скриншоты UI](redmi-screenshots.md) — автоматические снимки интерфейса через workflow сервера
-- [Ключ модели от runner](redmi-model-key-issuance.md) — выпуск API-ключа Yandex Cloud процессом runner
 - [Архив репозитория](redmi-repository-backup.md) — резервная копия репозитория из shell-задания Termux
 - [RootAgent: приёмка на устройстве (#650)](testing/rootagent-redmi9-650.md) — аппаратные наблюдения от 2026-10-13
 
@@ -192,8 +180,6 @@ Deployment system с config-driven reconciliation.
 - [Сообщество ботов](integrations/chatgpt-bot-community.md) — интеграция ChatGPT, MCP и A2A-ботов
 - [Cloud provider foundation](integrations/cloud-provider-foundation.md) — provider-neutral облачные инструменты с реализацией Cloud.ru (issue #417)
 - [Cloud.ru Object Storage](integrations/cloudru-object-storage.md) — адаптер `StorageProvider` поверх S3 API (issue #443)
-- [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru; статус not_planned
-- [Cloud.ru provider connector](tasks/issue-417-cloudru-provider.md) — постановка задачи для issue #417
 
 ## 3D-печать
 
@@ -215,16 +201,11 @@ Deployment system с config-driven reconciliation.
 
 ## Планы и исторические материалы
 
-- [Issue #75: план реализации](issue_75_implementation_plan.md) — этапы, которые можно ревьюить независимо
-- [Единый Execution Trace](tasks/execution-trace.md) — постановка задачи трассировки `/api/chat`
 - [Вопрос 14](simulations/q14.md) — воспроизводимый учебный стенд
 - [Video evidence для browser tool](testing/browser-tool-video-evidence.md) — спецификация сценариев; их запуск не заявлен
-- [CI cache experiment](ci/cache-experiment.md) — эксперимент с кешем окружения CI (#757 / #762)
-- [Удаление PostgreSQL из тестов](development/postgresql-test-removal.md) — чек-лист, удаление не завершено
-- [Alice Pro: подготовка PyPI-релиза](development/pypi-release.md) — статус NOT READY FOR PUBLICATION
 - [Logos Dev: OAuth origin](development/dev-oauth-acceptance.md) — публичный OAuth origin и проверка подключения (#939, #941)
 - [Подтверждение доступа к приложению](development/production-public-acceptance.md) — что фиксировать при порученной проверке доступа
-- [Live Server input composition](development/live-server-input-compose-1161.md) — сборка staging-веток ввода, только staging (#1161)
+- [Ключ модели от runner](redmi-model-key-issuance.md) — workflow выпуска удалён, страница сохранена как история
 
 ---
 

@@ -1,8 +1,8 @@
 # Tool configuration for the Logos application.
 #
 # Logos is an application with a flat multi-package layout, not an installable
-# library. Dependencies live in requirements*.txt, which deploy scripts and
-# Dependabot read; there is deliberately no [project] or [build-system] table.
+# library. Dependencies live in requirements*.txt, which deploy scripts read;
+# there is deliberately no [project] or [build-system] table.
 
 [tool.ruff]
 # The code uses PEP 695 generics (api/yandex_contracts.py, api/yandex_transport.py),

@@ -64,7 +64,7 @@ ENOSPC/read-only/fsync failures are explicit write failures. They must not publi
 
 ### Unknown write outcomes and writer recovery
 
-`FileMemoryDB` fences its writer before starting file I/O. The fence clears only
+`Kristall` fences its writer before starting file I/O. The fence clears only
 when the mutation's file barriers and in-memory publication complete. An open,
 partial/zero write, fsync, close, parent-directory barrier, or interruption failure
 leaves that instance faulted. Compaction uses the same fence, including uncertain
@@ -85,7 +85,7 @@ There is no automatic retry, in-place reset, or compaction-based repair. To resu
    ownership of the database path. Do not open a competing live writer.
 2. Resolve the underlying storage/capacity/permission fault. Preserve the journal;
    do not manually append, edit, or restore an older file to hide the failure.
-3. Construct a new `FileMemoryDB` for the same path. Recovery verifies records,
+3. Construct a new `Kristall` for the same path. Recovery verifies records,
    truncates only an incomplete final record, and fsyncs the validated file and
    its parent directory before returning. Any recovery/barrier error prevents
    admission. A complete invalid record remains fatal and is not silently lost.

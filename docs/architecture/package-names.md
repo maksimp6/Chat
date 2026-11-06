@@ -34,6 +34,7 @@ disk, which the code imports and the architecture map uses, does not change.
 | **Miruka** | `memory_engine` | Standalone key/value store run as a private Unix-socket service. |
 | **Gilaro** | `model_editor` | Local 3D scene builder with versioned scenes and STL exports. |
 | **Eskaro** | `observability` | Records each invocation's steps, API calls, tools, errors and timing. |
+| **Mokira** | `ollama_client` | Serves chat and embeddings of the local models through Ollama. |
 | **Fidalo** | `organization` | Department registry, government case workflow and partner CRM as tools. |
 | **Tirona** | `plugin_system` | Discovers local plugins from manifests and manages their state. |
 | **Suvema** | `printer_service` | Read-only LAN discovery and telemetry for Bambu A1 mini printers. |

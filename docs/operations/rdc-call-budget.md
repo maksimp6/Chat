@@ -83,13 +83,5 @@ Android/Cloud.ru runtime is changed in this slice.
 
 ## Validation
 
-`python -m pytest -q tests/test_rdc_usage_control.py tests/test_rdc_pairing.py`
-checks unchanged pairing, callable device actions, failed/ambiguous actions
-executed once, failure accounting, concurrent capture reuse, freshness and
-device isolation, fresh observations, invalidation, finite poll/deadline/call
-limits, completed-result reuse and a synthetic 12-second recording requiring
-one delayed result read rather than two empty reads plus a final read.
-
 Device access was inspected read-only through the existing Redmi 9 RDC agent;
-no restart, deployment, screenshot or input action was required. Unit tests do
-not establish a production cutover or account-wide savings measurement.
+no restart, deployment, screenshot or input action was required.

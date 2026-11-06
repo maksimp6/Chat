@@ -31,7 +31,7 @@ response
 - `yandex_client_modules/client.py` и `yandex_client_modules/` — текущий primary provider adapter;
 - `responses_tool_loop.py` — protocol helper для Responses API;
 - `universal_tool_platform.py` — единый контракт и pipeline выполнения инструментов;
-- `tool_registry.py` — единый каталог инструментов;
+- `tool_providers/registry.py` — единый каталог инструментов;
 - `observability/` (trace_manager и связанные) trace-модули — наблюдаемость;
 - treasury/billing слой — учёт стоимости и лимитов.
 
@@ -47,7 +47,7 @@ response
 - browser;
 - Android / local tool agent;
 - GitHub issue agent;
-- CLI/Termux entrypoint (`cli_agent.py`);
+- CLI/Termux entrypoint (`python -m agent_runtime.cli`);
 - A2A / agent gateway.
 
 ## Удалённый legacy
@@ -65,14 +65,14 @@ response
 
 ## Уже переведено на canonical runtime
 
-- `cli_agent.py` — тонкий CLI/Termux-адаптер к `/api/conversations`, `/api/chat` и стандартному approval endpoint; прямых Yandex API calls и локального shell execution больше нет.
+- `python -m agent_runtime.cli` — тонкий CLI/Termux-адаптер к `/api/conversations`, `/api/chat` и стандартному approval endpoint; прямых Yandex API calls и локального shell execution больше нет.
 - `issue_runner.py` — GitHub issue adapter создаёт и запускает invocation, сохраняет финальный Execution Trace и завершает invocation как completed/failed.
 
 ## На апгрейд
 
-- `agents/local_worker.py` — живой Android/local transport adapter;
-- `agents/gateway.py` — provider-neutral/A2A routing;
-- `agents/local_gateway.py` — HTTP transport/runtime gateway, имя и границы нужно уточнить.
+- `agent_runtime/local_tool_agent.py` — живой Android/local transport adapter;
+- `agent_runtime/gateway.py` — список агентов;
+- `agent_runtime/local_gateway.py` — HTTP transport/runtime gateway, имя и границы нужно уточнить.
 
 ## Правило
 

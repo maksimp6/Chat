@@ -23,17 +23,11 @@ data/uploads/
 logs/
 execution_logs/
 app.log
-app_logs.jsonl
 api_debug.txt
-debug_response.json
-history_debug.json
 
 # Local project dumps and archives
 project_dump.txt
 project_files.txt
-analysis.txt
-logos_pro.zip
-logos_pro_files.tar.gz
 
 # Dependencies and tooling caches
 # No trailing slash: also covers a root-level node_modules symlink.
@@ -41,16 +35,6 @@ node_modules
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-
-# Coverage reports
-.coverage
-.coverage.*
-coverage.xml
-/coverage.json
-/coverage-js/
-/frontend-coverage.json
-/infra-coverage.xml
-htmlcov/
 
 # Build output
 build/

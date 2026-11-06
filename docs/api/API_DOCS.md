@@ -9,15 +9,16 @@
 **Параметры:**
 
 - `message` (string, required): Текст сообщения
-- `conversation_id` (string, optional): ID диалога
-- `model` (string, optional): Модель (по умолчанию: logos-runtime)
+- `conversation_id` (string, required): ID диалога
+
+Параметра модели нет: текстовый ход отвечает одной моделью чата (`CHAT_MODEL` в `core/config.py`).
 
 **Пример:**
 
 ```bash
 curl -X POST http://localhost:8080/api/chat \
   -H "Content-Type: application/json" \
-  -d '{"message":"Привет","model":"logos-runtime"}'
+  -d '{"message":"Привет","conversation_id":"<id>"}'
 ```
 
 #### Живой ответ, повтор и `request_id`
@@ -110,25 +111,7 @@ curl -X POST http://localhost:8080/api/chat \
 
 Вложение хода `POST /api/chat`: `{"data_url": ...}` или `{"upload_id": ...}` — фото, загруженное кусками (`kind: "image"`, загрузка завершена). Браузер перед загрузкой перекодирует фото: длинная сторона до 1600 px, WebP (JPEG, если браузер не пишет WebP), качество 0,8; если результат не меньше оригинала, уходит оригинал.
 
-### 2. Vision API (Анализ изображений)
-
-**Эндпоинт:** `POST /api/vision`
-**Описание:** Анализ изображений с помощью YandexGPT
-**Параметры:**
-
-- `image` (string, required): Base64-кодированное изображение
-- `prompt` (string, optional): Запрос для анализа
-- `model` (string, optional): Модель (по умолчанию: yandexgpt-5.1)
-
-**Пример:**
-
-```bash
-curl -X POST http://localhost:8080/api/vision \
-  -H "Content-Type: application/json" \
-  -d '{"image":"base64data...","prompt":"Опиши изображение"}'
-```
-
-### 3. Embeddings API (Векторные представления)
+### 2. Embeddings API (Векторные представления)
 
 **Эндпоинт:** `POST /api/embeddings`
 **Описание:** Векторные представления текста через Yandex `textEmbedding`. Авторизация не требуется; запросы тратят серверный `YANDEX_API_KEY`.
@@ -171,42 +154,7 @@ curl -X POST http://localhost:8080/api/completion \
   -d '{"message":"Привет","max_tokens":200}'
 ```
 
-### 4. TTS API (Синтез речи)
-
-**Эндпоинт:** `POST /api/tts`
-**Описание:** Преобразование текста в речь
-**Параметры:**
-
-- `text` (string, required): Текст для озвучки
-- `voice` (string, optional): Голос (по умолчанию: filipp)
-- `speed` (float, optional): Скорость речи (по умолчанию: 1.0)
-
-**Пример:**
-
-```bash
-curl -X POST http://localhost:8080/api/tts \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Привет мир","voice":"filipp"}'
-```
-
-### 5. Tokenizer API (Подсчёт токенов)
-
-**Эндпоинт:** `POST /api/tokenize`
-**Описание:** Подсчёт количества токенов в тексте
-**Параметры:**
-
-- `text` (string, required): Текст для токенизации
-- `model` (string, optional): Модель токенизатора
-
-**Пример:**
-
-```bash
-curl -X POST http://localhost:8080/api/tokenize \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Привет мир"}'
-```
-
-### 6. Realtime API (Голосовой режим)
+### 3. Realtime API (Голосовой режим)
 
 **Эндпоинты:**
 
@@ -217,21 +165,22 @@ curl -X POST http://localhost:8080/api/tokenize \
 
 **Описание:** Реальное время голосового взаимодействия с LLM
 
+### 4. Classifiers API (Классификация)
+
+**Эндпоинт:** `POST /api/classify`
+**Описание:** Классификация текста; поля запроса и ответы — в [описании классификаторов](../models/classification.md).
+
 ## Планируемые функции
 
-### 7. Search API (Семантический поиск)
+### 5. Search API (Семантический поиск)
 
 Статус: В разработке
 
-### 8. Classifiers API (Классификация)
+### 6. Moderation API (Модерация контента)
 
 Статус: В разработке
 
-### 9. Moderation API (Модерация контента)
-
-Статус: В разработке
-
-### 10. Batch API (Пакетная обработка)
+### 7. Batch API (Пакетная обработка)
 
 Статус: В разработке
 
@@ -241,17 +190,6 @@ curl -X POST http://localhost:8080/api/tokenize \
 
 Нажмите кнопку 📷 рядом с полем ввода, выберите изображение, и AI проанализирует его. Фото сжимается в браузере и загружается кусками ещё до отправки; на превью виден процент загрузки, отправка ждёт её окончания.
 
-### Озвучка текста
-
-В контекстном меню сообщения выберите "Озвучить" для воспроизведения текста.
-
-### Подсчёт токенов
-
-Используйте функцию `countTokens(text)` в консоли браузера для подсчёта токенов.
-
 ## Логирование
 
-Все API-запросы логируются в:
-
-- `logs/app.txt` - основные логи приложения
-- `logs/api_debug.txt` - детали API-запросов
+Системный журнал — `logs/system.jsonl`, см. [логирование и диагностику](../backend/logging.md).

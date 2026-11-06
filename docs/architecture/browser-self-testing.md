@@ -13,8 +13,6 @@ workflow have been removed at the owner's request.
 - `verify_screenshots` verifies published device evidence.
 - `rootagent_native_check` runs `scripts/redmi_root_agent_e2e.py` for real
   native input, trusted browser events and screen changes.
-- `tools/device/rdc/test_live_server_smoke.py` is a real Redmi 9 Live Server
-  probe. It is not an offline unit suite and is not run automatically.
 
 The Redmi 9 workflow checks the device model. Offline unit preflight and the
 `tools_self_check_tests` replay job have been removed. Device evidence and

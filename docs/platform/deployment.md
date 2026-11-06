@@ -7,28 +7,11 @@ Keel Platform automates deployment of services from configuration. This document
 Deployments follow this process:
 
 1. **Configuration committed** to git (config/platform/*.yaml)
-2. **Validation** runs in CI (all rules checked)
+2. **Validation** runs by hand with `python -m keel validate`
 3. **Planning** calculates needed changes
 4. **Approval** required for production changes
 5. **Execution** applies changes to infrastructure
 6. **Verification** ensures services are healthy
-
-## CI Validation
-
-Every commit triggers automatic validation:
-
-```bash
-# Runs in CI (`.github/workflows/ci.yml`)
-python -m keel validate
-
-# Checks:
-# - Schema: valid YAML, required fields present
-# - Semantics: no cycles, valid references
-# - Secrets: no plaintext credentials
-# - Policies: production=github, test!=prod_secrets, etc.
-```
-
-If validation fails, the PR cannot merge.
 
 ## Deployment Planning
 
@@ -157,7 +140,6 @@ git diff abc1234 def5678 config/platform/
 
 Before deploying to production:
 
-- [ ] All CI checks pass (validation, tests, linting)
 - [ ] Configuration is reviewed and approved
 - [ ] Health checks defined for all services
 - [ ] Secrets are created and accessible

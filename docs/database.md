@@ -6,9 +6,7 @@ backend.
 
 ## Retired settings and modes
 
-- `LOGOS_DATABASE_URL` is retired. Nothing in the runtime reads it. The deploy
-  preflight (`scripts/cloudru_deploy_preflight.py`) rejects it with
-  `LOGOS_DATABASE_URL: retired setting; native MemoryStore required`. Do not set it
+- `LOGOS_DATABASE_URL` is retired. Nothing in the runtime reads it. Do not set it
   in any environment.
 - SQLite (`logos_pro.db`) and PostgreSQL are not runtime modes. There is no
   PostgreSQL service, compose file, SQL migration or SQL driver to install.
@@ -64,8 +62,7 @@ filesystem under it change.
 - **Shared or cloud deployment:** a journal on a persistent filesystem under the
   approved `data_root`, with exactly one writer process. An ephemeral container
   filesystem is not durable storage, and cloud object storage is a backup target,
-  not the live journal (see `../deploy/cloudru/README.md`,
-  "Native storage transition").
+  not the live journal.
 
 ## One writer per journal
 

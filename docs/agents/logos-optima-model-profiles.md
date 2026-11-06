@@ -1,5 +1,7 @@
 # Optima model profiles
 
+Status: this preset is not in the interface; no page or route offers it.
+
 Optima is a balanced, explicitly selected Logos preset for the existing Yandex
 Responses chat models. It is not a new Yandex model, provider or service tier.
 Adding the preset does not change the default model or activate generation.

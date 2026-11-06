@@ -40,8 +40,9 @@ Values larger than one frame, including attachments, must be stored separately. 
 - Python `tuple` is serialized as a JSON array. A staged tuple can be returned as a tuple before commit. After commit, committed reads, verified backups and reopened stores consistently return a `list`, including nested tuples. Do not rely on tuple type preservation.
 - Some invalid scalar types are rejected only at `commit()`, not `set()`.
 - A partial trailing journal frame is not silently truncated; recovery requires explicit handling.
+- After an uncertain fsync failure the current instance refuses further writes, and a failed fsync is never acknowledged as a successful commit. Reopening validates the complete hash-chained journal: a complete valid frame is replayed, while a partial or corrupt frame fails closed.
 - `backup()` does not publish atomically: a crashed copy may leave a partial destination. A backup file's existence is not proof of validity. `restore()` verifies journal integrity.
-- This component does not switch Logos's existing `FileMemoryDB` or migrate its files. See `MEMORY_DB_BOUNDARIES.md`.
+- This component does not switch Logos's existing `Kristall` or migrate its files. See `MEMORY_DB_BOUNDARIES.md`.
 
 ## Verification and handoff
 

@@ -70,13 +70,6 @@ violation count with `RATCHET_BASELINE`.
 
 ## Exception handling outside Python
 
-`scripts/check_exception_handling.py` ratchets `try {` blocks and silent catch
-blocks (empty, or only comments) in project-owned JavaScript, `.mjs`, Java and
-Kotlin, using `scripts/exception_handling_baseline.json`. The same rules apply:
-new handlers and silent catches fail, and fixes must lower the baseline.
-Python is covered by the ruff rules BLE001, S110, S112 and E722 above.
-Vendored code and `tests/` are excluded.
-
 A handler that reports the error should stay, but a catch that only hides the
 failure is a defect. Narrow exceptions only at real external boundaries, and
 let the error propagate to a caller that can report it.
@@ -95,18 +88,3 @@ pinned in `requirements-dev.txt`). The planned ratchet
 New modules are written fully typed: annotate every function, use precise
 container types (`dict[str, int]`, not `dict`) and avoid `Any` outside
 boundaries that parse external JSON.
-
-For new and changed function contracts, `scripts/check_changed_types.py`
-provides deterministic source-level diagnostics used by the focused contract
-tests. It rejects missing parameter/return annotations, bare generic return or
-parameter annotations, `Any` return leakage, and unqualified
-`# type: ignore`. Semantic typing remains the responsibility of
-`mypy --strict`; the source checker is deliberately not a second type checker.
-
-## Where the rules run
-
-- **Locally:** `bash scripts/check_code_rules.sh` runs the naming, root-layout,
-  reliability and type-checking ratchets (a few seconds; mypy caches results).
-- **CI:** the owner removed the standalone **Code rules** job and its required-check
-  references. Local validators and their regression tests remain available; no
-  standalone Code rules check is produced or awaited by merge readiness.

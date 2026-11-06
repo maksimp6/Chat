@@ -109,21 +109,6 @@ that an unknown path has no affected tests. Frontend, issue/PR ingestion, chunke
 full-text search, embeddings, remote cache service and relevance benchmarks are
 outside this slice.
 
-## Verification
-
-```sh
-python -m pytest -q tests/test_repository_revision_index.py \
-  tests/test_ai_repository_index.py tests/test_agent_retrieval.py \
-  tests/test_repository_snapshot_provenance.py
-bash scripts/pre_push.sh
-```
-
-Tests use real temporary Git repositories, not a substituted Git server. They
-cover committed-vs-dirty input, repeat/change/add/delete, isolation and cache
-versions, source references, secret literal omission, symlinks, size bounds,
-explicit failures, atomic CLI output and retrieval freshness. These checks do not
-claim that cloud embeddings or a production deployment have been verified.
-
 Configured partial/promisor clones are deliberately rejected before source reads,
 even when a particular requested blob happens to be present. This prevents an
 implicit network fetch on Git versions that do not honor the lazy-fetch
@@ -134,7 +119,6 @@ this command does not repair or expand the clone automatically.
 
 ```sh
 python scripts/bench_ai_index.py --iterations 20 > /tmp/logos-index-benchmark.json
-python -m pytest -q tests/test_ai_index_benchmark.py
 ```
 
 The benchmark creates and removes its own fixed eight-file Git repository. It

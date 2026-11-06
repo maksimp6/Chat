@@ -17,14 +17,5 @@ Mandatory architecture:
 7. If a required capability does not exist, add a dispatcher operation instead of bypassing the boundary.
 8. All runtime actions that become externally meaningful must remain observable through the existing Execution Trace architecture without exposing secrets.
 9. Add deterministic tests for same-runtime success, cross-runtime rejection, missing runtime/operation, and failure cleanup.
-10. Run the static runtime validator before considering the change complete.
 
-Required validation:
-
-```bash
-python tests/validate_runtime_modules.py
-pytest -q tests/test_runtime_policy.py tests/test_runtime_dispatcher.py
-python -m compileall -q .
-```
-
-Do not weaken the validator, add broad exemptions, or move code outside `runtime/` merely to make CI pass. If the architecture and validator disagree, fix the architecture or explicitly update the documented contract with tests.
+Do not add broad exemptions or move code outside `runtime/` to get around this contract.

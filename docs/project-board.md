@@ -1,6 +1,6 @@
 # Logos Board: локальная альтернатива GitHub Discussions/Issues на Memory DB
 
-**Статус:** изолированный MVP, не production/cutover. **Хранилище:** FileMemoryDB, без SQL.
+**Статус:** изолированный MVP, не production/cutover. **Хранилище:** `memory_engine.MemoryStore`, без SQL.
 
 ## Возможности сейчас
 
@@ -23,12 +23,12 @@
 
 ```text
 Browser (mobile) -> Logos Board HTTP loopback -> BoardStore
-                                               -> FileMemoryDB append+fsync
+                                               -> MemoryStore append+fsync
                                                -> /data/project-board/board.memory
 ```
 
 - Код сервиса в `project_board/`, UI в `project_board/static/`.
-- База `agent_memory.file_memory_db.FileMemoryDB` уже находится в `master`.
+- База — `memory_engine.MemoryStore` (порт в `project_board/host.py`).
 - Блокировка `board.memory.board.lock` управляется Logos Board, чтобы не запускать
   два writer-процесса до полной готовности нового Memory DB lock protocol.
 - Если ошибка записи оставила неопределённое состояние, экземпляр
@@ -78,19 +78,6 @@ python3 -m project_board.seed --db /data/project-board/board.memory
 Доступные статусы: `backlog → ready → in_progress → review → done`,
 с веткой `blocked`; зависимости должны быть `done` перед переходом в `ready`.
 Только `accepted_by_owner=true` позволяет `review → done`. Это **НЕ merge**.
-
-## Тесты и ограничения приёмки
-
-```bash
-python3 -m pytest -q tests/test_project_board.py
-python3 -m ruff check project_board tests/test_project_board.py
-python3 -m ruff format --check project_board tests/test_project_board.py
-node --check project_board/static/app.js
-```
-
-Есть реальный HTTP loopback E2E, process lock, parallel writes, restart/replay,
-SIGKILL после ACK, torn tail, fail-closed write-fault и idempotency.
-Проверка HTTP/JS не заменяет физический browser E2E на Android.
 
 ## Дальше (отдельные задачи)
 

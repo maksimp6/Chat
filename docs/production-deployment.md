@@ -32,5 +32,5 @@ Controller возвращает предыдущий код при неудач�
 
 Прежний VPS workflow выпуска/отката и token-prefixed схема доступа удалены
 из действующей инструкции. Работы по Cloud.ru остаются отдельной интеграцией:
-[Container Apps](cloudru-container-apps.md) и [облачный контур](integrations/cloud-provider-foundation.md).
-Их наличие не доказывает принятый production cutover.
+[облачный контур](integrations/cloud-provider-foundation.md).
+Его наличие не доказывает принятый production cutover.

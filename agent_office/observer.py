@@ -14,7 +14,7 @@ Run it locally with a token that can read the repository:
 
     GITHUB_TOKEN=... python -m agent_office.observer --repo maksimp6/Chat
 
-The scheduled workflow ``.github/workflows/agent-observer.yml`` runs it hourly.
+No workflow runs it: ``agent-observer.yml`` was removed by #1592.
 """
 
 from __future__ import annotations

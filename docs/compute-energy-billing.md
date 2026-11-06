@@ -60,7 +60,7 @@ The aggregate `billing` adds `cpu_seconds`, `energy_wh` and `compute_cost`
 ## Guarantees and limits
 
 - Exactly one compute item per snapshot; repeated snapshots and `finalize()`
-  calls do not add items or change billing (see `docs/execution-trace-lifecycle.md`).
+  calls do not add items or change billing (see `docs/architecture/execution_trace.md`).
 - A `not_billed` compute item never turns AI billing into `partial`, so token
   settlement to Treasury is unaffected.
 - `thread_time` is per thread. Work recorded on another thread is not

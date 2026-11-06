@@ -89,19 +89,11 @@ SpeechKit STT/TTS. Это проверенная клиентская часть
 ## Проверки
 
 ```bash
-python -m pytest -q tests/test_yandex_transport_contracts.py
 python scripts/build_yandex_contracts.py --check
 ```
 
-Тесты используют настоящие registry/profile schemas. Подменяются только конечные
-транспорты. Есть контроль реального Requests PreparedRequest, положительная отправка
-и отрицательные сценарии с **нулём отправок**, сохранение stream position, raw JSON
-и multipart, redirects, host mismatch, query/path/body, размеры, quotas/receipt
-ordering и архитектурный контроль прямых обходов. Тестовые transport doubles
-принимают и проверяют `allow_redirects=False`, валидатор в них не отключается.
-
-Живой вызов API/модели и пользовательская приёмка не выводятся из этих offline
-проверок. Результаты конкретного опубликованного HEAD и CI записываются в PR.
+Живой вызов API/модели и пользовательская приёмка не выводятся из этой offline
+проверки.
 
 ## Среды исполнения
 
@@ -113,7 +105,3 @@ Docker копирует этот файл до установки зависим
 настоящий `catalog.json` вместе с Python-кодом; byte identity проверяется тестом.
 Это проверка подготовки данных, а не сборка/установка APK или подтверждение
 Android ABI зависимостей. Gradle не запускается.
-
-Отдельный workflow `Yandex API contracts` запускает профильный pytest на точном
-HEAD PR без credentials; существующая политика отчётности job сохранена дословно.
-Реальный результат pytest читается в логе отдельно от итоговой policy-отметки.
