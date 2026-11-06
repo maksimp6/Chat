@@ -30,7 +30,7 @@ if (-not $vol) { throw "no volume ${letter}:" }
 $part = Get-Partition -DriveLetter $letter -ErrorAction SilentlyContinue
 $disk = if ($part) { Get-Disk -Number $part.DiskNumber } else { $null }
 if ($disk) {
-    Write-Host ("Target: {0}: on disk {1} '{2}' ({3}, {4:N1} GB)" -f $letter, $disk.Number, $disk.FriendlyName, $disk.BusType, $disk.Size / 1GB)
+    Write-Host ("Target: {0}: on disk {1} '{2}' ({3}, {4:N1} GB)" -f $letter, $disk.Number, $disk.FriendlyName, $disk.BusType, ($disk.Size / 1GB))
     if ($disk.BusType -ne "USB") { throw "${letter}: is not on a USB disk (bus $($disk.BusType)); refusing." }
 }
 
@@ -51,7 +51,7 @@ if ($Format) {
     Write-Host "About to FORMAT ${letter}: as FAT32. Everything on it will be erased." -ForegroundColor Yellow
     $answer = Read-Host "Type the drive letter ($letter) to confirm"
     if ($answer.ToUpper() -ne $letter) { throw "not confirmed; nothing done." }
-    if ($vol.Size -gt 32GB) { throw "Windows formats FAT32 only up to 32 GB; use a smaller stick or a smaller partition." }
+    # Format-Volume makes FAT32 above 32 GB (a 117 GB stick worked); only format.exe and the Explorer dialog stop at 32 GB.
     Format-Volume -DriveLetter $letter -FileSystem FAT32 -NewFileSystemLabel "ASMRUN" -Confirm:$false | Out-Null
     $vol = Get-Volume -DriveLetter $letter
 }
@@ -71,7 +71,7 @@ if ((Test-Path $dstModel) -and ((Get-Item $dstModel).Length -eq $blobSize)) {
     $sw = [Diagnostics.Stopwatch]::StartNew()
     Copy-Item -Path $blob -Destination $dstModel -Force
     $sw.Stop()
-    Write-Host ("  {0:N0} bytes in {1:N0} s ({2:N1} MB/s)" -f $blobSize, $sw.Elapsed.TotalSeconds, $blobSize / 1MB / [math]::Max($sw.Elapsed.TotalSeconds, 0.001))
+    Write-Host ("  {0:N0} bytes in {1:N0} s ({2:N1} MB/s)" -f $blobSize, $sw.Elapsed.TotalSeconds, ($blobSize / 1MB / [math]::Max($sw.Elapsed.TotalSeconds, 0.001)))
 }
 
 $bootDir = Join-Path $root "EFI\BOOT"
