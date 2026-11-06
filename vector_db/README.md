@@ -24,7 +24,7 @@ Also `delete(collection, doc_id)`, `drop(collection)`, `collections()`.
 
 - `repository-git`, `repository-issues`, `repository-issue_comments`, `repository-review_comments`, `repository-runs`: every record `rag_sync` appends (the app's code and history, its GitHub data).
 - `dialogs`: the reply of every finished chat turn with its question (`chat.mcp_routes._embed_turn`, in a thread after the reply is stored; a failure is a Court case `dialog_embedding_failed`).
-- `memory_facts`: every fact `agent_memory.extractor.save_global_memory_facts` accepts, after the Kristall transaction; the SHA-256 of the fact is the document id and its category the metadata, so a repeated fact replaces its document.
+- `memory_facts`: every fact `agent_memory.extractor.save_global_memory_facts` accepts, once, after the Kristall transaction; the SHA-256 of the fact is the document id and its category the metadata. A fact saved before this collection existed goes in when extraction returns it again.
 
 ## Tool
 
