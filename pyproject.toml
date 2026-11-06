@@ -147,7 +147,6 @@ canonical = "core/wikifunctions.py"
 copies = [
     "agent_skills/_vendor/wikifunctions.py",
     "cloud/_vendor/wikifunctions.py",
-    "sessions/_vendor/wikifunctions.py",
     "tool_providers/_vendor/wikifunctions.py",
     "yandex_client_modules/_vendor/wikifunctions.py",
 ]
@@ -156,7 +155,6 @@ copies = [
 canonical = "core/output.py"
 copies = [
     "remote_runtime/_vendor/output.py",
-    "sessions/_vendor/output.py",
     "tool_providers/_vendor/output.py",
 ]
 

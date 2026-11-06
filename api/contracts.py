@@ -45,69 +45,6 @@ NULLABLE_INTEGER = _nullable(INTEGER)
 NULLABLE_STRING = _nullable(STRING)
 NULLABLE_JSON = _nullable(ANY_JSON)
 
-VIRTUAL_SERVER = _object(
-    {
-        "runtime": STRING,
-        "cwd": STRING,
-        "env": _object(additional=STRING),
-        "memory_mb": INTEGER,
-        "cpu_seconds": INTEGER,
-        "command_timeout_seconds": INTEGER,
-        "idle_timeout_seconds": INTEGER,
-        "max_output_bytes": INTEGER,
-    }
-)
-
-SESSION_PROFILE = _object(
-    {
-        "id": NONEMPTY_STRING,
-        "name": NONEMPTY_STRING,
-        "type": NONEMPTY_STRING,
-        "model": STRING,
-        "system_prompt": STRING,
-        "tools": _list(STRING),
-        "environment": JSON_OBJECT,
-        "files": _list(STRING),
-        "state": JSON_OBJECT,
-        "virtual_server": VIRTUAL_SERVER,
-        "template": BOOLEAN,
-    }
-)
-
-SESSION = _object(
-    {
-        "id": NONEMPTY_STRING,
-        "status": _enum("active", "completed", "failed", "cancelled"),
-        "metadata": JSON_OBJECT,
-        "created_at": INTEGER,
-        "updated_at": INTEGER,
-        "completed_at": NULLABLE_INTEGER,
-    }
-)
-
-SESSION_DETAIL = _object(
-    {
-        "id": NONEMPTY_STRING,
-        "status": _enum("active", "completed", "failed", "cancelled"),
-        "metadata": JSON_OBJECT,
-        "created_at": INTEGER,
-        "updated_at": INTEGER,
-        "completed_at": NULLABLE_INTEGER,
-        "profile": _nullable(SESSION_PROFILE),
-    }
-)
-
-INVOCATION_CONTEXT = _object(
-    {
-        "session_id": NONEMPTY_STRING,
-        "conversation_id": NONEMPTY_STRING,
-        "invocation_id": NONEMPTY_STRING,
-        "trace_id": NONEMPTY_STRING,
-        "user_id": NULLABLE_STRING,
-        "metadata": JSON_OBJECT,
-    }
-)
-
 INVOCATION_VISIBLE = _object(
     {
         "id": NONEMPTY_STRING,
@@ -237,37 +174,10 @@ CONTRACTS = {
         }
     ),
     "chat.error.basic": _object({"error": NONEMPTY_STRING}, additional=ANY_JSON),
-    "runtime.profile.list.response": _object({"profiles": _list(SESSION_PROFILE)}),
-    "runtime.profile.response": SESSION_PROFILE,
-    "runtime.profile.clone.request": _object(
-        optional={"name": _nullable(NONEMPTY_STRING)}
-    ),
-    "runtime.profile.clone.response": _object(
-        {"session": SESSION, "profile": SESSION_PROFILE}
-    ),
-    "runtime.session.create.request": _object(
-        optional={"metadata": _nullable(JSON_OBJECT)}
-    ),
-    "runtime.session.response": SESSION,
-    "runtime.session.detail.response": SESSION_DETAIL,
-    "runtime.invocation.create.request": _object(
-        {"conversation_id": NONEMPTY_STRING},
-        optional={"metadata": _nullable(JSON_OBJECT)},
-    ),
-    "runtime.invocation.create.response": INVOCATION_CONTEXT,
     "runtime.invocation.response": INVOCATION_VISIBLE,
     "runtime.invocation.status.response": INVOCATION_STATUS,
     "runtime.invocation.trace.response": TRACE,
     "runtime.error.basic": _object({"error": NONEMPTY_STRING}),
-    "runtime.error.message": _object(
-        {"error": NONEMPTY_STRING, "message": NONEMPTY_STRING}
-    ),
-    "runtime.error.invalid_request": _object(
-        {
-            "error": _enum("invalid_request"),
-            "message": NONEMPTY_STRING,
-        }
-    ),
 }
 
 

@@ -15,7 +15,7 @@ from vector_db._binding import Binding, HostNotBound
 
 @dataclass(frozen=True, kw_only=True)
 class Host:
-    embed_texts: Any  # yandex_client_modules.embeddings.embed_texts
+    embed_texts: Any  # ollama_client.embeddings.embed_texts
     get_store: Any  # storage.records.get_store
 
 

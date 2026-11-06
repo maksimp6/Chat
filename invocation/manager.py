@@ -8,7 +8,6 @@ import hashlib
 import json
 import logging
 import re
-import threading
 import time
 import uuid
 from typing import Any
@@ -23,6 +22,7 @@ from invocation.host import (
     get_messages,
     memory_file_path,
     restore_session,
+    sanitize_metadata,
 )
 
 logger = logging.getLogger("logos.invocation.manager")
@@ -42,33 +42,9 @@ def _inline_value_bytes() -> int:
     return bound.MAX_JOURNAL_FRAME_BYTES // 2
 
 
-# "token" matches credential names such as access_token, but not usage counters such as
-# input_tokens, total_tokens or output_tokens, which the saved trace needs.
-_SENSITIVE_KEY_RE = re.compile(
-    r"(?:api[_-]?key|authorization|password|passwd|secret|credential|cookie|private[_-]?key"
-    r"|token(?!s(?![A-Za-z])))",
-    re.IGNORECASE,
-)
-
-
-def _sanitize_metadata(value: Any) -> Any:
-    """Remove credential-like metadata before it reaches persistent storage."""
-    if isinstance(value, dict):
-        return {
-            str(key): _sanitize_metadata(item)
-            for key, item in value.items()
-            if not _SENSITIVE_KEY_RE.search(str(key))
-        }
-    if isinstance(value, list):
-        return [_sanitize_metadata(item) for item in value]
-    if isinstance(value, tuple):
-        return [_sanitize_metadata(item) for item in value]
-    return value
-
-
 def _sanitize_for_storage(value: Any) -> Any:
     """Remove credential-like keys and credential-like text before a value is persisted."""
-    sanitized = _sanitize_metadata(value)
+    sanitized = sanitize_metadata(value)
     try:
         return bound.ExecutionTrace._sanitize_trace_value(sanitized)
     except (ImportError, AttributeError):
@@ -101,24 +77,17 @@ def create_invocation(
     conversation_id: str,
     metadata: dict[str, Any] | None = None,
     user_id: str | None = None,
-    *,
-    create_missing_session: bool = True,
 ) -> InvocationContext:
     session_id = _resolve_request_session_id(session_id, conversation_id)
     session = restore_session(session_id)
     if session is None:
-        if not create_missing_session:
-            raise ValueError(f"Session not found: {session_id}")
-        legacy_owner = (
-            str(user_id).strip() if user_id and str(user_id).strip() else None
-        )
+        owner = str(user_id).strip() if user_id and str(user_id).strip() else None
         try:
             create_session(
                 session_id,
                 metadata={
                     "conversation_id": conversation_id,
-                    "legacy": True,
-                    **({"user_id": legacy_owner} if legacy_owner else {}),
+                    **({"user_id": owner} if owner else {}),
                 },
             )
         except ValueError:
@@ -129,7 +98,7 @@ def create_invocation(
     invocation_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
     now = int(time.time())
-    persisted_metadata = _sanitize_metadata(metadata or {})
+    persisted_metadata = sanitize_metadata(metadata or {})
     resolved_user_id = (
         str(user_id).strip() if user_id is not None and str(user_id).strip() else None
     )
@@ -440,62 +409,12 @@ def fail_interrupted_invocations(before: float) -> int:
     return failed
 
 
-def compress_stored_values() -> int:
-    """Rewrite every value stored in v1 (uncompressed) chunks as gzip v2 chunks.
-
-    The v2 manifest is published first; the v1 chunks are removed after it, so a
-    value is never left without readable chunks. Returns how many values moved."""
-    client = get_memory_client(memory_file_path())
-    moved = 0
-    for key, record in client.items(_INVOCATION_PREFIX).items():
-        if not isinstance(record, dict):
-            continue
-        invocation_id = str(record.get("id") or key[len(_INVOCATION_PREFIX):])
-        for name, manifest in list(record.items()):
-            if not name.endswith("_chunks") or not isinstance(manifest, dict):
-                continue
-            if manifest.get("format") != _VALUE_FORMAT:
-                continue
-            field = name[: -len("_chunks")]
-            try:
-                value = _read_chunked_value(invocation_id, field, manifest)
-                if not _publish_invocation_values(invocation_id, {field: value}):
-                    continue
-            except Exception:
-                logger.exception("invocation %s %s was not compressed", invocation_id, field)
-                continue
-            _discard_prepared_chunks(invocation_id, field, manifest)
-            moved += 1
-    if moved:
-        logger.info("[BOOT] %d stored invocation value(s) compressed", moved)
-    return moved
-
-
-def compress_stored_values_in_background() -> None:
-    """Compress old invocation values without holding up the start of the server."""
-    threading.Thread(
-        target=compress_stored_values, name="invocation-value-compression", daemon=True
-    ).start()
-
-
-def cancel_invocation(invocation_id: str, reason: Any = None) -> bool:
-    return _complete(invocation_id, "cancelled", error=reason)
-
-
 def _complete(
     invocation_id: str, status: str, result: Any = None, error: Any = None
 ) -> bool:
     return _publish_invocation_values(
         invocation_id, {"result": result, "error": error}, status=status
     )
-
-
-def get_invocation_owner(invocation_id: str) -> str | None:
-    """Return the owner an invocation was created for, without reading its trace or result."""
-    value = get_memory_client(memory_file_path()).get(_key(invocation_id))
-    if not isinstance(value, dict) or value.get("id") != str(invocation_id):
-        return None
-    return value.get("user_id")
 
 
 def conversation_turn_running(conversation_id: str) -> bool:
@@ -515,8 +434,8 @@ def get_invocation(invocation_id: str) -> dict[str, Any] | None:
     if value is None:
         return None
     if not isinstance(value, dict) or value.get("id") != str(invocation_id):
-        # A record that is not this invocation is treated as absent, as in
-        # get_invocation_owner and get_session, not as a server error.
+        # A record that is not this invocation is treated as absent, as in get_session,
+        # not as a server error.
         return None
     for field in ("trace", "result", "error"):
         if field + "_chunks" in value:

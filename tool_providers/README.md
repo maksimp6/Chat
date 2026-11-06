@@ -39,11 +39,10 @@ Other units reach it only through their own ports:
 | `tool_providers.filesystem.resolves_to_link_local` | `browser` |
 | `tool_providers.registry.registry` | `agent_runtime`, `chat`, `mcp_server`, `tools.knowledge`, `yandex_client_modules` |
 | `tool_providers.runtime_tools.ssh_runtime_exec` | `cloud` |
-| `tool_providers.universal_tool_platform.UniversalToolCall` | `agent_runtime`, `chat`, `mcp_server`, `plugin_system`, `runtime`, `tools.knowledge`, `yandex_client_modules` |
-| `tool_providers.universal_tool_platform.UniversalToolExecutor` | `agent_runtime`, `chat`, `mcp_server`, `plugin_system`, `runtime`, `tools.knowledge`, `yandex_client_modules` |
+| `tool_providers.universal_tool_platform.UniversalToolCall` | `agent_runtime`, `chat`, `mcp_server`, `plugin_system`, `tools.knowledge`, `yandex_client_modules` |
+| `tool_providers.universal_tool_platform.UniversalToolExecutor` | `agent_runtime`, `chat`, `mcp_server`, `plugin_system`, `tools.knowledge`, `yandex_client_modules` |
 | `tool_providers.universal_tool_platform.tool_call_requires_approval` | `mcp_server` |
 | `tool_providers.universal_tool_platform.validate_json_schema` | `organization`, `tools.knowledge` |
-| `tool_providers.universal_tool_platform.warn_deprecated_execution_hooks` | `runtime` |
 
 ## Ports
 

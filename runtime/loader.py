@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import builtins
-import hashlib
 import importlib.machinery
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -59,15 +58,10 @@ class RuntimeLoader:
         self.source_root = Path(source_root).resolve()
         self._dispatcher = dispatcher
         self._application: Any = None
-        self._digest: str | None = None
 
     @property
     def loaded(self) -> bool:
         return self._application is not None
-
-    @property
-    def source_digest(self) -> str | None:
-        return self._digest
 
     def load(self) -> bool:
         path = self.source_root / self.ENTRYPOINT
@@ -100,7 +94,6 @@ class RuntimeLoader:
                 "runtime application must define invoke(operation, payload)"
             )
         self._application = application
-        self._digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
         return True
 
     def invoke(self, operation: str, payload: Mapping[str, Any] | None = None) -> Any:

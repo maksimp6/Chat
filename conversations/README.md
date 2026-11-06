@@ -30,7 +30,7 @@ Other units reach it only through their own ports:
 
 | Provides | To |
 | --- | --- |
-| `conversations.ownership.check_access` | `chat`, `mcp_server`, `runtime` |
+| `conversations.ownership.check_access` | `chat`, `mcp_server` |
 | `conversations.ownership.get_owned_conversation` | `mcp_server` |
 | `conversations.ownership.list_owned_conversations` | `chat`, `mcp_server` |
 | `conversations.ownership.set_owner` | `chat` |

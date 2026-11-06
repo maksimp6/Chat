@@ -25,12 +25,10 @@ logger = logging.getLogger("logos.ollama_client")
 class OllamaClientError(Exception):
     """A turn request Ollama did not answer, with the text the person reads."""
 
-    def __init__(self, message: str, *, status_code: int | None, reached: bool):
+    def __init__(self, message: str, *, status_code: int | None):
         super().__init__(message)
         self.status_code = status_code
         self.user_text = settings.USER_TEXT_UNREACHABLE
-        # The chat retries a request that never reached the provider.
-        self.request_not_accepted = not reached
 
 
 def _emit(sink: Callable[[dict[str, Any]], None] | None, event: dict[str, Any]) -> None:
@@ -129,7 +127,7 @@ class OllamaClient:
                 on_event=live,
             )
         except OllamaError as exc:
-            raise OllamaClientError(str(exc), status_code=exc.status_code, reached=exc.reached) from exc
+            raise OllamaClientError(str(exc), status_code=exc.status_code) from exc
         if trace is not None:
             ended = time.time()
             trace.add_api_request(body, step_index=step, start_timestamp=started, provider_key_id=None)

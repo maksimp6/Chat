@@ -25,9 +25,8 @@ first.
 
 ## Credentials
 
-Register `cloudru_storage_credential_resolver(...)` with
-`RuntimeDispatcher.set_storage_credential_resolver`. It resolves the Cloud.ru
-service account access key, in order:
+`cloudru_storage_credential_resolver(...)` resolves the Cloud.ru service account
+access key, in order:
 
 1. a dedicated key from `CLOUDRU_STORAGE_KEY_ID` / `CLOUDRU_STORAGE_KEY_SECRET`;
 2. the stored IAM key from `provider_credentials.get_cloudru_iam_credentials`,
@@ -42,8 +41,7 @@ Cloud.ru expects the S3 access key ID as `<tenant_id>:<key_id>`; set
 `CLOUDRU_STORAGE_TENANT_ID` so the resolver adds the prefix. The service account
 needs an Object Storage role on the bucket.
 
-The secret stays inside the dispatcher and the adapter: `S3Credentials.__repr__`
-hides it and API failures surface only as `StorageError`,
+The secret stays inside the adapter: `S3Credentials.__repr__` hides it and API failures surface only as `StorageError`,
 `StorageObjectNotFound`, `StorageCredentialsMissing` (missing or rejected keys)
 or `StorageProviderUnavailable` (network errors and 5xx), without response
 bodies.

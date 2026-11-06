@@ -15,10 +15,8 @@ logger = logging.getLogger("logos.core.config")
 # imports this module, so the values below already include it.
 _ENV_FILE = Path(__file__).resolve().with_name(".env")
 
-# Keep compatibility with the legacy YC_API_KEY name while preferring the
-# canonical YANDEX_API_KEY variable. Never put credentials in source code.
-# Provider credentials are resolved at runtime from provider_credentials.
-# No provider API key belongs in application configuration.
+# Never put credentials in source code. Provider credentials are resolved at runtime
+# from provider_credentials. No provider API key belongs in application configuration.
 
 BASE_URL = env_get("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
 CLOUDRU_BASE_URL = env_get(
@@ -264,8 +262,8 @@ class Config:
     PORT = PORT
 
 
-# Keys renamed in #1316. Stored conversations and older clients may still send the old id.
-# Stored conversations and older clients may still send them: requests go to the successor.
+# Keys renamed in #1316. Stored conversations and older clients may still send the old id:
+# requests go to the successor.
 LEGACY_MODEL_KEYS = {}
 
 

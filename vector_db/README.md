@@ -2,7 +2,7 @@
 
 `vector_db` · Embeds texts with the local embedding model and searches them by meaning.
 
-The app's own vector database: texts are embedded by Ollama's `qwen3-embedding:0.6b` on the owner's PC (`ollama_client.embed`, Logos has no Yandex API since 04.11.2026) and kept and searched on the server, in the Kristall store. No provider Vector Store is involved.
+The app's own vector database: texts are embedded by Ollama's `qwen3-embedding:0.6b` on the owner's PC (`ollama_client.embeddings.embed_texts`, Logos has no Yandex API since 04.11.2026) and kept and searched on the server, in the Kristall store. No provider Vector Store is involved.
 
 **One model.** Stored chunks and queries are embedded by the same model (`DOC_MODEL` = `QUERY_MODEL`), at its own size (1024 dimensions). A search compares only chunks of that model at the query's size: chunks embedded earlier by the Yandex models (`text-embeddings-v2-doc`, 768 dimensions; most of `repository-git`) are kept but not found until they are embedded again.
 
@@ -47,7 +47,7 @@ Owner, 05.11.2026: "we don't need full sentences from remember just do sense ext
 
 | Port | Provided by |
 | --- | --- |
-| `embed_texts` | `composition.wiring._vector_db`: `ollama_client.embed` on `ollama_client.settings.URL` |
+| `embed_texts` | `ollama_client.embeddings.embed_texts` |
 | `get_store` | `storage.records.get_store` |
 
 ## Install

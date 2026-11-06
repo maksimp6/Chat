@@ -1,8 +1,8 @@
 # Tamoro
 
-`sessions` · Keeps durable AI sessions with reusable profiles and lightweight runtimes.
+`sessions` · Keeps durable AI sessions.
 
-Durable runtime sessions stored as Kristall journal records, built-in reusable AI session profiles and the managed lightweight runtimes behind them.
+Durable runtime sessions stored as Kristall journal records.
 
 ## Role in a dialog
 
@@ -12,24 +12,20 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 
 ## Public API
 
-`from sessions import …`: `manager`, `profiles`.
+`from sessions import …`: `manager`.
 
 | Module | Purpose |
 | --- | --- |
 | [`sessions.manager`](manager.py) | Durable runtime sessions stored directly as Kristall journal records. |
-| [`sessions.profiles`](profiles.py) | Built-in reusable AI session profiles. |
 
 Other units reach it only through their own ports:
 
 | Provides | To |
 | --- | --- |
-| `sessions.manager.create_session` | `invocation`, `organization`, `runtime` |
-| `sessions.manager.get_session` | `mcp_server`, `organization`, `runtime` |
+| `sessions.manager.create_session` | `invocation`, `organization` |
+| `sessions.manager.get_session` | `mcp_server`, `organization` |
 | `sessions.manager.restore_session` | `invocation` |
-| `sessions.profiles.clone_profile` | `runtime` |
-| `sessions.profiles.get_profile` | `runtime` |
-| `sessions.profiles.list_profiles` | `runtime` |
-| `sessions.profiles.session_profile` | `runtime` |
+| `sessions.manager.sanitize_metadata` | `invocation` |
 
 ## Ports
 

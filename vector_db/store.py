@@ -14,8 +14,8 @@ Kristall keeps every value in RAM and a listing copies it, so a vector is one st
 (5.5 KB) instead of 1,024 Python floats (~32 KB in RAM, copied on every search); with
 unit vectors the cosine is one ``math.sumprod``. Chunks stored before the packed form
 (a ``vector`` list) are rewritten once, in the background, on the first use after start.
-Each embed call returns the tokens spent and writes an event into the caller's
-execution trace.
+Each embed call returns the tokens spent; ``add`` and ``search`` write an event with
+them into the caller's execution trace.
 """
 
 from __future__ import annotations
@@ -37,9 +37,9 @@ __all__ = ["CHUNK_CHARS", "add", "collections", "delete", "drop", "search", "uni
 logger = logging.getLogger("logos.vector_db")
 
 PREFIX = "vector_db/"
-# A chunk the size the provider's search models embed well; the whole text is kept.
+# Characters of one chunk; the whole text is kept.
 CHUNK_CHARS = 2000
-# Texts sent in one embed_texts call (its whole-call budget is 60 s).
+# Texts sent in one embed_texts call: one request, with a 300 s timeout.
 BATCH = 16
 DOC_MODEL = "qwen3-embedding:0.6b"
 QUERY_MODEL = DOC_MODEL

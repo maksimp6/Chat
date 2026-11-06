@@ -60,17 +60,14 @@ implicit payload shape.
 
 ## Runtime API reference implementation
 
-`api_contracts.py` is the current contract registry and strict validator for
-the runtime/session/invocation API.
+`api/contracts.py` is the current contract registry and strict validator for
+the runtime invocation API.
 
-`runtime_api.py` enforces two boundaries:
+In `runtime/api.py`, `_contract_response(contract_name, payload, status)` validates
+outgoing JSON before serialization.
 
-- `_request_payload(contract_name)` validates incoming JSON before business logic;
-- `_contract_response(contract_name, payload, status)` validates outgoing JSON
-  before serialization.
-
-Runtime routes are forbidden from calling `request.get_json()` or `jsonify()`
-directly. Architecture tests enforce this.
+Runtime routes are forbidden from calling `jsonify()` directly. Architecture tests
+enforce this.
 
 ## Test levels
 

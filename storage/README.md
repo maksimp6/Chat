@@ -39,11 +39,11 @@ Other units reach it only through their own ports:
 | Provides | To |
 | --- | --- |
 | `storage.StorageObjectNotFound` | `model_editor` |
-| `storage.contracts.StorageCredentialsMissing` | `cloud`, `runtime` |
-| `storage.contracts.StorageError` | `cloud`, `runtime` |
+| `storage.contracts.StorageCredentialsMissing` | `cloud` |
+| `storage.contracts.StorageError` | `cloud` |
 | `storage.contracts.StorageObject` | `cloud` |
 | `storage.contracts.StorageObjectNotFound` | `cloud` |
-| `storage.contracts.StorageProviderUnavailable` | `cloud`, `runtime` |
+| `storage.contracts.StorageProviderUnavailable` | `cloud` |
 | `storage.contracts.safe_relative_path` | `cloud` |
 | `storage.contracts.storage_provider_from_env` | `model_editor` |
 | `storage.generated_images.image_file_metadata` | `chat` |

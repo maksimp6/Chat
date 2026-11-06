@@ -50,7 +50,7 @@ disk, which the code imports and the architecture map uses, does not change.
 | **Zerano** | `repository_index` | Validates identity and provenance of immutable repository index snapshots. |
 | **Ruvane** | `runtime` | Scoped dispatcher for preview runtimes' database, file and tool access. |
 | **Vesara** | `secret_store` | Resolves secret references into redacted values with policy and audit. |
-| **Tamoro** | `sessions` | Keeps durable AI sessions with reusable profiles and lightweight runtimes. |
+| **Tamoro** | `sessions` | Keeps durable AI sessions. |
 | **Bokeri** | `steel` | Fail-closed admission check for worker jobs: approval, capabilities and limits. |
 | **Ondera** | `storage` | Saves chats and settings in the Kristall journal and generated images as private files. |
 | **Fenaro** | `tool_providers` | Tool contracts, a policy-checked execution pipeline and built-in tool sources. |

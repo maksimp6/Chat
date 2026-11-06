@@ -29,7 +29,7 @@ Other units reach it only through their own ports:
 | --- | --- |
 | `invocation.api.get_invocation_status` | `mcp_server`, `runtime` |
 | `invocation.api.get_invocation_trace` | `mcp_server`, `runtime` |
-| `invocation.manager.create_invocation` | `agent_runtime`, `chat`, `mcp_server`, `runtime`, `tools.knowledge` |
+| `invocation.manager.create_invocation` | `agent_runtime`, `chat`, `mcp_server`, `tools.knowledge` |
 | `invocation.manager.fail_invocation` | `agent_runtime`, `chat`, `mcp_server`, `tools.knowledge` |
 | `invocation.manager.finish_invocation` | `agent_runtime`, `chat`, `mcp_server`, `tools.knowledge` |
 | `invocation.manager.persist_invocation_trace` | `agent_runtime`, `chat`, `mcp_server`, `tools.knowledge` |
@@ -53,6 +53,7 @@ Everything `invocation` uses from other units is a field of `Host` in [`invocati
 | `get_messages` | `storage.records.get_messages` |
 | `memory_file_path` | `storage.records.memory_file_path` |
 | `restore_session` | `sessions.manager.restore_session` |
+| `sanitize_metadata` | `sessions.manager.sanitize_metadata` |
 
 ## Install
 

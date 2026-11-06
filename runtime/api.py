@@ -1,20 +1,10 @@
-"""Small API helpers for session/invocation lifecycle endpoints."""
+"""Small API helpers for invocation lifecycle endpoints."""
 
-from webframe import Blueprint, jsonify, request
+from webframe import Blueprint, jsonify
 
 from runtime.host import (
-    bound,
-    check_access,
-    clone_profile,
-    create_invocation,
-    create_session,
-    get_current_owner_id,
     get_invocation_status,
     get_invocation_trace,
-    get_profile,
-    get_session,
-    list_profiles,
-    session_profile,
     validate_api_contract,
 )
 
@@ -24,122 +14,6 @@ runtime_bp = Blueprint("runtime", __name__, url_prefix="/api")
 def _contract_response(name, payload, status=200):
     validate_api_contract(name, payload)
     return jsonify(payload), status
-
-
-def _request_payload(name):
-    payload = request.get_json(silent=True)
-    if payload is None:
-        payload = {}
-    validate_api_contract(name, payload)
-    return payload
-
-
-def _invalid_request(_exc):
-    payload = {
-        "error": "invalid_request",
-        "message": "request payload does not match API contract",
-    }
-    return _contract_response("runtime.error.invalid_request", payload, 400)
-
-
-@runtime_bp.get("/session-profiles")
-def api_list_session_profiles():
-    return _contract_response(
-        "runtime.profile.list.response",
-        {"profiles": list_profiles()},
-    )
-
-
-@runtime_bp.get("/session-profiles/<profile_id>")
-def api_get_session_profile(profile_id):
-    profile = get_profile(profile_id)
-    if not profile:
-        return _contract_response(
-            "runtime.error.basic", {"error": "profile_not_found"}, 404
-        )
-    return _contract_response("runtime.profile.response", profile)
-
-
-@runtime_bp.post("/session-profiles/<profile_id>/clone")
-def api_clone_session_profile(profile_id):
-    try:
-        data = _request_payload("runtime.profile.clone.request")
-    except bound.ContractViolation as exc:
-        return _invalid_request(exc)
-
-    name = data.get("name")
-    try:
-        payload = clone_profile(profile_id, name.strip() if name else None)
-    except KeyError:
-        return _contract_response(
-            "runtime.error.basic", {"error": "profile_not_found"}, 404
-        )
-    return _contract_response("runtime.profile.clone.response", payload, 201)
-
-
-@runtime_bp.post("/sessions")
-def api_create_session():
-    try:
-        data = _request_payload("runtime.session.create.request")
-    except bound.ContractViolation as exc:
-        return _invalid_request(exc)
-    metadata = {**dict(data.get("metadata") or {}), "user_id": get_current_owner_id()}
-    return _contract_response(
-        "runtime.session.response",
-        create_session(metadata=metadata),
-        201,
-    )
-
-
-@runtime_bp.get("/sessions/<session_id>")
-def api_get_session(session_id):
-    session = get_session(session_id)
-    if not session:
-        return _contract_response(
-            "runtime.error.basic", {"error": "session_not_found"}, 404
-        )
-    response = dict(session)
-    response["profile"] = session_profile(session_id)
-    return _contract_response("runtime.session.detail.response", response)
-
-
-@runtime_bp.post("/sessions/<session_id>/invocations")
-def api_create_invocation(session_id):
-    try:
-        data = _request_payload("runtime.invocation.create.request")
-    except bound.ContractViolation as exc:
-        return _invalid_request(exc)
-
-    owner = get_current_owner_id()
-    session = get_session(session_id)
-    if not session:
-        return _contract_response(
-            "runtime.error.message",
-            {"error": "session_not_found", "message": "session not found"},
-            404,
-        )
-    conversation_id = str(data.get("conversation_id") or "")
-    if not conversation_id or not check_access(conversation_id, owner):
-        return _contract_response(
-            "runtime.error.basic", {"error": "conversation_not_found"}, 404
-        )
-    try:
-        context = create_invocation(
-            session_id=session_id,
-            conversation_id=conversation_id,
-            metadata=data.get("metadata"),
-            user_id=owner,
-            create_missing_session=False,
-        )
-    except ValueError:
-        return _contract_response(
-            "runtime.error.message",
-            {"error": "session_not_found", "message": "session not found"},
-            404,
-        )
-    return _contract_response(
-        "runtime.invocation.create.response", context.as_dict(), 201
-    )
 
 
 @runtime_bp.get("/invocations/<invocation_id>")

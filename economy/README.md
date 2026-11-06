@@ -41,7 +41,7 @@ Other units reach it only through their own ports:
 | `economy.knowledge_economics.KnowledgeCostConfig` | `chat` |
 | `economy.knowledge_economics.calculate_knowledge_cost` | `chat` |
 | `economy.treasury_identity.TreasuryIdentityError` | `organization`, `remote_runtime` |
-| `economy.treasury_identity.get_current_owner_id` | `chat`, `conversations`, `forge`, `mcp_server`, `model_editor`, `organization`, `provider_accounts`, `remote_runtime`, `runtime`, `web_shell`, `yandex_client_modules` |
+| `economy.treasury_identity.get_current_owner_id` | `chat`, `conversations`, `forge`, `mcp_server`, `model_editor`, `organization`, `provider_accounts`, `remote_runtime`, `web_shell`, `yandex_client_modules` |
 
 ## Ports
 

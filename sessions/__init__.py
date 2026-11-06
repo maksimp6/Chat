@@ -1,13 +1,11 @@
-"""Durable runtime sessions stored as Kristall journal records, built-in reusable AI
-session profiles and the managed lightweight runtimes behind them.
-"""
+"""Durable runtime sessions stored as Kristall journal records."""
 
 from __future__ import annotations
 
 from importlib import import_module
 from typing import Any
 
-__all__ = ["manager", "profiles"]
+__all__ = ["manager"]
 
 
 def __getattr__(name: str) -> Any:

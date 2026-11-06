@@ -456,6 +456,7 @@ def _invocation():
     from storage.records import get_messages
     from storage.records import memory_file_path
     from sessions.manager import restore_session
+    from sessions.manager import sanitize_metadata
 
     return host.Host(
         ExecutionTrace=ExecutionTrace,
@@ -469,6 +470,7 @@ def _invocation():
         get_messages=get_messages,
         memory_file_path=memory_file_path,
         restore_session=restore_session,
+        sanitize_metadata=sanitize_metadata,
     )
 
 
@@ -794,47 +796,13 @@ def _remote_runtime():
 
 def _runtime():
     from runtime import host
-    from api.contracts import ContractViolation
-    from storage.contracts import StorageCredentialsMissing
-    from storage.contracts import StorageError
-    from storage.contracts import StorageProviderUnavailable
-    from tool_providers.universal_tool_platform import UniversalToolCall
-    from tool_providers.universal_tool_platform import UniversalToolExecutor
-    from tool_providers.universal_tool_platform import (
-        warn_deprecated_execution_hooks as _warn_deprecated_execution_hooks,
-    )
-    from conversations.ownership import check_access
-    from sessions.profiles import clone_profile
-    from invocation.manager import create_invocation
-    from sessions.manager import create_session
-    from economy.treasury_identity import get_current_owner_id
     from invocation.api import get_invocation_status
     from invocation.api import get_invocation_trace
-    from sessions.profiles import get_profile
-    from sessions.manager import get_session
-    from sessions.profiles import list_profiles
-    from sessions.profiles import session_profile
     from api.contracts import validate_api_contract
 
     return host.Host(
-        ContractViolation=ContractViolation,
-        StorageCredentialsMissing=StorageCredentialsMissing,
-        StorageError=StorageError,
-        StorageProviderUnavailable=StorageProviderUnavailable,
-        UniversalToolCall=UniversalToolCall,
-        UniversalToolExecutor=UniversalToolExecutor,
-        _warn_deprecated_execution_hooks=_warn_deprecated_execution_hooks,
-        check_access=check_access,
-        clone_profile=clone_profile,
-        create_invocation=create_invocation,
-        create_session=create_session,
-        get_current_owner_id=get_current_owner_id,
         get_invocation_status=get_invocation_status,
         get_invocation_trace=get_invocation_trace,
-        get_profile=get_profile,
-        get_session=get_session,
-        list_profiles=list_profiles,
-        session_profile=session_profile,
         validate_api_contract=validate_api_contract,
     )
 
@@ -922,12 +890,8 @@ def _tool_providers():
 
 def _vector_db():
     from vector_db import host
-    from ollama_client import embed, settings as ollama_settings
+    from ollama_client.embeddings import embed_texts
     from storage.records import get_store
-
-    def embed_texts(texts, *, model, trace=None):
-        # The vector database embeds with Ollama on the owner's PC (no Yandex API).
-        return embed(ollama_settings.URL, model, texts)
 
     return host.Host(embed_texts=embed_texts, get_store=get_store)
 

@@ -6,9 +6,10 @@ from typing import Any
 
 import requests
 
+from ollama_client import settings
 from ollama_client.chat import OllamaError
 
-__all__ = ["embed"]
+__all__ = ["embed", "embed_texts"]
 
 
 def embed(url: str, model: str, texts: list[str], *, timeout: float | None = 300) -> dict[str, Any]:
@@ -29,3 +30,8 @@ def embed(url: str, model: str, texts: list[str], *, timeout: float | None = 300
     if not isinstance(vectors, list) or len(vectors) != len(texts):
         raise OllamaError("Ollama embeddings returned no vector per text")
     return {"vectors": vectors, "tokens": int(data.get("prompt_eval_count") or 0), "model": model}
+
+
+def embed_texts(texts: list[str], *, model: str, trace: Any = None) -> dict[str, Any]:
+    """The vector database's embedding port: ``embed`` on the configured Ollama; ``trace`` stays unwritten."""
+    return embed(settings.URL, model, texts)

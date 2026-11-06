@@ -26,6 +26,7 @@ class Host:
     get_messages: Any  # storage.records.get_messages
     memory_file_path: Any  # storage.records.memory_file_path
     restore_session: Any  # sessions.manager.restore_session
+    sanitize_metadata: Any  # sessions.manager.sanitize_metadata
 
 
 _binding: Binding[Host] = Binding("invocation")
@@ -48,6 +49,7 @@ __all__ = [
     "memory_file_path",
     "provide",
     "restore_session",
+    "sanitize_metadata",
 ]
 
 
@@ -77,3 +79,7 @@ def memory_file_path(*args: Any, **kwargs: Any) -> Any:
 
 def restore_session(*args: Any, **kwargs: Any) -> Any:
     return current().restore_session(*args, **kwargs)
+
+
+def sanitize_metadata(*args: Any, **kwargs: Any) -> Any:
+    return current().sanitize_metadata(*args, **kwargs)
