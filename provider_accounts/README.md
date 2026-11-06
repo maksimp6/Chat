@@ -31,6 +31,8 @@ Other units reach it only through their own ports:
 
 | Provides | To |
 | --- | --- |
+| `provider_accounts.credentials.ExpiredCredentialError` | `chat`, `workspace` |
+| `provider_accounts.credentials.NoActiveCredentialError` | `chat`, `workspace` |
 | `provider_accounts.credentials.bootstrap_credential` | `agent_runtime` |
 | `provider_accounts.credentials.resolve_client_credential` | `yandex_client_modules` |
 | `provider_accounts.model_discovery.get_model_discovery` | `chat` |

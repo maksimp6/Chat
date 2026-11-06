@@ -1,9 +1,4 @@
-"""The one place that reads or writes the process environment.
-
-Configuration reaches the code through these functions, so there is a single entry point for the
-environment. They are thin wrappers over os.environ and cache nothing, so a value set after startup is
-seen by the next read. ``load_env_file`` is the one loader; composition roots call it at start-up.
-"""
+"""Loads core/.env and tells which names came from it."""
 
 from __future__ import annotations
 

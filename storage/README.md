@@ -50,15 +50,15 @@ Other units reach it only through their own ports:
 | `storage.generated_images.open_image_file` | `chat` |
 | `storage.generated_images.save_image_file` | `chat` |
 | `storage.memory_db.DatabaseError` | `agent_runtime`, `tools.knowledge` |
-| `storage.records.add_message` | `chat` |
+| `storage.records.add_message` | `chat`, `court`, `invocation` |
 | `storage.records.create_conversation` | `chat` |
 | `storage.records.delete_conversation` | `conversations` |
 | `storage.records.get_config` | `remote_runtime` |
-| `storage.records.get_conversation_title` | `chat` |
+| `storage.records.get_conversation_title` | `chat`, `court` |
 | `storage.records.get_conversations` | `conversations` |
 | `storage.records.get_message` | `chat` |
-| `storage.records.get_messages` | `chat`, `invocation`, `mcp_server` |
-| `storage.records.get_store` | `agent_runtime`, `chat`, `economy`, `forge`, `mcp_server`, `organization`, `provider_accounts`, `remote_runtime`, `secret_store`, `web_shell`, `yandex_client_modules` |
+| `storage.records.get_messages` | `chat`, `court`, `invocation`, `mcp_server` |
+| `storage.records.get_store` | `agent_runtime`, `chat`, `court`, `economy`, `forge`, `mcp_server`, `organization`, `provider_accounts`, `rag_sync`, `remote_runtime`, `secret_store`, `vector_db`, `web_shell`, `yandex_client_modules` |
 | `storage.records.get_yandex_conversation` | `chat` |
 | `storage.records.is_provider_pending` | `chat` |
 | `storage.records.maybe_update_conversation_title` | `chat` |

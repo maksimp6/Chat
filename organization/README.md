@@ -24,6 +24,7 @@ Everything `organization` uses from other units is a field of `Host` in [`organi
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_session` | `sessions.manager.get_session` |
 | `get_store` | `storage.records.get_store` |
+| `validate_json_schema` | `tool_providers.universal_tool_platform.validate_json_schema` |
 
 ## Install
 

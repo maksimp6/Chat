@@ -186,6 +186,7 @@ flowchart LR
     memory_log_adapter[memory_log_adapter]
     model_editor[model_editor]
     observability[observability]
+    ollama_client[ollama_client]
     organization[organization]
     plugin_system[plugin_system]
     printer_service[printer_service]

@@ -25,6 +25,7 @@ Other units reach it only through their own ports:
 
 | Provides | To |
 | --- | --- |
+| `observability.system_log.read_entries` | `web_shell` |
 | `observability.trace_manager.ExecutionTrace` | `chat`, `invocation`, `remote_runtime`, `yandex_client_modules` |
 | `observability.trace_manager.bind_current_trace` | `chat`, `mcp_server` |
 | `observability.trace_manager.get_current_trace` | `chat`, `cloud`, `secret_store` |
@@ -37,8 +38,12 @@ Everything `observability` uses from other units is a field of `Host` in [`obser
 
 | Port | Provided by |
 | --- | --- |
+| `PRICING_CURRENCY` | `economy.billing.PRICING_CURRENCY` |
+| `PRICING_VERSION` | `economy.billing.PRICING_VERSION` |
+| `PROVIDER` | `economy.billing.PROVIDER` |
 | `aggregate_billing` | `economy.billing.aggregate_billing` |
 | `build_ai_billing_item` | `economy.billing.build_ai_billing_item` |
+| `build_compute_billing_item` | `economy.compute_resources.build_compute_billing_item` |
 
 ## Install
 

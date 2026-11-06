@@ -1,6 +1,6 @@
 # Nemura
 
-`agent_memory` · Stores shared, source-linked memory facts for Logos agents.
+`agent_memory` · Stores shared memory facts for Logos agents.
 
 Shared memory for Logos agents on native Kristall: the Kristall client lifecycle, fact extraction, the memory panel's HTTP API, and durable conversation-ownership and user-identity records.
 
@@ -30,7 +30,9 @@ Other units reach it only through their own ports:
 | `agent_memory.client.close_memory_clients` | `remote_runtime` |
 | `agent_memory.client.get_memory_client` | `agent_shell`, `conversations`, `invocation`, `sessions`, `storage` |
 | `agent_memory.conversation_ownership_store.ConversationOwnershipStore` | `conversations` |
+| `agent_memory.extractor.save_global_memory_facts` | `chat` |
 | `agent_memory.manager.get_controlled_memory_summary` | `yandex_client_modules` |
+| `agent_memory.manager.load_memory_config` | `chat` |
 
 ## Ports
 

@@ -19,6 +19,7 @@ Everything `plugin_system` uses from other units is a field of `Host` in [`plugi
 | Port | Provided by |
 | --- | --- |
 | `UniversalToolCall` | `tool_providers.universal_tool_platform.UniversalToolCall` |
+| `UniversalToolExecutor` | `tool_providers.universal_tool_platform.UniversalToolExecutor` |
 
 ## Install
 

@@ -1,8 +1,8 @@
 # Tavuro
 
-`agent_runtime` · Provider-agnostic agent gateway, remote tool agents and GitHub issue runner.
+`agent_runtime` · Agent list, remote tool agents and GitHub issue runner.
 
-The agent runtime: the provider-agnostic agent gateway, the persistent gateway for remote Local Tool Agents and its client, the headless GitHub issue runner, the launch hold, the read-only review policy and helpers for Yandex Responses tool loops.
+The agent runtime: the agent gateway that lists the registered agents, the persistent gateway for remote Local Tool Agents and its client, the headless GitHub issue runner, the launch hold, the read-only review policy and helpers for Yandex Responses tool loops.
 
 ## Public API
 
@@ -38,7 +38,7 @@ Other units reach it only through their own ports:
 Everything `agent_runtime` uses from other units is a field of `Host` in [`agent_runtime/host.py`](host.py), read only when a function runs. Functions keep their names as call shims; other ports are `bound.<name>`.
 
 <details>
-<summary>20 ports</summary>
+<summary>22 ports</summary>
 
 | Port | Provided by |
 | --- | --- |
@@ -47,6 +47,7 @@ Everything `agent_runtime` uses from other units is a field of `Host` in [`agent
 | `KristallError` | `kristall.KristallError` |
 | `LogosClient` | `chat.mcp_routes.LogosClient` |
 | `UniversalToolCall` | `tool_providers.universal_tool_platform.UniversalToolCall` |
+| `UniversalToolExecutor` | `tool_providers.universal_tool_platform.UniversalToolExecutor` |
 | `bootstrap_credential` | `provider_accounts.credentials.bootstrap_credential` |
 | `create_invocation` | `invocation.manager.create_invocation` |
 | `create_invocation_trace` | `invocation.trace.create_invocation_trace` |
@@ -54,6 +55,7 @@ Everything `agent_runtime` uses from other units is a field of `Host` in [`agent
 | `current_runtime_id` | `runtime.request_context.current_runtime_id` |
 | `decrypt_secret` | `secret_store.credential_crypto.decrypt_secret` |
 | `encrypt_secret` | `secret_store.credential_crypto.encrypt_secret` |
+| `env_file_only` | `core.env.env_file_only` |
 | `fail_invocation` | `invocation.manager.fail_invocation` |
 | `filesystem` | `tool_providers.filesystem` |
 | `finish_invocation` | `invocation.manager.finish_invocation` |

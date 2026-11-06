@@ -62,9 +62,9 @@ Shipped behavior. Open scope is listed under [Status and roadmap](#status-and-ro
 
 ### Agents and runtime
 
-- **Agent Gateway and RuntimeDispatcher** for runtime-scoped invocations. The
-  target architecture is one Python process with managed threads/contexts;
-  threads are not a hostile-code security boundary.
+- **RuntimeDispatcher** for runtime-scoped invocations and an Agent Gateway that
+  lists the registered agents. The target architecture is one Python process with
+  managed threads/contexts; threads are not a hostile-code security boundary.
 - **Logos agent tooling:** headless runner, tools and draft PR output. See
   [Logos GitHub agent](docs/agents/github-agent.md).
 
@@ -251,7 +251,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 
 | Path               | Contents                                                                                        |
 | ------------------ | ----------------------------------------------------------------------------------------------- |
-| `agent_runtime/`   | Provider-agnostic Agent Gateway, Responses tool loop, local tool agent, headless issue runner   |
+| `agent_runtime/`   | Agent Gateway (the agent list), Responses tool loop, local tool agent, headless issue runner    |
 | `agent_shell/`     | Minimal shell for agent tasks: task store, runner and CLI                                       |
 | `agent_context/`   | Deterministic task-context contracts and cache                                                  |
 | `agent_memory/`    | Shared memory of Logos agents on native Kristall                                                |
@@ -273,7 +273,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | `kristall/`      | Native durable name/value store on one append-only journal ([contract](docs/database.md))          |
 | `memory_engine/` | Synchronous Memory DB with client-owned explicit name/value commits                                |
 | `storage/`       | Chat/config repositories backed by Kristall, archiver and generated images                         |
-| `economy/`       | Treasury, `ExecutionTrace` billing, pricing registry, budgets and compute resources                |
+| `economy/`       | Treasury, `ExecutionTrace` billing, pricing registry, cloud budget guard and compute resources     |
 | `organization/`  | Departments, Government workflows and Partner Relations                                            |
 | `project_board/` | Logos Board: SQL-free discussions, incidents, tasks and evidence                                   |
 

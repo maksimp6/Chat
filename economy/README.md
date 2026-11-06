@@ -1,6 +1,6 @@
 # Ferino
 
-`economy` · Tracks each reply's cost, billing, budgets and paper treasury ledger.
+`economy` · Tracks each reply's cost, billing, cloud spend and paper treasury ledger.
 
 The economy of Logos: a paper treasury ledger with a demo top-up and its HTTP API, the shared local identity used for accounting, billing and energy-based compute pricing of execution traces, the monthly cloud budget guard, provider pricing snapshots and knowledge economics.
 
@@ -32,14 +32,16 @@ Other units reach it only through their own ports:
 
 | Provides | To |
 | --- | --- |
+| `economy.billing.PRICING_CURRENCY` | `observability` |
+| `economy.billing.PRICING_VERSION` | `observability` |
+| `economy.billing.PROVIDER` | `observability` |
 | `economy.billing.aggregate_billing` | `chat`, `observability` |
 | `economy.billing.build_ai_billing_item` | `chat`, `observability` |
 | `economy.billing.settle_billing_to_treasury` | `chat` |
 | `economy.budget_controller.CloudBudgetGuard` | `cloud` |
 | `economy.compute_resources.build_compute_billing_item` | `observability` |
-| `economy.knowledge_economics.KnowledgeCostConfig` | `chat` |
-| `economy.knowledge_economics.calculate_knowledge_cost` | `chat` |
-| `economy.treasury_identity.get_current_owner_id` | `chat`, `conversations`, `forge`, `mcp_server`, `model_editor`, `organization`, `remote_runtime`, `web_shell`, `yandex_client_modules` |
+| `economy.knowledge_economics.embedding_cost` | `chat` |
+| `economy.treasury_identity.get_current_owner_id` | `chat`, `conversations`, `court`, `forge`, `mcp_server`, `model_editor`, `organization`, `remote_runtime`, `web_shell`, `yandex_client_modules` |
 
 ## Ports
 

@@ -39,6 +39,7 @@ Everything `secret_store` uses from other units is a field of `Host` in [`secret
 | Port | Provided by |
 | --- | --- |
 | `CloudProviderError` | `cloud.base.CloudProviderError` |
+| `CloudRuSecretManagementClient` | `cloud.cloudru.secret_management.CloudRuSecretManagementClient` |
 | `get_current_trace` | `observability.trace_manager.get_current_trace` |
 | `get_store` | `storage.records.get_store` |
 

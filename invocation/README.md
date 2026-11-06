@@ -27,8 +27,11 @@ Other units reach it only through their own ports:
 
 | Provides | To |
 | --- | --- |
-| `invocation.api.get_invocation_status` | `mcp_server`, `runtime` |
-| `invocation.api.get_invocation_trace` | `mcp_server`, `runtime` |
+| `invocation.api.get_invocation_status` | `court`, `mcp_server`, `runtime` |
+| `invocation.api.get_invocation_trace` | `court`, `mcp_server`, `runtime` |
+| `invocation.api.get_message_trace` | `court` |
+| `invocation.api.list_message_traces` | `court` |
+| `invocation.manager.conversation_turn_running` | `chat` |
 | `invocation.manager.create_invocation` | `agent_runtime`, `chat`, `mcp_server`, `tools.knowledge` |
 | `invocation.manager.fail_invocation` | `agent_runtime`, `chat`, `mcp_server`, `tools.knowledge` |
 | `invocation.manager.finish_invocation` | `agent_runtime`, `chat`, `mcp_server`, `tools.knowledge` |
@@ -47,6 +50,7 @@ Everything `invocation` uses from other units is a field of `Host` in [`invocati
 | `KristallError` | `kristall.KristallError` |
 | `KristallLimitError` | `kristall.KristallLimitError` |
 | `MAX_JOURNAL_FRAME_BYTES` | `kristall.store.MAX_JOURNAL_FRAME_BYTES` |
+| `add_message` | `storage.records.add_message` |
 | `create_session` | `sessions.manager.create_session` |
 | `file_court_case` | `court.filing.file_case` |
 | `get_memory_client` | `agent_memory.client.get_memory_client` |

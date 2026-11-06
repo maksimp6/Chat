@@ -25,6 +25,7 @@ Other units reach it only through their own ports:
 
 | Provides | To |
 | --- | --- |
+| `mcp_server.oauth` | `chat` |
 | `mcp_server.storage` | `chat`, `yandex_client_modules` |
 | `mcp_server.trace.record_yandex_mcp_activity` | `chat` |
 
@@ -33,7 +34,7 @@ Other units reach it only through their own ports:
 Everything `mcp_server` uses from other units is a field of `Host` in [`mcp_server/host.py`](host.py), read only when a function runs. Functions keep their names as call shims; other ports are `bound.<name>`.
 
 <details>
-<summary>31 ports</summary>
+<summary>33 ports</summary>
 
 | Port | Provided by |
 | --- | --- |
@@ -45,6 +46,7 @@ Everything `mcp_server` uses from other units is a field of `Host` in [`mcp_serv
 | `RuntimeOperationNotFound` | `runtime.RuntimeOperationNotFound` |
 | `RuntimeScopeViolation` | `runtime.RuntimeScopeViolation` |
 | `UniversalToolCall` | `tool_providers.universal_tool_platform.UniversalToolCall` |
+| `UniversalToolExecutor` | `tool_providers.universal_tool_platform.UniversalToolExecutor` |
 | `bind_current_trace` | `observability.trace_manager.bind_current_trace` |
 | `check_access` | `conversations.ownership.check_access` |
 | `create_invocation` | `invocation.manager.create_invocation` |
@@ -68,6 +70,7 @@ Everything `mcp_server` uses from other units is a field of `Host` in [`mcp_serv
 | `registry` | `tool_providers.registry.registry` |
 | `reset_current_trace` | `observability.trace_manager.reset_current_trace` |
 | `start_invocation` | `invocation.manager.start_invocation` |
+| `tool_call_requires_approval` | `tool_providers.universal_tool_platform.tool_call_requires_approval` |
 
 </details>
 

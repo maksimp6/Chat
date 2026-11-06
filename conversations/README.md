@@ -1,8 +1,8 @@
 # Gebato
 
-`conversations` · Tracks conversation ownership, titles, models, settings and deletion.
+`conversations` · Tracks conversation ownership, titles, models and deletion; serves the global settings.
 
-Conversations: ownership records of shared local conversations, helpers for creating Yandex conversations, and the HTTP API of one conversation (title, model, deletion and dialog settings).
+Conversations: ownership records of shared local conversations, helpers for creating Yandex conversations, and the HTTP API of conversations (title, model, deletion) with the global settings every dialog uses.
 
 ## Role in a dialog
 
@@ -24,15 +24,15 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | Module | Purpose |
 | --- | --- |
 | [`conversations.ownership`](ownership.py) | Legacy ownership metadata for shared local conversations. |
-| [`conversations.routes`](routes.py) | HTTP API of one conversation: title, model, deletion and dialog settings. |
+| [`conversations.routes`](routes.py) | HTTP API of conversations: title, model, deletion, and the global settings every dialog uses. |
 
 Other units reach it only through their own ports:
 
 | Provides | To |
 | --- | --- |
-| `conversations.ownership.check_access` | `chat`, `mcp_server` |
+| `conversations.ownership.check_access` | `chat`, `court`, `mcp_server` |
 | `conversations.ownership.get_owned_conversation` | `mcp_server` |
-| `conversations.ownership.list_owned_conversations` | `chat`, `mcp_server` |
+| `conversations.ownership.list_owned_conversations` | `chat`, `court`, `mcp_server` |
 | `conversations.ownership.set_owner` | `chat` |
 
 ## Ports
@@ -41,6 +41,7 @@ Everything `conversations` uses from other units is a field of `Host` in [`conve
 
 | Port | Provided by |
 | --- | --- |
+| `ConversationOwnershipStore` | `agent_memory.conversation_ownership_store.ConversationOwnershipStore` |
 | `delete_conversation` | `storage.records.delete_conversation` |
 | `get_conversations` | `storage.records.get_conversations` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
@@ -48,6 +49,9 @@ Everything `conversations` uses from other units is a field of `Host` in [`conve
 | `memory_file_path` | `storage.records.memory_file_path` |
 | `update_conversation_model` | `storage.records.update_conversation_model` |
 | `update_conversation_title` | `storage.records.update_conversation_title` |
+| `global_settings` | `yandex_client_modules.tool_config.global_settings` |
+| `ollama_status` | `ollama_client.status.status` |
+| `validate_dialog_model` | `provider_accounts.model_discovery.validate_dialog_model` |
 
 ## Install
 
