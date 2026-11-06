@@ -1,10 +1,10 @@
 ; tokenizer.asm — GPT-2 byte-level BPE with the qwen2 pre-tokenizer.
 ;
-; %included into asmrun.asm (bits 64, default rel already set). Nothing here uses
-; `section`/`global`/`extern`/`org`/`bits`, and no storage uses `resb`: mutable
-; globals are zero-initialised `dq 0` / `db 0` / `times N dw 0` bytes at the end
-; of this file; the hash tables, the id->string index and the per-encode scratch
-; all come from rt_alloc at run time.
+; %included into asmrun.asm (bits 64, default rel already set). Code is in .text;
+; the globals at the end switch to .data (`section .data`), and no storage uses
+; `resb`: mutable globals are zero-initialised `dq 0` / `db 0` / `times N dw 0`
+; bytes; the hash tables, the id->string index and the per-encode scratch all
+; come from rt_alloc at run time.
 ;
 ; Public surface (Windows x64 everywhere, also between modules):
 ;   tok_init(rcx=Model*)                         byte maps, vocab + merge tables
@@ -1189,8 +1189,9 @@ tok_cli:
   ret
 
 ; ===========================================================================
-; Mutable globals and constants (zero-initialised bytes in the .flat section).
+; Mutable globals and constants (zero-initialised bytes in .data).
 ; ===========================================================================
+section .data
 
 g_tok_ready:    dq 0           ; 1 once tok_init has built the tables
 g_model:        dq 0           ; Model* (for eos/bos/pad in tok_is_stop)

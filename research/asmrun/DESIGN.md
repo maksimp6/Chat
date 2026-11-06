@@ -148,32 +148,51 @@ prompt "The capital of France is" is 5 tokens: 785 "The", then " capital", " of"
 
 ```
 research/asmrun/
-  asmrun.asm          top level: %includes in order, PE header first
-  inc/pe.inc          PE64 header, section table, import directory (kernel32 only)
+  asmrun.asm          top level: org, the two sections, %includes in order, PE header first
+  inc/pe.inc          PE32+ header and section table; kernel32 import tables (Windows) or the
+                      no-op relocation block (UEFI)
   inc/win.inc         import names and IAT labels, Win32 constants
+  inc/efi.inc         UEFI table/protocol offsets, status codes
   inc/common.inc      struc definitions, constants, macros shared by every module
-  src/runtime.asm     process start, argv, stdout/stderr, memory, file mapping, timing,
-                      cpuid check, thread pool, memory-bandwidth probe
+  src/runtime.asm     shared: argv, stdout/stderr formatting, fatal, cpuid check, thread pool
+                      (pool_worker/pool_run), memory-bandwidth probe, string helpers
+  src/win.asm         Windows half: entry, WriteFile, VirtualAlloc, file mapping, QPC, CreateThread
+  src/efi.asm         UEFI half: entry, ConOut/ConIn, AllocatePages, file reads, TSC clock,
+                      EFI_MP_SERVICES workers, return to the firmware
   src/gguf.asm        GGUF parsing into the Model struct
   src/kernels.asm     matvec per type, rmsnorm, softmax, silu, exp, rope, attention
   src/tokenizer.asm   BPE encode, byte-level decode
-  src/model.asm       forward pass, KV cache, generation loop, statistics
-  build.ps1           nasm -f bin -O2 -o build/asmrun.exe asmrun.asm (build/ is ignored)
+  src/model.asm       forward pass, KV cache, generation loop, statistics, CLI (-i loop)
+  build.ps1           nasm -f bin for both images, EVEX scan, PE header dump (build/ is ignored)
+  make-usb.ps1        BOOTX64.EFI + model.gguf + asmrun.cfg onto a FAT32 USB stick
   bench.ps1           Ollama baseline and asmrun runs on the same prompts → results
   DESIGN.md           this file
   README.md           how to build and run, measurements, what was learned
 ```
 
-One NASM `-f bin` output, no linker: the file starts with the DOS and PE headers and has
-one section (code, data and imports), characteristics code | initialized data | execute |
-read | write. ImageBase 0x140000000, SectionAlignment 0x1000, FileAlignment 0x200, the
-section at file offset 0x200 = RVA 0x1000 (`org 0x140000000 + 0x1000 - 0x200`, so a
-label's virtual address equals its address and header RVAs are `label - IMAGE_BASE`).
-No relocations and no DYNAMIC_BASE flag, so the image loads at its preferred base.
-Subsystem console; stack reserve 8 MB, commit 1 MB; imports from kernel32.dll through
-the IAT (`call [rel __imp_Name]`). Every big buffer comes from VirtualAlloc; the model
-file is mapped read-only (CreateFileW, CreateFileMappingW, MapViewOfFile) and touched
-once at load so page-in time is counted in `load_ms`, not in the token rates.
+One NASM `-f bin` output, no linker, two images from the same sources: `asmrun.exe`
+(Windows console) and, with `-D ASMRUN_EFI`, `BOOTX64.EFI` (UEFI application). The file
+starts with the DOS and PE headers; then `.text` (import tables, code, read-only
+constants; execute | read) from RVA 0x1000 and `.data` (every module's mutable globals
+and strings; read | write) from the next page. SectionAlignment = FileAlignment = 0x1000,
+so a byte's file offset equals its RVA; with `org 0x140000000` a label's assembled
+address equals its link-time virtual address and header RVAs are `label - IMAGE_BASE`.
+In NASM's bin format the modules switch between `section .text` and `section .data`
+(declared once in asmrun.asm with `align=4096 follows=.text`), and the assembler lays
+the data section out after the code, page aligned, with file offset = RVA.
+
+The code is position-independent: RIP-relative addressing only, no absolute address in
+any data (the one table that held string addresses, `blk_tab`, holds offsets from
+itself). The Windows image says RELOCS_STRIPPED and loads at its base; the UEFI image
+clears that bit so the firmware may load it anywhere and advertises a 10-byte base-
+relocation block with one ABSOLUTE (no-op) entry, which the EDK2 loader walks without
+changing a byte. Subsystem 3 or 10; stack reserve 8 MB, commit 1 MB (Windows). Windows
+imports from kernel32.dll go through the IAT (`call [rel __imp_Name]`); the UEFI half
+calls through the system table's function pointers (`call [rax + BS_AllocatePages]`).
+Every big buffer comes from `rt_alloc` (VirtualAlloc / AllocatePages); on Windows the
+model file is mapped read-only (CreateFileW, CreateFileMappingW, MapViewOfFile) and
+touched once at load so page-in time is counted in `load_ms`, not in the token rates;
+on UEFI it is read from the stick into pages at load.
 
 ## Conventions
 
@@ -239,30 +258,86 @@ endstruc
 
 ## Module interfaces
 
-### runtime (`src/runtime.asm`)
+### runtime (`src/runtime.asm`, shared) and its platform halves (`src/win.asm`, `src/efi.asm`)
+
+The shared file implements everything that does not touch the platform and defines the
+ten names each platform half must provide. The modules call only these names.
 
 | Function | Contract |
 | --- | --- |
-| `_entry` | PE entry (AddressOfEntryPoint): parses `GetCommandLineW` into UTF-16 argv, calls `main`, `ExitProcess(eax)` |
-| `rt_out(rcx=ptr, rdx=len)` / `rt_err(...)` | write bytes to stdout / stderr |
+| `rt_parse_cmdline(rcx=utf16) -> rax argc` | splits a UTF-16 command line into `g_argv` in place (quotes honoured) |
+| `rt_out(rcx=ptr, rdx=len)` / `rt_err(...)` | write bytes to stdout / stderr (`rt_write_h` with `g_stdout`/`g_stderr`) |
 | `rt_out_str(rcx=zstr)`, `rt_err_str` | zero-terminated text |
-| `rt_out_u64(rcx)`, `rt_err_u64`, `rt_err_f32(xmm0)` (3 decimals), `rt_err_i64` | numbers |
-| `rt_fatal(rcx=zstr)` | message, exit 1 |
-| `rt_alloc(rcx=bytes) -> rax` | VirtualAlloc, zeroed, fatal on failure |
-| `rt_map_file(rcx=utf16 path, rdx=&size) -> rax base` | read-only mapping of a file |
-| `rt_read_stdin(rcx=&len) -> rax ptr` | whole stdin |
-| `rt_read_file(rcx=utf16 path, rdx=&len) -> rax ptr` | whole file into memory |
-| `rt_now_ns() -> rax` | QueryPerformanceCounter in nanoseconds |
-| `rt_cpu_count() -> rax` | processors |
-| `rt_cpuid_check()` | fatal without AVX2+FMA+F16C; sets `g_has_vnni` |
-| `pool_start(rcx=nthreads)` | creates nthreads−1 worker threads that spin for jobs |
-| `pool_run(rcx=func, rdx=arg)` | runs `func(rcx=arg, rdx=tid, r8=nthreads)` on all threads, tid 0 on the caller; returns when all are done |
+| `rt_out_u64(rcx)`, `rt_err_u64`, `rt_err_f32(xmm0)` (3 decimals), `rt_err_i64`, `rt_err_hex64` | numbers |
+| `rt_fatal(rcx=zstr)` | message, `rt_exit(1)` |
+| `rt_cpuid_check()` | fatal without AVX2+FMA+F16C and OS-enabled YMM state; sets `g_has_vnni` |
+| `pool_worker(rcx=tid)` | spins on the generation counter, runs each job, returns when `g_pool_quit` is set |
+| `pool_run(rcx=func, rdx=arg)` | runs `func(rcx=arg, rdx=tid, r8=nthreads)` on all threads, tid 0 on the caller; returns when all are done; fatal after 2^31 idle spins (a worker that never finishes is a bug, and with no OS it would be a silent hang) |
 | `rt_bench_bandwidth()` | `--bw`: all threads read a 512 MB buffer three times; prints GB/s |
-| `rt_utf16_to_utf8`, `rt_parse_u64`, `rt_streq`, `rt_memcmp`, `rt_memcpy`, `rt_memset` | small helpers |
+| `rt_utf16_to_utf8`, `rt_watoi`, `rt_wcmp_ascii`, `rt_parse_u64`, `rt_streq`, `rt_memcmp`, `rt_memcpy`, `rt_memset` | small helpers |
+
+| Platform name | Windows (`win.asm`) | UEFI (`efi.asm`) |
+| --- | --- | --- |
+| `_entry` | PE entry: console handles, QPC frequency, `GetCommandLineW` → argv, `main`, `rt_exit` | `efi_main(ImageHandle, SystemTable)`: save the firmware's registers, enable AVX state, disarm the 5-minute boot watchdog, measure the TSC against `Stall`, open the boot volume, `\asmrun.cfg` → argv (default `model.gguf -i`), `main`, `rt_exit` |
+| `rt_write_h(rcx=handle, rdx=ptr, r8=len)` | `WriteFile` | UTF-8 → UCS-2 with CR LF, `ConOut->OutputString`; decoder state kept across calls (a token may end mid-character) |
+| `rt_exit(rcx=code)` | `ExitProcess` | set `g_pool_quit`, wait for the APs to return to the firmware, print the code, wait for a key, return from `_entry`'s frame (`EFI_SUCCESS` / `EFI_ABORTED`) |
+| `rt_alloc(rcx=bytes) -> rax` | `VirtualAlloc`, zeroed by the OS | `AllocatePages(EfiLoaderData)`, zeroed here |
+| `rt_map_file(rcx=utf16 path, rdx=&size) -> rax` | read-only mapping | open on the boot volume, `GetInfo` size, pages, `Read` in 8 MB pieces with a progress line |
+| `rt_read_file` | same | same |
+| `rt_read_stdin(rcx=&len) -> rax` | all of stdin to EOF | one line from `ConIn` with echo, Backspace, Enter; Esc gives an empty line |
+| `rt_now_ns() -> rax` | `QueryPerformanceCounter` scaled | `rdtsc` scaled by the measured TSC Hz |
+| `rt_cpu_count() -> rax` | `GetSystemInfo` | `EFI_MP_SERVICES_PROTOCOL.GetNumberOfProcessors` (enabled), 1 without the protocol |
+| `pool_start(rcx=nthreads)` | `CreateThread` × (nthreads−1) running `pool_worker` | `StartupThisAP` × (nthreads−1), non-blocking with a wait event and no timeout, running `pool_ap_entry(tid)` on each application processor |
 
 Workers spin on a generation counter with `pause`; `pool_run` publishes `func`/`arg`,
 increments the generation, runs tid 0 itself and waits for the done counter. Each job
 splits its own work by `tid`/`nthreads` (rows of a matvec, heads of attention).
+
+## No operating system (the UEFI build)
+
+`BOOTX64.EFI` is the same runner with `efi.asm` as its platform half. The firmware's
+boot manager loads it from `\EFI\BOOT\BOOTX64.EFI` on a FAT32 stick and calls `_entry`
+with the Microsoft x64 calling convention, which is what every function in asmrun already
+uses, so nothing above the runtime changes. Boot services stay active for the whole run
+(`ExitBootServices` is never called): the firmware is the only other code on the machine,
+and it is used at the edges only.
+
+- **Processors.** `EFI_MP_SERVICES_PROTOCOL` (PI specification; present in EDK2-derived
+  firmware such as AMI Aptio) starts a procedure on an application processor.
+  `pool_start` starts `pool_ap_entry(tid)` on nthreads−1 of them in non-blocking mode
+  with a wait event and no timeout; the procedure enables AVX state on its core
+  (firmware leaves XCR0 at x87|SSE, and the first VEX instruction would fault), moves to
+  its own 1 MiB stack, checks in and runs `pool_worker` until `g_pool_quit`, then returns
+  to the firmware on the firmware's stack so the processor is the firmware's again when we
+  leave. Interrupts on the APs are as the firmware leaves them for an AP procedure
+  (disabled in EDK2); the boot processor keeps the firmware's timer tick, whose handler
+  saves and restores the SSE state and never executes AVX, so our ymm registers survive it.
+  Without the protocol the pool is the boot processor alone (a message says so).
+- **Memory.** `AllocatePages(EfiLoaderData)` for everything; the firmware's page tables
+  identity-map all RAM with large pages, so the 1.36 GB model lives in a handful of TLB
+  entries instead of Windows's 4 KB pages. The model is read from the stick into pages
+  (the firmware's FAT and USB drivers do the I/O; a progress line reports MB/s), not
+  mapped. Nothing is freed: the firmware reclaims loader memory when something else boots.
+- **Console.** stdout and stderr are both `ConOut`; UTF-8 is converted to UCS-2 with
+  CR LF line ends, characters outside the BMP print as `?`. Input is `ConIn`: one line
+  with echo and Backspace. `-i` (the default without an `asmrun.cfg`) loops: prompt,
+  generation, statistics, next prompt; an empty line or Esc ends the session.
+- **Clock.** `rdtsc` scaled by the TSC frequency measured over a 100 ms `Stall`
+  (CPUID.15H's figure is printed beside it when the leaf reports a crystal).
+- **Arguments.** `\asmrun.cfg` holds the Windows command-line arguments (`model.gguf -p
+  prompt.txt -n 64 -t 4`, `model.gguf --bw`, `model.gguf --kernels`, ...) and is turned
+  into the same UTF-16 argv `main` parses on Windows; file names are relative to the
+  stick's root, `/` and `\` both work.
+- **Leaving.** The 5-minute watchdog the boot manager arms is disarmed at entry.
+  `rt_exit` (normal end or `rt_fatal`) hands the processors back, prints the exit code,
+  waits for a key and returns to the boot manager, which continues with the next boot
+  option. Every step before the model loads prints one line and every firmware error
+  prints its EFI status, so a boot that stops shows where.
+- **Requirements and assumptions.** FAT32 stick (the firmware has no exFAT/NTFS
+  driver); Secure Boot off (the image is unsigned); x86-64 UEFI with XSAVE and the ISA
+  the kernels need. The image carries separate code (read-only) and data (read-write)
+  sections and no NX_COMPAT claim, so both a firmware that protects images and one that
+  does not run it as is.
 
 ### gguf (`src/gguf.asm`)
 
@@ -332,7 +407,7 @@ F16/F32 rows and the attention q·K / p·V use 8-wide ymm FMA.
 | `model_load(rcx=utf16 path, rdx=n_ctx, r8=nthreads) -> rax Model*` | map, parse, resolve, allocate, build rope table, touch every weight page |
 | `model_forward(rcx=Model*, rdx=token, r8=pos) -> rax logits` | one token |
 | `model_generate(rcx=Model*, rdx=ids, r8=n, r9=max_new)` | the loop, text to stdout, stats to stderr |
-| `main(rcx=argc, rdx=argv) -> eax` | `asmrun.exe <gguf> [-n N] [-t T] [-c CTX] [-p file] [--bw] [--cpuid] [--gguf] [--tokenize] [--kernels]` |
+| `main(rcx=argc, rdx=argv) -> eax` | `asmrun.exe <gguf> [-n N] [-t T] [-c CTX] [-p file] [-i] [--bw] [--cpuid] [--gguf] [--tokenize] [--kernels]`; `-i` reads prompt after prompt from stdin / the console (each generation starts at position 0, so the KV cache is simply overwritten) until an empty line |
 
 Statistics printed to stderr at the end:
 

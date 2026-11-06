@@ -1,9 +1,9 @@
 ; model.asm — the Qwen3 forward pass, KV cache, generation loop, and CLI.
 ;
-; %included into asmrun.asm (bits 64, default rel already set). Nothing here uses
-; `section`/`global`/`extern`/`org`/`bits`, and no storage uses `resb`: mutable
-; globals are zero-initialised `dq 0` bytes at the end of this file, and every big
-; buffer comes from rt_alloc at run time and is kept in a module global pointer.
+; %included into asmrun.asm (bits 64, default rel already set). Code is in .text;
+; the globals and strings at the end switch to .data (`section .data`), and no
+; storage uses `resb`: mutable globals are zero-initialised `dq 0` bytes, and
+; every big buffer comes from rt_alloc at run time and is kept in a module global.
 ;
 ; Public surface (Windows x64 everywhere, also between modules):
 ;   model_load(rcx=path utf16, rdx=n_ctx, r8=nthreads) -> rax Model*
@@ -27,6 +27,8 @@
 ; [n_ctx] and the per-thread row stride is n_ctx. AttnJob has no n_ctx field, so
 ; model_load publishes it in the module global g_n_ctx; k_attn_job reads g_n_ctx
 ; and places thread tid's score row at AttnJob.scores + tid*g_n_ctx.
+
+section .text
 
 ; CLI mode selector values held in r14d while main parses the argument vector.
 MODE_DEFAULT  equ 0
@@ -1111,6 +1113,9 @@ model_generate:
 .gdone:
   call rt_now_ns
   mov  [rsp+64], rax            ; tend
+  lea  rcx, [rel s_nl]
+  mov  rdx, 1
+  call rt_out                   ; end the generated text's line before the statistics
 
   ; convert the two phase timestamps into elapsed nanoseconds in place
   mov  rax, [rsp+48]
@@ -1269,13 +1274,15 @@ main:
   push r14
   push r15
   WINPROLOGUE
-  sub  rsp, 112                 ; [rsp+32]=max_new [+40]=n_ctx [+48]=threads
+  sub  rsp, 128                 ; [rsp+32]=max_new [+40]=n_ctx [+48]=threads
                                 ; [+56]=model* [+64]=text [+72]=len [+80]=ids
                                 ; [+88]=count [+96]=load_t0 [+104]=load_t1
+                                ; [+112]=interactive (-i)
   mov  r12, rcx                 ; argc
   mov  rbx, rdx                 ; argv
   mov  qword [rsp+32], 64       ; -n default
   mov  qword [rsp+40], 1024     ; -c default
+  mov  qword [rsp+112], 0       ; -i off
   call rt_cpu_count
   mov  [rsp+48], rax            ; -t default
   xor  esi, esi                 ; gguf path
@@ -1331,6 +1338,11 @@ main:
   call rt_wcmp_ascii
   test rax, rax
   jz   .opt_kern
+  mov  rcx, r15
+  lea  rdx, [rel f_i]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_i
   ; positional argument: the first one is the GGUF path
   test rsi, rsi
   jnz  .arg_next
@@ -1380,6 +1392,9 @@ main:
   jmp  .arg_next
 .opt_kern:
   mov  r14d, MODE_KERNELS
+  jmp  .arg_next
+.opt_i:
+  mov  qword [rsp+112], 1
   jmp  .arg_next
 .arg_next:
   inc  r13
@@ -1460,6 +1475,7 @@ main:
   mov  rdx, 1
   call rt_err
 
+.prompt_again:
   test rdi, rdi
   jz   .stdin
   mov  rcx, rdi
@@ -1468,6 +1484,11 @@ main:
   mov  [rsp+64], rax
   jmp  .have_prompt
 .stdin:
+  cmp  qword [rsp+112], 0
+  je   .readin
+  lea  rcx, [rel s_prompt_mark] ; -i: a prompt marker before reading the line
+  call rt_out_str
+.readin:
   lea  rcx, [rsp+72]
   call rt_read_stdin
   mov  [rsp+64], rax
@@ -1494,6 +1515,11 @@ main:
 .setlen:
   mov  [rsp+72], rdx
 .have_prompt:
+  cmp  qword [rsp+72], 0
+  jne  .nonempty
+  cmp  qword [rsp+112], 0
+  jne  .ret0                    ; -i: an empty line (or Esc) ends the session
+.nonempty:
   ; ids buffer = (len+1) u32 (token count never exceeds byte length)
   mov  rcx, [rsp+72]
   inc  rcx
@@ -1512,6 +1538,11 @@ main:
   mov  r8, [rsp+88]
   mov  r9, [rsp+32]
   call model_generate
+  cmp  qword [rsp+112], 0
+  je   .ret0
+  test rdi, rdi                 ; -i: the next prompt from the console (a -p file is used once)
+  jnz  .ret0
+  jmp  .prompt_again
 .ret0:
   xor  eax, eax
   WINEPILOGUE
@@ -1527,6 +1558,7 @@ main:
 ; ===========================================================================
 ; model.asm mutable globals and read-only text (zero-initialised bytes; no resb)
 ; ===========================================================================
+section .data
 
 g_x:            dq 0           ; f32[n_embd]  residual stream
 g_xn:           dq 0           ; f32[n_embd]  normalised / matvec-output scratch
@@ -1562,8 +1594,10 @@ f_cpuid:    db "--cpuid", 0
 f_gguf:     db "--gguf", 0
 f_tok:      db "--tokenize", 0
 f_kern:     db "--kernels", 0
+f_i:        db "-i", 0
 
-m_usage:    db "usage: asmrun <model.gguf> [-n N] [-c CTX] [-t T] [-p FILE] [--bw|--cpuid|--gguf|--tokenize|--kernels]", 0
+m_usage:    db "usage: asmrun <model.gguf> [-n N] [-c CTX] [-t T] [-p FILE] [-i] [--bw|--cpuid|--gguf|--tokenize|--kernels]", 0
+s_prompt_mark: db 10, "> ", 0
 
 s_feat:        db "asmrun: avx2=1 fma=1 f16c=1 avx_vnni=", 0
 s_feat_cores:  db " cores=", 0

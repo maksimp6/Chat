@@ -6,8 +6,8 @@
 ; rt_now_ns, rt_err_*, pool_run, model_matvec, model_fill_sums, Model/Tensor/
 ; MatvecJob/AttnJob offsets) are defined in the other modules / common.inc.
 ;
-; Nothing here uses `section`/`global`/`extern`/`org`/`bits`/`default`; storage is
-; `dd`/`dq 0` initialised bytes (no resb). Windows x64 ABI throughout, also
+; The constants at the top are in .data (`section .data`, back to .text before the
+; code); storage is `dd`/`dq 0` initialised bytes (no resb). Windows x64 ABI throughout, also
 ; between modules: volatile rax rcx rdx r8 r9 r10 r11 xmm0-5; nonvolatile rbx rsi
 ; rdi rbp r12-r15 xmm6-15; 32-byte shadow + 16-byte stack alignment at every call.
 ;
@@ -34,7 +34,8 @@
 KERNELS_BENCH_ITERS equ 24      ; matvecs timed by --kernels
 
 ; ---------------------------------------------------------------------------
-; f32 constants (initialised bytes in the .flat section; read with [rel ..]).
+; Constants (and the two rope globals) in .data; read with [rel ..].
+section .data
   align 4
 kc_one:     dd 1.0
   align 32
@@ -93,6 +94,8 @@ kc_s_kern:  db " kernel=", 0
 kc_s_ref:   db " ref_f32=", 0
 kc_s_pool:  db "asmrun: pool_run empty job ns=", 0
 kc_s_nl:    db 10
+
+section .text
 
 ; ===========================================================================
 ; k_exp — scalar e^x: xmm0 (f32) in/out. Clamps x to [-87,88]. The cephes expf

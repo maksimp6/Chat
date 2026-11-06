@@ -7,8 +7,10 @@ efficient can a language-model runner be on this CPU if nothing stands between
 the code and the hardware?*
 
 It is a research artifact, not a product. It targets exactly one model family
-(Qwen3) and one platform (Windows x64 with AVX2 + FMA + F16C, e.g. the Intel
-N100 this was written for). The architecture is specified in [DESIGN.md](DESIGN.md).
+(Qwen3) and one CPU class (x86-64 with AVX2 + FMA + F16C, e.g. the Intel N100 this
+was written for), as a Windows console program or as a **UEFI application that
+boots from a USB stick with no operating system at all** (same sources, a
+different runtime half). The architecture is specified in [DESIGN.md](DESIGN.md).
 
 ## Status: builds, runs, generates correct text, and runs at the memory bus
 
@@ -28,6 +30,11 @@ tokens each) measured asmrun 17.1 vs Ollama 16.1 tok/s on a 5-token prompt and
 the same bus, and the differences are inside the run-to-run noise of a desktop
 machine (±5%). asmrun is far behind on the *prompt* phase (17 tok/s against
 Ollama's 74+, which evaluates the prompt as one batch); see the benchmark notes.
+
+The no-OS build (`build\BOOTX64.EFI`, 45 KB) assembles and its PE header is what
+the EDK2 loader expects, but it has **not been booted yet**: there is no VM on
+the authoring machine, so the first run is the real one (see "Boot it from a USB
+stick"). What it will print on that run is laid out there.
 
 Bring-up took three assembler-caught fixes: two three-register effective
 addresses in `tokenizer.asm` (x86-64 allows only base+index) and one bitwise `&`
@@ -94,23 +101,23 @@ printed precision, and generation text is unchanged across v6–v8.
 ## Build
 
 Needs [NASM](https://www.nasm.us) (3.x). There is no linker step: `asmrun.asm` is
-one `nasm -f bin` translation unit that emits a complete PE executable.
+one `nasm -f bin` translation unit that emits a complete PE32+ image, twice:
 
 ```powershell
-.\build.ps1
+.\build.ps1              # both images; -Target win or -Target efi for one
 ```
-
-`build.ps1` finds `nasm` on `PATH` (or pass `-Nasm C:\path\to\nasm.exe`) and runs:
 
 ```bash
-nasm -f bin -O2 -I inc/ -I src/ -o build/asmrun.exe asmrun.asm
+nasm -f bin -O2 -I inc/ -I src/ -o build/asmrun.exe asmrun.asm                  # Windows console program
+nasm -f bin -O2 -I inc/ -I src/ -D ASMRUN_EFI -o build/BOOTX64.EFI asmrun.asm   # UEFI application (no OS)
 ```
 
-If NASM cannot start, the machine is almost certainly blocking it (Smart App
-Control / WDAC); build elsewhere. After changing a kernel, assemble once with
-`-l build/asmrun.lst` and make sure no code line's bytes start with `62`: that
-is an EVEX (AVX-512) encoding, which NASM emits without complaint for operand
-forms that have no VEX encoding, and the N100 cannot execute it.
+`build.ps1` finds `nasm` on `PATH` (or pass `-Nasm C:\path\to\nasm.exe`), keeps
+the listings in `build\*.lst`, scans them for EVEX (AVX-512) encodings — NASM
+emits those without complaint for operand forms that have no VEX encoding, and
+the N100 cannot execute them — and prints the PE header of each image. If NASM
+cannot start, the machine is almost certainly blocking it (Smart App Control /
+WDAC); build elsewhere.
 
 ## Run
 
@@ -121,6 +128,57 @@ asmrun.exe <model.gguf> -p prompt.txt -n 64 -c 1024 -t 4
 - `<model.gguf>` is an Ollama model blob (see "Pointing it at an Ollama model").
 - `-p FILE` reads the prompt from a UTF-8 file (otherwise it reads stdin).
 - `-n` new tokens, `-c` context, `-t` threads.
+- `-i` interactive: a prompt per line, generation and statistics after each,
+  until an empty line (or end of input). This is what the USB stick runs.
+
+## Boot it from a USB stick (no operating system)
+
+The same runner boots directly from the firmware: no Windows, no Linux, no
+loader of ours. The stick carries three files, and `make-usb.ps1` puts them
+there (it formats only with `-Format`, after a confirmation):
+
+```powershell
+.\build.ps1 -Target efi
+.\make-usb.ps1 -Drive E:                          # copies BOOTX64.EFI, model.gguf (1.36 GB) and asmrun.cfg
+.\make-usb.ps1 -Drive E: -Args "model.gguf -p prompt.txt -n 64 -t 4"   # a one-shot run instead of the prompt loop
+```
+
+```
+\EFI\BOOT\BOOTX64.EFI   the runner (the firmware's default boot file name)
+\model.gguf             the Ollama blob of qwen3:1.7b
+\asmrun.cfg             the arguments, in the Windows command-line syntax
+```
+
+Then on the PC: turn **Secure Boot off** in the firmware setup (the image is
+unsigned; with Secure Boot on the firmware refuses it before a byte of ours
+runs) and boot from the stick (the boot-device menu, or the stick first in the
+boot order). The stick must be **FAT32**: the firmware reads nothing else.
+
+What the screen shows, in order: the banner, `AVX state enabled`, `tsc_mhz=`,
+`boot volume opened`, the arguments, `reading 1296 MB from the boot volume`
+with a dot per 32 MB and the MB/s (the firmware's USB driver sets the pace; a
+minute is normal), the model summary with `threads=`, `processors=4 (the boot
+processor and 3 application processors through EFI_MP_SERVICES_PROTOCOL)`,
+`load_ms`, and a `>` prompt. Type a prompt, press Enter: the text is generated
+on all four cores and the same statistics lines as on Windows follow
+(`gen_tok_s`, `effective_gb_s`, `prof_ms`). An empty line or Esc ends the
+session; the exit code is printed, a key press returns to the firmware's boot
+manager, which continues with the next boot option. Every step before the model
+loads prints one line and every firmware error its EFI status, so if the boot
+stops, the last line says where.
+
+`asmrun.cfg` takes the same arguments as the Windows command line, so the
+diagnostic modes work bare-metal too: `model.gguf --bw` for the memory bus
+without an OS, `model.gguf --kernels` for the kernels. On the first boot the
+numbers to compare with the Windows runs are `tsc_mhz`, `load_ms` (now a read
+from the stick), `gen_tok_s` and `effective_gb_s`.
+
+Known assumptions (DESIGN.md, "No operating system"): the firmware provides
+`EFI_MP_SERVICES_PROTOCOL` (EDK2-derived firmware such as AMI Aptio does;
+without it the runner says so and uses one core), XSAVE for enabling AVX state,
+and leaves the application processors to us for the whole run. Nothing here is
+Windows-specific: the runtime half is 900 lines of UEFI calls, and the rest of
+the program is the same bytes as `asmrun.exe`.
 
 Diagnostic modes (each needs the model path except `--cpuid` and `--bw`):
 
@@ -217,21 +275,25 @@ where Ollama is far ahead and where asmrun's next large win would be.
 ## Layout
 
 ```
-asmrun.asm        top level: sets org/bits, %includes everything in order
-build.ps1         assemble with NASM (no linker)
+asmrun.asm        top level: org, the .text/.data sections, %includes everything in order
+build.ps1         assemble both images with NASM (no linker), EVEX scan, PE header dump
+make-usb.ps1      put BOOTX64.EFI, the model and asmrun.cfg on a FAT32 USB stick
 bench.ps1         compare against Ollama on the same model + prompts
 DESIGN.md         full architecture, struct layouts and per-function contracts
 inc/
   win.inc         Win32 constants, the winimp() import-call macro
+  efi.inc         UEFI table/protocol offsets and constants
   common.inc      Tensor/Layer/Model/MatvecJob/AttnJob structs, GGML/GGUF consts, WINPROLOGUE
-  pe.inc          hand-written PE32+ header + kernel32 import tables (the likely first-build fix)
+  pe.inc          hand-written PE32+ header: kernel32 import tables (Windows) or the no-op relocation block (UEFI)
 src/
-  runtime.asm     entry, I/O, VirtualAlloc, file mapping, QPC timing, CPUID gate, thread pool, --bw
+  runtime.asm     shared: console formatting, CPUID gate, thread pool (pool_worker/pool_run), --bw, helpers
+  win.asm         Windows: entry, WriteFile, VirtualAlloc, file mapping, QPC, CreateThread
+  efi.asm         UEFI: entry, ConOut/ConIn, AllocatePages, file reads from the stick, TSC, EFI_MP_SERVICES workers
   gguf.asm        GGUF v3 parse into the Model struct
   kernels.asm     int8 matvec over Q4_K/Q6_K, F16/F32 rows, activation quantisation, RMSNorm, RoPE, attention, SwiGLU, exp, argmax
   tokenizer.asm   byte-level BPE encode/decode (qwen2 pre-tokeniser)
   model.asm       the Qwen3 forward pass, KV cache, generation loop, phase profile, and CLI
 ```
 
-`build/` (the assembled `asmrun.exe`) is git-ignored. The model blob is never
-committed.
+`build/` (the assembled `asmrun.exe` and `BOOTX64.EFI`) is git-ignored. The
+model blob is never committed.

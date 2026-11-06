@@ -1,68 +1,47 @@
-; runtime.asm — process start-up and the services every other module leans on.
+; runtime.asm — the services every other module leans on, independent of what
+; runs underneath. The platform half lives in win.asm (Windows) or efi.asm (a
+; machine with no operating system, booted from a USB stick); both implement
+; the same names, which this file and the modules call:
 ;
-; %included into asmrun.asm (bits 64, default rel already set). Nothing here
-; uses `section`/`global`/`extern`/`org`/`bits` (set by asmrun.asm) and no
-; storage uses `resb` (mutable globals are zero-initialised `dq 0` / `db 0`
-; bytes at the end of this file; big buffers come from rt_alloc at run time).
+;   _entry        program entry (PE entry point / UEFI efi_main)
+;   rt_write_h    write bytes to the console "handle" g_stdout / g_stderr
+;   rt_exit       leave the program with an exit code (never returns)
+;   rt_alloc      zeroed memory, page granular, never freed
+;   rt_map_file   whole file in memory (a mapping on Windows, a read on UEFI)
+;   rt_read_file  whole file in memory, for small files such as the prompt
+;   rt_read_stdin the prompt from standard input / one line typed on the console
+;   rt_now_ns     monotonic nanoseconds
+;   rt_cpu_count  processors available to the pool
+;   pool_start    start nthreads-1 workers running pool_worker
 ;
-; Public surface (Windows x64 everywhere, also between modules):
-;   _entry                 PE entry point: argv parse, call main, ExitProcess
+; %included into asmrun.asm (bits 64, default rel set; .text current). Code stays
+; in .text; the globals and strings at the end switch to .data (no `resb`: a
+; zero-initialised byte is written to the file, so the loader's work is a copy).
+;
+; Public surface (Windows x64 ABI everywhere, also between modules):
+;   rt_parse_cmdline       UTF-16 command line -> g_argv, returns argc
 ;   rt_out/rt_err          write bytes to stdout / stderr
 ;   rt_out_str/rt_err_str  zero-terminated text
 ;   rt_out_u64/rt_err_u64  unsigned decimal
 ;   rt_err_i64/rt_err_f32  signed decimal / fixed-point (3 fraction digits)
-;   rt_fatal               "asmrun: <msg>\n" to stderr, exit 1
-;   rt_alloc               zeroed VirtualAlloc
-;   rt_map_file/rt_read_file/rt_read_stdin   file mapping and whole-file reads
-;   rt_now_ns/rt_cpu_count/rt_cpuid_check     timing, cores, ISA gate
-;   pool_start/pool_run    fixed thread pool over a generation counter
+;   rt_err_hex64           0x + 16 hex digits
+;   rt_fatal               "asmrun: <msg>\n" to stderr, rt_exit(1)
+;   rt_cpuid_check         ISA gate: AVX2, FMA, F16C, OS-enabled YMM state
+;   pool_worker/pool_run   fixed thread pool over a generation counter
 ;   rt_bench_bandwidth     --bw memory-bandwidth probe
 ;   rt_utf16_to_utf8/rt_watoi/rt_wcmp_ascii   UTF-16 helpers
 ;   rt_parse_u64/rt_streq/rt_memcmp/rt_memcpy/rt_memset   byte helpers
-;
-; Imports used (all from inc/pe.inc's kernel32 IAT): GetStdHandle, WriteFile,
-; ReadFile, ExitProcess, VirtualAlloc, CreateFileW, CreateFileMappingW,
-; MapViewOfFile, CloseHandle, GetFileSizeEx, QueryPerformanceCounter,
-; QueryPerformanceFrequency, GetCommandLineW, GetSystemInfo, CreateThread.
 
 MAX_ARGS equ 256             ; capacity of the static argv pointer array
 
+; pool_run gives up after this many pause-spins waiting for the workers (tens
+; of seconds): a worker that never finishes is a bug, and on a machine with no
+; operating system it would otherwise be a silent hang.
+POOL_WAIT_SPINS equ (1 << 31)
+
 ; ===========================================================================
-; Entry point
+; Command line
 ; ===========================================================================
-
-; _entry — PE entry. Caches stdout/stderr/stdin handles and the QPC frequency,
-; parses GetCommandLineW into g_argv, calls main(rcx=argc, rdx=argv), and exits
-; with its eax. The OS calls us with rsp%16 == 8 (return address on the stack).
-_entry:
-  push rbp
-  mov  rbp, rsp
-  sub  rsp, 32                 ; 32-byte call shadow, keeps rsp 16-aligned
-
-  mov  ecx, STD_OUTPUT_HANDLE
-  call winimp(GetStdHandle)
-  mov  [rel g_stdout], rax
-  mov  ecx, STD_ERROR_HANDLE
-  call winimp(GetStdHandle)
-  mov  [rel g_stderr], rax
-  mov  ecx, STD_INPUT_HANDLE
-  call winimp(GetStdHandle)
-  mov  [rel g_stdin], rax
-
-  lea  rcx, [rel g_qpc_freq]
-  call winimp(QueryPerformanceFrequency)
-
-  call winimp(GetCommandLineW) ; rax -> UTF-16 command line (writable)
-  mov  rcx, rax
-  call rt_parse_cmdline        ; -> rax = argc, fills g_argv
-
-  mov  rcx, rax                ; argc
-  lea  rdx, [rel g_argv]       ; argv
-  call main                    ; defined in model.asm
-
-  mov  ecx, eax                ; exit code = main's return
-  call winimp(ExitProcess)
-  hlt                          ; unreachable
 
 ; rt_parse_cmdline(rcx=cmdline wchar*) -> rax = argc. Splits the UTF-16 command
 ; line into g_argv in place: tokens are separated by spaces/tabs, a double quote
@@ -129,19 +108,8 @@ rt_parse_cmdline:
   ret
 
 ; ===========================================================================
-; Console output
+; Console output (rt_write_h is the platform's)
 ; ===========================================================================
-
-; rt_write_h(rcx=handle, rdx=ptr, r8=len) — WriteFile all len bytes once.
-; Internal; callers supply the handle. Clobbers rax,rcx,rdx,r8-r11.
-rt_write_h:
-  WINPROLOGUE
-  sub  rsp, 48                 ; [rsp+32]=lpOverlapped(0), [rsp+40]=bytesWritten
-  lea  r9, [rsp+40]            ; lpNumberOfBytesWritten
-  mov  qword [rsp+32], 0       ; lpOverlapped = NULL
-  call winimp(WriteFile)       ; rcx=handle, rdx=buf, r8=len already in place
-  WINEPILOGUE
-  ret
 
 ; rt_out(rcx=ptr, rdx=len) — write len bytes to stdout. Tail-calls rt_write_h.
 rt_out:
@@ -254,6 +222,31 @@ rt_err_i64:
   WINEPILOGUE
   ret
 
+; rt_err_hex64(rcx=value) — "0x" and 16 hex digits to stderr (status codes).
+; Clobbers rax,rcx,rdx,r8-r11.
+rt_err_hex64:
+  WINPROLOGUE
+  sub  rsp, 32                 ; [rsp+32..50) = "0x" + 16 digits
+  mov  word [rsp+32], '0x'
+  lea  r8, [rsp+34]
+  mov  r9d, 16
+.dig:
+  mov  rax, rcx
+  shr  rax, 60                 ; top nibble first
+  shl  rcx, 4
+  lea  rdx, [rel k_hex_digits]
+  mov  al, [rdx + rax]
+  mov  [r8], al
+  inc  r8
+  dec  r9d
+  jnz  .dig
+  mov  rcx, [rel g_stderr]
+  lea  rdx, [rsp+32]
+  mov  r8d, 18
+  call rt_write_h
+  WINEPILOGUE
+  ret
+
 ; rt_err_f32(xmm0=value) — fixed-point decimal with exactly 3 fraction digits to
 ; stderr: scale by 1000, round half-up, split into integer and 3-digit fraction,
 ; emit sign if negative. Clobbers rax,rcx,rdx,r8-r11,xmm0,xmm1.
@@ -322,7 +315,7 @@ rt_err_f32:
 ; Fatal error
 ; ===========================================================================
 
-; rt_fatal(rcx=zstr) — write "asmrun: <msg>\n" to stderr and ExitProcess(1).
+; rt_fatal(rcx=zstr) — write "asmrun: <msg>\n" to stderr and rt_exit(1).
 ; Never returns. Clobbers everything.
 rt_fatal:
   WINPROLOGUE
@@ -337,178 +330,12 @@ rt_fatal:
   mov  rdx, 1
   call rt_err
   mov  ecx, 1
-  call winimp(ExitProcess)
+  call rt_exit
   hlt
 
 ; ===========================================================================
-; Memory
+; ISA gate
 ; ===========================================================================
-
-; rt_alloc(rcx=bytes) -> rax = base. VirtualAlloc(NULL, bytes, COMMIT|RESERVE,
-; PAGE_RW); memory is zero-filled by the OS. rt_fatal on failure.
-rt_alloc:
-  WINPROLOGUE
-  mov  rdx, rcx                ; dwSize
-  xor  rcx, rcx                ; lpAddress = NULL
-  mov  r8d, MEM_COMMIT | MEM_RESERVE
-  mov  r9d, PAGE_RW
-  call winimp(VirtualAlloc)
-  test rax, rax
-  jz   .fail
-  WINEPILOGUE
-  ret
-.fail:
-  lea  rcx, [rel k_err_alloc]
-  call rt_fatal
-
-; ===========================================================================
-; File mapping and whole-file reads
-; ===========================================================================
-
-; rt_map_file(rcx=path utf16, rdx=&size) -> rax = view base. Opens the file
-; read-only, writes its 64-bit size to *size, maps the whole file read-only and
-; returns the base. The file and mapping handles are closed (the view survives).
-; rt_fatal on any failure. Clobbers caller-saved registers.
-rt_map_file:
-  WINPROLOGUE
-  sub  rsp, 96                 ; args at [rsp+32..56); [rsp+56]=hFile,[+64]=&size,[+72]=hMap,[+80]=base
-  mov  [rsp+64], rdx           ; save &size
-  ; CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, NORMAL, NULL)
-  mov  edx, GENERIC_READ
-  mov  r8d, FILE_SHARE_READ
-  xor  r9d, r9d
-  mov  qword [rsp+32], OPEN_EXISTING
-  mov  qword [rsp+40], FILE_ATTRIBUTE_NORMAL
-  mov  qword [rsp+48], 0
-  call winimp(CreateFileW)
-  cmp  rax, INVALID_HANDLE
-  je   .fail
-  mov  [rsp+56], rax           ; hFile
-  ; GetFileSizeEx(hFile, &size)
-  mov  rcx, rax
-  mov  rdx, [rsp+64]
-  call winimp(GetFileSizeEx)
-  test eax, eax
-  jz   .fail
-  ; CreateFileMappingW(hFile, NULL, PAGE_READONLY, 0, 0, NULL)
-  mov  rcx, [rsp+56]
-  xor  edx, edx
-  mov  r8d, PAGE_READONLY
-  xor  r9d, r9d
-  mov  qword [rsp+32], 0
-  mov  qword [rsp+40], 0
-  call winimp(CreateFileMappingW)
-  test rax, rax
-  jz   .fail
-  mov  [rsp+72], rax           ; hMapping
-  ; MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0)
-  mov  rcx, rax
-  mov  edx, FILE_MAP_READ
-  xor  r8d, r8d
-  xor  r9d, r9d
-  mov  qword [rsp+32], 0
-  call winimp(MapViewOfFile)
-  test rax, rax
-  jz   .fail
-  mov  [rsp+80], rax           ; view base
-  mov  rcx, [rsp+72]           ; close mapping handle (view persists)
-  call winimp(CloseHandle)
-  mov  rcx, [rsp+56]           ; close file handle (view persists)
-  call winimp(CloseHandle)
-  mov  rax, [rsp+80]
-  WINEPILOGUE
-  ret
-.fail:
-  lea  rcx, [rel k_err_map]
-  call rt_fatal
-
-; rt_read_file(rcx=path utf16, rdx=&len) -> rax = ptr. A whole file in memory for
-; -p; a read-only mapping is enough, so this is rt_map_file with the same ABI.
-rt_read_file:
-  jmp  rt_map_file
-
-; rt_read_stdin(rcx=&len) -> rax = ptr, *len = bytes. Reads STD_INPUT_HANDLE into
-; a growing rt_alloc buffer (doubling, old buffer left to the OS) until EOF or a
-; zero-byte read. Clobbers caller-saved registers.
-rt_read_stdin:
-  WINPROLOGUE
-  sub  rsp, 64                 ; [rsp+32]=overlapped; [+40]buf [+48]cap [+56]used [+64]read [+72]&len [+80]newbuf [+88]newcap
-  mov  [rsp+72], rcx           ; &len
-  mov  rcx, 65536
-  call rt_alloc
-  mov  [rsp+40], rax           ; buf
-  mov  qword [rsp+48], 65536   ; cap
-  mov  qword [rsp+56], 0        ; used
-.rloop:
-  mov  rax, [rsp+56]
-  cmp  rax, [rsp+48]
-  jb   .room
-  ; grow: newcap = cap*2, copy used bytes
-  mov  rcx, [rsp+48]
-  shl  rcx, 1
-  mov  [rsp+88], rcx
-  call rt_alloc                ; rcx = newcap
-  mov  [rsp+80], rax
-  mov  rcx, rax
-  mov  rdx, [rsp+40]
-  mov  r8, [rsp+56]
-  call rt_memcpy
-  mov  rax, [rsp+80]
-  mov  [rsp+40], rax           ; buf = newbuf
-  mov  rcx, [rsp+88]
-  mov  [rsp+48], rcx           ; cap = newcap
-.room:
-  mov  rcx, [rel g_stdin]
-  mov  rdx, [rsp+40]
-  add  rdx, [rsp+56]           ; buf + used
-  mov  r8, [rsp+48]
-  sub  r8, [rsp+56]            ; cap - used
-  lea  r9, [rsp+64]            ; &bytesRead
-  mov  qword [rsp+32], 0       ; lpOverlapped
-  call winimp(ReadFile)
-  test eax, eax
-  jz   .eof                    ; read failed -> treat as EOF
-  mov  eax, [rsp+64]           ; bytesRead
-  test eax, eax
-  jz   .eof                    ; 0 bytes -> EOF
-  add  [rsp+56], rax           ; used += bytesRead
-  jmp  .rloop
-.eof:
-  mov  rax, [rsp+72]
-  mov  rcx, [rsp+56]
-  mov  [rax], rcx              ; *len = used
-  mov  rax, [rsp+40]           ; return buffer
-  WINEPILOGUE
-  ret
-
-; ===========================================================================
-; Timing, cores, ISA gate
-; ===========================================================================
-
-; rt_now_ns() -> rax = nanoseconds. QueryPerformanceCounter scaled by the cached
-; frequency as counter*1e9/freq in 128-bit to avoid overflow. Clobbers rax,rcx,rdx.
-rt_now_ns:
-  WINPROLOGUE
-  sub  rsp, 16                 ; [rsp+32] = counter
-  lea  rcx, [rsp+32]
-  call winimp(QueryPerformanceCounter)
-  mov  rax, [rsp+32]
-  mov  rcx, 1000000000
-  mul  rcx                     ; rdx:rax = counter * 1e9
-  mov  rcx, [rel g_qpc_freq]
-  div  rcx                     ; rax = ns
-  WINEPILOGUE
-  ret
-
-; rt_cpu_count() -> rax = dwNumberOfProcessors from GetSystemInfo.
-rt_cpu_count:
-  WINPROLOGUE
-  sub  rsp, 48                 ; SYSTEM_INFO (48 bytes) at [rsp+32]
-  lea  rcx, [rsp+32]
-  call winimp(GetSystemInfo)
-  mov  eax, [rsp+32 + 0x20]    ; dwNumberOfProcessors
-  WINEPILOGUE
-  ret
 
 ; rt_cpuid_check() — require AVX2, FMA, F16C and OS-enabled XMM/YMM state; set
 ; g_has_vnni to 1 when AVX-VNNI (leaf 7.1 eax bit4) is present. rt_fatal if a
@@ -558,17 +385,19 @@ rt_cpuid_check:
   call rt_fatal
 
 ; ===========================================================================
-; Thread pool
+; Thread pool (pool_start is the platform's)
 ; ===========================================================================
 ;
-; A fixed set of worker threads spins on g_pool_gen. pool_run publishes the job
+; A fixed set of workers spins on g_pool_gen. pool_run publishes the job
 ; (func/arg), resets g_pool_done, bumps the generation (a locked increment, a
 ; full barrier so workers see func/arg too), runs tid 0 itself, then spins until
 ; every worker has incremented g_pool_done. Each job splits its own work by tid.
+; g_pool_quit set to 1 makes an idle worker return (efi.asm uses it to give the
+; processors back to the firmware before leaving).
 
-; pool_worker(rcx=tid) — worker thread body. Spins (pause) until the generation
+; pool_worker(rcx=tid) — worker body. Spins (pause) until the generation
 ; advances, runs g_pool_func(rcx=g_pool_arg, rdx=tid, r8=g_nthreads), atomically
-; bumps g_pool_done, and repeats forever (the process exit tears it down).
+; bumps g_pool_done, and repeats until g_pool_quit is set between jobs.
 pool_worker:
   push rbp
   mov  rbp, rsp
@@ -582,6 +411,8 @@ pool_worker:
   mov  rax, [rel g_pool_gen]
   cmp  rax, rdi
   jne  .go
+  cmp  byte [rel g_pool_quit], 0
+  jne  .quit
   pause
   jmp  .spin
 .go:
@@ -592,45 +423,16 @@ pool_worker:
   call [rel g_pool_func]
   lock inc qword [rel g_pool_done]
   jmp  .wloop
-
-; pool_start(rcx=nthreads) — store nthreads and create nthreads-1 worker threads
-; with ids 1..nthreads-1 (tid 0 is the calling thread). rt_fatal if CreateThread
-; fails. Clobbers caller-saved registers.
-pool_start:
-  WINPROLOGUE
-  sub  rsp, 48                 ; args at [rsp+32..48); [rsp+56] = tid counter
-  mov  [rel g_nthreads], rcx
-  mov  qword [rel g_pool_gen], 0
-  mov  qword [rel g_pool_done], 0
-  mov  qword [rsp+56], 1
-.cloop:
-  mov  rax, [rel g_nthreads]
-  cmp  [rsp+56], rax
-  jae  .done
-  ; CreateThread(NULL, 0, pool_worker, tid, 0, &g_thread_ids[tid])
-  xor  rcx, rcx
-  xor  rdx, rdx
-  lea  r8, [rel pool_worker]
-  mov  r9, [rsp+56]            ; lpParameter = tid
-  mov  qword [rsp+32], 0       ; dwCreationFlags
-  mov  rax, [rsp+56]
-  lea  r10, [rel g_thread_ids]
-  lea  r10, [r10 + rax*8]
-  mov  [rsp+40], r10           ; lpThreadId
-  call winimp(CreateThread)
-  test rax, rax
-  jz   .fail
-  inc  qword [rsp+56]
-  jmp  .cloop
-.done:
-  WINEPILOGUE
+.quit:
+  add  rsp, 32
+  pop  rdi
+  pop  rsi
+  pop  rbp
   ret
-.fail:
-  lea  rcx, [rel k_err_thread]
-  call rt_fatal
 
 ; pool_run(rcx=func, rdx=arg) — run func(rcx=arg, rdx=tid, r8=nthreads) on every
-; thread (tid 0 on the caller) and return when all have finished. Clobbers
+; thread (tid 0 on the caller) and return when all have finished. rt_fatal if the
+; workers have not reported back after POOL_WAIT_SPINS pauses. Clobbers
 ; caller-saved registers.
 pool_run:
   WINPROLOGUE
@@ -645,12 +447,16 @@ pool_run:
   mov  rax, [rel g_nthreads]
   dec  rax                               ; workers expected to report done
   jz   .done                             ; single-threaded: no workers
+  mov  r9, POOL_WAIT_SPINS
 .wait:
   mov  rcx, [rel g_pool_done]
   cmp  rcx, rax
   jae  .done
   pause
-  jmp  .wait
+  dec  r9
+  jnz  .wait
+  lea  rcx, [rel k_err_hang]
+  call rt_fatal
 .done:
   WINEPILOGUE
   ret
@@ -1038,21 +844,20 @@ rt_memset:
   ret
 
 ; ===========================================================================
-; Mutable globals and constants (zero-initialised bytes in the .flat section;
-; never resb — a BSS gap here would still occupy the file as zeros anyway).
+; Mutable globals and constants shared by both platform halves
 ; ===========================================================================
+section .data
 
-g_stdout:       dq 0           ; cached STD_OUTPUT_HANDLE
-g_stderr:       dq 0           ; cached STD_ERROR_HANDLE
-g_stdin:        dq 0           ; cached STD_INPUT_HANDLE
-g_qpc_freq:     dq 0           ; QueryPerformanceFrequency ticks per second
+g_stdout:       dq 0           ; Windows: STD_OUTPUT_HANDLE; UEFI: tag 1 (the screen)
+g_stderr:       dq 0           ; Windows: STD_ERROR_HANDLE;  UEFI: tag 2 (the screen)
+g_stdin:        dq 0           ; Windows: STD_INPUT_HANDLE;  UEFI: unused
 g_has_vnni:     dq 0           ; 1 if AVX-VNNI is available, else 0
 g_nthreads:     dq 0           ; pool size (including the calling thread, tid 0)
 g_pool_func:    dq 0           ; current job function pointer
 g_pool_arg:     dq 0           ; current job argument
 g_pool_gen:     dq 0           ; generation counter workers spin on
 g_pool_done:    dq 0           ; count of workers that finished the current job
-g_thread_ids:   times 64 dq 0  ; OS thread ids returned by CreateThread
+g_pool_quit:    dq 0           ; 1: idle workers return from pool_worker
 g_argv:         times MAX_ARGS dq 0   ; parsed argument pointers (into the command line)
 
 g_bw_bytes:     dq 0           ; --bw buffer size in bytes
@@ -1061,9 +866,10 @@ g_bw_partials:  times 64 dq 0  ; --bw per-thread checksums (keep the reads live)
 k_fatal_prefix: db "asmrun: "
 FATAL_PREFIX_LEN equ $ - k_fatal_prefix
 k_newline:      db 10
-k_err_alloc:    db "out of memory", 0
-k_err_map:      db "cannot open or map file", 0
+k_hex_digits:   db "0123456789abcdef"
 k_err_cpu:      db "CPU lacks required AVX2/FMA/F16C support", 0
-k_err_thread:   db "CreateThread failed", 0
+k_err_hang:     db "a worker thread did not finish its job (thread pool hang)", 0
 k_bw_prefix:    db "asmrun: bw_gb_s="
 K_BW_PREFIX_LEN equ $ - k_bw_prefix
+
+section .text

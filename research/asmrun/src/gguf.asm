@@ -688,9 +688,11 @@ gguf_open:
   jae .layers_done
   lea rsi, [rel blk_tab]      ; suffix/field-offset table
 .suf_loop:
-  mov r12, [rsi]             ; suffix zstr (0 terminates)
+  mov r12, [rsi]             ; suffix offset from blk_tab (0 terminates)
   test r12, r12
   jz .suf_done
+  lea rax, [rel blk_tab]
+  add r12, rax               ; suffix zstr (the table holds offsets: the image is position-independent)
   mov r13, [rsi+8]           ; Layer field offset
   ; build "blk.<i>." then append the suffix into GO_NAME
   lea rcx, [rsp+GO_NAME]
@@ -969,6 +971,7 @@ gguf_cli:
 
 ; ---------------------------------------------------------------------------
 ; gguf.asm read-only data: metadata keys, tensor names, suffix table, messages.
+section .data
 
 k_arch:     db "general.architecture", 0
 k_align:    db "general.alignment", 0
@@ -1005,19 +1008,22 @@ s_ffn_gate:    db "ffn_gate.weight", 0
 s_ffn_up:      db "ffn_up.weight", 0
 s_ffn_down:    db "ffn_down.weight", 0
 
+; Each entry: the suffix string's offset from blk_tab (never an absolute
+; address: the UEFI build is loaded wherever the firmware likes), then the
+; Layer field that receives the tensor.
   align 8
 blk_tab:
-  dq s_attn_norm,   Layer.attn_norm
-  dq s_attn_q,      Layer.attn_q
-  dq s_attn_k,      Layer.attn_k
-  dq s_attn_v,      Layer.attn_v
-  dq s_attn_output, Layer.attn_output
-  dq s_attn_q_norm, Layer.attn_q_norm
-  dq s_attn_k_norm, Layer.attn_k_norm
-  dq s_ffn_norm,    Layer.ffn_norm
-  dq s_ffn_gate,    Layer.ffn_gate
-  dq s_ffn_up,      Layer.ffn_up
-  dq s_ffn_down,    Layer.ffn_down
+  dq s_attn_norm - blk_tab,   Layer.attn_norm
+  dq s_attn_q - blk_tab,      Layer.attn_q
+  dq s_attn_k - blk_tab,      Layer.attn_k
+  dq s_attn_v - blk_tab,      Layer.attn_v
+  dq s_attn_output - blk_tab, Layer.attn_output
+  dq s_attn_q_norm - blk_tab, Layer.attn_q_norm
+  dq s_attn_k_norm - blk_tab, Layer.attn_k_norm
+  dq s_ffn_norm - blk_tab,    Layer.ffn_norm
+  dq s_ffn_gate - blk_tab,    Layer.ffn_gate
+  dq s_ffn_up - blk_tab,      Layer.ffn_up
+  dq s_ffn_down - blk_tab,    Layer.ffn_down
   dq 0, 0
 
 tn_f32: db "F32", 0
