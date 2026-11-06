@@ -118,7 +118,6 @@
 /* The names the older rules and scripts (trace_viewer.js) use, kept as aliases so there is one palette. */
 :root {
   --bg-app: var(--bg);
-  --bg-header: var(--bg);
   --bg-sidebar: var(--surface-1);
   --bg-input: var(--surface-2);
   --bg-hover: var(--surface-3);
@@ -126,15 +125,11 @@
   --bg-bubble-user: var(--msg-user-bg);
   --bg-bubble-bot: var(--surface-1);
   --text-main: var(--text);
-  --text-header: var(--text);
   --text-bubble-user: var(--text);
   --text-bubble-bot: var(--text);
   --text-secondary: var(--text-muted);
   --border-color: var(--border);
-  --control-border: var(--border-strong);
   --accent-text: var(--accent);
-  --accent-strong: var(--accent);
-  --danger-strong: var(--danger);
   --danger-text: var(--danger);
   --success-text: var(--success);
   --code-bg: var(--surface-2);
@@ -166,7 +161,6 @@ body {
     select,
     textarea
   ) {
-  box-sizing: border-box;
   height: 40px;
   padding: 0 12px;
   border: 1px solid var(--border-strong);
@@ -269,14 +263,10 @@ body {
   font-size: 14px;
 }
 
-.logos-pro-app .frontend-degraded-status[hidden] {
-  display: none;
-}
-
 /* Sidebar: the dialog list slides in over the chat behind a scrim. One surface with a hairline edge; a row is one
    quiet line and the open dialog a raised tile. Gold is only «Новый чат» and the focus ring. */
 .logos-pro-app #sidebar {
-  position: fixed !important;
+  position: fixed;
   top: 0;
   left: 0;
   z-index: 200;
@@ -694,7 +684,6 @@ body {
 /* One tile for every header action: a muted line icon on a clear tile, gold while the sidebar it opens is out. Hover is
    for a real pointer only: on a touch screen it would stay on the last tile tapped. A press shows at once. */
 .logos-pro-app .header-btn {
-  box-sizing: border-box;
   width: 44px;
   height: 44px;
   padding: 0;
@@ -705,7 +694,6 @@ body {
   border-radius: 10px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 20px;
   line-height: 1;
   text-decoration: none;
   cursor: pointer;
@@ -729,15 +717,9 @@ body {
   color: var(--text);
   transition: none;
 }
-.logos-pro-app .header-btn:is([aria-expanded="true"], [aria-pressed="true"], .active) {
+.logos-pro-app .header-btn:is([aria-expanded="true"], .active) {
   background: var(--accent-soft);
   color: var(--accent);
-}
-
-.logos-pro-app .donate-btn img,
-.logos-pro-app .github-login-btn svg {
-  display: block;
-  pointer-events: none;
 }
 
 /* Brand: the «Л» mark and the name in the UI font, on the line of the first row of tiles. A narrow phone has no room
@@ -778,7 +760,7 @@ body {
   background: var(--bg-app);
 }
 
-/* Empty state: one look for every place (chat, conversation list, a failed load). */
+/* Empty state: one look for every place (chat, a failed load). */
 .logos-pro-app .empty-state {
   flex: 1;
   display: flex;
@@ -850,12 +832,6 @@ body {
   border-bottom-left-radius: 4px;
 }
 
-.logos-pro-app .billing-bubble {
-  display: inline-block;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
 /* Copy sits outside the bubble, by its last line, on the free side of the chat: always visible (a phone has no
    hover), it covers no text and takes no row of its own. A bubble is at most 85% wide, so the side has room. */
 .logos-pro-app .msg-actions {
@@ -886,13 +862,11 @@ body {
 }
 .logos-pro-app .msg-details-summary {
   cursor: pointer;
-  list-style: none;
 }
 
 /* Voice UI */
 .logos-pro-app #voice-ui {
   padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
-  display: none;
   flex-direction: column;
   align-items: center;
   gap: 15px;
@@ -922,9 +896,7 @@ body {
   border: none;
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 30px;
   cursor: pointer;
-  display: flex;
   align-items: center;
   justify-content: center;
   transition: background-color 0.15s ease;
@@ -1038,17 +1010,16 @@ body {
   }
 }
 
-/* Windows: one frame for everything the header opens, built by LogosCoreAPI.ui.modal. No window has a size of its own:
-   all stand at the same place with the same width, padding, title and ×, and grow downward, so the title and the × do
-   not move while the content loads (owner, 06.11.2026: "it is not standartized"). */
+/* Windows: one frame for everything the header opens, built by LogosCoreAPI.ui.modal. No window has a size of its own,
+   except Settings, which keeps one height across its tabs: all stand at the same place with the same width, padding,
+   title and ×, and grow downward, so the title and the × do not move while the content loads (owner, 06.11.2026: "it is
+   not standartized"). */
 .logos-pro-app .modal {
   display: none;
   position: fixed;
   inset: 0;
-  box-sizing: border-box;
   padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
   background: var(--backdrop);
-  z-index: 1000;
   align-items: flex-start;
   justify-content: center;
 }
@@ -1077,7 +1048,6 @@ body {
 }
 
 .logos-pro-app .modal-content {
-  box-sizing: border-box;
   background: var(--surface-1);
   color: var(--text);
   border: 1px solid var(--border-strong);
@@ -1122,12 +1092,6 @@ body {
     color: var(--text);
   }
 }
-.logos-pro-app .modal-content h3 {
-  margin-top: 0;
-  margin-bottom: 16px;
-  padding-right: 48px;
-  color: var(--text-main);
-}
 
 .logos-pro-app .model-option {
   padding: 12px;
@@ -1153,10 +1117,6 @@ body {
   box-shadow: inset 0 0 0 1px var(--accent);
   font-weight: 600;
   background: var(--accent-soft);
-}
-.logos-pro-app .model-price {
-  font-size: 12px;
-  color: var(--text-secondary);
 }
 
 /* Markdown */
@@ -1185,9 +1145,6 @@ body {
   border: none;
   padding: 0;
   color: var(--text-main);
-}
-
-.context-menu {
 }
 
 /* Стили для Markdown */
@@ -1454,10 +1411,8 @@ body {
   cursor: default;
 }
 
-/* Outranks the window-title rule for h3 in .modal-content (its 16px gap and room for the close button). */
 .logos-pro-app .memory-modal-content .memory-facts-title {
   margin: 0 0 8px;
-  padding-right: 0;
   font-size: 14px;
   font-weight: 600;
 }
@@ -1488,7 +1443,7 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* The category is a small gold chip before the fact. */
+/* The category is a small neutral chip before the fact. */
 .logos-pro-app .memory-fact-category {
   display: inline-block;
   margin-right: 8px;
@@ -1554,10 +1509,6 @@ body {
   display: none;
 }
 
-.logos-pro-app #text-ui {
-  display: flex;
-}
-
 .logos-pro-app.logos-model-voice #voice-ui,
 .logos-pro-app.logos-model-voice #response-mode-wrap,
 .logos-pro-app.logos-model-voice #mic-btn {
@@ -1569,16 +1520,8 @@ body {
 }
 
 /* Voice models whose catalog entry accepts text keep the text field (voice.js sets this class). */
-.logos-pro-app.logos-model-voice.logos-voice-text-input #text-ui,
-.logos-pro-app.logos-model-voice.logos-voice-text-input #text-ui[aria-hidden="true"] {
+.logos-pro-app.logos-model-voice.logos-voice-text-input #text-ui {
   display: flex;
-}
-
-.logos-pro-app #voice-ui[aria-hidden="true"],
-.logos-pro-app #text-ui[aria-hidden="true"],
-.logos-pro-app #response-mode-wrap[aria-hidden="true"],
-.logos-pro-app #mic-btn[aria-hidden="true"] {
-  display: none;
 }
 
 .logos-pro-app .copy-btn {
@@ -1675,7 +1618,6 @@ body {
   font-size: 12px;
   background: transparent;
   border: 0;
-  padding: 2px 0;
   color: var(--accent-text);
   text-align: left;
   cursor: pointer;
@@ -1754,17 +1696,6 @@ body {
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-/* The window wears the shared modal shell and backdrop. */
-.logos-pro-app .provider-credentials-modal {
-  z-index: 100002;
-  background: var(--backdrop);
-}
-.logos-pro-app .provider-credentials-modal.visible {
-  display: flex;
-}
-.logos-pro-app .provider-credentials-title {
-  margin-top: 0;
-}
 .logos-pro-app .provider-credentials-actions {
   display: flex;
   gap: 8px;
@@ -1777,16 +1708,6 @@ body {
   line-height: 1.45;
 }
 
-/* File manager windows: the shared modal shell and backdrop; the main window is wide enough for the store row. */
-.logos-pro-app .file-manager-modal,
-.logos-pro-app .file-manager-add-modal {
-  background: var(--backdrop);
-  z-index: 10001;
-}
-.logos-pro-app .file-manager-add-modal {
-  z-index: 10002;
-}
-
 /* Chat markdown and reasoning presentation. */
 .logos-pro-app .md-code-block {
   margin: 8px 0;
@@ -1794,7 +1715,6 @@ body {
 .logos-pro-app .md-code-block > pre {
   margin: 0;
   max-width: 100%;
-  box-sizing: border-box;
 }
 /* A message drawn again once its renderer arrives (chat.js renderPendingMarkdown); it adds no box of its own. */
 .logos-pro-app .md-pending {
@@ -1845,11 +1765,6 @@ body {
   margin: 8px 0;
   border-radius: 8px;
 }
-.logos-pro-app .msg sup,
-.logos-pro-app .msg sub {
-  font-size: 0.75em;
-  line-height: 0;
-}
 .logos-pro-app .reasoning-details {
   margin-bottom: 10px;
   font-size: 13px;
@@ -1873,7 +1788,7 @@ body {
 }
 
 /* A failure is a calm note, not a red block: a red edge on the left, the text in the body colour, and its retry as a
-   secondary button under the text. Shared by the panels; :where() reaches windows appended to <body> too. */
+   secondary button under the text. */
 :where(.logos-error-note, .file-manager-state-error) {
   margin: 8px 0;
   padding: 10px 12px;
@@ -1950,10 +1865,8 @@ body {
   gap: 8px 12px;
   margin-bottom: 12px;
 }
-/* Outranks the window-title rule for h3 in .modal-content (its 16px gap and room for the close button). */
 .logos-pro-app .file-manager-box .file-manager-section-title {
   margin: 0;
-  padding-right: 0;
   color: var(--text);
   font-size: 15px;
   font-weight: 600;
@@ -2071,13 +1984,7 @@ body {
   white-space: nowrap;
 }
 /* The display above would beat the browser's own [hidden] rule: «Отменить» is hidden while a file is being stored. */
-.logos-pro-app :is(
-    .file-manager-secondary-btn,
-    .file-manager-danger-btn,
-    .file-manager-vs-create-btn,
-    .file-manager-vs-refresh-btn,
-    .mcp-oauth-btn
-  )[hidden] {
+.logos-pro-app .file-manager-secondary-btn[hidden] {
   display: none;
 }
 /* Beside the 40px name field, the store controls are as tall as it. */
@@ -2104,23 +2011,6 @@ body {
 }
 
 /* File manager vector-store file picker. */
-.logos-pro-app .file-manager-add-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.logos-pro-app .file-manager-add-title {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text);
-}
-.logos-pro-app .file-manager-close-btn {
-  border: 0;
-  background: none;
-  font-size: 20px;
-  cursor: pointer;
-  color: var(--text-muted);
-}
 .logos-pro-app .file-manager-add-list {
   max-height: 300px;
   overflow-y: auto;
@@ -2288,7 +2178,6 @@ body {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 .logos-pro-app .logos-btn {
-  box-sizing: border-box;
   font-family: inherit;
   line-height: 1;
   cursor: pointer;
@@ -2372,7 +2261,7 @@ body {
 .logos-pro-app .execution-surface {
   margin: 4px 0;
   font-size: 12px;
-  color: var(--text-secondary, inherit);
+  color: var(--text-secondary);
 }
 .logos-pro-app .execution-surface-stages {
   display: flex;
@@ -2387,10 +2276,6 @@ body {
   border-radius: 999px;
   border: 1px solid currentColor;
 }
-.logos-pro-app .execution-surface-stages li[data-status="done"],
-.logos-pro-app .execution-surface-stages li[data-status="active"] {
-  opacity: 1;
-}
 .logos-pro-app .execution-surface-blocker,
 .logos-pro-app .execution-surface[data-state="error"] .execution-surface-summary,
 .logos-pro-app .execution-surface[data-state="timeout"] .execution-surface-summary {
@@ -2401,11 +2286,7 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* Кнопки окон настроек и основная кнопка (пункты 40, 90); их цвета задаёт UNIFIED BUTTON CONTRACT. */
-.settings-contract-btn {
-  background: transparent;
-  border: 1px solid var(--border-strong);
-}
+/* Основная кнопка; её цвета задаёт UNIFIED BUTTON CONTRACT. */
 .btn-primary {
   border-radius: 10px;
   min-height: 44px;
@@ -2474,10 +2355,6 @@ body {
   background: var(--surface-1);
 }
 
-/* Высокий контраст (пункт 52): the theme's border tokens are the text colour, so every outlined button already
-   shows a black edge; icon-only buttons (copy, delete, rename, trace) and the tabs keep no box, as before. The
-   dialog rows' edge is in the Sidebar section. */
-
 /* Кнопка загрузки файлов получает фокус с клавиатуры (пункт 77): the shared gold ring; the transparent outline
    still shows in Windows forced colours. */
 #file-upload:focus-visible + label {
@@ -2522,9 +2399,6 @@ body {
 .logos-pro-app .bubble a {
   color: var(--accent-text);
 }
-.logos-pro-app .bubble del {
-  text-decoration: line-through;
-}
 .logos-pro-app summary {
   list-style: none;
 }
@@ -2560,10 +2434,6 @@ body {
   height: 6px;
   border-radius: 50%;
   background: var(--text-secondary);
-}
-.logos-pro-app .typing span:nth-child(2) {
-}
-.logos-pro-app .typing span:nth-child(3) {
 }
 
 /* Live answer: the reply as it streams in. It stays hidden until the first text arrives;
@@ -2679,7 +2549,6 @@ body {
 .logos-pro-app #set-status {
   margin-top: auto;
 }
-/* Both titles outrank the window-title rule for h3 in .modal-content. */
 .logos-pro-app .modal-content .settings-subtitle {
   margin: 12px 0 8px;
   font-size: 14px;
@@ -2889,7 +2758,7 @@ body {
 
 /* "What the model sees": the hidden part of each provider request. */
 .logos-pro-app .msg-model-view-request {
-  border-top: 1px solid var(--border-color, rgba(127, 127, 127, 0.3));
+  border-top: 1px solid var(--border-color);
   padding: 6px 0;
 }
 .logos-pro-app .msg-model-view-head {
@@ -2910,16 +2779,14 @@ body {
   overflow-wrap: anywhere;
   max-height: 22em;
   overflow: auto;
-  font-size: 0.85em;
-  margin: 4px 0;
 }
 .logos-pro-app .msg-model-view-fold-summary {
   cursor: pointer;
 }
 
-/* Court: the judge's word (source court) wears a rainbow frame and rainbow text, the user's words carry a side
-   mark, and the proofs the court names are marked. The frame is the bubble's own border; the text is one gradient
-   across the whole bubble, clipped to the glyphs, in shades that stay readable on the theme's bubble. */
+/* Court: the judge's word (source court) wears a rainbow frame and rainbow text, and the proofs the court names are
+   marked. The frame is the bubble's own border; the text is one gradient across the whole bubble, clipped to the
+   glyphs, in shades that stay readable on the theme's bubble. */
 :root {
   --court-rainbow-frame: linear-gradient(90deg, #ff4d4d, #ffa64d, #ffe04d, #4dd96b, #4da6ff, #9b6bff, #ff4da6);
   --court-rainbow-text: linear-gradient(90deg, #c62828, #a65200, #806600, #1e7d32, #1a5fb4, #6a3fc8, #b0246e);
@@ -2969,8 +2836,7 @@ body {
 .logos-pro-app #attach-btn,
 .logos-pro-app #mic-btn,
 .logos-pro-app #send-btn {
-  font-size: 0 !important;
-  position: relative;
+  font-size: 0;
 }
 .logos-pro-app #header .header-btn::before,
 .logos-pro-app #attach-btn::before,
@@ -3131,8 +2997,7 @@ body {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.logos-pro-app #chatbox .msg .copy-btn,
-.logos-pro-app #chatbox .msg .copy-btn:hover {
+.logos-pro-app #chatbox .msg .copy-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3152,29 +3017,13 @@ body {
   background: color-mix(in srgb, var(--text-main) 8%, transparent);
   color: var(--text-main);
 }
-/* The rules above clear the shadow, so the keyboard ring is put back here; later at equal specificity, it also shows
-   while hovered. */
+/* The rules above clear the shadow, so the keyboard ring is put back here. */
 .logos-pro-app #chatbox .msg .copy-btn:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .logos-pro-app #chatbox .msg .copy-btn svg {
   width: 17px;
   height: 17px;
-}
-/* A finger gets the full 44px target; the mouse keeps the compact row. */
-@media (pointer: coarse) {
-  .logos-pro-app #chatbox .msg .copy-btn,
-  .logos-pro-app #chatbox .msg .copy-btn:hover {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-    min-height: 44px;
-  }
-  .logos-pro-app #chatbox .msg-details-summary {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-  }
 }
 .logos-pro-app #chatbox > .msg > .msg-details {
   margin: 4px 0 0;
@@ -3185,13 +3034,25 @@ body {
   display: inline-block;
   padding: 6px 8px;
   border-radius: 9px;
-  cursor: pointer;
-  list-style: none;
 }
 .logos-pro-app #chatbox .msg-details-summary:hover,
 .logos-pro-app #chatbox .msg-details[open] > .msg-details-summary {
   background: color-mix(in srgb, var(--text-main) 6%, transparent);
   color: var(--text-main);
+}
+/* A finger gets the full 44px target; the mouse keeps the compact row. */
+@media (pointer: coarse) {
+  .logos-pro-app #chatbox .msg .copy-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .logos-pro-app #chatbox .msg-details-summary {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
 }
 
 /* The model's thinking: a small pill that opens into a quiet quote. */
@@ -3213,7 +3074,6 @@ body {
   color: var(--text-secondary);
   font-weight: 500;
   cursor: pointer;
-  list-style: none;
 }
 .logos-pro-app #chatbox .msg .reasoning-summary::after {
   content: "›";

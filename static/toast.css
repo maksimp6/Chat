@@ -25,15 +25,9 @@
   line-height: 1.4;
   box-shadow: 0 6px 20px var(--shadow-color);
   overflow-wrap: anywhere;
-  opacity: 1;
 }
 
 .logos-toast-error {
   background: var(--danger);
   color: var(--danger-ink);
 }
-
-.logos-toast-hide {
-  opacity: 0;
-}
-

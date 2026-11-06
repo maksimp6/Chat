@@ -34,8 +34,8 @@ button.logos-dept-row:focus-visible {
   font-size: 12px;
 }
 
-/* Buttons in these windows, which may sit on <body> outside .logos-pro-app: the shared colours come from
-   .logos-btn / .btn-primary, the size from here. The window's × keeps its own square. */
+/* Buttons in these windows: the shared colours come from .logos-btn / .btn-primary, the size from here. The window's ×
+   keeps its own square. */
 .logos-dept-card :is(.logos-btn, .btn-primary):not(.modal-close) {
   display: inline-flex;
   align-items: center;

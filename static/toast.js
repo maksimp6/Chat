@@ -4,7 +4,6 @@
   var HIDE_AFTER_MS = 4000;
   // Errors stay long enough to read and can be dismissed by a click.
   var ERROR_HIDE_AFTER_MS = 8000;
-  var REMOVE_AFTER_MS = 300;
   var stack = null;
   var watcher = new MutationObserver(placeStack);
 
@@ -44,10 +43,7 @@
       item.remove();
     });
     setTimeout(function () {
-      item.classList.add("logos-toast-hide");
-      setTimeout(function () {
-        item.remove();
-      }, REMOVE_AFTER_MS);
+      item.remove();
     }, isError ? ERROR_HIDE_AFTER_MS : HIDE_AFTER_MS);
     return item;
   }

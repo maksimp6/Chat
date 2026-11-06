@@ -127,7 +127,6 @@
     var ov = CoreUI.modal.create({
       id: "file-manager-modal",
       title: "Файловый менеджер",
-      className: "file-manager-modal",
       contentClassName: "file-manager-box",
       body: body,
     });
@@ -372,7 +371,6 @@
       var bg = CoreUI.modal.create({
         id: "vs-add-files-modal",
         title: "Файлы → " + (vsName || vsId.substring(0, 8)),
-        className: "file-manager-add-modal",
         body: addBody,
       });
       var panel = addBody;

@@ -494,7 +494,6 @@
     var title = md.querySelector(".modal-title");
     var closeButton = md.querySelector(".modal-close");
     closeButton.id = "set-close-btn";
-    closeButton.classList.add("settings-contract-btn");
 
     function fieldHtml(key) {
       var field = SETTINGS_FIELDS[key];
@@ -535,12 +534,12 @@
       '<div class="settings-modal-top">',
       '<div class="settings-modal-heading"></div>',
       '<div class="llm-tabs">',
-      '    <button class="logos-btn llm-tab-btn active settings-contract-btn" data-tab="tab-ollama">Ollama</button>',
-      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',
-      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-output">Формат вывода</button>',
-      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-routing">Маршрутизация вызовов</button>',
-      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-adv">Промпты и кэш</button>',
-      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-theme">Оформление</button>',
+      '    <button class="logos-btn llm-tab-btn active" data-tab="tab-ollama">Ollama</button>',
+      '    <button class="logos-btn llm-tab-btn" data-tab="tab-gen">Сэмплинг</button>',
+      '    <button class="logos-btn llm-tab-btn" data-tab="tab-output">Формат вывода</button>',
+      '    <button class="logos-btn llm-tab-btn" data-tab="tab-routing">Маршрутизация вызовов</button>',
+      '    <button class="logos-btn llm-tab-btn" data-tab="tab-adv">Промпты и кэш</button>',
+      '    <button class="logos-btn llm-tab-btn" data-tab="tab-theme">Оформление</button>',
       "</div>",
       "</div>",
     ].join("");

@@ -131,7 +131,6 @@
     UI.modal.create({
       id: "provider-credentials-modal",
       title: "Ключи провайдеров",
-      className: "provider-credentials-modal",
       closeAction: "provider-credentials.close",
       body: body,
     });

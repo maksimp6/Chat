@@ -9,9 +9,6 @@
   justify-content: space-between;
   margin-bottom: 14px;
 }
-.logos-pro-app .environments-head h2 {
-  margin: 0;
-}
 .logos-pro-app .environments-head p {
   margin: 3px 0 0;
   color: var(--text-muted);
