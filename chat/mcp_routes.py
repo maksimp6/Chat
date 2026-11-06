@@ -2929,7 +2929,8 @@ def fork_dialog(
     edits: dict[int, str] | None = None,
     drop_ids: Any = None,
 ) -> dict[str, Any]:
-    """A new dialog with a copy of what was said in ``conv_id``: its own provider conversation.
+    """A new dialog with a copy of what was said in ``conv_id``, with a provider conversation of
+    its own only when the chat model is not local.
 
     The copy keeps the messages before ``before_id``, applies ``edits`` (message id -> new
     text) and leaves out ``drop_ids``. Errors, notices and the Court's words are not copied,
@@ -3031,8 +3032,9 @@ def call_yandex_operation(
 
 @mcp_bp.route("/api/conversations/<conv_id>/copy", methods=["POST"])
 def copy_conversation(conv_id):
-    """A copy of a dialog for the Court: its messages in a new dialog with its own provider
-    conversation, so what is asked in the copy never reaches the original."""
+    """A copy of a dialog for the Court: its messages in a new dialog, with a provider conversation
+    of its own only when the chat model is not local, so what is asked in the copy never reaches
+    the original."""
     owner_id = get_current_owner_id()
     data = request.get_json(silent=True) or {}
     try:

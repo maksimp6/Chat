@@ -2,12 +2,14 @@
 
 Owner, 05.11.2026: "we don't need full sentences from remember just do sense extraction, and
 convert it to text". Only the embedding model runs. The best chunk of each of the DOCUMENTS
-best-matching documents is cut into short phrases at its punctuation, words that carry no
-meaning are dropped from the ends of each phrase, a word alone joins the phrase before it, a
-clause that holds a negation is not cut and takes no word alone, so that a phrase does not say
-the opposite of the stored text (a comma can still part a negation from what it negates), a
-phrase the question itself holds is left out, every other phrase is embedded, and SENSE_PHRASES
-phrases are chosen one by one: the nearest in meaning to the question, each losing
+best-matching documents is cut into short phrases at its punctuation, and words that carry no
+meaning are dropped from the ends of each phrase. A word alone joins the phrase before it,
+unless that phrase is already longer than PHRASE_WORDS. A clause that holds a negation is not
+cut, and after a comma, a dash or a sentence end it takes no word alone, so that a phrase does
+not say the opposite of the stored text (a comma, or a quote of several words, can still part a
+negation from what it negates). A phrase the question itself holds is left out, except a word
+alone after another phrase, which can be the answer. Every other phrase is embedded, and
+SENSE_PHRASES phrases are chosen one by one: the nearest in meaning to the question, each losing
 REPEAT_PENALTY of its likeness to the phrases already chosen (maximal marginal relevance). They
 are joined into one line of text, best first. Tried on the owner's dialogs on 05.11.2026:
 nearness alone gave eight rewordings of the question; this rule brought the facts up ("функция
@@ -42,17 +44,26 @@ REPEAT_PENALTY = 0.6
 
 # The speakers' labels of a stored turn (chat.mcp_routes._embed_turn) are no part of what was said.
 _LABEL = re.compile(r"(?:Пользователь|Мысли Логоса|Логос):\s")
-# The number of a list item or a heading is no part of it. It opens a line or follows a sentence
-# ("План: 1. Проверить порт. 2. Перезапустить сервер."); after a colon or a question mark a
-# number is an answer, and a year is no list number. Run before _LABEL, or a reply that opens
-# with a number ("Логос: 12. Все они…") would look like a list.
-_LIST_MARK = re.compile(r"(?:^[ \t]*(?:#+[ \t]+)?|(?<=[.;] ))\d{1,3}[.)][ \t]+(?=\S)", re.MULTILINE)
+# The mark of a list item (a number, or "-" or "*" with a space after it) or a heading's number is
+# no part of it, and the item before it ends there. A number opens a line or follows a sentence
+# ("План: 1. Проверить порт. 2. Перезапустить сервер."). After a colon or a question mark it is an
+# answer, after a lone letter and a dot a reference ("Аналог п. 41."), and a year is no list
+# number. Run before _LABEL, or a reply that opens with a number ("Логос: 12. Все они…") would
+# look like a list.
+_LIST_MARK = re.compile(
+    r"(?:^[ \t]*(?:#+[ \t]+)?|(?<=[.;] )(?<!\b[^\W\d]\. ))\d{1,3}[.)][ \t]+(?=\S)|^[ \t]*[-*][ \t]+(?=\S)",
+    re.MULTILINE,
+)
 # A clause ends at a sentence or list mark followed by a space, a bracket, a quote, a line end or
 # a dash between spaces, unless a number stands before a hyphen ("12 - 5 = 7"); a mark inside a
 # word ("2+2=4", "file.py", "qwen3:4b") stays. A colon ends nothing: what follows it belongs to
 # what precedes it ("Имя: Максим", "Код выхода: 0").
-_CLAUSE_END = re.compile(r"[.!?…]+(?=\s|$)|[,;](?=\s|$)|[()\[\]{}«»\"“”\n]|\s[—–]\s|(?<!\d)\s-\s")
-# A token of nothing but these marks is markup: a list, heading or table mark, a rule.
+_CLAUSE_END = re.compile(r"([.!?…]+(?=\s|$)|[,;](?=\s|$)|[()\[\]{}«»\"“”\n]|\s[—–]\s|(?<!\d)\s-\s)")
+# The marks that part a phrase with a negation from a word alone after them. A quote, a bracket, a
+# question mark and a line end do not: "система не «убивает» агента", "Файла нет?\n\nЛогос: Нет.".
+_PARTS = re.compile(r"[.!…,;—–-]")
+# A token of nothing but these marks is markup (a heading or table mark, a rule), unless it is one
+# of _SIGNS.
 _EDGE = ".,;:!?()[]{}\"'«»“”‘’…*_`#|<>~=-—–"
 # What stands around a word and is no part of it. The sign of "-5", the dot of ".env", the
 # underscore of "_chat_turn" and the "#" of "#1413" are.
@@ -89,15 +100,18 @@ NEGATIONS = frozenset(
     shouldn't couldn't
     """.split()
 )
-# A line that ends in a negation after other words is a hard wrap: what it negates opens the next
-# line. A negation alone on its line is an answer, and one after a colon is a value.
+# A line that ends in a negation is taken for a hard wrap and goes on in the next line, unless the
+# negation opens the line (an answer) or directly follows a colon (a value). So a finished line
+# with no full stop fuses with the next one: only a length could tell it from a wrap (a script's
+# "gc.pruneExpire never", then "pin_tips").
 _WRAPPED_NEGATION = re.compile(
     r"(?<=[^\s:] )(" + "|".join(map(re.escape, NEGATIONS)) + r")\n[ \t]*(?=\S)", re.IGNORECASE
 )
 
 
 def _word(raw: str) -> str:
-    """``raw`` without the marks around it; a list, heading or table mark alone is nothing."""
+    """``raw`` without the marks around it. A heading or table mark or a rule alone is nothing, and
+    a sign stays for _trimmed."""
     if raw in _SIGNS:
         return raw
     return raw.lstrip(_OPENING).rstrip(_CLOSING) if raw.strip(_EDGE) else ""
@@ -135,27 +149,43 @@ def _carries_sense(words: list[str]) -> bool:
     return any(map(str.isalnum, word)) and not word.isalpha() and not word.isdigit()
 
 
+def _takes_word(phrase: list[str], parted: bool) -> bool:
+    """Whether a word alone can join ``phrase``: not one already longer than PHRASE_WORDS, and not
+    one with a negation that a mark ``parted`` from the word, which would fall under it."""
+    return len(phrase) <= PHRASE_WORDS and not (parted and _negated(phrase))
+
+
 def phrases(text: str) -> list[str]:
-    """The short phrases of ``text`` in order: its clauses, in blocks of PHRASE_WORDS words.
+    """The short phrases of ``text`` in order: its clauses, in blocks of PHRASE_WORDS words, or whole
+    if they hold a negation.
 
     A word alone joins the phrase before it, where it means something ("Логос: Барсик.", "г. Москва"),
-    unless that phrase holds a negation: the word would fall under it ("Порт не 8080, а 9090.")."""
+    unless that phrase is already longer than PHRASE_WORDS, or holds a negation and a comma, a dash
+    or a sentence end parts them ("Порт не 8080, а 9090.")."""
     found: list[list[str]] = []
-    plain = _WRAPPED_NEGATION.sub(r"\1 ", _LABEL.sub(" ", _LIST_MARK.sub("", text)))
-    for clause in _CLAUSE_END.split(plain):
+    parted = False
+    pieces = _CLAUSE_END.split(_WRAPPED_NEGATION.sub(r"\1 ", _LABEL.sub(" ", _LIST_MARK.sub(".\n", text))))
+    for clause, mark in zip(pieces[::2], pieces[1::2] + [""]):
         words = [word for word in map(_word, clause.split()) if word]
         for block in _blocks(words):
             phrase = _trimmed(block)
-            if found and not _carries_sense(phrase) and len(found[-1]) <= PHRASE_WORDS and not _negated(found[-1]):
+            if found and not _carries_sense(phrase) and _takes_word(found[-1], parted):
                 found[-1] += phrase
             elif phrase:
                 found.append(phrase)
+            parted = parted and not phrase
+        parted = parted or _PARTS.search(mark) is not None
     return [" ".join(phrase) for phrase in found if any(map(str.isalnum, "".join(phrase)))]
 
 
 def _usable(text: str, asked_text: str) -> list[str]:
-    """The phrases of ``text`` that add to the question: what it says itself adds nothing."""
-    return [phrase for phrase in phrases(text) if phrase.casefold() not in asked_text]
+    """The phrases of ``text`` that add to the question: what it says itself adds nothing, but a word
+    alone after another phrase can be the answer ("Можно или нельзя?", "Логос: Нельзя.")."""
+    found = phrases(text)
+    return [
+        phrase for index, phrase in enumerate(found)
+        if phrase.casefold() not in asked_text or (index and " " not in phrase)
+    ]
 
 
 def best_documents(query: str, hits: list[dict[str, Any]], count: int = DOCUMENTS) -> list[dict[str, Any]]:

@@ -1,8 +1,9 @@
 """The Court's actions over dialogs: traces, branches and the Yandex operations it may call.
 
 Reading traces and listing operations changes nothing. A branch is a new dialog made from
-the said messages of a dialog, with its own provider conversation: the original dialog is
-never edited, so the accused never sees the Court in it. The Yandex operations are the
+the said messages of a dialog, with a provider conversation of its own only when the chat model
+is not local: the original dialog is never edited, so the accused never sees the Court in it.
+The Yandex operations are the
 catalog's read and create operations (``yandex_client_modules.operations``); deletes,
 cancels and updates are not offered to the Court.
 """
