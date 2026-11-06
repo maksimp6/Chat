@@ -1,23 +1,26 @@
 #!/bin/sh
-# The owner's server's side of the home's QUIC tunnel (scripts/home/tunnel.py on the Redmi 9).
-# Run as root on the server (Linux, x86-64):
+# The far end of the home's QUIC links (scripts/home/tunnel.py on the Redmi 9): the owner's
+# server. Run as root (Linux, x86-64):
 #
-#   sh tunnel_client_setup.sh key                  # once: makes the key pair and prints the
-#                                                  # public half for SERVER_PUBLIC_KEY in tunnel.py
-#   sh tunnel_client_setup.sh connect <REDMI_KEY>  # installs sing-box and starts the service;
+#   sh tunnel_server_setup.sh key                  # once: makes the key pair and the certificate
+#                                                  # and prints their public halves, which go into
+#                                                  # SERVER_PUBLIC_KEY and SERVER_CERTIFICATE in
+#                                                  # tunnel.py
+#   sh tunnel_server_setup.sh connect <REDMI_KEY>  # installs sing-box and starts the service;
 #                                                  # REDMI_KEY is the base64 line of public.pem
 #                                                  # in ~/.config/tunnel on the Redmi
 #
-# Both sides derive the tunnel's password from their own private key and the other's public
-# key, so the password itself never travels.
+# Both sides derive the password from their own private key and the other's public key, so the
+# password itself never travels.
 #
-# After connect, 192.168.10.0/24 (the home network) is routed through the tunnel, and
-# 127.0.0.1:1081 is a SOCKS5 proxy whose traffic leaves from the home.
+# After connect, 192.168.10.0/24 (the home network) is routed through tunnel.maxxxpavlov.ru,
+# and UDP 443 here takes what the Redmi's SOCKS5 proxy carries out to the internet.
 set -eu
 umask 077
 
 ROOT=/etc/tunnel
 HOST=tunnel.maxxxpavlov.ru
+NAME=maxxxpavlov.online
 VERSION=1.14.4
 SHA256=699a1b510aa4396b2176d32d1181920399ebf1e267835da6f3b598d0f7c24968
 
@@ -25,7 +28,11 @@ case ${1:-} in
 key)
   mkdir -p "$ROOT"
   [ -f "$ROOT/key.pem" ] || openssl genpkey -algorithm X25519 -out "$ROOT/key.pem"
+  [ -f "$ROOT/cert.key" ] || openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
+    -nodes -keyout "$ROOT/cert.key" -out "$ROOT/cert.pem" -subj "/CN=$NAME" \
+    -addext "subjectAltName=DNS:$NAME" -days 36500
   openssl pkey -in "$ROOT/key.pem" -pubout
+  cat "$ROOT/cert.pem"
   ;;
 connect)
   work=$(mktemp -d)
@@ -55,7 +62,19 @@ connect)
       "route_address": ["192.168.10.0/24"],
       "dns_mode": "disabled"
     },
-    {"type": "socks", "tag": "socks", "listen": "127.0.0.1", "listen_port": 1081}
+    {
+      "type": "hysteria2",
+      "tag": "quic",
+      "listen": "0.0.0.0",
+      "listen_port": 443,
+      "users": [{"name": "redmi", "password": "$password"}],
+      "tls": {
+        "enabled": true,
+        "alpn": ["h3"],
+        "certificate_path": "$ROOT/cert.pem",
+        "key_path": "$ROOT/cert.key"
+      }
+    }
   ],
   "outbounds": [
     {
@@ -65,9 +84,14 @@ connect)
       "server_port": 443,
       "password": "$password",
       "tls": {"enabled": true, "server_name": "$HOST", "alpn": ["h3"]}
-    }
+    },
+    {"type": "direct", "tag": "direct"}
   ],
-  "route": {"auto_detect_interface": true, "default_domain_resolver": "local"}
+  "route": {
+    "auto_detect_interface": true,
+    "default_domain_resolver": "local",
+    "rules": [{"inbound": ["quic"], "action": "route", "outbound": "direct"}]
+  }
 }
 EOF
   /usr/local/bin/sing-box check -c "$ROOT/config.json"
@@ -75,12 +99,12 @@ EOF
   umask 022
   cat >/etc/systemd/system/home-tunnel.service <<EOF
 [Unit]
-Description=QUIC tunnel to the home network ($HOST)
+Description=QUIC links to the home network ($HOST)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/sing-box run -c $ROOT/config.json
+ExecStart=/usr/local/bin/sing-box run --disable-color -c $ROOT/config.json
 Restart=always
 RestartSec=5
 LimitNOFILE=infinity

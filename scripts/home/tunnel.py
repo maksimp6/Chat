@@ -1,24 +1,25 @@
-"""The home's QUIC tunnel, tunnel.maxxxpavlov.ru, and the SOCKS5 proxy on the Redmi 9.
+"""The home's QUIC links and the SOCKS5 proxy on the Redmi 9.
 
 Run from the Logos checkout in Termux; the script also writes its Termux:Boot hook:
 
     python scripts/home/tunnel.py
 
-The owner's server connects to UDP port 443 and reaches the home network through the tunnel
-(owner, 06.11.2026: "so my server can connect there and use it to access lan, also to run
-socks5 proxy on redmi and proxify traffic without tcp overhead"). tunnel_client_setup.sh
-sets up that side.
+Owner, 06.11.2026: "build tunnel.maxxxpavlov.ru with quic support so my server can connect
+there and use it to access lan, also to run socks5 proxy on redmi and proxify traffic without
+tcp overhead", then "socks is used only on lan". So there are two links, each one way:
 
-The wire is QUIC: sing-box speaks Hysteria2, where each proxied TCP connection is a QUIC
-stream and each UDP packet a QUIC datagram, so TCP never runs inside TCP. The certificate is
-the one acme_cert.py keeps fresh; sing-box reloads it by itself.
+- The owner's server connects to UDP port 443 here, tunnel.maxxxpavlov.ru, and reaches the
+  home network. The certificate is the one acme_cert.py keeps fresh; sing-box reloads it.
+- Port 1080 is the SOCKS5 proxy for the home network. What it carries goes to the owner's
+  server over QUIC and leaves from there, so SOCKS never crosses the internet.
 
-The server dials the home and not the other way round: the router forwards UDP 443 to this
-phone, and Russian filtering leaves traffic that enters the country alone (Heitmann et al.,
-"On Russia's Early Introduction of QUIC SNI Censorship", FOCI 2026).
+sing-box speaks Hysteria2 on both: each proxied TCP connection is a QUIC stream and each UDP
+packet a QUIC datagram, so TCP never runs inside TCP. Hysteria2 carries connections from its
+client to its server only, hence the two links. tunnel_server_setup.sh sets up the far end.
 
-Port 1080 is the SOCKS5 proxy, for private addresses only: the home network, and the server
-through the tunnel.
+Russian filtering drops QUIC leaving the country only for forbidden domain names (Heitmann et
+al., "On Russia's Early Introduction of QUIC SNI Censorship", FOCI 2026), and SERVER_NAME is
+not one.
 """
 
 from __future__ import annotations
@@ -39,6 +40,8 @@ import acme_cert  # noqa: E402 (sibling script)
 QUIC_PORT = 443
 SOCKS_PORT = 1080
 ROUTER = "192.168.10.1"
+# Who may use the proxy: the home network, and programs on this phone.
+HOME_NETWORK = ["192.168.10.0/24", "127.0.0.0/8"]
 ROOT = Path.home() / ".config/tunnel"
 PRIVATE_KEY = ROOT / "key.pem"
 PUBLIC_KEY = ROOT / "public.pem"
@@ -46,11 +49,28 @@ SERVER_KEY = ROOT / "server.pem"
 CONFIG = ROOT / "config.json"
 BOOT_HOOK = Path.home() / ".termux/boot/75-tunnel"
 LOG = Path.home() / ".tunnel.log"
-# The public half of the key on the owner's server (vm4800173.firstbyte.club).
+# The owner's server (vm4800173.firstbyte.club): its address, the public half of its key, and
+# its own certificate, the only one trusted on that link.
+SERVER_ADDRESS = "157.228.161.121"
+SERVER_NAME = "maxxxpavlov.online"
 SERVER_PUBLIC_KEY = (
     "-----BEGIN PUBLIC KEY-----\n"
     "MCowBQYDK2VuAyEABbOob3Ivz6D5OLLdhV0p6hSpztpJ9HUDbtO55KYuQQU=\n"
     "-----END PUBLIC KEY-----\n"
+)
+SERVER_CERTIFICATE = (
+    "-----BEGIN CERTIFICATE-----\n"
+    "MIIBsDCCAVagAwIBAgIUBTqgQUhGV+i5jLAujJIudXM4OZgwCgYIKoZIzj0EAwIw\n"
+    "HTEbMBkGA1UEAwwSbWF4eHhwYXZsb3Yub25saW5lMCAXDTI2MTEwNjE0MDkwNVoY\n"
+    "DzIxMjYxMDEzMTQwOTA1WjAdMRswGQYDVQQDDBJtYXh4eHBhdmxvdi5vbmxpbmUw\n"
+    "WTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARQcniJKQmXt4ne3GArBzdGSwSA0v0O\n"
+    "SRyI7tl55FQdWkFS3AbBNodBuGMJNO3Z8njImX7TeOZnCJ+btvEhEUIwo3IwcDAd\n"
+    "BgNVHQ4EFgQU9nVu9RD+RElKA42AoQBF9facu1UwHwYDVR0jBBgwFoAU9nVu9RD+\n"
+    "RElKA42AoQBF9facu1UwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHREEFjAUghJtYXh4\n"
+    "eHBhdmxvdi5vbmxpbmUwCgYIKoZIzj0EAwIDSAAwRQIgDe05xw5fCqU+aL5dTFVb\n"
+    "bBaN0EzM/TxVJYowF+ypOjQCIQCJi9B4MeIEIUvZV48emElM5l5GGCs1kEBFmm1j\n"
+    "AlGQrA==\n"
+    "-----END CERTIFICATE-----\n"
 )
 
 
@@ -96,12 +116,35 @@ def _config(password: str) -> dict:
             },
             {"type": "socks", "tag": "socks", "listen": "0.0.0.0", "listen_port": SOCKS_PORT},
         ],
-        "outbounds": [{"type": "direct", "tag": "direct"}],
+        "outbounds": [
+            {"type": "direct", "tag": "direct"},
+            {
+                "type": "hysteria2",
+                "tag": "server",
+                "server": SERVER_ADDRESS,
+                "server_port": QUIC_PORT,
+                "password": password,
+                "tls": {
+                    "enabled": True,
+                    "server_name": SERVER_NAME,
+                    "alpn": ["h3"],
+                    "certificate": SERVER_CERTIFICATE.splitlines(),
+                },
+            },
+        ],
         "route": {
             "default_domain_resolver": "router",
-            # No password on the proxy, so it must not answer on the phone's mobile interface.
+            # No password on the proxy, so it answers the home network and nothing else, such
+            # as the phone's mobile interface. A home address stays at home.
             "rules": [
-                {"inbound": ["socks"], "source_ip_is_private": True, "action": "route", "outbound": "direct"},
+                {
+                    "inbound": ["socks"],
+                    "source_ip_cidr": HOME_NETWORK,
+                    "ip_is_private": True,
+                    "action": "route",
+                    "outbound": "direct",
+                },
+                {"inbound": ["socks"], "source_ip_cidr": HOME_NETWORK, "action": "route", "outbound": "server"},
                 {"inbound": ["socks"], "action": "reject"},
             ],
         },
@@ -128,7 +171,9 @@ def _changed(script: Path, loaded: float) -> bool:
 
 def _run(binary: str, script: Path, loaded: float) -> None:
     """Run sing-box until it stops or this script changes."""
-    server = subprocess.Popen([binary, "run", "-c", str(CONFIG)], stdin=subprocess.DEVNULL)
+    server = subprocess.Popen(
+        [binary, "run", "--disable-color", "-c", str(CONFIG)], stdin=subprocess.DEVNULL
+    )
     try:
         while not _changed(script, loaded):
             if server.poll() is not None:
@@ -158,8 +203,8 @@ def main() -> None:
     fd = os.open(CONFIG, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         json.dump(config, handle, indent=2)
-    # A sing-box left by a killed run would hold the ports.
-    subprocess.run(["pkill", "-x", "sing-box"], check=False)
+    # A sing-box left by a killed run would hold the ports. pkill -x does not find it on this phone.
+    subprocess.run(["pkill", "-f", "sing-box run"], check=False)
     log(f"tunnel starting on UDP {QUIC_PORT}, SOCKS5 on {SOCKS_PORT}")
     while not _changed(script, loaded):
         _run(binary, script, loaded)
