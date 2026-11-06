@@ -38,7 +38,7 @@ numeric confidence values in `[0, 1]`, and the provider's `modelVersion` and
 `inputTokens` when supplied. An incomplete or malformed prediction set is an
 upstream error, never a successful classification.
 
-The route resolves the same active deployment credential as chat on every
+The route resolves the stored provider credential on every
 request. It sends one POST to
 `https://ai.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification`.
 It never automatically retries a failed POST. A transport failure has an unknown

@@ -45,7 +45,7 @@ curl -X POST http://localhost:8080/api/chat \
 | тот же запрос, ход прервался после сохранения вопроса (перезапуск сервера или сбой при сохранении итога) | `409 turn_lost` (`status: "lost"`, `request_id`, `conversation_id`, `user_message_id`, `invocation_id`) |
 | тот же запрос, процесс сервера перезапустился до сохранения вопроса | GET: `409 turn_lost` с `user_message_id: null` (вопрос не сохранён, отправьте его снова); POST: ход запускается заново |
 | тот же запрос, сбой при сохранении итога в этом процессе, вопрос не сохранён | POST и GET: `409 turn_lost` с `user_message_id: null`; следующий POST запускает ход |
-| другой текст, модель, число фото или `retry_message_id` | `409 turn_request_conflict` |
+| другой текст, число фото или `retry_message_id` | `409 turn_request_conflict` |
 | хранилище не смогло проверить запрос или записать квитанцию, вопрос не сохранён | `503 turn_store_unavailable` (`request_id`, `detail`); ход не запущен, запрос можно отправить снова |
 | диалог не найден или недоступен | `404 conversation_not_found` |
 | нет `conversation_id` | `400` с `error: "conversation_id is required"` |
@@ -114,7 +114,7 @@ curl -X POST http://localhost:8080/api/chat \
 ### 2. Embeddings API (Векторные представления)
 
 **Эндпоинт:** `POST /api/embeddings`
-**Описание:** Векторные представления текста через Yandex `textEmbedding`. Авторизация не требуется; запросы тратят серверный `YANDEX_API_KEY`.
+**Описание:** Векторные представления текста через Yandex `textEmbedding`. Авторизация не требуется.
 **Параметры:**
 
 - `text` (string): один текст. Ответ содержит `embedding`.
@@ -132,12 +132,12 @@ curl -X POST http://localhost:8080/api/embeddings \
   -d '{"texts":["Привет мир"],"mode":"doc"}'
 ```
 
-Коды ответа: 400 — неверный запрос, 503 — не заданы `YANDEX_API_KEY` или `YANDEX_PROJECT_ID`, 502 — сбой Yandex, 504 — превышен общий лимит времени. В ответах 502 и 504 есть `completed` (сколько текстов уже обработано) и `tokens_spent`.
+Коды ответа: 400 — неверный запрос, 503 — `embeddings_not_configured`, 502 — сбой Yandex, 504 — превышен общий лимит времени. В ответах 502 и 504 есть `completed` (сколько текстов уже обработано) и `tokens_spent`.
 
 ### Completion API (отдельно от Responses)
 
 **Эндпоинт:** `POST /api/completion`
-**Описание:** Генерация через Yandex completion API для моделей с транспортом `text_generation_async` (сейчас только `yandexgpt-5.1`). Авторизация не требуется; запросы тратят серверный `YANDEX_API_KEY`.
+**Описание:** Генерация через Yandex completion API для моделей с транспортом `text_generation_async` (сейчас только `yandexgpt-5.1`). Авторизация не требуется.
 **Параметры:**
 
 - `message` (string) или `messages` (до 32 элементов с `role` = `system`, `user` или `assistant` и `text`). Нельзя передавать оба.

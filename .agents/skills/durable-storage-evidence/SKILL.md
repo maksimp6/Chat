@@ -16,7 +16,7 @@ Accepted storage contract, exact engine head, authoritative consumer inventory, 
 Existing typed storage APIs, fault-injection tests, fresh-process reopen and isolated backup/restore tests.
 
 ## Procedure
-1. Identify the authority for each consumer and distinguish FileMemoryDB and proposed engines.
+1. Identify the authority for each consumer and distinguish Kristall and proposed engines.
 2. Prove one typed table: acknowledgement follows the required durable barrier; fresh-process reopen returns the committed state.
 3. Test torn writes, corruption, ENOSPC and concurrency; failed mutations must not appear committed.
 4. Check bounded replay and checkpoint/compaction preservation of the last valid state.

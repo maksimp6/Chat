@@ -88,23 +88,6 @@ does not assert account entitlement or successful live generation.
 
 ## Verification and limits
 
-Run the focused offline suites:
-
-```sh
-python -m pytest -q tests/test_optima_profiles.py tests/test_optima_chat_contract.py tests/test_optima_upstream.py tests/test_yandex_request_builder.py tests/test_yandex_metadata_validator.py
-node --test tests/test_optima_ui.js tests/test_ui_settings_params.js tests/test_model_ultra_ui.js tests/test_ui_model_picker.js
-```
-
-The isolated HTTP tests compile the actual handler/helpers from the route source
-and use the webframe test client with recording substitutes for persistence, provider and tool
-execution. The tool-loop test executes the actual continuation closure. A negative
-control removes `model_profile` from the allowlist and demonstrates that the
-Optima contract detects the resulting Ultra/high payload.
-
-UI tests exercise the real settings/picker modules in BrowserShim, including
-selection, server-settings reload, conversation isolation, manual-settings
-restoration, unsupported models and save errors. This is not a full application,
-Android browser or provider E2E run. No paid generation is required by these tests.
 
 The legacy `/api/mcp/execute-approved` follow-up creates its own synthesis settings;
 it is outside the ordinary `/api/chat` continuation contract above.

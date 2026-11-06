@@ -4,6 +4,8 @@ A minimal shell for running agent tasks in your own container instead of a GitHu
 Actions job. This is the smallest slice: a task store, a runner and a CLI. It does not
 yet start a model; handlers are plain Python functions registered by task kind.
 
+Status: the only built-in kind, `logos_task`, stops at the D0 hold (`docs/agents/logos-native-quality.md`), so every task ends `agent_failed`.
+
 ## Pieces
 
 - `agent_shell/store.py`: native Kristall store of tasks and their events (SQLite is
@@ -20,7 +22,7 @@ yet start a model; handlers are plain Python functions registered by task kind.
   Logos only has its sandboxed filesystem tools and never commits, pushes or runs commands.
   If it stops at an approval-gated tool the task fails with `needs_approval` (never
   auto-approved) and an agent failure ends as `agent_failed`; the result is kept either
-  way. It needs its Yandex credentials (`YANDEX_API_KEY`, `YANDEX_PROJECT_ID`).
+  way.
 - Approval gate: a task added with `--needs-approval` is `blocked` and is never picked
   until the owner runs `approve`. Use it for anything that deploys or touches secrets.
 

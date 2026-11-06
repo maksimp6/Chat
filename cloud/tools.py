@@ -477,7 +477,7 @@ CLOUD_TOOLS = {
                 "command": {"type": "string", "minLength": 1, "maxLength": 20000},
                 "timeout_seconds": {
                     "anyOf": [
-                        {"type": "number", "minimum": 1, "maximum": 300},
+                        {"type": "number", "minimum": 0, "maximum": 3600},
                         {"type": "null"},
                     ]
                 },

@@ -7,4 +7,4 @@
 
 **Allowed dependency:** `agent_memory → memory_engine` (through the public API). **Forbidden dependency:** `memory_engine → agent_memory` or Logos-specific modules. The engine must remain independently testable.
 
-The existing `Kristall` and new `MemoryStore` have different APIs, journal formats and commit semantics. They are not yet interchangeable and must not open the same file. The running Logos application stays on `Kristall` until a separate, tested adapter and data migration are accepted. This document does not switch runtime, migrate data or authorize merge.
+`Kristall` is the application journal, with checkpoints, `items` and `delete`. `MemoryStore` is the private-file engine `project_board` uses. They write the same frame format but have different APIs and must not open the same file. The running Logos application stays on `Kristall` until a separate, tested adapter and data migration are accepted. This document does not switch runtime, migrate data or authorize merge.

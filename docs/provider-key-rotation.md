@@ -45,8 +45,8 @@ The current modal in `static/provider_credentials.js` contains:
 - **Cloud.ru API key**
 
 It sends `PUT /api/provider-credentials`. The backend validates supplied keys
-with the provider before saving them. This manual path stores a key with no expiry
-of its own and no provider resource ID; saving a key does not establish managed
+with the provider before saving them. This manual path stores a key with an expiry 100 years ahead
+(the status window shows that date) and no provider resource ID; saving a key does not establish managed
 rotation support.
 
 A separate `POST /api/provider-credentials/cloudru/bootstrap` route accepts IAM

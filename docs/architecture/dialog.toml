@@ -6,7 +6,7 @@
 # docs/architecture/modules.md (`--write-docs`). Edit it when a dialog path changes.
 
 intro = """
-Logos is a dialog assistant. A person opens the page, picks a model and talks;
+Logos is a dialog assistant. A person opens the page and talks;
 the model answers through Ollama and may call tools (local tools, MCP
 servers, web and file search) during the turn. Every turn is an invocation with an
 execution trace and a cost, and everything is stored in the native Kristall journal.
@@ -19,7 +19,7 @@ turn = [
     "conversations",
     "invocation",
     "agent_skills",
-    "yandex_client_modules",
+    "ollama_client",
     "tool_providers",
     "mcp_server",
     "observability",
@@ -102,7 +102,7 @@ units = [
     "sessions",
     "observability",
     "agent_skills",
-    "yandex_client_modules",
+    "ollama_client",
     "provider_accounts",
     "secret_store",
     "storage",
@@ -114,8 +114,8 @@ kristall = "chat/message/<n>, chat/yandex/<id>, runtime_session:<sid>, runtime_i
 name = "Tools during the turn"
 ui = "results appear in the reply; MCP servers in static/settings/settings_modal.js"
 routes = ["POST /api/chat", "GET /api/mcp-servers"]
-backend = ["yandex_client_modules.mcp_mixin:YandexMcpMixin.ask_with_mcp", "chat.mcp_routes:handle_mcp_servers"]
-units = ["yandex_client_modules", "tool_providers", "mcp_server", "agent_memory", "workspace", "storage", "kristall"]
+backend = ["ollama_client.client:OllamaClient.ask_with_mcp", "chat.mcp_routes:handle_mcp_servers"]
+units = ["ollama_client", "tool_providers", "mcp_server", "agent_memory", "workspace", "storage", "kristall"]
 kristall = "mcp/server/*, global_fact:*"
 
 [[operation]]

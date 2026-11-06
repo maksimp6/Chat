@@ -64,41 +64,33 @@ ENOSPC/read-only/fsync failures are explicit write failures. They must not publi
 
 ### Unknown write outcomes and writer recovery
 
-`Kristall` fences its writer before starting file I/O. The fence clears only
-when the mutation's file barriers and in-memory publication complete. An open,
-partial/zero write, fsync, close, parent-directory barrier, or interruption failure
-leaves that instance faulted. Compaction uses the same fence, including uncertain
-replace outcomes. Validation/serialization failures before file I/O do not fault
-a healthy writer.
+`Kristall` fences its writer when a journal write fails or its outcome is unknown:
+an open, partial or zero write, fsync, close, parent-directory barrier or
+interruption failure sets the fence. Checkpoints use the same fence, including
+uncertain replace outcomes. Validation and serialization failures before file I/O
+do not fault a healthy writer.
 
 The triggering call reports its original error and does not acknowledge the
-mutation. All later `put`, `delete`, and `compact` calls on that instance raise
-`FileMemoryRecoveryRequired` before changing either database file. This also
-applies to callers already waiting for the write lock. Read methods retain the
-last acknowledged in-memory view; they do not assert that an unacknowledged
-record is absent from the journal. Do not use a faulted instance for backup or
-consumer cutover.
+mutation. Later transactions on that instance raise `KristallError` with
+`recovery required` before changing any file, and reads through `last_commit` raise
+the same error. Do not use a faulted instance for backup or consumer cutover.
 
-There is no automatic retry, in-place reset, or compaction-based repair. To resume:
+There is no automatic retry, truncation or checkpoint-based repair. To resume:
 
-1. Stop/drain every caller of the faulted instance and preserve single-writer
+1. Stop or drain every caller of the faulted instance and preserve single-writer
    ownership of the database path. Do not open a competing live writer.
-2. Resolve the underlying storage/capacity/permission fault. Preserve the journal;
-   do not manually append, edit, or restore an older file to hide the failure.
-3. Construct a new `Kristall` for the same path. Recovery verifies records,
-   truncates only an incomplete final record, and fsyncs the validated file and
-   its parent directory before returning. Any recovery/barrier error prevents
-   admission. A complete invalid record remains fatal and is not silently lost.
+2. Resolve the underlying storage, capacity or permission fault. Preserve the
+   journal; do not manually append, edit, or restore an older file to hide the
+   failure.
+3. Call `Kristall.recover()`, or restart the process: the journal is verified and
+   replayed, and the file and directory barriers run again before writes resume.
+   A journal with an incomplete final frame raises `incomplete journal tail;
+   recovery required` and stays blocked: nothing truncates it. A complete invalid
+   record stays fatal and is not silently lost.
 4. Reconcile the failed operation's logical identity against recovered state
    before retrying it. A complete checksummed record without an ACK may survive;
    it consumes its recovered sequence and must not be overwritten by sequence
    reuse. This engine does not implement business-operation idempotency.
-5. Admit callers to the new instance only after recovery succeeds. The old
-   instance stays faulted even after another instance has recovered the path.
-
-This is a single-instance/process ownership contract, not an interprocess lock
-or a proof against power loss or cloud-volume failure. No recovery policy grants
-permission for a production restart, data migration, or backup rollback.
 
 ## Compaction
 

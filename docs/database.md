@@ -116,14 +116,3 @@ There is no schema to migrate. A new installation starts with an empty journal.
 
 ## Operator check
 
-The deployment config names the store as `memory_engine.MemoryStore`. The preflight
-validates that exact string as a schema label. No module with that name exists. The
-implementation is `kristall.Kristall`.
-
-```bash
-LOGOS_MEMORY_PATH=/absolute/persistent/path/logos.memory \
-  python scripts/cloudru_deploy_preflight.py --config deployment.json --check-db
-```
-
-`--check-db` verifies an existing journal under its writer lock. It never repairs,
-replaces or deletes source data. A passing result does not mark a deployment ready.

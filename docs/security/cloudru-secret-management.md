@@ -151,8 +151,8 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
    окружения.
 3. Административная пара (`CLOUDRU_IAM_KEY_ID`/`CLOUDRU_IAM_KEY_SECRET`)
    остаётся вне рантайма приложения — она нужна только тем, кто создаёт
-   секреты/версии и настраивает права (сегодня это уже так для
-   `scripts/cloudru_deploy.py` и ротации provider-ключей).
+   секреты/версии и настраивает права (сегодня это уже так для ротации
+   provider-ключей).
 4. Реальные значения (`LOGOS_SHORT_TOKEN`, OAuth-секреты, provider-ключи,
    `LOGOS_DATABASE_URL` — retired, не переносится) перестают быть переменными окружения контейнера и
    становятся версиями в Secret Management; Container Apps перестаёт быть

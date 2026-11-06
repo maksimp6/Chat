@@ -28,7 +28,7 @@ response
 ## Канонические компоненты
 
 - `invocation/` — идентичность и жизненный цикл одного запуска;
-- `yandex_client_modules/client.py` и `yandex_client_modules/` — текущий primary provider adapter;
+- `ollama_client/` — provider adapter чата и эмбеддингов; `yandex_client_modules/` — клиент Yandex, неактивен;
 - `responses_tool_loop.py` — protocol helper для Responses API;
 - `universal_tool_platform.py` — единый контракт и pipeline выполнения инструментов;
 - `tool_providers/registry.py` — единый каталог инструментов;

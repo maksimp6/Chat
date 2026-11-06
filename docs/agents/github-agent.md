@@ -3,7 +3,7 @@
 The workflow `logos.yml` was removed by #1592, and the runner stops at the D0 hold (`docs/agents/logos-native-quality.md`), so nothing here runs today. This page describes the workflow it was built for.
 
 Logos can take a GitHub issue and work on its own code. The headless runner is
-`issue_runner.py`.
+`agent_runtime/issue_runner.py`.
 
 ## How it works
 
@@ -94,7 +94,7 @@ an unavailable response remains unknown and must not be replaced with a new
 generation presented as the old answer. The exported text excludes reasoning.
 
 Optional repository variable `LOGOS_AGENT_MODEL` selects the model key from
-`config.py` (default `logos-runtime`).
+`core/config.py` (default `logos-runtime`).
 
 Protect `develop` with a required pull request and green CI, so draft PRs from Logos
 can never land without review.
