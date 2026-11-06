@@ -20,8 +20,6 @@ class Host:
     AUDIO_TTS_PRICE_PER_SEC: Any  # core.config.AUDIO_TTS_PRICE_PER_SEC
     CloudProviderError: Any  # cloud.base.CloudProviderError
     KristallError: Any  # kristall.KristallError
-    canonical_model_key: Any  # core.config.canonical_model_key
-    get_current_trace: Any  # observability.trace_manager.get_current_trace
     get_store: Any  # storage.records.get_store
 
 
@@ -36,20 +34,10 @@ __all__ = [
     "HostNotBound",
     "bind",
     "bound",
-    "canonical_model_key",
     "current",
-    "get_current_trace",
     "get_store",
     "provide",
 ]
-
-
-def canonical_model_key(*args: Any, **kwargs: Any) -> Any:
-    return current().canonical_model_key(*args, **kwargs)
-
-
-def get_current_trace(*args: Any, **kwargs: Any) -> Any:
-    return current().get_current_trace(*args, **kwargs)
 
 
 def get_store(*args: Any, **kwargs: Any) -> Any:

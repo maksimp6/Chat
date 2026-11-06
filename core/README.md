@@ -33,10 +33,9 @@ Other units reach it only through their own ports:
 | `core.config.IMAGE_MODELS` | `chat`, `provider_accounts`, `yandex_client_modules` |
 | `core.config.TEXT_MODELS` | `chat`, `provider_accounts` |
 | `core.config.VOICE_MODELS` | `chat`, `provider_accounts` |
-| `core.config.canonical_model_key` | `economy`, `provider_accounts` |
 | `core.config.config` | `provider_accounts` |
 | `core.config.get_donation_url` | `web_shell` |
-| `core.config.get_model_uri` | `chat`, `provider_accounts`, `yandex_client_modules` |
+| `core.config.get_model_uri` | `chat`, `yandex_client_modules` |
 | `core.config.registry_key_for_upstream` | `provider_accounts` |
 | `core.config.upstream_model_id` | `yandex_client_modules` |
 | `core.model_profiles.annotate_catalog` | `provider_accounts` |

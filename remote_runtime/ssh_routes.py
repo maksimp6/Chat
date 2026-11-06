@@ -6,7 +6,6 @@ import logging
 
 from webframe import Application, jsonify
 
-from remote_runtime.host import bound
 from remote_runtime.ssh_settings import public_settings
 
 logger = logging.getLogger("logos.remote_runtime.ssh_routes")
@@ -23,8 +22,6 @@ _DETAILS = {
 def get_ssh_runtime_settings():
     try:
         return jsonify(public_settings())
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except Exception as exc:
         logger.exception("Failed to load SSH Runtime settings")
         return jsonify(

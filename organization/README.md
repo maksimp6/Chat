@@ -20,7 +20,6 @@ Everything `organization` uses from other units is a field of `Host` in [`organi
 
 | Port | Provided by |
 | --- | --- |
-| `TreasuryIdentityError` | `economy.treasury_identity.TreasuryIdentityError` |
 | `create_session` | `sessions.manager.create_session` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_session` | `sessions.manager.get_session` |

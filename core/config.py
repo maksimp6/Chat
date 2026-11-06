@@ -1,7 +1,6 @@
 """Logos - Configuration & Pricing"""
 
 import logging
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -13,7 +12,6 @@ logger = logging.getLogger("logos.core.config")
 # core/.env is loaded by the composition roots (core.env.load_env_file, called by
 # composition.process.start and composition.wiring.register_all) before any unit
 # imports this module, so the values below already include it.
-_ENV_FILE = Path(__file__).resolve().with_name(".env")
 
 # Never put credentials in source code. Provider credentials are resolved at runtime
 # from provider_credentials. No provider API key belongs in application configuration.
@@ -23,8 +21,6 @@ CLOUDRU_BASE_URL = env_get(
     "CLOUDRU_BASE_URL",
     "https://foundation-models.api.cloud.ru/v1",
 )
-YANDEX_PROVIDER_KEY_ID = env_get("YANDEX_PROVIDER_KEY_ID")
-CLOUDRU_API_KEY_ID = env_get("CLOUDRU_API_KEY_ID")
 
 
 def get_donation_url():
@@ -59,9 +55,6 @@ def get_donation_url():
         return None
     return raw
 
-
-HOST = "127.0.0.1"
-PORT = 8080
 
 TEXT_MODELS: dict[str, dict[str, Any]] = {
     "yandexgpt-5.1": {
@@ -256,19 +249,6 @@ AUDIO_TTS_PRICE_PER_SEC = 0.0203
 class Config:
     BASE_URL = BASE_URL
     CLOUDRU_BASE_URL = CLOUDRU_BASE_URL
-    YANDEX_PROVIDER_KEY_ID = YANDEX_PROVIDER_KEY_ID
-    CLOUDRU_API_KEY_ID = CLOUDRU_API_KEY_ID
-    HOST = HOST
-    PORT = PORT
-
-
-# Keys renamed in #1316. Stored conversations and older clients may still send the old id:
-# requests go to the successor.
-LEGACY_MODEL_KEYS = {}
-
-
-def canonical_model_key(model_key: str) -> str:
-    return LEGACY_MODEL_KEYS.get(model_key, model_key)
 
 
 def registry_key_for_upstream(upstream_id: str) -> str | None:
@@ -282,21 +262,10 @@ def registry_key_for_upstream(upstream_id: str) -> str | None:
     return None
 
 
-def get_model_info(model_key):
-    info = ALL_MODELS.get(canonical_model_key(model_key))
-    if info is None:
-        # Discovered tuned/versioned models have no public tariff. Preserve unknown
-        # cost instead of inventing another model's rate or failing after execution.
-        if not isinstance(model_key, str) or not model_key.strip():
-            raise ValueError("model key is required")
-        return {"name": model_key, "type": "text", "pricing_status": "unknown"}
-    return info
-
-
 # The registry key is ours; the upstream id is the name Yandex knows the model by.
 # Keys that are not in the registry (including legacy stored keys) pass through unchanged.
 def upstream_model_id(model_key: str) -> str:
-    info = ALL_MODELS.get(canonical_model_key(model_key)) or {}
+    info = ALL_MODELS.get(model_key) or {}
     return str(info.get("upstream", model_key))
 
 
@@ -332,37 +301,4 @@ def get_model_uri(project_id, model_key):
     return "gpt://" + project_id + "/" + suffix
 
 
-def calculate_cost(
-    model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0
-):
-    m = get_model_info(model_key)
-    if m.get("pricing_status") == "unknown":
-        return None
-    cost = (
-        input_tokens * m["input"]
-        + cached_tokens * m.get("cached", m["input"])
-        + tool_tokens * m.get("tool", m["input"])
-        + output_tokens * m.get("output", m["input"])
-    ) / 1000
-    return round(cost, 2)
-
-
-def calculate_full_cost(model_key, usage):
-    m = get_model_info(model_key)
-    if m.get("pricing_status") == "unknown":
-        return None
-    if not usage:
-        return 0.0
-    token_cost = (
-        usage.get("input_tokens", 0) * m["input"]
-        + usage.get("output_tokens", 0) * m.get("output", m["input"])
-    ) / 1000
-    audio_cost = (
-        usage.get("audio_seconds_stt", 0) * AUDIO_STT_PRICE_PER_SEC
-        + usage.get("audio_seconds_tts", 0) * AUDIO_TTS_PRICE_PER_SEC
-    )
-    return round(token_cost + audio_cost, 4)
-
-
 config = Config()
-REPO_DIR = "/sdcard/repo"

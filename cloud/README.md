@@ -22,7 +22,7 @@ Other units reach it only through their own ports:
 | `cloud.cloudru.api_key_provider.CloudRuApiKeyProvider` | `provider_accounts` |
 | `cloud.cloudru.iam.CloudRuIamClient` | `provider_accounts` |
 | `cloud.cloudru.object_storage.CloudRuObjectStorage` | `storage` |
-| `cloud.cloudru.secret_management.CloudRuSecretManagementClient` | `provider_accounts`, `secret_store` |
+| `cloud.cloudru.secret_management.CloudRuSecretManagementClient` | `secret_store` |
 
 ## Ports
 
@@ -30,7 +30,6 @@ Everything `cloud` uses from other units is a field of `Host` in [`cloud/host.py
 
 | Port | Provided by |
 | --- | --- |
-| `BudgetLimitExceeded` | `economy.budget_controller.BudgetLimitExceeded` |
 | `CloudBudgetGuard` | `economy.budget_controller.CloudBudgetGuard` |
 | `StorageCredentialsMissing` | `storage.contracts.StorageCredentialsMissing` |
 | `StorageError` | `storage.contracts.StorageError` |

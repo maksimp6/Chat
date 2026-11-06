@@ -2013,34 +2013,7 @@ def _chat_error_response(
             error_type=type(error).__name__,
         )
         record_yandex_mcp_activity(trace)
-        if isinstance(error, bound.ProviderQuotaExceeded):
-            trace.add_event(
-                "provider_quota_http_response",
-                {
-                    "status_code": 429,
-                    "reason": error.reason,
-                    "user_id": error.user_id,
-                },
-            )
         trace_data = trace.finalize()
-    if isinstance(error, bound.ProviderQuotaExceeded):
-        if invocation is not None:
-            persist_invocation_trace(invocation.invocation_id, trace_data)
-            fail_invocation(invocation.invocation_id, error=error.to_dict()["error"])
-        return jsonify(
-            {
-                **error.to_dict(),
-                "reply": "⚠️ Лимит запросов исчерпан. Повторите после указанного времени сброса.",
-                "user_message_id": user_message_id,
-                "invocation_id": invocation.invocation_id if invocation else None,
-                "session_id": invocation.session_id if invocation else None,
-                "conversation_id": invocation.conversation_id
-                if invocation
-                else conv_id,
-                "trace_id": invocation.trace_id if invocation else trace.trace_id,
-                "trace": trace_data,
-            }
-        ), 429
     responses = trace_data.get("responses", [])
     partial_reasoning, partial_output = _turn_output_from_trace(responses)
     reply = format_partial_output_message(partial_output, error_message)

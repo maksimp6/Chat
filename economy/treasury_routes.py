@@ -8,7 +8,7 @@ from webframe import Application, jsonify, request
 
 from economy.host import get_store
 from economy.treasury import demo_top_up, get_account
-from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
+from economy.treasury_identity import get_current_owner_id
 
 
 def treasury_account():
@@ -32,8 +32,6 @@ def treasury_top_up():
             owner_id, data.get("amount"), data.get("description", "Demo top-up")
         )
         return jsonify({"demo": True, "account": account}), 201
-    except TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except (TypeError, ValueError) as exc:
         return jsonify({"error": str(exc)}), 400
 

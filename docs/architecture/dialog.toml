@@ -108,7 +108,7 @@ units = [
     "storage",
     "kristall",
 ]
-kristall = "chat/message/<n>, chat/yandex/<id>, runtime_session:<sid>, runtime_invocation:<iid>, quota/*"
+kristall = "chat/message/<n>, chat/yandex/<id>, runtime_session:<sid>, runtime_invocation:<iid>"
 
 [[operation]]
 name = "Tools during the turn"

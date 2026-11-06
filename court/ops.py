@@ -29,17 +29,11 @@ def _is_int(value: Any) -> bool:
 
 
 def _viewer() -> str | None:
-    try:
-        return get_current_owner_id(required=False)
-    except bound.TreasuryIdentityError:
-        return None
+    return get_current_owner_id(required=False)
 
 
 def _owner() -> str | None:
-    try:
-        return get_current_owner_id()
-    except bound.TreasuryIdentityError:
-        return None
+    return get_current_owner_id()
 
 
 def _int_list(value: Any, name: str) -> list[int]:

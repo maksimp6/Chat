@@ -5,7 +5,7 @@ issue #477): https://cloud.ru/docs/scsm/ug/doc-contents ,
 https://cloud.ru/docs/scsm/ug/topics/overview__limitations . Versions are
 immutable once written and several versions may be active at once, so "switch"
 and "rollback" are purely local operations: which version this app currently
-trusts for a given purpose (see ``provider_credentials.SecretManagementRef``).
+trusts for a given purpose.
 The rendered API reference is not machine-readable and this repository has no
 mirrored copy yet (``docs/integrations/cloudru-docs-mirror.md`` is still
 "planned"), so the request paths and status-code mapping below are the

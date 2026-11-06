@@ -136,9 +136,7 @@ printing3d = { packages = ["printing3d", "forge"], forbid = [["printing3d", "for
 [[tool.logos.vendored]]
 canonical = "core/restrictions.py"
 copies = [
-    "economy/_vendor/restrictions.py",
     "tool_providers/_vendor/restrictions.py",
-    "provider_accounts/_vendor/restrictions.py",
     "remote_runtime/_vendor/restrictions.py",
 ]
 

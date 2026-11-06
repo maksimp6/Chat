@@ -7,20 +7,17 @@ non-secret provider metadata/fingerprints.
 
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from provider_accounts.host import bound, fingerprint_key, get_current_trace
+from provider_accounts.host import fingerprint_key
 
 KEY_TTL = timedelta(hours=12)
 ROTATE_BEFORE = timedelta(hours=1)
 ACTIVE = "active"
 ROTATING = "rotating"
-REVOKED = "revoked"
-DISABLED = "disabled"
 
 YANDEX = "yandex"
 CLOUDRU = "cloudru"
@@ -110,15 +107,6 @@ def get_active_credential(
         expires_at=expires,
         fingerprint=fingerprint_key(secret),
     )
-
-
-def get_active_key(
-    db: Any,
-    decrypt: Callable[[str], str],
-    now: datetime | None = None,
-    provider: str = YANDEX,
-) -> str:
-    return get_active_credential(db, decrypt, now, provider=provider).api_key
 
 
 def bootstrap_credential(
@@ -346,8 +334,6 @@ def record_health_check(
     status: str,
     error: str | None = None,
     checked_at: datetime | None = None,
-    # Kept for existing callers and ignored: every call is its own committed native transaction.
-    commit: bool = True,
 ) -> None:
     if provider not in SUPPORTED_PROVIDERS:
         raise ValueError("Unsupported provider")
@@ -369,127 +355,6 @@ def record_health_check(
                     "last_check_error": error,
                 },
             )
-
-
-@dataclass(frozen=True)
-class SecretManagementRef:
-    """A local pointer to one immutable Cloud.ru Secret Management version.
-
-    Cloud.ru versions cannot be edited in place, so "rotate" and "rollback"
-    are purely local: which version_id this app currently trusts for a given
-    purpose (e.g. ``logos_short_token``, ``github_oauth_client_secret``,
-    ``provider_credential:yandex``). ``logos_database_url`` is retired; see
-    ``docs/production-deployment.md``. The value itself is never stored here;
-    it is resolved on demand through ``resolve_secret_management_value``.
-    """
-
-    purpose: str
-    secret_id: str
-    pinned_version_id: str
-    previous_version_id: str | None
-    updated_at: datetime
-
-
-def set_secret_management_ref(
-    db: Any,
-    purpose: str,
-    secret_id: str,
-    version_id: str,
-    *,
-    now: datetime | None = None,
-) -> SecretManagementRef:
-    purpose, secret_id, version_id = (
-        purpose.strip(),
-        secret_id.strip(),
-        version_id.strip(),
-    )
-    if not purpose or not secret_id or not version_id:
-        raise ValueError("purpose, secret_id and version_id are required")
-    key = "secret/ref/" + purpose
-    with db.transaction() as tx:
-        old = tx.get(key)
-        previous = None
-        if old and old["secret_id"] == secret_id:
-            previous = (
-                old["pinned_version_id"]
-                if old["pinned_version_id"] != version_id
-                else old["previous_version_id"]
-            )
-        row = {
-            "purpose": purpose,
-            "secret_id": secret_id,
-            "pinned_version_id": version_id,
-            "previous_version_id": previous,
-            "updated_at": _as_utc(now or utcnow()).isoformat(),
-        }
-        tx.set(key, row)
-    return _ref_from_record(row)
-
-
-def get_secret_management_ref(db: Any, purpose: str) -> SecretManagementRef | None:
-    row = db.get("secret/ref/" + purpose)
-    return _ref_from_record(row) if row else None
-
-
-def rollback_secret_management_ref(
-    db: Any,
-    purpose: str,
-    *,
-    now: datetime | None = None,
-) -> SecretManagementRef:
-    key = "secret/ref/" + purpose
-    with db.transaction() as tx:
-        row = tx.get(key)
-        if row is None:
-            raise NoActiveCredentialError("No secret management ref configured")
-        if not row["previous_version_id"]:
-            raise CredentialError("No previous secret version")
-        row.update(
-            pinned_version_id=row["previous_version_id"],
-            previous_version_id=row["pinned_version_id"],
-            updated_at=_as_utc(now or utcnow()).isoformat(),
-        )
-        tx.set(key, row)
-    return _ref_from_record(row)
-
-
-_SECRET_MANAGEMENT_CLIENT: Any = None
-_SECRET_MANAGEMENT_CLIENT_LOCK = threading.Lock()
-
-
-def _get_secret_management_client():
-    global _SECRET_MANAGEMENT_CLIENT
-    if _SECRET_MANAGEMENT_CLIENT is None:
-        with _SECRET_MANAGEMENT_CLIENT_LOCK:
-            if _SECRET_MANAGEMENT_CLIENT is None:
-                _SECRET_MANAGEMENT_CLIENT = bound.CloudRuSecretManagementClient()
-    return _SECRET_MANAGEMENT_CLIENT
-
-
-def resolve_secret_management_value(
-    db: Any,
-    purpose: str,
-    client: Any = None,
-) -> str:
-    """Resolve one purpose's pinned Cloud.ru secret to plaintext.
-
-    Backend-only: the caller must not log, trace, cache beyond the client's
-    own bounded cache, or return this value through any client-visible path.
-    There is no fallback path; if Secret Management cannot be reached this
-    raises instead of reading or writing an unencrypted copy anywhere.
-    """
-    ref = get_secret_management_ref(db, purpose)
-    if ref is None:
-        raise NoActiveCredentialError(
-            f"No secret management ref configured for '{purpose}'"
-        )
-    if client is None:
-        client = _get_secret_management_client()
-    secret_value = client.get_secret_value(ref.secret_id, ref.pinned_version_id)
-    trace = get_current_trace()
-    if trace is not None:
-        trace.register_sensitive_value(secret_value)
-    return secret_value
 
 
 def _publish_credential(
@@ -575,15 +440,3 @@ def save_cloudru_iam_credentials(
                 "expires_at": _as_utc(expires_at).isoformat() if expires_at else None,
             },
         )
-
-
-def _ref_from_record(row: dict[str, Any]) -> SecretManagementRef:
-    return SecretManagementRef(
-        purpose=str(row["purpose"]),
-        secret_id=str(row["secret_id"]),
-        pinned_version_id=str(row["pinned_version_id"]),
-        previous_version_id=str(row["previous_version_id"])
-        if row["previous_version_id"]
-        else None,
-        updated_at=_as_utc(row["updated_at"]),
-    )

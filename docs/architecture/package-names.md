@@ -41,7 +41,7 @@ disk, which the code imports and the architecture map uses, does not change.
 | **Suvema** | `printer_service` | Read-only LAN discovery and telemetry for Bambu A1 mini printers. |
 | **Cavori** | `printing3d` | 3D-printing business domain: quotes, slicing, preflight, telemetry and workflow. |
 | **Yurena** | `project_board` | Private project board for discussions, incidents, tasks and evidence. |
-| **Nuvero** | `provider_accounts` | Stores and rotates provider credentials, enforces quotas, lists chat models. |
+| **Nuvero** | `provider_accounts` | Stores and rotates provider credentials, lists chat models. |
 | **Hadomi** | `rag_sync` | Adds new commits and GitHub activity to chat file search. |
 | **Sobeki** | `rdc_connection` | Redirects to an active Remote Desktop Commander pairing page. |
 | **Pasuno** | `recovery` | CadQuery script making an unverified two-piece TPU case model. |

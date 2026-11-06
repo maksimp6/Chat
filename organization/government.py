@@ -11,7 +11,7 @@ from uuid import uuid4
 from webframe import Blueprint, jsonify, request
 
 from organization._vendor.schema import object_schema
-from organization.host import bound, get_current_owner_id, get_store
+from organization.host import get_current_owner_id, get_store
 
 government_bp = Blueprint("government", __name__, url_prefix="/api/government")
 
@@ -51,10 +51,7 @@ init_government_tables = prepare_government_records
 
 
 def _current_owner() -> str | None:
-    try:
-        return get_current_owner_id(required=False)
-    except bound.TreasuryIdentityError:
-        return None
+    return get_current_owner_id(required=False)
 
 
 def _case_owned_by_current_user(case: dict[str, Any] | None) -> bool:

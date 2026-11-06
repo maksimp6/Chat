@@ -70,7 +70,6 @@ def rotate_yandex_key() -> int:
             old_id=int(row["id"]),
             project_id=str(row["project_id"]),
             old_provider_key_id=row["provider_key_id"] or row["yandex_key_id"],
-            commit_before_revoke=True,
             provider_name="yandex",
         )
         logger.info(
@@ -169,7 +168,6 @@ def rotate_cloudru_key() -> int:
             # A reissue keeps the key's project; an empty id would overwrite the saved one.
             project_id=str(row["project_id"] or ""),
             old_provider_key_id=row["provider_key_id"],
-            commit_before_revoke=True,
             provider_name=CLOUDRU,
             reissue_existing=True,
             ttl=cloudru_key_ttl(),

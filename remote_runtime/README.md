@@ -29,7 +29,7 @@ Other units reach it only through their own ports:
 Everything `remote_runtime` uses from other units is a field of `Host` in [`remote_runtime/host.py`](host.py), read only when a function runs. Functions keep their names as call shims; other ports are `bound.<name>`.
 
 <details>
-<summary>14 ports</summary>
+<summary>13 ports</summary>
 
 | Port | Provided by |
 | --- | --- |
@@ -37,7 +37,6 @@ Everything `remote_runtime` uses from other units is a field of `Host` in [`remo
 | `RuntimeDispatcher` | `runtime.RuntimeDispatcher` |
 | `RuntimeLoader` | `runtime.RuntimeLoader` |
 | `RuntimeNotFound` | `runtime.RuntimeNotFound` |
-| `TreasuryIdentityError` | `economy.treasury_identity.TreasuryIdentityError` |
 | `bind_runtime_request` | `runtime.request_context.bind_runtime_request` |
 | `close_memory_clients` | `agent_memory.client.close_memory_clients` |
 | `create_invocation_trace` | `invocation.trace.create_invocation_trace` |

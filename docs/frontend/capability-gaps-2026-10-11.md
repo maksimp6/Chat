@@ -45,7 +45,7 @@ consent, устройства, принтеры и deployment не вызыва�
 | Устройства/runtime | SSH settings/test modal; Android local-agent UI | `../../local_agent_gateway.py`: register/heartbeat/poll/result/health; [pairing.py](../../rdc_connection/pairing.py): `/rdc`. Health требует bootstrap authority; redirect может вернуть 401/503 |
 | Память | [memory_panel.js](../../static/memory_panel.js), server-rendered modal | [app.py](../../app.py): manage/config/clear. Facts, enable/limit/clear есть |
 | Backup/replay | Web controls не найдены | `../../agent_memory/backup.py`, `../../agent_memory/file_memory_db.py`, backup tests `../../tests/test_memory_backup.py`. Library capabilities, не operational HTTP restore API |
-| Бюджеты/ошибки | [treasury.js](../../static/treasury.js), execution summary, [system_status.js](../../static/system_status.js) | Treasury API, `../../provider_quota_routes.py`, [budget_controller.py](../../economy/budget_controller.py). Paper balance, provider quota и budget policy — разные сущности |
+| Бюджеты/ошибки | [treasury.js](../../static/treasury.js), execution summary, [system_status.js](../../static/system_status.js) | Treasury API, [budget_controller.py](../../economy/budget_controller.py) (месячный бюджет облака). Paper balance и budget policy — разные сущности |
 | 3D business | Chat tools; dashboard отсутствует | `../../printing3d/routes.py`: quote/orders/status/settle/summary/finance; `../../printing3d/tools.py`. Это business slice, не printer controller |
 | Model Editor / slicing / transfer | В master/develop нет viewport/scene editor/print-job UI | #1098/#1101/#1109 только drafts; `../printing3d.md`. Production transport/queue не доказаны |
 | Задачи/результаты | Chat Execution Surface есть; task workbench нет | [agent_shell CLI](../../agent_shell/__main__.py), [store.py](../../agent_shell/store.py), [task_state.py](../../agent_office/task_state.py). CLI и GitHub evidence lifecycle отдельны; общего web task API в проверенных routes нет |
@@ -116,21 +116,6 @@ deselect удаляет его; Trace содержит name/source/version бе�
 документационного PR не обходят allowlist. Tools controls дополнительно требуют
 targeted payload tests; исторический общий дефект tools_config не объявляется
 сегодняшним без такой проверки.
-
-### G05 / P1 — provider quota невидима до отказа
-
-**Тип:** преимущественно UI; self-read backend существует.
-`../../provider_quota_routes.py` имеет
-`GET /api/provider-quota/me`, но UI его не вызывает. Quota blocker в Execution
-Surface не заменяет usage/limit view.
-
-**Не хватает:** authenticated self-quota summary, периода/остатка из API,
-объяснения отказа и разрешённого next step.
-
-**Приёмка:** UI отражает API values, различает 401/unknown/denied; 429 сохраняет
-ввод и объясняет повторную попытку по доступным данным. Admin policy token не
-передаётся browser. Treasury balance и calculated cost не выдаются за spend
-allowance. Для BudgetController нужен отдельно согласованный user-safe API.
 
 ### G06 / P1 — нет общей безопасной панели устройств
 
@@ -257,7 +242,7 @@ READY_FOR_USER/PRINTING/COMPLETE различены. Owners #1096/#1108; ник�
 ## Предлагаемый порядок
 
 1. G02/G03: ошибки в существующих панелях.
-2. G04/G05: skills-to-request и read-only self-quota.
+2. G04: skills-to-request.
 3. G01: early correlation/ownership, затем recovery UI.
 4. G06/G07: safe connection/device API, затем onboarding/status UI.
 5. G08/G09: authority/lifecycle API, затем read-only evidence panels; writes позже.

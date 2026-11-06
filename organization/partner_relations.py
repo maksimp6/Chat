@@ -18,12 +18,7 @@ from uuid import uuid4
 from webframe import Blueprint, jsonify, request
 
 from organization._vendor.schema import object_schema
-from organization.host import (
-    bound,
-    get_current_owner_id,
-    get_store,
-    validate_json_schema,
-)
+from organization.host import get_current_owner_id, get_store, validate_json_schema
 
 partner_relations_bp = Blueprint(
     "partner_relations",
@@ -986,10 +981,7 @@ def _page_text(exc: ValueError) -> str:
 
 @partner_relations_bp.get("")
 def partners_list():
-    try:
-        return jsonify(list_partners({}))
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
+    return jsonify(list_partners({}))
 
 
 @partner_relations_bp.post("")
@@ -997,8 +989,6 @@ def partners_create():
     try:
         body = _http_arguments("partner.create", request.get_json(silent=True) or {})
         return jsonify({"partner": create_partner(body)}), 201
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -1008,8 +998,6 @@ def partners_get(partner_id: str):
     try:
         result = get_partner({"partner_id": partner_id})
         return jsonify(result)
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
         return jsonify({"error": _page_text(exc)}), status
@@ -1021,8 +1009,6 @@ def partners_update(partner_id: str):
         data = _http_arguments("partner.update", request.get_json(silent=True) or {})
         data["partner_id"] = partner_id
         return jsonify(update_partner(data))
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
         return jsonify({"error": str(exc)}), status
@@ -1032,8 +1018,6 @@ def partners_update(partner_id: str):
 def partners_delete(partner_id: str):
     try:
         return jsonify(delete_partner({"partner_id": partner_id}))
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
         return jsonify({"error": str(exc)}), status
@@ -1043,8 +1027,6 @@ def partners_delete(partner_id: str):
 def partner_contacts_list(partner_id: str):
     try:
         return jsonify(list_contacts({"partner_id": partner_id}))
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
         return jsonify({"error": str(exc)}), status
@@ -1058,8 +1040,6 @@ def partner_contact_create(partner_id: str):
         )
         data["partner_id"] = partner_id
         return jsonify(add_contact(data)), 201
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
         return jsonify({"error": str(exc)}), status
@@ -1073,8 +1053,6 @@ def partner_contact_update(contact_id: str):
         )
         data["contact_id"] = contact_id
         return jsonify(update_contact(data))
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "contact not found" else 400
         return jsonify({"error": str(exc)}), status
@@ -1084,8 +1062,6 @@ def partner_contact_update(contact_id: str):
 def partner_contact_delete(contact_id: str):
     try:
         return jsonify(delete_contact({"contact_id": contact_id}))
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "contact not found" else 400
         return jsonify({"error": str(exc)}), status
@@ -1095,8 +1071,6 @@ def partner_contact_delete(contact_id: str):
 def partner_messages(partner_id: str):
     try:
         return jsonify(get_thread({"partner_id": partner_id}))
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
         return jsonify({"error": str(exc)}), status
@@ -1111,8 +1085,6 @@ def partner_message_record(partner_id: str):
         data["partner_id"] = partner_id
         result = prepare_message(data)
         return jsonify(result), 201
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
         return jsonify({"error": str(exc)}), status
@@ -1126,8 +1098,6 @@ def partner_followup_create(partner_id: str):
         )
         data["partner_id"] = partner_id
         return jsonify({"followup": create_followup(data)}), 201
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
         return jsonify({"error": str(exc)}), status
@@ -1141,8 +1111,6 @@ def partner_status_update(partner_id: str):
         )
         data["partner_id"] = partner_id
         return jsonify({"partner": update_status(data)})
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "partner not found" else 400
         return jsonify({"error": _page_text(exc)}), status
@@ -1156,8 +1124,6 @@ def partner_followup_complete(followup_id: str):
         )
         data["followup_id"] = followup_id
         return jsonify({"followup": complete_followup(data)})
-    except bound.TreasuryIdentityError as exc:
-        return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
         status = 404 if str(exc) == "followup not found" else 400
         return jsonify({"error": _page_text(exc)}), status

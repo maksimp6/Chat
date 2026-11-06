@@ -1,8 +1,8 @@
 # Nuvero
 
-`provider_accounts` · Stores and rotates provider credentials, enforces quotas, lists chat models.
+`provider_accounts` · Stores and rotates provider credentials, lists chat models.
 
-Model-provider accounts: deployment credentials and their API, provider-agnostic key rotation and the rotation workers' logic, import of runner-issued keys, per-user quotas and their API, and model discovery with the model catalog API.
+Model-provider accounts: deployment credentials and their API, provider-agnostic key rotation and the rotation workers' logic, import of runner-issued keys, the retired quota calls, and model discovery with the model catalog API.
 
 ## Role in a dialog
 
@@ -16,7 +16,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 
 ## Public API
 
-`from provider_accounts import …`: `credentials`, `credentials_routes`, `key_rotation_cli`, `model_discovery`, `model_routes`, `quota_routes`, `quotas`.
+`from provider_accounts import …`: `credentials`, `credentials_routes`, `key_rotation_cli`, `model_discovery`, `model_routes`, `quotas`.
 
 | Module | Purpose |
 | --- | --- |
@@ -25,8 +25,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | [`provider_accounts.key_rotation_cli`](key_rotation_cli.py) | Deployment-wide provider key rotation. |
 | [`provider_accounts.model_discovery`](model_discovery.py) | Provider-backed model discovery with a bounded in-process cache. |
 | [`provider_accounts.model_routes`](model_routes.py) | HTTP API of the model catalog. |
-| [`provider_accounts.quota_routes`](quota_routes.py) | HTTP API for inspecting and configuring per-user provider quotas. |
-| [`provider_accounts.quotas`](quotas.py) | Per-user provider usage quotas and rate limiting. |
+| [`provider_accounts.quotas`](quotas.py) | Provider request quotas, retired: nothing is counted and no request is refused. |
 
 Other units reach it only through their own ports:
 
@@ -50,6 +49,7 @@ Everything `provider_accounts` uses from other units is a field of `Host` in [`p
 
 | Port | Provided by |
 | --- | --- |
+| `CHAT_MODEL` | `core.config.CHAT_MODEL` |
 | `CLASSIFIER_MODELS` | `core.config.CLASSIFIER_MODELS` |
 | `CloudRuApiKeyProvider` | `cloud.cloudru.api_key_provider.CloudRuApiKeyProvider` |
 | `CloudRuIamClient` | `cloud.cloudru.iam.CloudRuIamClient` |
@@ -59,17 +59,16 @@ Everything `provider_accounts` uses from other units is a field of `Host` in [`p
 | `IMAGE_MODELS` | `core.config.IMAGE_MODELS` |
 | `TEXT_MODELS` | `core.config.TEXT_MODELS` |
 | `VOICE_MODELS` | `core.config.VOICE_MODELS` |
+| `YandexApiKeyProvider` | `yandex_client_modules.api_key_provider.YandexApiKeyProvider` |
+| `_resolve_global_provider_credential` | `yandex_client_modules.request_mixin.resolve_global_provider_credential` |
 | `annotate_catalog` | `core.model_profiles.annotate_catalog` |
-| `canonical_model_key` | `core.config.canonical_model_key` |
 | `config` | `core.config.config` |
 | `decrypt_secret` | `secret_store.credential_crypto.decrypt_secret` |
 | `encrypt_secret` | `secret_store.credential_crypto.encrypt_secret` |
 | `encryption_configured` | `secret_store.credential_crypto.encryption_configured` |
 | `fingerprint_key` | `secret_store.credential_crypto.fingerprint_key` |
-| `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
-| `get_current_trace` | `observability.trace_manager.get_current_trace` |
-| `get_model_uri` | `core.config.get_model_uri` |
 | `get_store` | `storage.records.get_store` |
+| `provider_request_headers` | `yandex_client_modules.request_mixin.provider_request_headers` |
 | `registry_key_for_upstream` | `core.config.registry_key_for_upstream` |
 | `traced_operation` | `observability.trace_manager.traced_operation` |
 
@@ -78,6 +77,5 @@ Everything `provider_accounts` uses from other units is a field of `Host` in [`p
 ## Install
 
 - `composition/wiring.py` registers the `provider_accounts` host factory (`register_all()`, or `register_units("provider_accounts")` for this unit alone); the host is built on first use.
-- `composition/web.py` registers the blueprints `provider_credentials_bp` (`provider_accounts.credentials_routes`), `provider_quota_bp` (`provider_accounts.quota_routes`).
+- `composition/web.py` registers the blueprint `provider_credentials_bp` (`provider_accounts.credentials_routes`).
 - `composition/web.py` calls `provider_accounts.model_routes.install(app)`.
-- Storage start-up (`web_shell`) runs `provider_accounts.quotas.prepare_quota_records`.

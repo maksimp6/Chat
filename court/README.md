@@ -77,7 +77,6 @@ Everything `court` uses from other units is a field of `Host` in [`court/host.py
 
 | Port | Provided by |
 | --- | --- |
-| `TreasuryIdentityError` | `economy.treasury_identity.TreasuryIdentityError` |
 | `add_message` | `storage.records.add_message` |
 | `check_access` | `conversations.ownership.check_access` |
 | `get_conversation_title` | `storage.records.get_conversation_title` |

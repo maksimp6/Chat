@@ -2,7 +2,7 @@
 
 `economy` · Tracks each reply's cost, billing, budgets and paper treasury ledger.
 
-The economy of Logos: a paper treasury ledger with a demo top-up and its HTTP API, the shared local identity used for accounting, billing and energy-based compute pricing of execution traces, department budgets, provider pricing snapshots and knowledge economics.
+The economy of Logos: a paper treasury ledger with a demo top-up and its HTTP API, the shared local identity used for accounting, billing and energy-based compute pricing of execution traces, the monthly cloud budget guard, provider pricing snapshots and knowledge economics.
 
 ## Role in a dialog
 
@@ -21,7 +21,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | Module | Purpose |
 | --- | --- |
 | [`economy.billing`](billing.py) | Billing helpers for ExecutionTrace. |
-| [`economy.budget_controller`](budget_controller.py) | Deterministic REAL/DEMO budget controller for department-level spending. |
+| [`economy.budget_controller`](budget_controller.py) | Monthly cloud budget guard: cloud spend classified from provider billing data. |
 | [`economy.compute_resources`](compute_resources.py) | Energy-based compute billing for ExecutionTrace. |
 | [`economy.knowledge_economics`](knowledge_economics.py) | Semantic economics for knowledge items and agent operations. |
 | [`economy.treasury`](treasury.py) | Durable paper balance ledger; no real payment processing. |
@@ -35,13 +35,11 @@ Other units reach it only through their own ports:
 | `economy.billing.aggregate_billing` | `chat`, `observability` |
 | `economy.billing.build_ai_billing_item` | `chat`, `observability` |
 | `economy.billing.settle_billing_to_treasury` | `chat` |
-| `economy.budget_controller.BudgetLimitExceeded` | `cloud` |
 | `economy.budget_controller.CloudBudgetGuard` | `cloud` |
 | `economy.compute_resources.build_compute_billing_item` | `observability` |
 | `economy.knowledge_economics.KnowledgeCostConfig` | `chat` |
 | `economy.knowledge_economics.calculate_knowledge_cost` | `chat` |
-| `economy.treasury_identity.TreasuryIdentityError` | `organization`, `remote_runtime` |
-| `economy.treasury_identity.get_current_owner_id` | `chat`, `conversations`, `forge`, `mcp_server`, `model_editor`, `organization`, `provider_accounts`, `remote_runtime`, `web_shell`, `yandex_client_modules` |
+| `economy.treasury_identity.get_current_owner_id` | `chat`, `conversations`, `forge`, `mcp_server`, `model_editor`, `organization`, `remote_runtime`, `web_shell`, `yandex_client_modules` |
 
 ## Ports
 
@@ -54,8 +52,6 @@ Everything `economy` uses from other units is a field of `Host` in [`economy/hos
 | `AUDIO_TTS_PRICE_PER_SEC` | `core.config.AUDIO_TTS_PRICE_PER_SEC` |
 | `CloudProviderError` | `cloud.base.CloudProviderError` |
 | `KristallError` | `kristall.KristallError` |
-| `canonical_model_key` | `core.config.canonical_model_key` |
-| `get_current_trace` | `observability.trace_manager.get_current_trace` |
 | `get_store` | `storage.records.get_store` |
 
 ## Install

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Protocol
 
@@ -17,8 +16,6 @@ from provider_accounts.credentials import (
     issue_window,
     promote_rotated_key,
     record_health_check,
-    rotation_needed,
-    should_revoke,
 )
 from provider_accounts.host import fingerprint_key
 
@@ -41,23 +38,6 @@ class ProviderKeyProvider(Protocol):
         """Reissue an existing provider resource when supported."""
 
 
-# Backwards-compatible alias for existing Yandex integrations/tests.
-YandexKeyProvider = ProviderKeyProvider
-
-
-@dataclass(frozen=True)
-class RotationDecision:
-    rotate: bool
-    revoke: bool
-
-
-def decide(expires_at: datetime, now: datetime | None = None) -> RotationDecision:
-    return RotationDecision(
-        rotate=rotation_needed(expires_at, now),
-        revoke=should_revoke(expires_at, now),
-    )
-
-
 def _revoke_quietly(provider: ProviderKeyProvider, provider_key_id: str) -> None:
     """Revoke a key that was created but never stored, so it is not left active at the provider."""
     try:
@@ -75,7 +55,6 @@ def rotate_active_key(
     project_id: str,
     old_provider_key_id: str | None = None,
     now: datetime | None = None,
-    commit_before_revoke: bool = False,
     provider_name: str = "yandex",
     reissue_existing: bool = False,
     ttl: timedelta | None = None,

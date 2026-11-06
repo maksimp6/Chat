@@ -93,7 +93,6 @@
 - [Yandex embeddings](models/embeddings.md) — `POST /api/embeddings` через OpenAI-совместимый endpoint Яндекса
 - [Yandex classifiers](models/classification.md) — `POST /api/classify` через Text Classification API
 - [Ротация ключей провайдеров](provider-key-rotation.md) — жизненный цикл backend-owned API-ключа провайдера
-- [Квоты провайдеров](provider-quotas.md) — прежние per-user квоты запросов к Yandex Responses API; сейчас квоты отключены
 - [Голосовой ассистент](voice-assistant.md) — Yandex Realtime и цепочка SpeechKit STT → текстовая модель → TTS
 - [Профили Optima](agents/logos-optima-model-profiles.md) — сбалансированный пресет для существующих моделей Yandex Responses
 - [Профиль Pro 5.1 async](agents/logos-pro51-async-profile.md) — выбранный владельцем YandexGPT Pro 5.1 в асинхронном API

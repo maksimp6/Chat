@@ -87,10 +87,7 @@ def prepare_court_records() -> None:
 
 
 def _owner() -> str | None:
-    try:
-        return get_current_owner_id(required=False)
-    except bound.TreasuryIdentityError:
-        return None
+    return get_current_owner_id(required=False)
 
 
 def _dialog_messages(conversation_id: str, owner: str | None) -> list[dict[str, Any]]:

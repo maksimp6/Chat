@@ -17,7 +17,6 @@ import requests
 
 from provider_accounts.host import (
     bound,
-    canonical_model_key,
     provider_request_headers,
     registry_key_for_upstream,
 )
@@ -46,28 +45,23 @@ class ModelDiscovery:
         self,
         *,
         base_url: str,
-        api_key: str | None = None,
-        project_id: str | None = None,
-        credential_resolver: Callable[[], Any] | None = None,
+        credential_resolver: Callable[[], Any],
         ttl_seconds: int = DEFAULT_TTL_SECONDS,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
-        session: requests.Session | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
-        self.project_id = project_id
         self._credential_resolver = credential_resolver
         self.ttl_seconds = max(0, int(ttl_seconds))
         self.timeout_seconds = timeout_seconds
-        self.session = session or requests.Session()
+        self.session = requests.Session()
         self._lock = threading.Lock()
         self._cached: dict[str, Any] | None = None
         self._cached_at = 0.0
-        self._cached_credential: tuple[str, str, str] | None = None
+        self._cached_credential: tuple[str, str] | None = None
         # A failed read is remembered like a catalog: a provider that refuses is not asked
         # again on every page load, and the same failure is logged once.
         self._failed_at = 0.0
-        self._failed_credential: tuple[str, str, str] | None = None
+        self._failed_credential: tuple[str, str] | None = None
         self._logged_failure: str | None = None
 
     def get_models(self, *, force_refresh: bool = False) -> dict[str, Any]:
@@ -117,18 +111,11 @@ class ModelDiscovery:
         if not repeated:
             logger.warning("Model discovery failed: %s", failure)
 
-    def _request_auth(self) -> tuple[dict[str, str], str | None, tuple[str, str, str]]:
-        if self._credential_resolver is not None:
-            credential = self._credential_resolver()
-            api_key = credential.api_key
-            project_id = credential.project_id
-            headers = provider_request_headers(credential)
-            source = "active_provider_credential"
-        else:
-            api_key = self.api_key
-            project_id = self.project_id
-            headers = {"Authorization": "Api-Key " + api_key} if api_key else {}
-            source = "explicit"
+    def _request_auth(self) -> tuple[dict[str, str], str | None, tuple[str, str]]:
+        credential = self._credential_resolver()
+        api_key = credential.api_key
+        project_id = credential.project_id
+        headers = provider_request_headers(credential)
         if not isinstance(api_key, str) or not api_key:
             raise ModelDiscoveryError("provider credential is not configured")
         if project_id:
@@ -136,11 +123,7 @@ class ModelDiscovery:
             # SDK. Both identify the same active credential's folder.
             headers["OpenAI-Project"] = project_id
             headers["x-project"] = project_id
-        identity = (
-            source,
-            project_id or "",
-            hashlib.sha256(api_key.encode()).hexdigest(),
-        )
+        identity = (project_id or "", hashlib.sha256(api_key.encode()).hexdigest())
         return headers, project_id, identity
 
     def _fetch(
@@ -382,7 +365,7 @@ def validate_dialog_model(model_key: str) -> str:
     """
     if not isinstance(model_key, str) or not model_key.strip():
         raise ValueError("model is required")
-    model_key = canonical_model_key(model_key.strip())
+    model_key = model_key.strip()
     if model_key == bound.CHAT_MODEL:
         return model_key
     for registry in (bound.VOICE_MODELS, bound.IMAGE_MODELS):

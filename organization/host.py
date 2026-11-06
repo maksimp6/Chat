@@ -15,7 +15,6 @@ from organization._binding import Binding, HostNotBound
 
 @dataclass(frozen=True, kw_only=True)
 class Host:
-    TreasuryIdentityError: Any  # economy.treasury_identity.TreasuryIdentityError
     create_session: Any  # sessions.manager.create_session
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
     get_session: Any  # sessions.manager.get_session

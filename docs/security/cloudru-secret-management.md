@@ -23,44 +23,14 @@
 
 Секрет в Cloud.ru Secret Management состоит из версий; версия после записи
 неизменяема, и несколько версий могут быть одновременно активны. Logos не
-меняет эту модель. Вместо этого приложение хранит локально только **ссылку**:
-какую версию оно сейчас считает действующей для каждого назначения
-(`purpose`).
+меняет эту модель. Код, которому нужно значение, называет секрет и версию сам:
+`CloudRuSecretBackend` (`secret_store/cloudru_backend.py`) принимает
+`SecretReference` и вызывает `CloudRuSecretManagementClient.get_secret_value`.
 
-Таблица `secret_management_refs` (`provider_credentials.py`):
-
-| Колонка               | Смысл                                                    |
-| ---------------------- | --------------------------------------------------------- |
-| `purpose`               | Ключ назначения, например `logos_short_token`             |
-| `secret_id`             | Идентификатор секрета в Cloud.ru                           |
-| `pinned_version_id`     | Версия, которую сейчас читает backend                      |
-| `previous_version_id`   | Предыдущая закреплённая версия — для явного отката          |
-| `updated_at`            | Когда ссылка менялась в последний раз                       |
-
-Само значение секрета в этой таблице никогда не хранится.
-
-```python
-from provider_credentials import (
-    set_secret_management_ref,
-    rollback_secret_management_ref,
-    resolve_secret_management_value,
-)
-
-# Закрепить/переключить версию — старая версия не изменяется в Cloud.ru,
-# только меняется локальная ссылка.
-set_secret_management_ref(db, "logos_short_token", secret_id="...", version_id="v2")
-
-# Явный откат к прежней закреплённой версии.
-rollback_secret_management_ref(db, "logos_short_token")
-
-# Получить значение — только внутри доверенного backend-кода.
-# Результат нельзя логировать, трейсить, отдавать в MCP/UI/ошибки.
-token_value = resolve_secret_management_value(db, "logos_short_token")
-```
-
-`resolve_secret_management_value` не имеет отката на локальное
-незашифрованное хранилище: если Cloud.ru Secret Management недоступен, вызов
-падает с `CloudProviderError`, а не читает/пишет secret в открытом виде.
+Значение можно получать только внутри доверенного backend-кода; его нельзя
+логировать, трейсить, отдавать в MCP/UI/ошибки. Отката на локальное
+незашифрованное хранилище нет: если Cloud.ru Secret Management недоступен, вызов
+падает с ошибкой, а не читает/пишет secret в открытом виде.
 
 ## Два разных уровня прав
 
@@ -91,9 +61,7 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
 Разрешено (backend-only путь):
 
 - `CloudRuSecretManagementClient.get_secret_value(...)` — единственная точка,
-  которая возвращает plaintext, и только напрямую вызывающему коду;
-- `resolve_secret_management_value(db, purpose)` — тонкая обёртка поверх неё
-  для существующей границы `provider_credentials.py`.
+  которая возвращает plaintext, и только напрямую вызывающему коду.
 
 Запрещено (проверки `tests/test_cloudru_secret_management.py` и
 `tests/test_provider_credentials_secret_management.py` в репозитории пока нет):
@@ -113,14 +81,13 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
   cloud-инструментов (`cloud/tools.py`), которые вызывает модель;
   административный клиент (`cloud/cloudru/iam.py`) для чтения payload значений не
   используется вовсе.
-- вложенные ошибки: если код, вызвавший `resolve_secret_management_value`,
+- вложенные ошибки: если код, получивший значение через `get_secret_value`,
   падает позже с уже полученным значением в области видимости и попадает в
   `ExecutionTrace.record_error(..., exception=...)`, значение секрета не
   должно оказаться в снимке трейса. Общий механизм редактирования локальных
   переменных в `observability/trace_manager.py` уже редактирует по имени переменной любое
   имя, содержащее `secret`/`token`/`password`/`api_key` — поэтому весь код,
-  работающий со значением секрета в этом модуле и в
-  `provider_credentials.py`, называет соответствующую локальную переменную
+  работающий со значением секрета, называет соответствующую локальную переменную
   `secret_value`/`secret_plaintext`, а не общим именем вроде `value`.
 
 ## Предсказуемые ошибки, таймауты и работа с plaintext
@@ -152,13 +119,11 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
    версию значения (вне репозитория, вручную владельцем).
 2. Убедиться, что runtime-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID` /
    `_SECRET`) имеет только роль просмотра на этот секрет.
-3. Закрепить ссылку в Logos:
-   `set_secret_management_ref(db, purpose, secret_id, version_id)`.
-4. Там, где сегодня код читает значение из переменной окружения или из
+3. Там, где сегодня код читает значение из переменной окружения или из
    `provider_credentials`/`key_manager`, для соответствующего `purpose`
-   вызвать `resolve_secret_management_value(db, purpose)` вместо чтения
-   локального plaintext. Эта замена — отдельный, следующий узкий PR по
-   каждому назначению, не часть данного этапа.
+   читать секрет через `CloudRuSecretBackend` вместо локального plaintext. Эта
+   замена — отдельный, следующий узкий PR по каждому назначению, не часть
+   данного этапа.
 
 Назначения (`purpose`), которые эпик #440/#475 планирует перевести на эту
 схему:
@@ -169,9 +134,8 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
   (`identity/github_oauth.py`);
 - `provider_credential:yandex` / `provider_credential:cloudru` — ключи
   провайдеров LLM, которые уже хранятся зашифрованными через
-  `provider_credentials.py`; Secret Management становится дополнительным
-  источником ссылки на закреплённую версию, а не заменяет существующую
-  таблицу `provider_credentials`;
+  `provider_accounts/credentials.py`; Secret Management становится
+  дополнительным источником, а не заменяет это хранилище;
 - `logos_database_url` — retired: строка подключения к PostgreSQL больше не создаётся и не читается
   (`LOGOS_DATABASE_URL`; хранилище — нативный Kristall journal, см. `docs/database.md`), см. известное ограничение "App secrets are plain
   container env vars" в `docs/cloudru-container-apps.md`.
@@ -189,9 +153,9 @@ limitations") секреты Container Apps — обычные переменн�
    высокого уровня, чем сами по себе — они дают право прочитать только то,
    что явно открыто для чтения политикой Secret Management, и не дают права
    администрирования.
-2. При старте backend читает ссылки (`secret_management_refs`) и вызывает
-   `resolve_secret_management_value` по каждому нужному `purpose`, вместо
-   того чтобы ожидать готовое значение в переменной окружения.
+2. При старте backend читает секрет через `CloudRuSecretBackend` по каждому
+   нужному `purpose`, вместо того чтобы ожидать готовое значение в переменной
+   окружения.
 3. Административная пара (`CLOUDRU_IAM_KEY_ID`/`CLOUDRU_IAM_KEY_SECRET`)
    остаётся вне рантайма приложения — она нужна только тем, кто создаёт
    секреты/версии и настраивает права (сегодня это уже так для
@@ -202,8 +166,8 @@ limitations") секреты Container Apps — обычные переменн�
    местом, где они видны в открытом виде.
 
 Этот bootstrap-переход — не часть текущего этапа: сейчас подключён только
-адаптер и локальная граница ссылок, без переноса живых секретов и без выдачи
-прав в Cloud.ru IAM (см. "Out of scope" в issue #477).
+адаптер, без переноса живых секретов и без выдачи прав в Cloud.ru IAM (см.
+"Out of scope" в issue #477).
 
 ## Связанные материалы
 

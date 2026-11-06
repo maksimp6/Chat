@@ -1,7 +1,7 @@
 """The economy of Logos: a paper treasury ledger with a demo top-up and its HTTP API, the
 shared local identity used for accounting, billing and energy-based compute pricing of
-execution traces, department budgets, provider pricing snapshots and knowledge
-economics.
+execution traces, the monthly cloud budget guard, provider pricing snapshots and
+knowledge economics.
 """
 
 from __future__ import annotations

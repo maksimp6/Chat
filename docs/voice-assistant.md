@@ -66,10 +66,7 @@ service account role `ai.models.user` and API-key scope
 `yc.ai.foundationModels.execute`; a model's presence in the catalog does not prove
 these rights.
 
-Realtime turns use the existing configured provider quota admission and account
-for returned token usage. Unknown network outcomes do not release a reservation
-as though non-execution were proven. The SpeechKit pipeline retains the existing
-text-model quota/tool path without another Realtime reservation. Realtime's
+The SpeechKit pipeline retains the existing text-model tool path. Realtime's
 single-turn adapter does not currently expose tools; provider support and runtime
 tool support are separate. Text-model microphone requests retain the normal
 `ask_with_mcp` executor and conversation settings rather than substituting a model.

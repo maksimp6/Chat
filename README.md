@@ -220,7 +220,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 
 | Path              | Contents                                                                                       |
 | ----------------- | ---------------------------------------------------------------------------------------------- |
-| `core/`           | Configuration, environment access, clock, model profiles and Wikifunctions-derived helpers     |
+| `core/`           | Configuration, environment access, model profiles and Wikifunctions-derived helpers            |
 | `chat/`           | HTTP routes for chat (`/api/chat`), voice, images, embeddings and classification              |
 | `conversations/`  | Conversation ownership and metadata                                                            |
 | `sessions/`       | Durable runtime sessions stored as Kristall journal records                                    |
@@ -240,7 +240,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | `yandex_client_modules/` | Yandex AI Studio client: request building, response polling, realtime, image generation     |
 | `api/`                   | Yandex request profiles, transport and contract validation                                   |
 | `contracts/`             | Machine-readable Yandex API contracts ([`contracts/yandex`](contracts/yandex/README.md))     |
-| `provider_accounts/`     | Provider credentials, key rotation, quotas and model discovery                               |
+| `provider_accounts/`     | Provider credentials, key rotation and model discovery                                       |
 | `cloud/`                 | Provider-neutral cloud abstractions with Cloud.ru and Alice adapters                         |
 | `secret_store/`          | Provider-neutral secret resolution boundary and provider credential encryption               |
 | `config/`                | Platform YAML, model profiles, pricing snapshot and integrations catalog                     |

@@ -20,9 +20,6 @@ class Host:
     CLASSIFIER_MODELS: Any  # core.config.CLASSIFIER_MODELS
     CloudRuApiKeyProvider: Any  # cloud.cloudru.api_key_provider.CloudRuApiKeyProvider
     CloudRuIamClient: Any  # cloud.cloudru.iam.CloudRuIamClient
-    CloudRuSecretManagementClient: (
-        Any  # cloud.cloudru.secret_management.CloudRuSecretManagementClient
-    )
     Config: Any  # core.config.Config
     CredentialCryptoError: Any  # secret_store.credential_crypto.CredentialCryptoError
     EMBEDDING_MODELS: Any  # core.config.EMBEDDING_MODELS
@@ -36,15 +33,11 @@ class Host:
         Any  # yandex_client_modules.request_mixin.resolve_global_provider_credential
     )
     annotate_catalog: Any  # core.model_profiles.annotate_catalog
-    canonical_model_key: Any  # core.config.canonical_model_key
     config: Any  # core.config.config
     decrypt_secret: Any  # secret_store.credential_crypto.decrypt_secret
     encrypt_secret: Any  # secret_store.credential_crypto.encrypt_secret
     encryption_configured: Any  # secret_store.credential_crypto.encryption_configured
     fingerprint_key: Any  # secret_store.credential_crypto.fingerprint_key
-    get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
-    get_current_trace: Any  # observability.trace_manager.get_current_trace
-    get_model_uri: Any  # core.config.get_model_uri
     get_store: Any  # storage.records.get_store
     provider_request_headers: (
         Any  # yandex_client_modules.request_mixin.provider_request_headers
@@ -65,13 +58,9 @@ __all__ = [
     "annotate_catalog",
     "bind",
     "bound",
-    "canonical_model_key",
     "current",
     "encryption_configured",
     "fingerprint_key",
-    "get_current_owner_id",
-    "get_current_trace",
-    "get_model_uri",
     "get_store",
     "provide",
     "provider_request_headers",
@@ -84,28 +73,12 @@ def annotate_catalog(*args: Any, **kwargs: Any) -> Any:
     return current().annotate_catalog(*args, **kwargs)
 
 
-def canonical_model_key(*args: Any, **kwargs: Any) -> Any:
-    return current().canonical_model_key(*args, **kwargs)
-
-
 def encryption_configured(*args: Any, **kwargs: Any) -> Any:
     return current().encryption_configured(*args, **kwargs)
 
 
 def fingerprint_key(*args: Any, **kwargs: Any) -> Any:
     return current().fingerprint_key(*args, **kwargs)
-
-
-def get_current_owner_id(*args: Any, **kwargs: Any) -> Any:
-    return current().get_current_owner_id(*args, **kwargs)
-
-
-def get_current_trace(*args: Any, **kwargs: Any) -> Any:
-    return current().get_current_trace(*args, **kwargs)
-
-
-def get_model_uri(*args: Any, **kwargs: Any) -> Any:
-    return current().get_model_uri(*args, **kwargs)
 
 
 def get_store(*args: Any, **kwargs: Any) -> Any:

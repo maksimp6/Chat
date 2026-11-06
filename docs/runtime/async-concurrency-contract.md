@@ -8,7 +8,7 @@ the backend around native asyncio.
 
 The backend remains primarily synchronous. Production concurrency currently comes
 from thread pools, concurrent invocations, database transactions, agent execution,
-quota reservations, budget reservations, and request/tool lifecycles.
+and request/tool lifecycles.
 
 Async tests use `asyncio` as an orchestration harness around those existing
 boundaries, usually through `asyncio.to_thread(...)`. This lets tests reproduce
@@ -54,7 +54,7 @@ transition, and that a late worker calling `finish_invocation()` after external
 cancellation cannot overwrite terminal `cancelled` state with `completed`.
 
 Sibling invocations/tasks must remain independent. Cancelling one waiter must not
-corrupt another invocation, session, trace, quota bucket, or budget account.
+corrupt another invocation, session, or trace.
 
 ## Timeout semantics
 
@@ -76,30 +76,7 @@ Required behavior proven by the current regression:
 
 Native cancellation of running Python threads is not part of the contract.
 
-## Budget reservation atomicity
-
-`BudgetController.reserve()` is serialized by the controller lock. Concurrent
-reservations must never oversubscribe the same account balance.
-
-The async harness must force real contention rather than relying on scheduler
-luck. The regression suite includes a mutation-control that removes the lock and
-deterministically reproduces oversubscription. This proves that the concurrency
-test can detect the missing-lock race it is intended to protect against.
-
-Reservation, settlement, release, spend, refund, cooldown, and fallback semantics
-remain domain operations owned by `BudgetController`, not by the LLM.
-
-## Provider quota atomicity
-
-`reserve_request()` in `provider_accounts/quotas.py` is the provider-request admission boundary.
-
-Atomicity comes from the native Kristall write barrier: the usage read and the usage
-write run in one `store.transaction()` for the user's quota key. SQLite
-`BEGIN IMMEDIATE` and PostgreSQL `SELECT ... FOR UPDATE` are retired.
-
-Concurrent async callers must not spend the same quota slot twice. The async
-harness executes this path through `asyncio.to_thread` against the native Kristall
-store.
+## Transaction coverage
 
 Tests that claim transaction coverage must exercise the real native Kristall store
 in a temporary journal, not a substitute, and must not reintroduce
@@ -168,8 +145,6 @@ The current regression surface includes:
 - late `finish_invocation()` after external cancellation cannot overwrite terminal state;
 - AgentGateway timeout observation plus sibling isolation;
 - representative invocation lifecycle task cleanup;
-- budget reservation contention and mutation-control;
-- provider quota reservation atomicity;
 - native Kristall transaction execution (SQLite and PostgreSQL are retired).
 
 Relevant commands:

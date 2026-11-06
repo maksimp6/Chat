@@ -48,8 +48,6 @@ from organization.partner_relations import (
 from plugin_system.routes import plugin_bp
 from provider_accounts.credentials_routes import provider_credentials_bp
 from provider_accounts.model_routes import install as install_model_routes
-from provider_accounts.quota_routes import provider_quota_bp
-from provider_accounts.quotas import prepare_quota_records
 from rdc_connection.pairing import install_rdc_pairing
 from remote_runtime.environment_routes import environment_bp, environment_gateway_bp
 from remote_runtime.environments import prepare_environment_records
@@ -70,7 +68,6 @@ BLUEPRINTS = (
     local_agent_bp,
     cloudru_iam_bp,
     provider_credentials_bp,
-    provider_quota_bp,
     partner_relations_bp,
     departments_bp,
     government_bp,
@@ -97,7 +94,6 @@ STORAGE_INITIALIZERS = (
     prepare_local_agent_records,
     prepare_printing_records,
     prepare_department_records,
-    prepare_quota_records,
     prepare_partner_relations_records,
     ensure_partner_department,
     prepare_government_records,

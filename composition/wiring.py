@@ -307,7 +307,6 @@ def _chat():
 
 def _cloud():
     from cloud import host
-    from economy.budget_controller import BudgetLimitExceeded
     from economy.budget_controller import CloudBudgetGuard
     from storage.contracts import StorageCredentialsMissing
     from storage.contracts import StorageError
@@ -321,7 +320,6 @@ def _cloud():
     from secret_store.key_manager import store_secret
 
     return host.Host(
-        BudgetLimitExceeded=BudgetLimitExceeded,
         CloudBudgetGuard=CloudBudgetGuard,
         StorageCredentialsMissing=StorageCredentialsMissing,
         StorageError=StorageError,
@@ -370,7 +368,6 @@ def _court():
     from api.contracts import ContractViolation
     from chat.mcp_routes import ForkError
     from yandex_client_modules.operations import OperationRefused
-    from economy.treasury_identity import TreasuryIdentityError
     from yandex_client_modules.errors import YandexClientError
     from storage.records import add_message
     from chat.mcp_routes import call_yandex_operation
@@ -393,7 +390,6 @@ def _court():
         ContractViolation=ContractViolation,
         ForkError=ForkError,
         OperationRefused=OperationRefused,
-        TreasuryIdentityError=TreasuryIdentityError,
         YandexClientError=YandexClientError,
         add_message=add_message,
         call_yandex_operation=call_yandex_operation,
@@ -419,8 +415,6 @@ def _economy():
     from core.config import AUDIO_TTS_PRICE_PER_SEC
     from cloud.base import CloudProviderError
     from kristall import KristallError
-    from core.config import canonical_model_key
-    from observability.trace_manager import get_current_trace
     from storage.records import get_store
 
     return host.Host(
@@ -429,8 +423,6 @@ def _economy():
         AUDIO_TTS_PRICE_PER_SEC=AUDIO_TTS_PRICE_PER_SEC,
         CloudProviderError=CloudProviderError,
         KristallError=KristallError,
-        canonical_model_key=canonical_model_key,
-        get_current_trace=get_current_trace,
         get_store=get_store,
     )
 
@@ -635,7 +627,6 @@ def _observability():
 
 def _organization():
     from organization import host
-    from economy.treasury_identity import TreasuryIdentityError
     from sessions.manager import create_session
     from economy.treasury_identity import get_current_owner_id
     from sessions.manager import get_session
@@ -643,7 +634,6 @@ def _organization():
     from tool_providers.universal_tool_platform import validate_json_schema
 
     return host.Host(
-        TreasuryIdentityError=TreasuryIdentityError,
         create_session=create_session,
         get_current_owner_id=get_current_owner_id,
         get_session=get_session,
@@ -683,7 +673,6 @@ def _provider_accounts():
     from core.config import CLASSIFIER_MODELS
     from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
     from cloud.cloudru.iam import CloudRuIamClient
-    from cloud.cloudru.secret_management import CloudRuSecretManagementClient
     from core.config import Config
     from secret_store.credential_crypto import CredentialCryptoError
     from core.config import EMBEDDING_MODELS
@@ -695,15 +684,11 @@ def _provider_accounts():
         resolve_global_provider_credential as _resolve_global_provider_credential,
     )
     from core.model_profiles import annotate_catalog
-    from core.config import canonical_model_key
     from core.config import config
     from secret_store.credential_crypto import decrypt_secret
     from secret_store.credential_crypto import encrypt_secret
     from secret_store.credential_crypto import encryption_configured
     from secret_store.credential_crypto import fingerprint_key
-    from economy.treasury_identity import get_current_owner_id
-    from observability.trace_manager import get_current_trace
-    from core.config import get_model_uri
     from storage.records import get_store
     from yandex_client_modules.request_mixin import provider_request_headers
     from core.config import registry_key_for_upstream
@@ -714,7 +699,6 @@ def _provider_accounts():
         CLASSIFIER_MODELS=CLASSIFIER_MODELS,
         CloudRuApiKeyProvider=CloudRuApiKeyProvider,
         CloudRuIamClient=CloudRuIamClient,
-        CloudRuSecretManagementClient=CloudRuSecretManagementClient,
         Config=Config,
         CredentialCryptoError=CredentialCryptoError,
         EMBEDDING_MODELS=EMBEDDING_MODELS,
@@ -724,15 +708,11 @@ def _provider_accounts():
         YandexApiKeyProvider=YandexApiKeyProvider,
         _resolve_global_provider_credential=_resolve_global_provider_credential,
         annotate_catalog=annotate_catalog,
-        canonical_model_key=canonical_model_key,
         config=config,
         decrypt_secret=decrypt_secret,
         encrypt_secret=encrypt_secret,
         encryption_configured=encryption_configured,
         fingerprint_key=fingerprint_key,
-        get_current_owner_id=get_current_owner_id,
-        get_current_trace=get_current_trace,
-        get_model_uri=get_model_uri,
         get_store=get_store,
         provider_request_headers=provider_request_headers,
         registry_key_for_upstream=registry_key_for_upstream,
@@ -765,7 +745,6 @@ def _remote_runtime():
     from runtime import RuntimeDispatcher
     from runtime import RuntimeLoader
     from runtime import RuntimeNotFound
-    from economy.treasury_identity import TreasuryIdentityError
     from runtime.request_context import bind_runtime_request
     from agent_memory.client import close_memory_clients
     from invocation.trace import create_invocation_trace
@@ -781,7 +760,6 @@ def _remote_runtime():
         RuntimeDispatcher=RuntimeDispatcher,
         RuntimeLoader=RuntimeLoader,
         RuntimeNotFound=RuntimeNotFound,
-        TreasuryIdentityError=TreasuryIdentityError,
         bind_runtime_request=bind_runtime_request,
         close_memory_clients=close_memory_clients,
         create_invocation_trace=create_invocation_trace,

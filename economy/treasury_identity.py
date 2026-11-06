@@ -5,10 +5,6 @@ import os
 from economy.host import bound, get_store
 
 
-class TreasuryIdentityError(ValueError):
-    """Compatibility error type for existing callers."""
-
-
 def get_current_owner_id(*, required: bool = True) -> str | None:
     """Use one installation identity for every browser, CLI and MCP client."""
     configured = str(os.environ.get("LOGOS_OWNER_ID") or "").strip()

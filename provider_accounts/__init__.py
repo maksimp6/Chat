@@ -1,6 +1,6 @@
 """Model-provider accounts: deployment credentials and their API, provider-agnostic key
-rotation and the rotation workers' logic, import of runner-issued keys, per-user
-quotas and their API, and model discovery with the model catalog API.
+rotation and the rotation workers' logic, import of runner-issued keys, the retired
+quota calls, and model discovery with the model catalog API.
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ __all__ = [
     "key_rotation_cli",
     "model_discovery",
     "model_routes",
-    "quota_routes",
     "quotas",
 ]
 

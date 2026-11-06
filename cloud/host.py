@@ -15,7 +15,6 @@ from cloud._binding import Binding, HostNotBound
 
 @dataclass(frozen=True, kw_only=True)
 class Host:
-    BudgetLimitExceeded: Any  # economy.budget_controller.BudgetLimitExceeded
     CloudBudgetGuard: Any  # economy.budget_controller.CloudBudgetGuard
     StorageCredentialsMissing: Any  # storage.contracts.StorageCredentialsMissing
     StorageError: Any  # storage.contracts.StorageError

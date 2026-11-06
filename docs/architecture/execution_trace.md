@@ -40,7 +40,7 @@ Tool execution    → сохраняется в Trace
 Responses #2 usage → сохраняется в Trace и используется для расчёта цены
                          │
                          ▼
-                    calculate_cost()
+                 build_ai_billing_item()
                          │
                          ▼
                     total_cost

@@ -7,7 +7,7 @@ models never become a confirmed zero-cost invocation.
 import logging
 from typing import Any
 
-from economy.host import bound, canonical_model_key
+from economy.host import bound
 
 logger = logging.getLogger("logos.economy.billing")
 
@@ -57,15 +57,8 @@ def build_ai_billing_item(
         "output_tokens": output_tokens,
         "total_tokens": total_tokens,
     }
-    # A retired model keeps its own prices for accounting; only legacy keys resolve to a successor.
-    pricing = (
-        (
-            bound.ALL_MODELS.get(model_key)
-            or bound.ALL_MODELS.get(canonical_model_key(model_key))
-        )
-        if model_key
-        else None
-    )
+    # A retired model keeps its own prices for accounting.
+    pricing = bound.ALL_MODELS.get(model_key) if model_key else None
     item["provider"] = (pricing or {}).get("provider") or PROVIDER
     if usage_missing or pricing is None or pricing.get("pricing_status") == "unknown":
         item.update(

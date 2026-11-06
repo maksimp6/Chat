@@ -18,7 +18,6 @@ class Host:
     ContractViolation: Any  # api.contracts.ContractViolation
     ForkError: Any  # chat.mcp_routes.ForkError
     OperationRefused: Any  # yandex_client_modules.operations.OperationRefused
-    TreasuryIdentityError: Any  # economy.treasury_identity.TreasuryIdentityError
     YandexClientError: Any  # yandex_client_modules.errors.YandexClientError
     add_message: Any  # storage.records.add_message
     call_yandex_operation: Any  # chat.mcp_routes.call_yandex_operation

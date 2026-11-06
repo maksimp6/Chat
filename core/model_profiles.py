@@ -16,7 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from core.config import ALL_MODELS, canonical_model_key
+from core.config import ALL_MODELS
 
 logger = logging.getLogger("logos.core.model_profiles")
 
@@ -104,7 +104,6 @@ def ultra_request_defaults(model_key: str) -> dict[str, Any]:
     output ceiling. Only reasoning effort present in this model's wire profile
     is selected. Unknown or unsupported reasoning is omitted from the request.
     """
-    model_key = canonical_model_key(model_key)
     profile = ultra_profiles().get(model_key)
     if (
         profile is None
@@ -133,7 +132,7 @@ def ultra_reasoning_controllable(model_key: str) -> bool:
     for it, and a requested effort can spend the whole output budget on reasoning.
     Models without a profile keep the caller's settings unchanged.
     """
-    profile = ultra_profiles().get(canonical_model_key(model_key))
+    profile = ultra_profiles().get(model_key)
     if profile is None:
         return True
     return (profile.get("reasoning") or {}).get("depth_control") is not False
@@ -151,11 +150,7 @@ def completion_model_keys() -> set[str]:
 def annotate_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of a model catalog with registry availability and Ultra summaries."""
     profiles = ultra_profiles()
-    completion_keys = {
-        key
-        for key, profile in profiles.items()
-        if profile.get("transport") == "text_generation_async"
-    }
+    completion_keys = completion_model_keys()
     annotated = deepcopy(catalog)
     for section in ("text", "voice"):
         for key, entry in (annotated.get(section) or {}).items():

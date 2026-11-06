@@ -182,7 +182,7 @@ def build_body(upstream: str, items: Any, params: dict[str, Any]) -> dict[str, A
     body: dict[str, Any] = {
         "model": upstream,
         "messages": chat_messages(params.get("instructions"), items),
-        "stream": False,
+        "stream": True,
         "think": settings.think(upstream),
         "options": settings.options(),
     }
@@ -216,7 +216,6 @@ def ask(
     ``timeout`` bounds the wait between pieces, not the whole answer.
     """
     body = build_body(upstream, items, params)
-    body["stream"] = True
     endpoint = url.rstrip("/") + "/api/chat"
     started = time.time()
     try:

@@ -94,21 +94,12 @@ def cloud_resources_get(
     )
 
 
-def _budget_gate(
-    provider, operation: str
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    """Return (refusal, budget): a refusal when blocked, else the budget status worth reporting."""
-    try:
-        status = _budget_guard(provider).enforce(operation)
-    except bound.BudgetLimitExceeded as exc:
-        return {
-            "success": False,
-            "error": str(exc),
-            "metadata": {"phase": "policy", "provider_code": "budget_exceeded"},
-        }, None
+def _budget_report(provider) -> dict[str, Any] | None:
+    """The budget status worth reporting with a result."""
+    status = _budget_guard(provider).status()
     if status.get("status") in {"ok", "unconfigured"}:
-        return None, None
-    return None, status
+        return None
+    return status
 
 
 def _with_budget(
@@ -125,9 +116,7 @@ def cloud_compute(args: dict[str, Any], cfg: dict | None = None) -> dict[str, An
     operation = str(args.get("operation") or "").strip().lower()
     budget = None
     if operation in BUDGET_GUARDED_COMPUTE_OPERATIONS:
-        refusal, budget = _budget_gate(provider, f"cloud.compute.{operation}")
-        if refusal is not None:
-            return refusal
+        budget = _budget_report(provider)
     result = provider.compute(
         operation=str(args.get("operation") or ""),
         instance_id=(
@@ -175,9 +164,7 @@ def cloud_backup(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any
     operation = str(args.get("operation") or "").strip().lower()
     budget = None
     if operation in BUDGET_GUARDED_BACKUP_OPERATIONS:
-        refusal, budget = _budget_gate(provider, f"cloud.backup.{operation}")
-        if refusal is not None:
-            return refusal
+        budget = _budget_report(provider)
     result = provider.backup(
         operation=str(args.get("operation") or ""),
         resource_id=(
