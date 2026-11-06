@@ -11,6 +11,7 @@ There are no compatibility copies at the old root paths; update external shortcu
 | --- | --- | --- |
 | `bash scripts/install_protobuf_env.sh` | Historical Termux SDK setup | Installs/upgrades packages; never run as part of relocation checks |
 | `python scripts/send_logs.py` | Historical execution-log uploader | Reads checkout `execution_logs/`; upload endpoint and placeholder auth remain unverified |
+| `bash scripts/file.sh` | Create a project dump | Writes `project_dump.txt`; inspect content before sharing because tracked files/logs can contain private data |
 
 ## Canonical development checks
 

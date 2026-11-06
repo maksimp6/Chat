@@ -56,6 +56,7 @@ Everything `tool_providers` uses from other units is a field of `Host` in [`tool
 | `external_tool_sources` | `composition.tool_sources.SOURCES` |
 | `memory_file_path` | `storage.records.memory_file_path` |
 | `runtime_for_operation` | `remote_runtime.ssh_settings.runtime_for_operation` |
+| `vector_add` | `vector_db.store.add` |
 | `wait_for_local_tool_job` | `agent_runtime.local_gateway.wait_for_local_tool_job` |
 
 ## Install

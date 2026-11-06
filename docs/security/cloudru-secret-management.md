@@ -125,10 +125,8 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
 Назначения (`purpose`), которые эпик #440/#475 планирует перевести на эту
 схему:
 
-- `logos_short_token` — короткий токен доступа (`identity/short_token_auth.py`,
-  `LOGOS_SHORT_TOKEN`);
-- `github_oauth_client_id` / `github_oauth_client_secret` — GitHub OAuth
-  (`identity/github_oauth.py`);
+- `logos_short_token` — короткий токен доступа (`LOGOS_SHORT_TOKEN`);
+- `github_oauth_client_id` / `github_oauth_client_secret` — GitHub OAuth;
 - `provider_credential:yandex` / `provider_credential:cloudru` — ключи
   провайдеров LLM, которые уже хранятся зашифрованными через
   `provider_accounts/credentials.py`; Secret Management становится

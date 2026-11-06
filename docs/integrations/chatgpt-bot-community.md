@@ -21,7 +21,7 @@ Logos MCP Gateway
    |                                 +--> MCP tools
    |                                 +--> Android Local Tool Agent
    |
-   +--> Agent Gateway --> A2A agents / bot community
+   +--> Agent Gateway (agent list)
    |
    +--> ExecutionTrace
 ```

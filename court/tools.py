@@ -203,10 +203,10 @@ _ACTIONS: dict[str, dict[str, Any]] = {
     "hearing_reopen": {"fn": _reopen, "required": ["hearing_id", "reason"], "write": True,
                        "about": "возобновить закрытое заседание с причиной"},
     "trace_get": {"fn": trace_get, "required": [], "write": False,
-                  "about": "трасса вызова: invocation_id, либо conversation_id и message_id сообщения; "
+                  "about": "трассировка вызова: invocation_id, либо conversation_id и message_id сообщения; "
                            "с состоянием вызова (running, completed, failed)"},
     "trace_refs": {"fn": trace_refs, "required": ["conversation_id"], "write": False,
-                   "about": "сообщения диалога conversation_id с трассами и их invocation_id"},
+                   "about": "сообщения диалога conversation_id с трассировками и их invocation_id"},
     "branch": {"fn": branch, "required": ["conversation_id"], "write": True,
                "about": "ветка диалога conversation_id: новый диалог из сказанного; before_message_id обрезает, "
                         "edits [{message_id, text}] правят сообщения, drop_message_ids убирают; оригинал не меняется"},
@@ -243,8 +243,8 @@ _FIELDS = {
     },
     "decision": {"type": "string", "enum": list(DECISIONS)},
     "reason": {"type": "string", "minLength": 1},
-    "invocation_id": {"type": "string", "minLength": 1, "maxLength": 128, "description": "trace_get: вызов, чья трасса нужна"},
-    "message_id": {"type": "integer", "minimum": 1, "description": "trace_get: сообщение диалога с трассой"},
+    "invocation_id": {"type": "string", "minLength": 1, "maxLength": 128, "description": "trace_get: вызов, чья трассировка нужна"},
+    "message_id": {"type": "integer", "minimum": 1, "description": "trace_get: сообщение диалога с трассировкой"},
     "before_message_id": {"type": "integer", "minimum": 1, "description": "branch: ветка до этого сообщения (не включая его)"},
     "edits": {
         "type": "array",

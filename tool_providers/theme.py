@@ -1,4 +1,4 @@
-"""AI-assisted UI theme control with an explicit approval boundary."""
+"""The set_ui_theme tool: it names a color scheme; the page does not apply it."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ THEME_LABELS = {
 
 
 def set_ui_theme(arguments: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
-    """Return a client-side theme action after the existing approval gate allows it."""
+    """Return a client-side theme action; nothing in the page reads it today."""
     theme = str((arguments or {}).get("theme") or "").strip().lower()
     if theme not in THEME_LABELS:
         return {
@@ -43,8 +43,8 @@ THEME_TOOLS = {
     "set_ui_theme": {
         "func": set_ui_theme,
         "description": (
-            "Применить цветовую схему Logos. Используй только после явного "
-            "согласия пользователя: действие проходит через обязательное подтверждение."
+            "Выбрать цветовую схему Logos. Инструмент только возвращает выбранную схему: "
+            "страница её не применяет, схема меняется в меню темы."
         ),
         "parameters": {
             "type": "object",

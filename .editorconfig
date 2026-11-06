@@ -24,7 +24,7 @@ indent_size = 2
 indent_size = 2
 
 # These older shell scripts indent with 4 spaces.
-[{scripts/cache_cloud_cli.sh,tools/device/root/99-logos-mouse.sh}]
+[{scripts/cache_cloud_cli.sh,scripts/file.sh,tools/device/root/99-logos-mouse.sh}]
 indent_size = 4
 
 [*.{c,h,scad}]

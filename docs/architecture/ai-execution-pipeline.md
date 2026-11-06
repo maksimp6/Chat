@@ -48,7 +48,7 @@ response
 - Android / local tool agent;
 - GitHub issue agent;
 - CLI/Termux entrypoint (`python -m agent_runtime.cli`);
-- A2A / agent gateway.
+- agent gateway (список агентов).
 
 ## Удалённый legacy
 
@@ -70,7 +70,6 @@ response
 
 ## На апгрейд
 
-- `agent_runtime/local_tool_agent.py` — живой Android/local transport adapter;
 - `agent_runtime/gateway.py` — список агентов;
 - `agent_runtime/local_gateway.py` — HTTP transport/runtime gateway, имя и границы нужно уточнить.
 

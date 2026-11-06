@@ -77,7 +77,7 @@ In scope:
 | Area | What matters | Reference |
 | --- | --- | --- |
 | Provider keys | Yandex AI Studio API keys and IAM tokens, Cloud.ru Foundation Models keys, stored provider credentials and their rotation. Without `LOGOS_PROVIDER_CREDENTIAL_KEY`, saved provider keys are stored unencrypted. | [Key manager](docs/security/key_manager.md), [provider key lifecycle](docs/provider-key-rotation.md) |
-| Cloud.ru credentials | Cloud.ru API keys and Secret Management values. Logos keeps only a reference to the pinned version; the value must not reach logs, traces, MCP, UI or errors. | [Cloud.ru Secret Management](docs/security/cloudru-secret-management.md) |
+| Cloud.ru credentials | Cloud.ru API keys and Secret Management values. The calling code names the secret and its version; the value must not reach logs, traces, MCP, UI or errors. | [Cloud.ru Secret Management](docs/security/cloudru-secret-management.md) |
 | MCP bearer tokens | Bearer tokens and other credentials must not appear in MCP arguments, prompts, ExecutionTrace or logs. The Logos MCP transport itself has no bearer-token checks. | [MCP access and data](docs/mcp/chatgpt_apps.md#access-and-data) |
 | Trace and log sanitization | Secrets are sanitized at the trace/log boundary. ExecutionTrace, ordinary logs, API responses and frontend storage must never contain secret values. | [Execution Trace and system log](docs/backend/logging.md), [key manager policy](docs/security/key_manager.md) |
 | Local tool execution | `UniversalToolExecutor`, local and MCP tools. | [Tool providers](tool_providers/README.md) |

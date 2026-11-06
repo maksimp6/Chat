@@ -200,7 +200,7 @@ MCP-сервер (`mcp_server/tools.py::_tools_list`) по-прежнему пе
 Определены в `mcp_server/tools.py`, доступны через MCP-эндпоинт Logos (streamable-http):
 
 - logos_get_system_status — статус рантайма, MCP, моделей и локальных тула;
-- logos_list_agents — агенты Agent Gateway (A2A);
+- logos_list_agents — список агентов Agent Gateway;
 - logos_get_session — жизненный цикл сессии рантайма;
 - logos_get_invocation / logos_get_invocation_trace — статус и трассировка вызова;
 - logos_get_execution / logos_get_execution_trace — выполнение и трассировка;
@@ -212,7 +212,7 @@ MCP-сервер (`mcp_server/tools.py::_tools_list`) по-прежнему пе
 - `tool_providers/universal_tool_platform.py` — единый контракт UniversalToolCall/UniversalToolDefinition;
   transports: responses_api, local_agent, mcp.
 - `yandex_client_modules/mcp_mixin.py` — клиент провайдера вызывает инструменты через реестр; трассировка в observability.
-- `agent_runtime/gateway.py` — Agent Gateway (A2A-протокол, circuit breaker, permissions, rate limits).
+- `agent_runtime/gateway.py` — Agent Gateway: список агентов для logos_list_agents; сейчас в нём никого нет.
 
 ## Что доступно Logos в раннере (issue_runner)
 

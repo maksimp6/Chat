@@ -121,7 +121,7 @@ The binding mechanism is `core/host_binding.py`, vendored into each such unit as
 2. Add the field to `Host` with a comment naming its provider (`# storage.records.get_store`),
    plus a call shim for a function.
 3. Regenerate the wiring: `python3 scripts/check_independence.py --write-wiring`.
-4. Run `python3 scripts/check_independence.py --summary` and expect `TOTAL=0`.
+4. Run `python3 scripts/check_independence.py --summary` and read its counters.
 
 A new unit host also needs its `_binding.py` copy: add it to the
 `core/host_binding.py` entry of `[[tool.logos.vendored]]` and run `--sync-vendored`.
@@ -152,7 +152,7 @@ python3 scripts/check_independence.py --write-wiring
 | **W** wiring | hosts have no defaults and are registered by a root; every provider exists; every `bound.<name>` is a port; `composition/wiring.py` is current; no root reads an undefined name |
 | **D** docs | every unit has a README (Public API, Ports, Install; Role in a dialog for units on a dialog path), the life of a dialog matches the code and this map is current |
 
-The check is static and manual; it is not a CI gate. It prints `TOTAL=0`.
+The check is static and manual; it is not a CI gate.
 
 ## Current map
 

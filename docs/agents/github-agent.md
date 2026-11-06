@@ -1,6 +1,6 @@
 # Logos as a GitHub agent
 
-The workflow `logos.yml` was removed by #1592: the code runs only by hand, and this page describes the workflow it was built for.
+The workflow `logos.yml` was removed by #1592, and the runner stops at the D0 hold (`docs/agents/logos-native-quality.md`), so nothing here runs today. This page describes the workflow it was built for.
 
 Logos can take a GitHub issue and work on its own code. The headless runner is
 `issue_runner.py`.

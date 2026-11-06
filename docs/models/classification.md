@@ -39,10 +39,10 @@ numeric confidence values in `[0, 1]`, and the provider's `modelVersion` and
 upstream error, never a successful classification.
 
 The route resolves the same active deployment credential as chat on every
-request and uses the existing provider quota policy. It sends one POST to
+request. It sends one POST to
 `https://ai.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification`.
 It never automatically retries a failed POST. A transport failure has an unknown
-provider outcome and keeps its quota reservation; no provider cost is invented.
+provider outcome; no provider cost is invented.
 Upstream error bodies, credentials, input text, labels and samples are not
 included in diagnostic events.
 
