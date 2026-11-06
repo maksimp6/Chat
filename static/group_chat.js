@@ -130,8 +130,6 @@
     modal = UI.modal.create({
       id: "group-chat-modal",
       title: "Групповой чат",
-      titleTag: "h3",
-      className: "logos-dept-overlay",
       contentClassName: "logos-dept-card",
       closeAction: "group.close",
       body: body,

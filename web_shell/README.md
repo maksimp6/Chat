@@ -2,7 +2,7 @@
 
 `web_shell` · Serves the Logos web page and health and readiness endpoints.
 
-The web shell: the page, health, readiness and version endpoints, the Cache-Control and unexpected-error policy, and storage start-up.
+The web shell: the page, health, readiness, version and log endpoints, the Cache-Control and unexpected-error policy, and storage start-up.
 
 ## Role in a dialog
 
@@ -33,6 +33,7 @@ Everything `web_shell` uses from other units is a field of `Host` in [`web_shell
 | `get_store` | `storage.records.get_store` |
 | `memory_file_path` | `storage.records.memory_file_path` |
 | `problem` | `invocation.problems.problem` |
+| `read_log_entries` | `observability.system_log.read_entries` |
 | `storage_initializers` | `composition.web.STORAGE_INITIALIZERS` |
 
 ## Install

@@ -176,212 +176,47 @@
       <div id="overlay"></div>
       <div id="main">
         <div id="header">
-          <div class="header-row header-row-primary">
-            <button
-              id="menu-btn"
-              type="button"
-              class="header-btn logos-btn"
-              aria-label="Открыть меню"
-              aria-controls="sidebar"
-              aria-expanded="false"
-              data-action="sidebar.toggle"
-            >
-              ☰</button
-            ><button
-              id="system-status-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Состояние системы"
-              aria-label="Состояние системы"
-              aria-haspopup="dialog"
-              aria-expanded="false"
-              data-action="system-status.toggle"
-            >
-              ●</button
-            ><button
-              id="model-btn"
-              type="button"
-              class="header-btn model-btn logos-btn"
-              title="Модели"
-              aria-label="Модели"
-              data-action="modal.open"
-              data-modal="model-modal"
-            >
-              🤖</button
-            ><button
-              id="tools-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Локальные инструменты"
-              data-action="header.tools.open"
-            >
-              🧰</button
-            ><button
-              id="ssh-runtime-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="SSH Runtime"
-              aria-label="SSH Runtime"
-              data-action="header.ssh.open"
-            >
-              🔐
-            </button>
-            <span class="header-brand"
-              ><svg
-                class="brand-mark"
-                viewBox="0 0 20 20"
-                aria-hidden="true"
-                focusable="false"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.75"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="2" y="2" width="16" height="16" rx="5" />
-                <path d="M7 14c1.1 0 1.6-.9 1.6-2.6V6H13v8" /></svg
-              ><span class="brand-name">Логос</span></span
-            >
+          <!-- One grid, one kind of tile: a tile's title and aria-label name the window it opens, word for word, and every
+               tile stays visible (#1718). Order: the chat and its data, what Logos runs on, the keys, money and Court. -->
+          <div class="header-tiles">
+            <button id="menu-btn" type="button" class="header-btn logos-btn" title="Диалоги" aria-label="Диалоги" aria-controls="sidebar" aria-expanded="false" data-action="sidebar.toggle">☰</button>
+            <button id="system-status-btn" type="button" class="header-btn logos-btn" title="Состояние системы" aria-label="Состояние системы" data-action="modal.open" data-modal="logos-system-status">●</button>
+            <button id="model-btn" type="button" class="header-btn logos-btn" title="Модели" aria-label="Модели" data-action="modal.open" data-modal="model-modal">🤖</button>
+            <button id="memory-btn" type="button" class="header-btn logos-btn" title="Управление памятью" aria-label="Управление памятью" data-action="modal.open" data-modal="memoryModal">🧠</button>
+            <button id="file-manager-btn" type="button" class="header-btn logos-btn" title="Файловый менеджер" aria-label="Файловый менеджер" data-action="header.files.open">📁</button>
+            <button id="project-tree-btn" type="button" class="header-btn logos-btn" title="Структура проекта" aria-label="Структура проекта" data-action="project-tree.open">🌳</button>
+            <button id="group-chat-btn" type="button" class="header-btn logos-btn" title="Групповой чат" aria-label="Групповой чат" data-action="header.group.open">👥</button>
+            <button id="tools-btn" type="button" class="header-btn logos-btn" title="Инструменты" aria-label="Инструменты" data-action="header.tools.open">🧰</button>
+            <button id="mcp-btn" type="button" class="header-btn logos-btn" title="MCP серверы" aria-label="MCP серверы" data-action="header.mcp.open">🌐</button>
+            <button id="ssh-runtime-btn" type="button" class="header-btn logos-btn" title="Среда SSH" aria-label="Среда SSH" data-action="header.ssh.open">🔐</button>
+            <button id="environments-btn" type="button" class="header-btn logos-btn" title="Окружения" aria-label="Окружения" data-action="header.environments.open">🌿</button>
+            <button id="rdc-btn" type="button" class="header-btn logos-btn" title="RDC" aria-label="RDC" data-action="header.rdc.open">🖥️</button>
+            <button id="logs-btn" type="button" class="header-btn logos-btn" title="Логи" aria-label="Логи" data-action="header.logs.open">📄</button>
+            <button id="settings-btn" type="button" class="header-btn logos-btn" title="Настройки" aria-label="Настройки" data-action="header.settings.open">⚙️</button>
+            <button id="provider-credentials-btn" type="button" class="header-btn logos-btn" title="Ключи провайдеров" aria-label="Ключи провайдеров" data-action="header.credentials.open">🔑</button>
+            <button id="treasury-btn" type="button" class="header-btn logos-btn" title="Казна" aria-label="Казна" data-action="header.treasury.open">💰</button>
+            <button id="departments-btn" type="button" class="header-btn logos-btn" title="Отделы" aria-label="Отделы" data-action="header.departments.open">🏢</button>
+            <button id="court-btn" type="button" class="header-btn logos-btn" title="Зал заседаний" aria-label="Зал заседаний" data-action="header.court.open">⚖️</button>
+            <a id="court-cases-btn" class="header-btn logos-btn" href="https://github.com/maksimp6/Chat/issues?q=label%3Afrom-dialog+is%3Aopen+%D0%A1%D1%83%D0%B4+%D0%9B%D0%BE%D0%B3%D0%BE%D1%81%D0%B0" target="_blank" rel="noopener noreferrer external" title="Суд Логоса: открытые дела" aria-label="Суд Логоса: открытые дела">📋</a>
+            {% if donation_url %}<a id="donate-btn" class="header-btn logos-btn donate-btn" href="{{ donation_url }}" target="_blank" rel="noopener noreferrer external" title="Поддержать проект" aria-label="Поддержать проект"><img src="{{ static_root }}/icons/donate.svg?v={{ static_version }}" alt="" width="22" height="22" /></a>{% endif %}
+            <button id="theme-toggle" type="button" class="header-btn logos-btn" title="Цветовая схема" aria-label="Цветовая схема" data-action="theme.cycle">🌙</button>
           </div>
-          <div id="header-actions-2" class="header-row header-row-secondary">
-            <button
-              id="mcp-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Внешние MCP шлюзы"
-              data-action="header.mcp.open"
+          <span class="header-brand"
+            ><svg
+              class="brand-mark"
+              viewBox="0 0 20 20"
+              aria-hidden="true"
+              focusable="false"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             >
-              🌐</button
-            ><button
-              id="settings-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Параметры генерации"
-              data-action="header.settings.open"
-            >
-              ⚙️</button
-            ><button
-              id="file-manager-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Файловый менеджер"
-              data-action="header.files.open"
-            >
-              📁</button
-            ><button
-              id="treasury-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Казначейство"
-              aria-label="Казначейство"
-              data-action="header.treasury.open"
-            >
-              💰</button
-            ><button
-              id="dozzle-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Логи Dozzle"
-              aria-label="Логи Dozzle"
-              data-action="header.dozzle.open"
-            >
-              🐳</button
-            ><button
-              id="rdc-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="RDC — подключить к Логосу"
-              aria-label="RDC — подключить к Логосу"
-              data-action="header.rdc.connect"
-            >
-              🖥️</button
-            ><button
-              id="project-tree-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Структура проекта"
-              aria-label="Структура проекта"
-              data-action="project-tree.open"
-            >
-              🌳</button
-            ><button
-              id="departments-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Departments"
-              data-action="header.departments.open"
-            >
-              🏢</button
-            ><button
-              id="court-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Зал заседаний"
-              aria-label="Зал заседаний"
-              data-action="header.court.open"
-            >
-              ⚖️</button
-            ><button
-              id="group-chat-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Групповой чат"
-              aria-label="Групповой чат"
-              data-action="header.group.open"
-            >
-              👥</button
-            ><button
-              id="provider-credentials-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Ключи провайдеров"
-              aria-label="Ключи провайдеров"
-              data-action="header.credentials.open"
-            >
-              🔑</button
-            ><button
-              id="memory-btn"
-              type="button"
-              class="header-btn logos-btn"
-              title="Управление памятью"
-              aria-label="Управление памятью"
-              data-action="modal.open"
-              data-modal="memoryModal"
-            >
-              🧠</button
-            ><a
-              id="court-btn"
-              class="header-btn logos-btn court-btn"
-              href="https://github.com/maksimp6/Chat/issues?q=label%3Afrom-dialog+is%3Aopen+%D0%A1%D1%83%D0%B4+%D0%9B%D0%BE%D0%B3%D0%BE%D1%81%D0%B0"
-              target="_blank"
-              rel="noopener noreferrer external"
-              title="Суд Логоса: открытые дела"
-              aria-label="Суд Логоса: открытые дела"
-              >⚖️</a
-            >{% if donation_url %}<a
-              id="donate-btn"
-              class="header-btn donate-btn"
-              href="{{ donation_url }}"
-              target="_blank"
-              rel="noopener noreferrer external"
-              title="Поддержать проект"
-              aria-label="Поддержать проект"
-              ><img
-                src="{{ static_root }}/icons/donate.svg?v={{ static_version }}"
-                alt=""
-                width="22"
-                height="22" /></a
-            >{% endif %}<button
-              id="theme-toggle"
-              type="button"
-              class="header-btn logos-btn"
-              title="Цветовая схема"
-              aria-label="Цветовая схема"
-              data-action="theme.cycle"
-            >
-              🌙
-            </button>
-          </div>
+              <rect x="2" y="2" width="16" height="16" rx="5" />
+              <path d="M7 14c1.1 0 1.6-.9 1.6-2.6V6H13v8" /></svg
+            ><span class="brand-name">Логос</span></span
+          >
         </div>
         <div id="app-version" class="app-version" role="status" aria-live="polite"
              data-update-state="loaded" title="Версия интерфейса, загруженная этой вкладкой">
@@ -448,24 +283,28 @@
           </button>
         </div>
       </div>
-      <div
+      <dialog
         id="logos-system-status"
-        class="logos-system-status-panel"
+        class="modal"
         hidden
         role="dialog"
-        aria-modal="false"
+        aria-modal="true"
         aria-labelledby="logos-system-status-title"
       >
-        <div class="logos-system-status-content">
-          <div class="logos-system-status-header">
-            <h2 id="logos-system-status-title">Состояние системы</h2>
-            <button type="button" class="logos-btn logos-system-status-close" aria-label="Закрыть">
-              &times;
-            </button>
-          </div>
+        <div class="modal-content">
+          <button
+            type="button"
+            class="logos-btn modal-close"
+            aria-label="Закрыть"
+            data-action="modal.close"
+            data-modal="logos-system-status"
+          >
+            &times;
+          </button>
+          <h2 id="logos-system-status-title" class="modal-title">Состояние системы</h2>
           <div class="logos-system-status-list" aria-live="polite"></div>
         </div>
-      </div>
+      </dialog>
       <dialog
         id="model-modal"
         class="modal"
@@ -478,13 +317,14 @@
           <button
             id="close-modal"
             type="button"
-            class="logos-btn"
+            class="logos-btn modal-close"
+            aria-label="Закрыть"
             data-action="modal.close"
             data-modal="model-modal"
           >
             &times;
           </button>
-          <h3 id="model-modal-title">Модели</h3>
+          <h2 id="model-modal-title" class="modal-title">Модели</h2>
           <div id="model-list"></div>
         </div>
       </dialog>
@@ -499,7 +339,7 @@
         <div class="modal-content memory-modal-content">
           <button
             id="memoryCloseBtn"
-            class="memory-modal-close logos-btn"
+            class="logos-btn modal-close"
             type="button"
             aria-label="Закрыть"
             data-action="modal.close"
@@ -507,7 +347,7 @@
           >
             &times;
           </button>
-          <h2 id="memoryModalTitle" class="memory-modal-title">Управление памятью</h2>
+          <h2 id="memoryModalTitle" class="modal-title">Управление памятью</h2>
           <div class="memory-config">
             <label class="memory-config-option"
               ><input type="checkbox" id="memEnabled" disabled /> Включить память</label
@@ -528,6 +368,6 @@
     <script src="{{ static_root }}/header_actions.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/memory_panel.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/provider_credentials.js?v={{ static_version }}" defer></script>
-    <script src="{{ static_root }}/dozzle.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/logs.js?v={{ static_version }}" defer></script>
   </body>
 </html>

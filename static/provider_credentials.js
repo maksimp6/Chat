@@ -131,8 +131,7 @@
     body.className = "provider-credentials-body";
     var modal = UI.modal.create({
       id: "provider-credentials-modal",
-      title: "Провайдеры",
-      titleTag: "h3",
+      title: "Ключи провайдеров",
       className: "provider-credentials-modal",
       contentClassName: "provider-credentials-box",
       closeAction: "provider-credentials.close",

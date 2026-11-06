@@ -945,6 +945,7 @@ def _web_shell():
     from storage.records import get_store
     from storage.records import memory_file_path
     from invocation.problems import problem
+    from observability.system_log import read_entries as read_log_entries
     from composition.web import STORAGE_INITIALIZERS as storage_initializers
 
     return host.Host(
@@ -955,6 +956,7 @@ def _web_shell():
         get_store=get_store,
         memory_file_path=memory_file_path,
         problem=problem,
+        read_log_entries=read_log_entries,
         storage_initializers=storage_initializers,
     )
 

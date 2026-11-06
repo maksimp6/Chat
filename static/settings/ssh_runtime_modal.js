@@ -7,9 +7,8 @@
     if (existing) existing.remove();
     var tabSsh = [
       '<div id="tab-ssh" class="llm-tab-content">',
-      UI.section("SSH Runtime"),
       '<div id="ssh-settings-status" style="font-size:12px;color:var(--m-muted,#666);margin-bottom:10px;">Загрузка конфигурации...</div>',
-      UI.chk("set-ssh-enabled", false, "<strong>🔐 SSH Runtime</strong> включён"),
+      UI.chk("set-ssh-enabled", false, "<strong>🔐 Среда SSH</strong> включена"),
       UI.gap2(
         "<div>" + UI.chk("set-ssh-readonly", false, "Только чтение") + "</div>",
         "<div>" +
@@ -55,7 +54,7 @@
       "Приватный ключ и его содержимое никогда не передаются через этот интерфейс. В targets указывается только серверный путь к существующему ключу и known_hosts.",
       "</div>",
       '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">',
-      "Настройки SSH Runtime только для чтения: изменить их здесь нельзя.",
+      "Настройки среды SSH только для чтения: изменить их здесь нельзя.",
       "</div>",
       "</div>",
     ].join("");
@@ -74,14 +73,11 @@
 
     var ov = CoreUI.modal.create({
       id: "ssh-runtime-modal-custom",
-      title: "SSH Runtime",
+      title: "Среда SSH",
       className: "ssh-runtime-modal-custom",
       contentClassName: "ssh-runtime-modal-content",
       body: content,
     });
-    var modalContent = ov.querySelector(".modal-content");
-    // Layout only: background, border, radius and shadow come from the shared window shell (style.css).
-    modalContent.style.cssText = "padding:20px;";
     (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 

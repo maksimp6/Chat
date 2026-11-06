@@ -126,9 +126,6 @@
       contentClassName: "settings-tools-modal-content",
       body: md,
     });
-    var modalContent = ov.querySelector(".modal-content");
-    // Layout only: background, border, radius and shadow come from the shared window shell (style.css).
-    modalContent.style.cssText = "padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;";
     // Shown at once with its loading line; the categories fill it when they arrive. A click on the backdrop and Escape
     // close it through LogosCoreAPI.ui.modal.
     (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
@@ -527,13 +524,13 @@
 
     var ov = CoreUI.modal.create({
       id: "settings-modal-custom",
-      title: "Конфигурация LLM & Responses API",
+      title: "Настройки",
       contentClassName: "settings-modal-panel",
     });
     ov.style.zIndex = "10002";
     var md = ov.querySelector(".modal-content");
     // Layout only: background, border, radius and shadow come from the shared window shell (style.css).
-    md.style.cssText = "padding:20px;max-width:720px;overflow-y:auto;display:flex;flex-direction:column;";
+    md.style.cssText = "display:flex;flex-direction:column;";
     var title = md.querySelector(".modal-title");
     // Size, weight and colour come from the shared window-title rule (static/style.css).
     title.style.cssText = "margin:0;";
@@ -582,7 +579,7 @@
 
     var tabsHeader = [
       '<div class="settings-modal-top">',
-      '<div class="settings-modal-heading" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"></div>',
+      '<div class="settings-modal-heading" style="display:flex;justify-content:space-between;align-items:flex-start;"></div>',
       '<div class="llm-tabs">',
       '    <button class="logos-btn llm-tab-btn active settings-contract-btn" data-tab="tab-ollama">Ollama</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',

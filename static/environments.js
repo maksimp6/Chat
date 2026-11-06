@@ -270,16 +270,5 @@
   });
 
 
-  document.addEventListener("DOMContentLoaded", () => {
-    const header = document.getElementById("header-actions-2");
-    if (!header || document.getElementById("environments-btn")) return;
-    const button = document.createElement("button");
-    button.id = "environments-btn";
-    button.className = "logos-btn header-btn";
-    button.title = "Окружения";
-    button.setAttribute("aria-label", "Окружения");
-    button.textContent = "🌿";
-    button.onclick = open;
-    header.insertBefore(button, header.firstChild);
-  });
+  window.openEnvironmentsModal = open;
 })();

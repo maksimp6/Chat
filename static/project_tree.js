@@ -60,7 +60,6 @@
     var modal = UI.modal.create({
       id: "project-tree-modal",
       title: "Структура проекта",
-      titleTag: "h3",
       closeAction: "project-tree.close",
       body: body,
     });

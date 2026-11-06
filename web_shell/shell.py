@@ -23,6 +23,7 @@ from web_shell.host import (
     get_store,
     memory_file_path,
     problem,
+    read_log_entries,
 )
 from web_shell.compression import install as install_compression
 from web_shell.version import boot_version, static_file_states
@@ -155,6 +156,19 @@ def loaded_version():
     return jsonify(dict(APP_VERSION))
 
 
+def system_log():
+    """GET /api/logs: the system log for the header's logs window (static/logs.js)."""
+    args = request.args
+    return jsonify(
+        read_log_entries(
+            before=args.get("before", type=int),
+            after=args.get("after", type=int),
+            level=args.get("level", ""),
+            text=args.get("q", ""),
+        )
+    )
+
+
 def bootstrap_local_user():
     """Compatibility endpoint for older clients; no registration or token is needed."""
     return jsonify({"user_id": get_current_owner_id(), "status": "local"})
@@ -193,6 +207,7 @@ def install(app: Application) -> None:
     app.add_url_rule("/healthz", view_func=healthz, methods=["GET"])
     app.add_url_rule("/readyz", view_func=readyz, methods=["GET"])
     app.add_url_rule("/api/version", view_func=loaded_version, methods=["GET"])
+    app.add_url_rule("/api/logs", view_func=system_log, methods=["GET"])
     app.add_url_rule(
         "/api/users/bootstrap", view_func=bootstrap_local_user, methods=["POST"]
     )

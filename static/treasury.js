@@ -34,11 +34,10 @@
 
     treasuryModal = UI.modal.create({
       id: "treasury-modal",
-      title: "Казначейство",
-      titleTag: "h3",
+      title: "Казна",
       className: "treasury-modal",
       contentClassName: "treasury-modal-content",
-      closeLabel: "Закрыть казначейство",
+      closeLabel: "Закрыть казну",
       closeAction: "treasury.close",
       body: body,
     });

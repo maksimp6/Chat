@@ -155,16 +155,16 @@ HTML/CSS/critical-script chain (~89 KiB) has arrived but the remaining
   wired by `static/models.js`.
 - **Settings, MCP configuration, provider credentials, SSH runtime, file
   manager, project tree, treasury, departments, environments, partner
-  relations, memory panel, trace viewer, voice input, and dozzle logs** are
+  relations, memory panel, trace viewer, voice input, and the logs window** are
   each owned by their own deferred module (`settings.js` and
   `static/settings/*.js`, `provider_credentials.js`,
   `settings/ssh_runtime_modal.js`, `file_manager.js`, `project_tree.js`,
   `treasury.js`, `departments.js`, `environments.js`,
   `partner_relations.js`, `memory_panel.js`, `trace_viewer*.js`, `voice.js`,
-  `dozzle.js`) and are unavailable until that module loads.
+  `logs.js`) and are unavailable until that module loads.
 - **Most header buttons cannot act** until `header_actions.js` (also
-  deferred) registers their handlers, and `sidebar.js`, `models.js` and
-  `system_status.js` register theirs only at DOMContentLoaded. Since
+  deferred) registers their handlers, and `sidebar.js` and `models.js`
+  register theirs only at DOMContentLoaded. Since
   05.11.2026 such a tap is not lost (the owner's header icons did not respond
   on a 10 KB/s phone): `static/boot.js` keeps the latest tap on a
   `button[data-action]` until the click dispatcher in `static/core_api.js`
@@ -172,9 +172,7 @@ HTML/CSS/critical-script chain (~89 KiB) has arrived but the remaining
   scripts have all run (a window opened earlier, such as 🤖 models or 🧠
   memory, would show before its script fills it), the button pulses with an
   outline (`.logos-action-pending`), and the latest such tap runs once the
-  page's scripts have all run. A button that opens a
-  new tab (🐳 Dozzle logs) may then be stopped by the browser's pop-up
-  blocker, since the replayed tap is no longer a user gesture. This added
+  page's scripts have all run. This added
   1,427 B to `boot.js` and 2,493 B to `core_api.js`.
 - `android_diagnostics.js` and `eruda_init.js` are already explicitly
   marked `data-optional-script="true"` and are debug/diagnostic tooling,

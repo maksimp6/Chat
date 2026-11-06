@@ -18,7 +18,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 
 | Module | Purpose |
 | --- | --- |
-| [`observability.system_log`](system_log.py) | Centralized process-level system log. |
+| [`observability.system_log`](system_log.py) | Centralized process-level system log; `read_entries` reads it for the logs window (`GET /api/logs`). |
 | [`observability.trace_manager`](trace_manager.py) | Centralized execution trace for the Logos chat pipeline. |
 
 Other units reach it only through their own ports:

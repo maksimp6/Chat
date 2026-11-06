@@ -679,15 +679,14 @@ body {
   background: var(--bg-app);
 }
 
-/* Header: the page colour with one hairline under it, no gradient or heavy shadow. Two rows of 44px icon tiles;
-   the brand ends the first row. */
+/* Header: the page colour with one hairline under it, no gradient or heavy shadow. Every tile sits in one grid, so the
+   columns line up in every row at any width; the rows wrap and every tile stays visible (#1718). The brand ends it. */
 .logos-pro-app #header {
   position: relative;
   z-index: 2;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 12px;
   flex-shrink: 0;
   padding: calc(10px + env(safe-area-inset-top, 0px)) max(15px, env(safe-area-inset-right, 0px)) 10px
     max(15px, env(safe-area-inset-left, 0px));
@@ -696,43 +695,28 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.logos-pro-app #header .header-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.logos-pro-app .header-tiles {
+  flex: 1 1 0;
   min-width: 0;
-  flex: 0 1 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 44px);
+  justify-content: space-between;
+  gap: 6px;
 }
 
-/* The wide screen scrolls the second row sideways; the padding keeps the tiles' focus ring inside the scroll box. */
-.logos-pro-app #header .header-row-secondary {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 3px;
-  margin: -3px;
-}
-
-/* Phone width: the second button row wraps instead of scrolling sideways, so every button is visible (#1718). */
 @media (max-width: 768px) {
   .logos-pro-app #header {
     padding-left: max(10px, env(safe-area-inset-left, 0px));
     padding-right: max(10px, env(safe-area-inset-right, 0px));
   }
-  .logos-pro-app #header .header-row-secondary {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
 }
 
-/* One tile for every header action: a muted line icon on a clear tile, a raised tile on hover, gold when open. */
+/* One tile for every header action: a muted line icon on a clear tile, gold while the sidebar it opens is out. Hover is
+   for a real pointer only: on a touch screen it would stay on the last tile tapped. A press shows at once. */
 .logos-pro-app .header-btn {
   box-sizing: border-box;
-  flex: 0 0 44px;
   width: 44px;
   height: 44px;
-  min-width: 44px;
-  min-height: 44px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -745,21 +729,29 @@ body {
   line-height: 1;
   text-decoration: none;
   cursor: pointer;
+  touch-action: manipulation;
   transition:
     background-color 0.15s ease,
     color 0.15s ease;
 }
-.logos-pro-app .header-btn:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .logos-pro-app .header-btn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  /* White tiles on a white page: the hovered tile is outlined instead. */
+  [data-theme="high-contrast"] .logos-pro-app .header-btn:hover {
+    border-color: var(--text);
+  }
+}
+.logos-pro-app .header-btn:active {
+  background: var(--surface-3);
   color: var(--text);
+  transition: none;
 }
 .logos-pro-app .header-btn:is([aria-expanded="true"], [aria-pressed="true"], .active) {
   background: var(--accent-soft);
   color: var(--accent);
-}
-/* White tiles on a white page: the hovered tile is outlined instead. */
-[data-theme="high-contrast"] .logos-pro-app .header-btn:hover {
-  border-color: var(--text);
 }
 
 .logos-pro-app .donate-btn img,
@@ -768,9 +760,11 @@ body {
   pointer-events: none;
 }
 
-/* Brand: the «Л» mark and the name in the UI font. */
+/* Brand: the «Л» mark and the name in the UI font, on the line of the first row of tiles. A narrow phone has no room
+   for it; the empty chat still shows the mark and the name. */
 .logos-pro-app #header .header-brand {
-  margin-left: auto;
+  flex: none;
+  height: 44px;
   padding-right: 4px;
   display: inline-flex;
   align-items: center;
@@ -787,19 +781,7 @@ body {
   flex: none;
   display: block;
 }
-/* A narrow phone: both rows flow as one wrapped group, so the 21 tiles fill three full rows of seven instead of
-   four rows with one tile alone on the last (the header took a quarter of an 812px screen). The brand leaves the
-   header here; the empty chat still shows the mark and the name. Every button stays visible (#1718). */
 @media (max-width: 480px) {
-  .logos-pro-app #header {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .logos-pro-app #header .header-row {
-    display: contents;
-  }
   .logos-pro-app #header .header-brand {
     display: none;
   }
@@ -1076,29 +1058,28 @@ body {
   }
 }
 
-/* Modals: one shell for every window and popover. :where() gives it to windows appended to <body> as well, at zero
-   specificity, so a window's own rule (width, padding) still wins. */
-:where(.modal, .logos-dept-overlay) {
-  background: var(--backdrop);
-}
-:where(.modal-content, .logos-dept-card, .logos-system-status-content) {
-  background: var(--surface-1);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-modal);
-  box-shadow: var(--shadow-modal);
-}
+/* Windows: one frame for everything the header opens, built by LogosCoreAPI.ui.modal. No window has a size of its own:
+   all stand at the same place with the same width, padding, title and ×, and grow downward, so the title and the × do
+   not move while the content loads (owner, 06.11.2026: "it is not standartized"). */
 .logos-pro-app .modal {
   display: none;
   position: fixed;
   inset: 0;
+  box-sizing: border-box;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
   background: var(--backdrop);
   z-index: 1000;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
 }
 .logos-pro-app .modal.visible {
   display: flex;
+}
+@media (min-width: 769px) {
+  .logos-pro-app .modal {
+    padding-top: 48px;
+    padding-bottom: 48px;
+  }
 }
 
 /* Keep the existing full-screen modal layout inside the native dialog top layer. */
@@ -1108,9 +1089,7 @@ body {
   max-width: none;
   max-height: none;
   margin: 0;
-  padding: 0;
   border: 0;
-  box-sizing: border-box;
   color: inherit;
 }
 .logos-pro-app dialog.modal::backdrop {
@@ -1118,45 +1097,34 @@ body {
 }
 
 .logos-pro-app .modal-content {
+  box-sizing: border-box;
   background: var(--surface-1);
   color: var(--text);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-modal);
   box-shadow: var(--shadow-modal);
-  padding: 24px;
-  width: min(500px, calc(100vw - 24px));
+  padding: 20px;
+  width: min(720px, 100%);
   max-width: 100%;
-  max-height: calc(100% - 24px);
+  max-height: 100%;
   overflow-y: auto;
+  overflow-wrap: break-word;
   position: relative;
-}
-.logos-pro-app .modal > .modal-content {
-  margin: auto;
-}
-/* Размеры окон, которые раньше задавались инлайн-стилями (пункты 80, 81) */
-.logos-pro-app .ssh-runtime-modal-content {
-  max-width: 720px;
-  width: 94%;
-  max-height: calc(100% - 24px);
-}
-.logos-pro-app .settings-mcp-modal-content {
-  max-width: 600px;
-  width: 90%;
-  max-height: calc(100% - 24px);
-}
-.logos-pro-app .settings-modal-panel {
-  width: 94%;
-  max-height: calc(100% - 24px);
 }
 /* Кнопка закрытия: липкая справа сверху, поэтому остаётся видимой при прокрутке .modal-content (пункты 23, 30).
    Вынесена в поток через float, а не absolute: при absolute она уезжала вместе с прокруткой. */
 .logos-pro-app .modal-close {
   position: sticky;
   top: 0;
+  z-index: 1;
   float: right;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 44px;
   height: 44px;
   margin: -8px -8px 0 8px;
+  padding: 0;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -1164,10 +1132,6 @@ body {
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
-}
-.logos-pro-app .modal-close:hover {
-  background: var(--surface-2);
-  color: var(--text);
 }
 .logos-pro-app .modal-content h3 {
   margin-top: 0;
@@ -1331,15 +1295,6 @@ body {
 }
 
 /* Treasury modal */
-.logos-pro-app .treasury-modal {
-  z-index: 1100;
-  padding: env(safe-area-inset-top, 0px) 12px env(safe-area-inset-bottom, 0px);
-}
-
-.logos-pro-app .treasury-modal-content {
-  padding: 24px;
-}
-
 .logos-pro-app .treasury-balance-card {
   display: flex;
   align-items: baseline;
@@ -1471,16 +1426,6 @@ body {
 }
 
 @media (max-width: 520px) {
-  .logos-pro-app .treasury-modal {
-    padding-left: 8px;
-    padding-right: 8px;
-  }
-
-  .logos-pro-app .treasury-modal-content {
-    width: 100%;
-    padding: 20px;
-  }
-
   .logos-pro-app .treasury-top-up-row {
     flex-direction: column;
   }
@@ -1490,49 +1435,6 @@ body {
   }
 }
 /* Memory panel: HTML-first structure, presentation owned by CSS. */
-.logos-pro-app .memory-modal {
-  z-index: 100000;
-  padding: 20px;
-  background: var(--backdrop);
-}
-
-.logos-pro-app .memory-modal[hidden] {
-  display: none;
-}
-
-/* The window wears the shared modal shell (surface, edge, radius, shadow, UI font). */
-.logos-pro-app .memory-modal-content {
-  width: min(560px, calc(100vw - 24px));
-}
-
-/* The close button is the same clear 44px square as .modal-close, and stays in view while the window scrolls. */
-.logos-pro-app .memory-modal-close {
-  position: sticky;
-  top: 0;
-  float: right;
-  width: 44px;
-  height: 44px;
-  margin: -8px -8px 0 8px;
-  padding: 0;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-}
-.logos-pro-app .memory-modal-close:hover {
-  background: var(--surface-2);
-  color: var(--text);
-}
-
-.logos-pro-app .memory-modal-title {
-  margin: 0 0 12px;
-  font-size: 17px;
-  font-weight: 600;
-}
-
 /* The two read-only settings: each control sits inline with its label. */
 .logos-pro-app .memory-config {
   display: flex;
@@ -1926,9 +1828,6 @@ body {
 }
 .logos-pro-app .file-manager-add-modal {
   z-index: 10002;
-}
-.logos-pro-app .file-manager-box {
-  width: min(720px, calc(100vw - 24px));
 }
 
 /* Chat markdown and reasoning presentation. */
@@ -2458,10 +2357,6 @@ body {
 
 /* === SYSTEM STATUS MODULE === */
 /* The header mark is muted like the other icons while all is well; a problem colours it. */
-.logos-pro-app #system-status-btn {
-  position: relative;
-  font-size: 18px;
-}
 .logos-pro-app #system-status-btn[data-state="degraded"] {
   color: var(--warning);
 }
@@ -2471,51 +2366,6 @@ body {
   color: var(--danger);
 }
 
-/* system_status.js sets --status-panel-top to the header's real bottom edge, so the dimmed layer never covers (and
-   swallows taps on) a wrapped header row. */
-.logos-pro-app .logos-system-status-panel {
-  position: fixed;
-  inset: var(--status-panel-top, var(--header-h)) 0 0 0;
-  z-index: 100020;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding: 8px 12px 12px;
-  background: rgba(0, 0, 0, 0.28);
-}
-.logos-pro-app .logos-system-status-panel[hidden] {
-  display: none;
-}
-
-/* The popover wears the modal shell: same surface, edge, radius and shadow. */
-.logos-pro-app .logos-system-status-content {
-  width: min(360px, 100%);
-  /* The panel's own height: it already ends at the screen's bottom edge, whatever the header's height. */
-  max-height: 100%;
-  overflow-y: auto;
-  padding: 16px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-modal);
-  background: var(--surface-1);
-  color: var(--text);
-  box-shadow: var(--shadow-modal);
-}
-.logos-pro-app .logos-system-status-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.logos-pro-app .logos-system-status-header h2 {
-  font-size: 16px;
-  margin: 0;
-}
-.logos-pro-app .logos-system-status-close {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-}
 .logos-pro-app .logos-system-status-list {
   display: flex;
   flex-direction: column;
@@ -2618,7 +2468,7 @@ body {
 
 /* Window titles: plain text in the UI font, 17px/600, with one 12px gap under them (the emoji are gone from the
    titles). :where() keeps this at zero specificity and reaches windows appended to <body> as well. */
-:where(.modal-content > .modal-title, .settings-modal-heading > .modal-title, #model-modal-title, #memoryModalTitle) {
+:where(.modal-content > .modal-title, .settings-modal-heading > .modal-title) {
   margin: 0 0 12px;
   color: var(--text);
   font-size: 17px;
@@ -2661,12 +2511,6 @@ body {
 /* The scroll box would clip an outer ring, so a focused tab is ringed inside. */
 .logos-pro-app .llm-tab-btn:focus-visible {
   box-shadow: inset var(--focus-ring);
-}
-.logos-pro-app #set-close-btn {
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
-  font-size: 24px;
 }
 .logos-pro-app .llm-tab-btn.active {
   color: var(--text);
@@ -2763,9 +2607,6 @@ body {
 }
 .logos-pro-app .logos-system-status-revoke {
   font-size: 12px;
-}
-.logos-pro-app .memory-modal-close {
-  font-size: 24px;
 }
 
 /* Индикатор набора ответа (пункт 16) */
@@ -2864,41 +2705,6 @@ body {
   padding: 0 16px;
   border-radius: 10px;
 }
-/* The dialog close buttons look the same as .modal-close: a clear 44px square with the glyph, raised on hover. */
-.logos-pro-app #close-modal,
-.logos-pro-app #set-close-btn,
-.logos-pro-app button.logos-system-status-close {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-}
-.logos-pro-app #close-modal:hover,
-.logos-pro-app #set-close-btn:hover,
-.logos-pro-app button.logos-system-status-close:hover {
-  background: var(--surface-2);
-  color: var(--text);
-}
-/* The model picker scrolls as a whole; its close button stays at the top like .modal-close. */
-.logos-pro-app #close-modal {
-  position: sticky;
-  top: 0;
-  right: auto;
-  float: right;
-  margin: -12px -12px 0 8px;
-  z-index: 1;
-}
 /* «Трассировка» is a text action with a full touch target. */
 .logos-pro-app .logos-trace-open-viewer {
   min-height: 44px;
@@ -2912,6 +2718,10 @@ body {
    which an Android WebView may not show. Buttons keep the 44px touch target. */
 .logos-pro-app .logos-dialog-content {
   width: min(420px, calc(100vw - 32px));
+}
+/* A question stands in the middle of the screen: it is not a window of the header. */
+.logos-pro-app .modal.logos-dialog {
+  align-items: center;
 }
 .logos-pro-app .logos-dialog-message {
   margin: 0 0 16px;
@@ -3019,14 +2829,14 @@ body {
 /* Line icons: one monochrome set drawn with masks in the button's own text colour, so a tile's muted, hover and
    open colours colour its icon too; the emoji stay only as text fallback (font-size 0 hides them). The sidebar's
    close, rename and delete icons are drawn the same way in the Sidebar section. */
-.logos-pro-app #header .header-btn:not(#system-status-btn),
+.logos-pro-app #header .header-btn,
 .logos-pro-app #attach-btn,
 .logos-pro-app #mic-btn,
 .logos-pro-app #send-btn {
   font-size: 0 !important;
   position: relative;
 }
-.logos-pro-app #header .header-btn:not(#system-status-btn)::before,
+.logos-pro-app #header .header-btn::before,
 .logos-pro-app #attach-btn::before,
 .logos-pro-app #mic-btn::before,
 .logos-pro-app #send-btn::before {
@@ -3049,16 +2859,22 @@ body {
 .logos-pro-app #settings-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h11.5M19.5 6H21M3 12h4M11 12h10M3 18h12.5M20.5 18H21'/><circle cx='17' cy='6' r='2.5'/><circle cx='9' cy='12' r='2'/><circle cx='18' cy='18' r='2.5'/></svg>");}
 .logos-pro-app #file-manager-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/></svg>");}
 .logos-pro-app #treasury-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 7V6a2 2 0 0 1 2-2h11M16 14h2'/></svg>");}
-.logos-pro-app #dozzle-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M5 4h14v16H5zM8.5 9h7M8.5 12.5h7M8.5 16h4'/></svg>");}
+.logos-pro-app #logs-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M5 4h14v16H5zM8.5 9h7M8.5 12.5h7M8.5 16h4'/></svg>");}
 .logos-pro-app #rdc-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='12' rx='2'/><path d='M8 20h8M12 16v4M10 8h4v4M14 8l-5 5'/></svg>");}
 .logos-pro-app #project-tree-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='5' r='2'/><circle cx='5' cy='19' r='2'/><circle cx='19' cy='19' r='2'/><path d='M12 7v4M12 11H5v6M12 11h7v6'/></svg>");}
 .logos-pro-app #departments-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M5 21V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v17M15 9h3a1 1 0 0 1 1 1v11M3 21h18M9 7h2M9 11h2M9 15h2'/></svg>");}
-.logos-pro-app button#court-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18'/></svg>");}
-.logos-pro-app a#court-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3v18M7 21h10M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z'/></svg>");}
+.logos-pro-app #court-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18'/></svg>");}
+.logos-pro-app #court-cases-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3v18M7 21h10M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z'/></svg>");}
 .logos-pro-app #group-chat-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='9' cy='8' r='3'/><path d='M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5.5M18 14a6 6 0 0 1 3 6'/></svg>");}
 .logos-pro-app #provider-credentials-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='8' cy='15' r='4'/><path d='M10.8 12.2 20 3M16 7l3 3M14 9l2 2'/></svg>");}
 .logos-pro-app #memory-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><ellipse cx='12' cy='5' rx='8' ry='3'/><path d='M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3'/></svg>");}
 .logos-pro-app #theme-toggle{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M12 3a9 9 0 0 1 0 18z' fill='black'/></svg>");}
+/* The status tile changes its line icon with the state; system_status.js sets data-state. */
+.logos-pro-app #system-status-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/></svg>");}
+.logos-pro-app #system-status-btn:is([data-state="ready"],[data-state="stopped"]){--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M8 12.5l2.8 2.8L16 9.5'/></svg>");}
+.logos-pro-app #system-status-btn:is([data-state="running"],[data-state="waiting"]){--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3.5 2'/></svg>");}
+.logos-pro-app #system-status-btn[data-state="degraded"]{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M12 4 2.5 20h19zM12 10v5M12 17.5v.01'/></svg>");}
+.logos-pro-app #system-status-btn:is([data-state="blocked"],[data-state="revoked"],[data-state="error"]){--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M9 9l6 6M15 9l-6 6'/></svg>");}
 /* The donate tile wears the same line heart as its neighbours; its coloured img stays in the markup for no-CSS. */
 .logos-pro-app #donate-btn{--ico:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M12 20s-7-4.4-8.8-8.6C1.9 8.3 3.8 5 7 5c2 0 3.3 1 4.1 2.3h1.8C13.7 6 15 5 17 5c3.2 0 5.1 3.3 3.8 6.4C19 15.6 12 20 12 20z'/></svg>");}
 .logos-pro-app #header .donate-btn img { display: none; }
@@ -3303,4 +3119,83 @@ body {
   .logos-pro-app .logos-action-pending {
     animation: none;
   }
+}
+
+/* The logs window (static/logs.js): filters, then the records, newest first. */
+.logos-pro-app .logs-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.logos-pro-app .logs-search {
+  box-sizing: border-box;
+  flex: 1 1 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+.logos-pro-app .logs-filter {
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+.logos-pro-app .logs-filter[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+.logos-pro-app .logs-status {
+  min-height: 16px;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.logos-pro-app .logs-row {
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.logos-pro-app .logs-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  color: var(--text-muted);
+}
+.logos-pro-app .logs-level {
+  font-weight: 600;
+}
+.logos-pro-app .logs-row[data-level="WARNING"] .logs-level {
+  color: var(--warning);
+}
+.logos-pro-app .logs-row:is([data-level="ERROR"], [data-level="CRITICAL"]) .logs-level {
+  color: var(--danger);
+}
+.logos-pro-app .logs-text {
+  margin-top: 2px;
+  font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.logos-pro-app .logs-more {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+}
+
+/* The RDC window (static/settings/settings_mcp.js): the state, the server's address, the button. */
+.logos-pro-app .rdc-state {
+  margin: 0 0 4px;
+}
+.logos-pro-app .rdc-address {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }

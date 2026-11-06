@@ -557,7 +557,7 @@
       "modal-content" +
       (options.contentClassName ? " " + String(options.contentClassName).trim() : "");
 
-    var title = document.createElement(options.titleTag || "h2");
+    var title = document.createElement("h2");
     title.id = modal.id + "-title";
     title.className = "modal-title";
     title.textContent = String(options.title);
@@ -665,8 +665,6 @@
 
   function openModal(modal) {
     prepareModal(modal);
-    // A window covers the page, so a panel left open under it (the status popover) closes first: one at a time.
-    closeOpenPanels(modal);
     modal.hidden = false;
     modal.classList.add("visible");
     modal.setAttribute("aria-hidden", "false");
@@ -693,58 +691,6 @@
     return modal;
   }
 
-  // Panels outside the browser's top layer: the status popover (registered through ui.panel) and the plain overlays
-  // the court hall and partner relations put on <body> (div.logos-dept-overlay, closed by a click on their backdrop).
-  // Nothing closed them: they stayed open under every window opened later, and Escape did nothing. Now a window or a
-  // panel that opens closes them, and Escape closes the top-most.
-  var openPanels = [];
-
-  function isShown(element) {
-    return element.isConnected && !element.hidden;
-  }
-
-  function forgetPanel(element) {
-    openPanels = openPanels.filter(function (entry) {
-      return entry.element !== element && isShown(entry.element);
-    });
-  }
-
-  function plainOverlays() {
-    return Array.prototype.filter.call(document.querySelectorAll("div.logos-dept-overlay"), isShown);
-  }
-
-  function closePanelEntry(entry) {
-    forgetPanel(entry.element);
-    try {
-      entry.close();
-    } catch (error) {
-      console.error("[UI PANEL]", error);
-    }
-  }
-
-  function closeOverlay(overlay) {
-    // The overlay's own backdrop handler closes it (court.js, partner_relations.js).
-    overlay.click();
-  }
-
-  function closeOpenPanels(keep) {
-    openPanels.slice().forEach(function (entry) {
-      if (entry.element !== keep && isShown(entry.element)) closePanelEntry(entry);
-    });
-    plainOverlays().forEach(function (overlay) {
-      if (overlay !== keep) closeOverlay(overlay);
-    });
-  }
-
-  function panelOpened(element, close) {
-    if (!element || typeof close !== "function") {
-      throw new Error("UI panel requires an element and a close function");
-    }
-    closeOpenPanels(element);
-    forgetPanel(element);
-    openPanels.push({ element: element, close: close });
-  }
-
   // The window Escape is for. Focus is only ever inside the top-most window (the browser makes the ones under it
   // inert); with focus elsewhere it is the newest window opened here. A window shown another way (the confirm and
   // prompt questions) is left to its own handler and the browser's Escape.
@@ -759,29 +705,15 @@
     return shownModals.length ? shownModals[shownModals.length - 1] : null;
   }
 
-  // Escape closes the top-most open thing: a window, else a plain overlay, else the newest panel.
+  // Escape closes the top-most window.
   function onEscapeKey(event) {
     if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
-    if (document.querySelector("dialog[open]")) {
-      var dialog = escapeDialog(event.target);
-      if (!dialog) return;
-      // Prevented, the key does not also reach the browser's own Escape, which would then close a second window.
-      event.preventDefault();
-      // The cancel event is the path the browser's Escape takes, so the window's own handlers run.
-      if (dialog.dispatchEvent(new Event("cancel", { cancelable: true })) && dialog.open) dialog.close();
-      return;
-    }
-    var overlays = plainOverlays();
-    if (overlays.length) {
-      event.preventDefault();
-      closeOverlay(overlays[overlays.length - 1]);
-      return;
-    }
-    forgetPanel(null);
-    var entry = openPanels[openPanels.length - 1];
-    if (!entry) return;
+    var dialog = escapeDialog(event.target);
+    if (!dialog) return;
+    // Prevented, the key does not also reach the browser's own Escape, which would then close a second window.
     event.preventDefault();
-    closePanelEntry(entry);
+    // The cancel event is the path the browser's Escape takes, so the window's own handlers run.
+    if (dialog.dispatchEvent(new Event("cancel", { cancelable: true })) && dialog.open) dialog.close();
   }
 
   if (typeof document.addEventListener === "function") {
@@ -851,7 +783,6 @@
       events: Object.freeze({ mountClicks: mountClickDispatcher }),
       modal: Object.freeze({ create: createModal, open: openModal, close: closeModal }),
       // A non-modal panel reports itself shown (with its close function) and hidden.
-      panel: Object.freeze({ opened: panelOpened, closed: forgetPanel }),
     }),
   });
 

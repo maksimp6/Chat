@@ -51,11 +51,6 @@
     return h("span", { class: "logos-court-badge logos-court-badge-" + cls }, verdict || "—");
   }
 
-  function closeModal() {
-    var existing = document.getElementById(MODAL_ID);
-    if (existing) existing.remove();
-  }
-
   function summaryLine(summary) {
     return ["ПРАВО", "БЕСПОЛЕЗНОЕ", "СКОЛЬЗКО", "ТЯЖКОЕ"]
       .map(function (key) {
@@ -97,18 +92,12 @@
   }
 
   function openCourtHall() {
-    closeModal();
+    var existing = document.getElementById(MODAL_ID);
+    if (existing) existing.remove();
 
-    var overlay = h("div", { id: MODAL_ID, class: "logos-dept-overlay" });
-    var card = h("div", { class: "logos-dept-card logos-court-card" });
-    var head = h("div", { class: "logos-dept-head" });
-    head.appendChild(h("h3", {}, "Зал заседаний"));
-    var close = h("button", { type: "button", "aria-label": "Закрыть" }, "×");
-    close.onclick = closeModal;
-    head.appendChild(close);
-    card.appendChild(head);
-
-    card.appendChild(
+    var UI = window.LogosCoreAPI.ui;
+    var body = h("div");
+    body.appendChild(
       h(
         "div",
         { class: "logos-court-note" },
@@ -119,13 +108,16 @@
     );
 
     var list = h("div", { class: "logos-dept-list" }, "Загрузка…");
-    card.appendChild(list);
-    overlay.appendChild(card);
-    document.body.appendChild(overlay);
+    body.appendChild(list);
 
-    overlay.addEventListener("click", function (event) {
-      if (event.target === overlay) closeModal();
+    var modal = UI.modal.create({
+      id: MODAL_ID,
+      title: "Зал заседаний",
+      contentClassName: "logos-dept-card",
+      body: body,
     });
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
+    UI.modal.open(modal);
 
     api("/api/court/hearings")
       .then(function (data) {

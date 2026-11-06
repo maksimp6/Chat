@@ -22,6 +22,7 @@ class Host:
     get_store: Any  # storage.records.get_store
     memory_file_path: Any  # storage.records.memory_file_path
     problem: Any  # invocation.problems.problem
+    read_log_entries: Any  # observability.system_log.read_entries
     storage_initializers: Any  # composition.web.STORAGE_INITIALIZERS
 
 
@@ -44,6 +45,7 @@ __all__ = [
     "memory_file_path",
     "problem",
     "provide",
+    "read_log_entries",
 ]
 
 
@@ -69,3 +71,7 @@ def memory_file_path(*args: Any, **kwargs: Any) -> Any:
 
 def problem(*args: Any, **kwargs: Any) -> Any:
     return current().problem(*args, **kwargs)
+
+
+def read_log_entries(*args: Any, **kwargs: Any) -> Any:
+    return current().read_log_entries(*args, **kwargs)

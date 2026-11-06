@@ -104,72 +104,11 @@
 
   function bind() {
     var button = document.getElementById("system-status-btn");
-    var panel = getRoot();
-    if (!button || !panel || button.dataset.statusBound === "true") return;
+    if (!button || !getRoot() || button.dataset.statusBound === "true") return;
 
     button.dataset.statusBound = "true";
-    var header = document.getElementById("header");
-    var panels = window.LogosCoreAPI.ui.panel;
 
-    function isOpen() {
-      return !panel.hasAttribute("hidden");
-    }
-
-    // The popover starts at the header's real bottom edge. The header grows when its second row wraps on a phone
-    // (#1718) and by the safe-area inset; with the fixed --header-h the dimmed layer lay over the lower icon rows, and
-    // a tap on one of them only closed the popover.
-    function place() {
-      if (!header) return;
-      var bottom = Math.max(0, Math.round(header.getBoundingClientRect().bottom));
-      panel.style.setProperty("--status-panel-top", bottom + "px");
-    }
-
-    function close() {
-      var hadFocus = panel.contains(document.activeElement);
-      panel.setAttribute("hidden", "");
-      button.setAttribute("aria-expanded", "false");
-      panels.closed(panel);
-      // Closed from inside (Escape, ×), focus goes back to the button instead of dropping to the page.
-      if (hadFocus) button.focus();
-    }
-
-    function open() {
-      place();
-      panel.removeAttribute("hidden");
-      button.setAttribute("aria-expanded", "true");
-      // Registered, the popover closes when a window or another panel opens, and on Escape.
-      panels.opened(panel, close);
-    }
-
-    window.LogosCoreAPI.ui.actions.register("system-status.toggle", function () {
-      if (isOpen()) close();
-      else open();
-    });
-
-    var closeButton = panel.querySelector(".logos-system-status-close");
-    if (closeButton) closeButton.addEventListener("click", close);
-
-    panel.addEventListener("click", function (event) {
-      if (event.target === panel) close();
-    });
-
-    // Any other tap in the header (a window, the menu, a link, the theme) closes the popover before the control acts:
-    // one panel is open at a time, and the tap still does what it was for.
-    if (header) {
-      header.addEventListener(
-        "click",
-        function (event) {
-          if (isOpen() && !button.contains(event.target)) close();
-        },
-        true,
-      );
-    }
-
-    window.addEventListener("resize", function () {
-      if (isOpen()) place();
-    });
-
-    // A subscriber is told about one module at a time; the panel always lists every module.
+    // A subscriber is told about one module at a time; the window always lists every module.
     var unsubscribe = window.LogosCoreAPI.status.subscribe(function () {
       render(window.LogosCoreAPI.status.snapshot());
     });

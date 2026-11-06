@@ -1,11 +1,3 @@
-/* Зал заседаний (static/court.js): поверх окна отделов (.logos-dept-*). */
-.logos-court-card {
-  width: min(880px, 100%);
-}
-.logos-pro-app .logos-court-card.modal-content {
-  width: min(880px, 100%);
-  max-width: 880px;
-}
 /* Muted text in the theme's muted colour, not by fading: it stays at 4.5:1 or more. */
 .logos-court-note,
 .logos-court-muted {

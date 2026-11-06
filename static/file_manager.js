@@ -128,7 +128,7 @@ window.fetchVectorStores = function () {
     body.className = "file-manager-body";
     var ov = CoreUI.modal.create({
       id: "file-manager-modal",
-      title: "Менеджер файлов",
+      title: "Файловый менеджер",
       className: "file-manager-modal",
       contentClassName: "file-manager-box",
       closeAction: "file-manager.close",
@@ -384,7 +384,6 @@ window.fetchVectorStores = function () {
       var bg = CoreUI.modal.create({
         id: "vs-add-files-modal",
         title: "Файлы → " + (vsName || vsId.substring(0, 8)),
-        titleTag: "h3",
         className: "file-manager-add-modal",
         contentClassName: "file-manager-add-box",
         closeAction: "file-manager.add.close",

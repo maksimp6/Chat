@@ -27,9 +27,7 @@
     var list = el("div", { class: "logos-dept-list" }, "Загрузка…");
     modal = UI.modal.create({
       id: "departments-modal",
-      title: "Departments",
-      titleTag: "h3",
-      className: "logos-dept-overlay",
+      title: "Отделы",
       contentClassName: "logos-dept-card",
       closeAction: "departments.close",
       body: list,

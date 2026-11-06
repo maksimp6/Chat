@@ -10,11 +10,6 @@
     return node;
   }
 
-  function closeModal() {
-    var existing = document.getElementById("partner-relations-modal");
-    if (existing) existing.remove();
-  }
-
   var STATUS_LABELS = {
     lead: "Лид",
     active: "Активен",
@@ -44,16 +39,10 @@
   }
 
   function openPartnerRelationsModal() {
-    closeModal();
+    var existing = document.getElementById("partner-relations-modal");
+    if (existing) existing.remove();
 
-    var overlay = h("div", { id: "partner-relations-modal", class: "logos-dept-overlay" });
-    var card = h("div", { class: "logos-dept-card" });
-    var head = h("div", { class: "logos-dept-head" });
-    head.appendChild(h("h3", {}, "Партнёры"));
-    var close = h("button", { type: "button", "aria-label": "Закрыть" }, "×");
-    close.onclick = closeModal;
-    head.appendChild(close);
-    card.appendChild(head);
+    var card = h("div");
 
     var notice = h(
       "div",
@@ -88,8 +77,16 @@
     var list = h("div", { class: "logos-dept-list" });
     list.textContent = "Загрузка…";
     card.appendChild(list);
-    overlay.appendChild(card);
-    document.body.appendChild(overlay);
+
+    var UI = window.LogosCoreAPI.ui;
+    var modal = UI.modal.create({
+      id: "partner-relations-modal",
+      title: "Партнёры",
+      contentClassName: "logos-dept-card",
+      body: card,
+    });
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
+    UI.modal.open(modal);
 
     function load() {
       return window.LogosDispatcher.request("/api/partners", {
@@ -292,10 +289,6 @@
         .finally(function () {
           create.disabled = false;
         });
-    });
-
-    overlay.addEventListener("click", function (event) {
-      if (event.target === overlay) closeModal();
     });
 
     load().catch(function (err) {

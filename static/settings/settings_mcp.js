@@ -59,6 +59,73 @@
   };
 
 
+  // The RDC window: whether Logos is connected to RDC, and the button that connects it (owner, 05.11.2026: a link to the
+  // RDC site did not connect Logos). The state is read again when the sign-in tab hands the page back.
+  window.openRdcModal = function () {
+    var CoreUI = window.LogosCoreAPI.ui;
+    var existing = document.getElementById("rdc-modal");
+    if (existing) existing.remove();
+
+    var body = document.createElement("div");
+    var state = document.createElement("p");
+    state.className = "rdc-state";
+    state.setAttribute("role", "status");
+    state.textContent = "Загрузка…";
+    var address = document.createElement("p");
+    address.className = "rdc-address";
+    var connect = document.createElement("button");
+    connect.type = "button";
+    connect.className = "logos-btn btn-primary";
+    connect.hidden = true;
+    body.appendChild(state);
+    body.appendChild(address);
+    body.appendChild(connect);
+
+    var modal = CoreUI.modal.create({ id: "rdc-modal", title: "RDC", body: body });
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
+    CoreUI.modal.open(modal);
+
+    var serverId = null;
+
+    function load() {
+      window
+        .fetchMcpServers()
+        .then(function (servers) {
+          var rdc = servers.filter(function (server) {
+            return server && server.server_label === "rdc";
+          })[0];
+          if (!rdc) throw new Error("сервер RDC не найден");
+          serverId = rdc.id;
+          state.classList.remove("logos-error-note");
+          state.textContent = rdc.has_authorization ? "Логос подключён к RDC." : "Логос не подключён к RDC.";
+          address.textContent = rdc.server_url || "";
+          connect.textContent = rdc.has_authorization ? "Подключить заново" : "Подключить";
+          connect.hidden = false;
+        })
+        .catch(function (error) {
+          state.classList.add("logos-error-note");
+          state.textContent = "Не удалось проверить RDC: " + ((error && error.message) || error);
+        });
+    }
+
+    connect.addEventListener("click", function () {
+      connect.disabled = true;
+      window.startMcpOAuth(serverId).then(function () {
+        connect.disabled = false;
+      });
+    });
+
+    function onVisible() {
+      if (!document.hidden) load();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    modal.addEventListener("close", function () {
+      document.removeEventListener("visibilitychange", onVisible);
+    });
+
+    load();
+  };
+
   function closeMcpManagerModal(modal) {
     if (!modal) return;
     window.LogosCoreAPI.ui.modal.close(modal);
@@ -88,7 +155,7 @@
 
     var ov = CoreUI.modal.create({
       id: "mcp-manager-modal",
-      title: "MCP Серверы",
+      title: "MCP серверы",
       className: "mcp-manager-modal",
       contentClassName: "settings-mcp-modal-content",
       closeAction: "mcp-manager.close",
