@@ -5,18 +5,33 @@
 ; for the whole run (ExitBootServices is never called): the firmware's console,
 ; its FAT driver and its multiprocessor services are the only other code on the
 ; machine, and they are used only at the edges (load the file, print a token,
-; read a key); the forward pass itself runs on bare cores with interrupts off
+; read a key); the forward pass itself runs on bare cores, with interrupts off
 ; on the application processors.
+;
+; The machine is ours: every processor runs the model (the boot processor is
+; tid 0, the others come through EFI_MP_SERVICES_PROTOCOL), and each one asks
+; the hardware for its highest performance level (HWP, see efi_cpu_perf), since
+; without an operating system nobody else would: a firmware may leave the cores
+; at their base clock (800 MHz on the N100, against a 3.4 GHz burst).
+;
+; Interrupts stay enabled on the boot processor: the firmware's timer tick, its
+; USB polling and MpInitLib's status check arrive through the IDT while the
+; kernels hold live ymm state. The firmware's interrupt entry saves and restores
+; only the FXSAVE image (x87, MXCSR, xmm0-15), never bits 255:128 of the ymm
+; registers; they survive because firmware code is non-VEX (SSE2 at most: a
+; legacy SSE instruction leaves the upper halves alone). cli would not remove
+; that dependency (SMIs ignore it and are handled the same way).
 ;
 ; %included into asmrun.asm after runtime.asm (bits 64, default rel, .text
 ; current), which lists the names both platform halves implement:
 ;
 ;   _entry         save the firmware's registers, enable AVX state, disarm the
-;                  boot watchdog, measure the TSC, read \asmrun.cfg into argv
-;                  (or "model.gguf -i"), call main, rt_exit
+;                  boot watchdog, measure the TSC, set the clock, read
+;                  \asmrun.cfg into argv (or "model.gguf -i"), call main, rt_exit
 ;   rt_write_h     UTF-8 -> UCS-2 to ConOut (stdout and stderr are the screen)
 ;   rt_exit        give the application processors back to the firmware, wait
-;                  for a key, return to the boot manager (next boot option)
+;                  for a key, return to the boot manager (next boot option);
+;                  reset the machine instead if a processor never came back
 ;   rt_alloc       AllocatePages(EfiLoaderData), zero-filled here
 ;   rt_map_file    the whole file from the boot volume, read into pages
 ;   rt_read_file   the same
@@ -25,12 +40,19 @@
 ;   rt_cpu_count   enabled processors from EFI_MP_SERVICES_PROTOCOL (1 without it)
 ;   pool_start     run pool_worker on nthreads-1 application processors
 ;
-; Internal: efi_fatal_status, rt_enable_avx, efi_calibrate_tsc, efi_open_root,
-; efi_open, efi_file_size, efi_pages, efi_read_all, efi_read_optional,
-; efi_build_cmdline, efi_mp, efi_wait_key, pool_ap_entry.
+; Internal: efi_warn_status, efi_fatal_status, rt_enable_avx, efi_calibrate_tsc,
+; efi_cpu_setup, efi_cpu_perf, efi_measure_clock, efi_open_root, efi_open,
+; efi_file_size, efi_pages, efi_read_all, efi_read_optional, efi_build_cmdline,
+; efi_mp, efi_wait_key, pool_ap_entry.
 ;
 ; Stage messages: every step before the model loads prints one line, so a boot
 ; that stops shows where. Errors print the EFI status code.
+;
+; The boot processor keeps the firmware's stack (the UEFI specification gives an
+; application at least 128 KiB; no frame here is larger than a few hundred bytes
+; and every buffer comes from pages). Memory is never freed and no page attribute
+; is changed, so the application processors keep running on the firmware's
+; identity map while the boot processor allocates.
 
 EFI_PATH_CHARS   equ 260                 ; CHAR16 path buffer
 EFI_FINFO_BYTES  equ 1024                ; EFI_FILE_INFO buffer (80 bytes + the name)
@@ -111,17 +133,20 @@ _entry:
   lea  rcx, [rel e_s_banner]
   call rt_err_str
 
-  ; AVX state needs XSAVE; enable it on this processor (APs do it in pool_ap_entry)
-  mov  eax, 1
-  xor  ecx, ecx
-  cpuid                        ; rbx is saved above
-  bt   ecx, 26                 ; XSAVE
-  jnc  .noxsave
-  call rt_enable_avx
+  ; AVX state on this processor (the APs do the same in pool_ap_entry); the
+  ; firmware's CR4 and XCR0 are kept for rt_exit to restore
+  call rt_enable_avx           ; eax = 1 if enabled; rdx = CR4 before, r8 = XCR0 before
+  test eax, eax
+  jz   .noavx
+  mov  [rel g_fw_cr4], rdx
+  mov  [rel g_fw_xcr0], r8
+  mov  qword [rel g_avx_on], 1
+  ldmxcsr [rel k_mxcsr_init]   ; round to nearest, exceptions masked (what Windows gives a process)
   lea  rcx, [rel e_s_avx]
   call rt_err_str
 
   call efi_calibrate_tsc       ; g_tsc_hz; prints tsc_mhz
+  call efi_cpu_setup           ; this processor at its highest clock; prints what it found
   call efi_open_root           ; g_root: the volume we were loaded from
   call efi_build_cmdline       ; rax = argc, g_argv filled
 
@@ -131,30 +156,87 @@ _entry:
   mov  ecx, eax
   call rt_exit
   hlt
-.noxsave:
+.noavx:
   lea  rcx, [rel e_err_xsave]
   call rt_fatal
 
-; rt_enable_avx — on this processor: CR4.OSFXSR|OSXSAVE, XCR0 |= x87|SSE|AVX.
-; Firmware leaves AVX state disabled (its code is SSE at most), and the first
-; VEX instruction would #UD. Leaf; clobbers rax, rcx, rdx.
+; rt_enable_avx — on this processor: CR4.OSFXSR|OSXSAVE, XCR0 |= x87|SSE|AVX,
+; after CPUID has confirmed XSAVE (leaf 1 ecx[26]), AVX (ecx[28]) and that XCR0
+; may hold the three state bits (leaf 0DH eax[2:0]); a bit XCR0 does not support
+; would be a #GP, and the firmware's handler stops the machine. Firmware leaves
+; AVX state disabled (its code is SSE at most), and the first VEX instruction
+; would #UD. Returns eax = 1 when enabled, with rdx = the CR4 and r8 = the XCR0
+; the firmware had (for the restore on the way out); eax = 0 and nothing
+; changed otherwise. Clobbers rax, rcx, rdx, r8, r9; preserves rbx.
 rt_enable_avx:
-  mov  rax, cr4
-  or   rax, (1 << 9) | (1 << 18)
+  push rbx
+  mov  eax, 1
+  xor  ecx, ecx
+  cpuid
+  mov  r8d, ecx
+  bt   r8d, 26                 ; XSAVE
+  jnc  .no
+  bt   r8d, 28                 ; AVX
+  jnc  .no
+  mov  eax, 0x0D
+  xor  ecx, ecx
+  cpuid                        ; eax[2:0]: x87, SSE and AVX state supported in XCR0
+  and  eax, 7
+  cmp  eax, 7
+  jne  .no
+  mov  r9, cr4                 ; the firmware's CR4
+  mov  rax, r9
+  or   rax, (1 << 9) | (1 << 18) ; OSFXSR, OSXSAVE
   mov  cr4, rax
   xor  ecx, ecx
-  xgetbv                       ; edx:eax = XCR0
-  or   eax, 7
+  xgetbv                       ; edx:eax = XCR0 as the firmware left it
+  mov  r8d, eax
+  shl  rdx, 32
+  or   r8, rdx                 ; r8 = the firmware's XCR0
+  mov  rdx, r8
+  shr  rdx, 32                 ; high half unchanged
+  mov  eax, r8d
+  or   eax, 7                  ; x87 | SSE | AVX
   xsetbv
+  mov  rdx, r9
+  mov  eax, 1
+  pop  rbx
+  ret
+.no:
+  xor  eax, eax
+  pop  rbx
   ret
 
 ; efi_calibrate_tsc — g_tsc_hz from the TSC delta over a 100 ms BootServices
-; Stall (the firmware's timer is the reference). Prints "asmrun: tsc_mhz=N" and,
-; when CPUID.15H reports a crystal clock, the frequency it implies as well.
+; Stall (the firmware's timer is the reference). When CPUID.15H reports a
+; crystal clock the frequency it implies is printed too, and it replaces an
+; implausible measurement (below 100 MHz or above 20 GHz: a Stall that returned
+; early); with neither, fatal, since rt_now_ns divides by this value. Prints
+; "asmrun: tsc_mhz=N".
 efi_calibrate_tsc:
   push rbx
   WINPROLOGUE
-  sub  rsp, 16                 ; [rsp+32] = t0
+  sub  rsp, 16                 ; [rsp+32] = t0, then the measured Hz; [rsp+40] = CPUID.15H Hz or 0
+  mov  qword [rsp+40], 0
+  xor  eax, eax
+  cpuid
+  cmp  eax, 0x15
+  jb   .measure
+  mov  eax, 0x15
+  xor  ecx, ecx
+  cpuid                        ; eax=denominator ebx=numerator ecx=crystal Hz (any may be 0)
+  test eax, eax
+  jz   .measure
+  test ebx, ebx
+  jz   .measure
+  test ecx, ecx
+  jz   .measure
+  mov  r8d, eax
+  mov  eax, ecx
+  mul  rbx                     ; crystal * numerator (ebx was zero-extended by cpuid)
+  div  r8                      ; / denominator = TSC Hz per CPUID
+  mov  [rsp+40], rax
+.measure:
   lfence
   rdtsc
   shl  rdx, 32
@@ -169,7 +251,31 @@ efi_calibrate_tsc:
   or   rax, rdx
   sub  rax, [rsp+32]
   imul rax, rax, 10            ; ticks per second
+  mov  [rsp+32], rax
+  mov  rcx, 100000000          ; 100 MHz
+  cmp  rax, rcx
+  jb   .implausible
+  mov  rcx, 20000000000        ; 20 GHz
+  cmp  rax, rcx
+  ja   .implausible
   mov  [rel g_tsc_hz], rax
+  jmp  .report
+.implausible:
+  mov  rax, [rsp+40]
+  test rax, rax
+  jz   .fatal
+  mov  [rel g_tsc_hz], rax
+  lea  rcx, [rel e_s_tsc_bad]
+  call rt_err_str
+  mov  rax, [rsp+32]
+  xor  edx, edx
+  mov  ecx, 1000000
+  div  rcx
+  mov  rcx, rax
+  call rt_err_u64
+  lea  rcx, [rel e_s_tsc_bad2]
+  call rt_err_str
+.report:
   lea  rcx, [rel e_s_tsc]
   call rt_err_str
   mov  rax, [rel g_tsc_hz]
@@ -178,24 +284,9 @@ efi_calibrate_tsc:
   div  rcx
   mov  rcx, rax
   call rt_err_u64
-  ; CPUID.15H: eax=denominator ebx=numerator ecx=crystal Hz (ecx may be 0)
-  xor  eax, eax
-  cpuid
-  cmp  eax, 0x15
-  jb   .nl
-  mov  eax, 0x15
-  xor  ecx, ecx
-  cpuid
-  test eax, eax
+  mov  rax, [rsp+40]
+  test rax, rax
   jz   .nl
-  test ebx, ebx
-  jz   .nl
-  test ecx, ecx
-  jz   .nl
-  mov  r8d, eax
-  mov  eax, ecx
-  mul  rbx                     ; crystal * numerator
-  div  r8                      ; / denominator = TSC Hz per CPUID
   xor  edx, edx
   mov  ecx, 1000000
   div  rcx
@@ -204,11 +295,216 @@ efi_calibrate_tsc:
   call rt_err_str
   mov  rcx, rbx
   call rt_err_u64
+  lea  rcx, [rel e_s_paren_nl]
+  call rt_err_str
+  jmp  .ret
 .nl:
   lea  rcx, [rel k_newline]
   mov  edx, 1
   call rt_err
+.ret:
   WINEPILOGUE
+  pop  rbx
+  ret
+.fatal:
+  lea  rcx, [rel e_err_tsc]
+  call rt_fatal
+
+; ===========================================================================
+; The clock: every processor at its highest performance level
+; ===========================================================================
+;
+; Without an operating system nothing sets the P-state after the firmware, and
+; a firmware commonly leaves the cores at their base ratio (the N100's is
+; 800 MHz against a 3.4 GHz burst). Since Skylake and Goldmont Plus the
+; processor picks its own frequency once Hardware P-states (HWP, "Speed Shift")
+; are on, inside the window software requests. Per logical processor,
+; efi_cpu_perf enables HWP if the firmware has not and requests minimum =
+; maximum = the highest level the hardware reports (desired 0: autonomous inside
+; that window; EPP 0: performance), and sets the energy/performance bias to
+; performance. The hardware still enforces its power and thermal limits; this
+; only removes the software limit. Every MSR is touched only when CPUID says the
+; feature exists: a wrong MSR is a #GP, and the firmware's handler would stop
+; the machine with a register dump.
+
+; efi_cpu_setup — on the boot processor: measure the clock, apply efi_cpu_perf,
+; measure again, print both and the HWP levels. The application processors
+; apply efi_cpu_perf themselves in pool_ap_entry.
+efi_cpu_setup:
+  push rbx
+  push r12
+  push r13
+  push r14
+  WINPROLOGUE
+  sub  rsp, 16                 ; [rsp+32] = MHz after
+  call efi_measure_clock
+  mov  r12, rax                ; MHz before (0 = no APERF/MPERF)
+  call efi_cpu_perf
+  mov  r13d, eax               ; highest level (0 = no HWP)
+  mov  ebx, edx                ; IA32_HWP_CAPABILITIES[31:0]
+  mov  r14d, r8d               ; 1 = HWP enabled by us
+  mov  rax, [rel g_bs]
+  mov  ecx, 10000              ; let the clock settle before measuring again
+  call [rax + BS_Stall]
+  call efi_measure_clock
+  mov  [rsp+32], rax
+  test r12, r12
+  jz   .nomeas
+  lea  rcx, [rel e_s_clock1]
+  call rt_err_str
+  mov  rcx, r12
+  call rt_err_u64
+  lea  rcx, [rel e_s_clock2]
+  call rt_err_str
+  mov  rcx, [rsp+32]
+  call rt_err_u64
+  lea  rcx, [rel e_s_clock3]
+  call rt_err_str
+.nomeas:
+  test r13d, r13d
+  jz   .nohwp
+  lea  rcx, [rel e_s_hwp_on]
+  test r14d, r14d
+  jz   .say
+  lea  rcx, [rel e_s_hwp_enabled]
+.say:
+  call rt_err_str
+  lea  rcx, [rel e_s_hwp1]
+  call rt_err_str
+  mov  ecx, ebx
+  shr  ecx, 24                 ; lowest
+  call rt_err_u64
+  lea  rcx, [rel e_s_hwp2]
+  call rt_err_str
+  mov  ecx, ebx
+  shr  ecx, 8
+  and  ecx, 0xFF               ; guaranteed
+  call rt_err_u64
+  lea  rcx, [rel e_s_hwp3]
+  call rt_err_str
+  movzx ecx, bl                ; highest
+  call rt_err_u64
+  lea  rcx, [rel e_s_hwp4]
+  call rt_err_str
+  jmp  .done
+.nohwp:
+  lea  rcx, [rel e_s_nohwp]
+  call rt_err_str
+.done:
+  WINEPILOGUE
+  pop  r14
+  pop  r13
+  pop  r12
+  pop  rbx
+  ret
+
+; efi_cpu_perf — this processor at its highest performance level (see above).
+; Returns eax = the highest HWP level (0: no HWP, nothing requested), edx =
+; IA32_HWP_CAPABILITIES[31:0], r8d = 1 when this call enabled HWP. Clobbers
+; rax, rcx, rdx, r8-r10; preserves rbx. Runs on every processor.
+efi_cpu_perf:
+  push rbx
+  xor  r8d, r8d
+  xor  r9d, r9d                ; capabilities
+  xor  r10d, r10d              ; highest level
+  mov  eax, 6
+  xor  ecx, ecx
+  cpuid                        ; eax[7] HWP, eax[10] HWP EPP; ecx[3] IA32_ENERGY_PERF_BIAS
+  mov  ebx, eax
+  bt   ecx, 3
+  jnc  .noepb
+  mov  ecx, MSR_IA32_ENERGY_PERF_BIAS
+  xor  eax, eax                ; 0 = performance
+  xor  edx, edx
+  wrmsr
+.noepb:
+  bt   ebx, 7
+  jnc  .done
+  mov  ecx, MSR_IA32_PM_ENABLE
+  rdmsr
+  test eax, 1
+  jnz  .hwp_on
+  or   eax, 1                  ; HWP on for the package (stays on until a reset)
+  wrmsr
+  mov  r8d, 1
+.hwp_on:
+  mov  ecx, MSR_IA32_HWP_CAPABILITIES
+  rdmsr                        ; [7:0] highest [15:8] guaranteed [23:16] most efficient [31:24] lowest
+  mov  r9d, eax
+  movzx r10d, al
+  mov  eax, r10d               ; minimum = highest
+  mov  edx, r10d
+  shl  edx, 8
+  or   eax, edx                ; maximum = highest; desired 0 (autonomous in [min,max]);
+                               ; EPP 0 (performance; reserved-as-zero without the EPP feature)
+  xor  edx, edx                ; activity window 0, package control off, valid bits 0
+  mov  ecx, MSR_IA32_HWP_REQUEST
+  wrmsr
+.done:
+  mov  eax, r10d
+  mov  edx, r9d
+  pop  rbx
+  ret
+
+; efi_measure_clock -> rax = this processor's clock in MHz over a 50 ms busy
+; loop, from IA32_APERF/IA32_MPERF against the TSC (CPUID.06H:ECX[0]); 0 when
+; the counters are missing. Needs g_tsc_hz. Clobbers rax, rcx, rdx, r8-r11;
+; preserves rbx.
+efi_measure_clock:
+  push rbx
+  mov  eax, 6
+  xor  ecx, ecx
+  cpuid
+  bt   ecx, 0
+  jnc  .none
+  mov  ecx, MSR_IA32_MPERF
+  rdmsr
+  shl  rdx, 32
+  or   rax, rdx
+  mov  r8, rax                 ; mperf at the start
+  mov  ecx, MSR_IA32_APERF
+  rdmsr
+  shl  rdx, 32
+  or   rax, rdx
+  mov  r9, rax                 ; aperf at the start
+  mov  rax, [rel g_tsc_hz]
+  xor  edx, edx
+  mov  ecx, 20
+  div  rcx                     ; ticks in 50 ms
+  mov  r11, rax
+  rdtsc
+  shl  rdx, 32
+  or   rax, rdx
+  add  r11, rax                ; deadline
+.spin:
+  rdtsc
+  shl  rdx, 32
+  or   rax, rdx
+  cmp  rax, r11
+  jb   .spin
+  mov  ecx, MSR_IA32_MPERF
+  rdmsr
+  shl  rdx, 32
+  or   rax, rdx
+  sub  rax, r8                 ; mperf ticks: the TSC rate while the core ran
+  mov  r8, rax
+  mov  ecx, MSR_IA32_APERF
+  rdmsr
+  shl  rdx, 32
+  or   rax, rdx
+  sub  rax, r9                 ; actual core cycles meanwhile
+  test r8, r8
+  jz   .none
+  mov  rcx, [rel g_tsc_hz]
+  mul  rcx                     ; rdx:rax = cycles * tsc_hz
+  div  r8                      ; / mperf = Hz
+  xor  edx, edx
+  mov  ecx, 1000000
+  div  rcx                     ; MHz
+  pop  rbx
+  ret
+.none:
+  xor  eax, eax
   pop  rbx
   ret
 
@@ -245,10 +541,15 @@ efi_fatal_status:
   call rt_exit
   hlt
 
-; rt_exit(rcx=code) — tell the worker processors to return to the firmware,
-; wait for them (up to 3 s), print the exit code, wait for a key, then return
-; from _entry's frame with the firmware's registers restored. EFI_SUCCESS for
-; code 0, EFI_ABORTED otherwise. Never returns to its caller.
+; rt_exit(rcx=code) — tell the worker processors to return to the firmware and
+; wait until every processor pool_start handed a procedure (g_ap_started) has
+; come back (g_ap_exited). Then print the exit code, wait for a key, and return
+; from _entry's frame with the firmware's registers, XCR0 and CR4 restored:
+; EFI_SUCCESS for code 0, EFI_ABORTED otherwise. A worker that has not returned
+; within 3 s is stuck inside a job (the way pool_run's hang detector gets here);
+; the image must not be handed back while a core executes it (the boot manager
+; frees an application's pages the moment its entry point returns), so after
+; the key the machine is reset instead. Never returns to its caller.
 rt_exit:
   WINPROLOGUE
   sub  rsp, 16                 ; [rsp+32] = remaining waits
@@ -257,13 +558,35 @@ rt_exit:
   mov  qword [rsp+32], 3000
 .wq:
   mov  rax, [rel g_ap_exited]
-  cmp  rax, [rel g_ap_ready]
+  cmp  rax, [rel g_ap_started]
   jae  .quiet
   mov  rax, [rel g_bs]
   mov  ecx, 1000
   call [rax + BS_Stall]
   dec  qword [rsp+32]
   jnz  .wq
+  ; a worker processor is still inside asmrun: say so, then reset
+  lea  rcx, [rel e_s_exit1]
+  call rt_err_str
+  mov  rcx, [rel g_exit_code]
+  call rt_err_u64
+  lea  rcx, [rel e_s_stuck1]
+  call rt_err_str
+  mov  rcx, [rel g_ap_started]
+  sub  rcx, [rel g_ap_exited]
+  call rt_err_u64
+  lea  rcx, [rel e_s_stuck2]
+  call rt_err_str
+  call efi_wait_key
+  mov  rax, [rel g_rs]
+  mov  ecx, EfiResetCold
+  mov  rdx, EFI_ABORTED
+  xor  r8d, r8d
+  xor  r9d, r9d
+  call [rax + RS_ResetSystem]  ; does not return
+.park:
+  hlt                          ; and if it did: never hand the image back
+  jmp  .park
 .quiet:
   lea  rcx, [rel e_s_exit1]
   call rt_err_str
@@ -272,7 +595,10 @@ rt_exit:
   lea  rcx, [rel e_s_exit2]
   call rt_err_str
   call efi_wait_key
+  cmp  qword [rel g_avx_on], 0
+  je   .novz
   vzeroupper
+.novz:
   ldmxcsr [rel g_fw_mxcsr]
   lea  rax, [rel g_fw_xmm]
   movups xmm6,  [rax+0]
@@ -285,6 +611,16 @@ rt_exit:
   movups xmm13, [rax+112]
   movups xmm14, [rax+128]
   movups xmm15, [rax+144]
+  cmp  qword [rel g_avx_on], 0
+  je   .nox
+  mov  rax, [rel g_fw_xcr0]    ; XCR0, then CR4, as the firmware had them
+  mov  rdx, rax
+  shr  rdx, 32
+  xor  ecx, ecx
+  xsetbv
+  mov  rax, [rel g_fw_cr4]
+  mov  cr4, rax
+.nox:
   mov  rbx, [rel g_fw_rbx]
   mov  rbp, [rel g_fw_rbp]
   mov  rsi, [rel g_fw_rsi]
@@ -301,10 +637,12 @@ rt_exit:
 .ok:
   ret
 
-; efi_wait_key — block until a key is pressed and consume it.
+; efi_wait_key — block until a key is pressed and consume it (a wake with no
+; complete keystroke yet, EFI_NOT_READY, waits again).
 efi_wait_key:
   WINPROLOGUE
   sub  rsp, 16                 ; [rsp+32] = index, [rsp+40] = EFI_INPUT_KEY
+.again:
   mov  rax, [rel g_bs]
   mov  ecx, 1
   mov  rdx, [rel g_conin]
@@ -314,6 +652,9 @@ efi_wait_key:
   mov  rcx, [rel g_conin]
   lea  rdx, [rsp+40]
   call [rcx + TXTIN_ReadKeyStroke]
+  mov  rdx, EFI_NOT_READY
+  cmp  rax, rdx
+  je   .again
   WINEPILOGUE
   ret
 
@@ -448,7 +789,11 @@ rt_write_h:
 ; rt_read_stdin(rcx=&len) -> rax = buffer, *len = bytes. One line typed on the
 ; console: characters are echoed as typed, Backspace removes the last character,
 ; Enter ends the line (not stored), Esc returns an empty line. UTF-8 in the
-; buffer (UCS-2 from the firmware).
+; buffer (UCS-2 from the firmware); the buffer is g_line_buf, consumed before
+; the next call. Keys the firmware queued before the first prompt (pressed while
+; the model was loading) are discarded once, so a stray Enter during the load
+; does not end the session; after that, typing ahead works as on any console.
+; A ReadKeyStroke error other than EFI_NOT_READY ends the line.
 rt_read_stdin:
   push rbx
   push rsi
@@ -456,10 +801,17 @@ rt_read_stdin:
   WINPROLOGUE
   sub  rsp, 32                 ; [rsp+32]=&len [rsp+40]=index [rsp+48]=EFI_INPUT_KEY
   mov  [rsp+32], rcx
-  mov  rcx, EFI_LINE_BYTES
-  call rt_alloc
-  mov  rbx, rax                ; buffer
+  lea  rbx, [rel g_line_buf]   ; buffer
   xor  esi, esi                ; bytes so far
+  cmp  qword [rel g_stdin_drained], 0
+  jne  .key
+  mov  qword [rel g_stdin_drained], 1
+.drain:
+  mov  rcx, [rel g_conin]
+  lea  rdx, [rsp+48]
+  call [rcx + TXTIN_ReadKeyStroke]
+  test rax, rax
+  jz   .drain                  ; a queued key: dropped; EFI_NOT_READY (or any error) ends the drain
 .key:
   mov  rax, [rel g_bs]
   mov  ecx, 1
@@ -471,7 +823,12 @@ rt_read_stdin:
   lea  rdx, [rsp+48]
   call [rcx + TXTIN_ReadKeyStroke]
   test rax, rax
-  jnz  .key                    ; EFI_NOT_READY: wait again
+  jz   .got
+  mov  rdx, EFI_NOT_READY
+  cmp  rax, rdx
+  je   .key                    ; woken without a complete keystroke: wait again
+  jmp  .enter                  ; the keyboard failed: end the line with what there is
+.got:
   movzx eax, word [rsp+50]     ; UnicodeChar
   movzx edx, word [rsp+48]     ; ScanCode
   cmp  edx, SCAN_ESC
@@ -900,10 +1257,10 @@ efi_build_cmdline:
   call efi_read_optional
   test rax, rax
   jnz  .have
+  lea  rcx, [rel e_s_nocfg]
+  call rt_err_str              ; (clobbers rax: the default is loaded after it)
   lea  rax, [rel e_default_args]
   mov  qword [rsp+32], E_DEFAULT_ARGS_LEN
-  lea  rcx, [rel e_s_nocfg]
-  call rt_err_str
 .have:
   mov  [rsp+48], rax
   lea  rcx, [rel e_s_args]
@@ -1034,12 +1391,14 @@ rt_cpu_count:
   WINEPILOGUE
   ret
 
-; pool_start(rcx=nthreads) — g_nthreads = nthreads (clamped to the enabled
-; processors), then for tid 1.. start pool_ap_entry(tid) on an application
-; processor through StartupThisAP in non-blocking mode (a wait event, no
-; timeout), each with its own 1 MiB stack, and wait until every one has
-; checked in. Without EFI_MP_SERVICES_PROTOCOL the pool is the boot processor
-; alone. Fatal if an AP cannot be started or does not check in within 5 s.
+; pool_start(rcx=nthreads) — g_nthreads = nthreads (at least 1, at most
+; MAX_THREADS, no more than the enabled processors), then for tid 1.. start
+; pool_ap_entry(tid) on an application processor through StartupThisAP in
+; non-blocking mode (a wait event, no timeout), each with its own 1 MiB stack,
+; and wait until every one has checked in. Without EFI_MP_SERVICES_PROTOCOL the
+; pool is the boot processor alone. A processor the firmware will not start is
+; reported and the pool is the ones started so far; fatal only if a started
+; processor does not check in within 5 s.
 pool_start:
   push rbx
   push rsi
@@ -1050,11 +1409,19 @@ pool_start:
   WINPROLOGUE
   sub  rsp, 160                ; [32]=Timeout [40]=Argument [48]=&Finished (StartupThisAP args 5-7)
                                ; [56]=total [64]=enabled [72]=bsp [80]=event [96..160)=EFI_PROCESSOR_INFORMATION
-  mov  [rel g_nthreads], rcx
+  mov  rbx, rcx                ; threads wanted
+  test rbx, rbx
+  jnz  .nz
+  mov  ebx, 1                  ; -t 0 would leave pool_run waiting for -1 workers
+.nz:
+  cmp  rbx, MAX_THREADS
+  jbe  .cap
+  mov  ebx, MAX_THREADS        ; the per-tid tables have this many slots
+.cap:
+  mov  [rel g_nthreads], rbx
   mov  qword [rel g_pool_gen], 0
   mov  qword [rel g_pool_done], 0
   mov  qword [rel g_pool_quit], 0
-  mov  rbx, rcx                ; threads wanted
   cmp  rbx, 1
   jbe  .done
   call efi_mp
@@ -1124,6 +1491,7 @@ pool_start:
   call [r12 + MP_StartupThisAP]
   test rax, rax
   jnz  .apfail
+  inc  qword [rel g_ap_started] ; rt_exit waits for this many to come back
   inc  rsi
 .skip:
   inc  rdi
@@ -1150,6 +1518,10 @@ pool_start:
   dec  r13d
   jnz  .waitap
   lea  rcx, [rel e_err_apstart]
+  cmp  qword [rel g_ap_noavx], 0
+  je   .apfatal
+  lea  rcx, [rel e_err_apnoavx]
+.apfatal:
   call rt_fatal
 .ready:
   lea  rcx, [rel e_s_cpus1]
@@ -1178,10 +1550,13 @@ pool_start:
   ret
 
 ; pool_ap_entry(rcx=tid) — EFI_AP_PROCEDURE run by the firmware on an
-; application processor. Saves the firmware's nonvolatile registers, enables
-; AVX state on this core, moves to the worker's own stack, checks in and runs
-; pool_worker until g_pool_quit; then returns to the firmware on its stack, so
-; the processor is the firmware's again when we leave.
+; application processor. Saves the firmware's nonvolatile registers, MXCSR, CR4
+; and XCR0, enables AVX state on this core, asks it for its highest clock
+; (efi_cpu_perf), moves to the worker's own stack, checks in and runs
+; pool_worker until g_pool_quit; then puts everything back and returns to the
+; firmware on its stack, so the processor is the firmware's again when we leave.
+; A core that cannot enable AVX state (not on a homogeneous machine) records it
+; in g_ap_noavx and returns at once without checking in; pool_start reports it.
 pool_ap_entry:
   push rbx
   push rbp
@@ -1191,7 +1566,7 @@ pool_ap_entry:
   push r13
   push r14
   push r15
-  sub  rsp, 168                ; xmm6-15 (160 bytes) + alignment
+  sub  rsp, 168                ; xmm6-15 (160 bytes) + MXCSR (4 bytes) + alignment
   movups [rsp+0],   xmm6
   movups [rsp+16],  xmm7
   movups [rsp+32],  xmm8
@@ -1202,10 +1577,19 @@ pool_ap_entry:
   movups [rsp+112], xmm13
   movups [rsp+128], xmm14
   movups [rsp+144], xmm15
+  stmxcsr [rsp+160]
   mov  r12, rcx                ; tid
   lea  rax, [rel g_ap_fw_rsp]
   mov  [rax + r12*8], rsp
-  call rt_enable_avx
+  call rt_enable_avx           ; eax = 1 if enabled; rdx = CR4 before, r8 = XCR0 before
+  test eax, eax
+  jz   .noavx
+  lea  rax, [rel g_ap_fw_cr4]
+  mov  [rax + r12*8], rdx
+  lea  rax, [rel g_ap_fw_xcr0]
+  mov  [rax + r12*8], r8
+  ldmxcsr [rel k_mxcsr_init]
+  call efi_cpu_perf            ; this core at its highest performance level
   lea  rax, [rel g_ap_stack_top]
   mov  rsp, [rax + r12*8]      ; own stack (16-byte aligned top)
   lock inc qword [rel g_ap_ready]
@@ -1214,6 +1598,7 @@ pool_ap_entry:
   vzeroupper
   lea  rax, [rel g_ap_fw_rsp]
   mov  rsp, [rax + r12*8]
+  ldmxcsr [rsp+160]
   movups xmm6,  [rsp+0]
   movups xmm7,  [rsp+16]
   movups xmm8,  [rsp+32]
@@ -1224,6 +1609,16 @@ pool_ap_entry:
   movups xmm13, [rsp+112]
   movups xmm14, [rsp+128]
   movups xmm15, [rsp+144]
+  lea  rax, [rel g_ap_fw_xcr0] ; XCR0, then CR4, as the firmware had them
+  mov  rax, [rax + r12*8]
+  mov  rdx, rax
+  shr  rdx, 32
+  xor  ecx, ecx
+  xsetbv
+  lea  rax, [rel g_ap_fw_cr4]
+  mov  rax, [rax + r12*8]
+  mov  cr4, rax
+.out:
   add  rsp, 168
   pop  r15
   pop  r14
@@ -1235,11 +1630,15 @@ pool_ap_entry:
   pop  rbx
   lock inc qword [rel g_ap_exited]
   ret
+.noavx:
+  mov  qword [rel g_ap_noavx], 1
+  jmp  .out                    ; nothing changed on this core; still on the firmware's stack
 
 ; ===========================================================================
 ; Globals, GUIDs and strings of the UEFI half
 ; ===========================================================================
 section .data
+  align 8
 
 g_image_handle: dq 0
 g_systab:       dq 0           ; EFI_SYSTEM_TABLE*
@@ -1253,10 +1652,11 @@ g_mp_tried:     dq 0           ; 1 once LocateProtocol has been asked
 g_tsc_hz:       dq 1           ; TSC ticks per second (measured at start)
 g_last_status:  dq 0           ; status of the last efi_open
 g_exit_code:    dq 0
-g_ap_ready:     dq 0           ; APs that reached pool_worker
-g_ap_exited:    dq 0           ; APs that returned to the firmware
+g_avx_on:       dq 0           ; 1 once AVX state is enabled on the boot processor
+g_stdin_drained: dq 0          ; 1 once rt_read_stdin has dropped the keys queued before its first prompt
 g_utf_need:     dd 0           ; rt_write_h decoder: continuation bytes expected
 g_utf_cp:       dd 0           ;                     code point under construction
+k_mxcsr_init:   dd 0x1F80      ; MXCSR for our code: round to nearest, all exceptions masked
 
 g_fw_rsp:       dq 0           ; the firmware's registers at _entry
 g_fw_rbx:       dq 0
@@ -1267,17 +1667,29 @@ g_fw_r12:       dq 0
 g_fw_r13:       dq 0
 g_fw_r14:       dq 0
 g_fw_r15:       dq 0
+g_fw_cr4:       dq 0           ; the firmware's CR4 and XCR0 on the boot processor
+g_fw_xcr0:      dq 0
 g_fw_mxcsr:     dd 0
   align 16
 g_fw_xmm:       times 20 dq 0  ; xmm6-15
 
-g_ap_stack_top: times 64 dq 0  ; per tid: top of the worker's stack
-g_ap_fw_rsp:    times 64 dq 0  ; per tid: the firmware's rsp inside pool_ap_entry
-g_ap_proc:      times 64 dq 0  ; per tid: processor number
+  align 64                     ; the processors' check-in counters, on a line of their own
+g_ap_ready:     dq 0           ; APs that reached pool_worker
+g_ap_exited:    dq 0           ; APs that returned to the firmware
+g_ap_started:   dq 0           ; APs StartupThisAP accepted (counted on the boot processor)
+g_ap_noavx:     dq 0           ; 1 if an AP could not enable AVX state (it returned at once)
+
+  align 64
+g_ap_stack_top: times MAX_THREADS dq 0  ; per tid: top of the worker's stack
+g_ap_fw_rsp:    times MAX_THREADS dq 0  ; per tid: the firmware's rsp inside pool_ap_entry
+g_ap_proc:      times MAX_THREADS dq 0  ; per tid: processor number
+g_ap_fw_cr4:    times MAX_THREADS dq 0  ; per tid: the firmware's CR4 on that processor
+g_ap_fw_xcr0:   times MAX_THREADS dq 0  ; per tid: its XCR0
 
 g_path:         times EFI_PATH_CHARS dw 0
 g_finfo:        times EFI_FINFO_BYTES db 0
 g_outbuf:       times (EFI_OUT_CHARS + 2) dw 0
+g_line_buf:     times EFI_LINE_BYTES db 0  ; rt_read_stdin's line
 
   align 8
 e_guid_loaded_image:           ; EFI_LOADED_IMAGE_PROTOCOL 5B1B31A1-9562-11D2-8E3F-00A0C969723B
@@ -1306,6 +1718,18 @@ e_s_banner:     db "asmrun: UEFI build, no operating system (firmware boot servi
 e_s_avx:        db "asmrun: AVX state enabled on the boot processor", 10, 0
 e_s_tsc:        db "asmrun: tsc_mhz=", 0
 e_s_tsc_cpuid:  db " (cpuid says ", 0
+e_s_tsc_bad:    db "asmrun: the TSC measured against Stall is implausible (", 0
+e_s_tsc_bad2:   db " MHz): the CPUID.15H value is used", 10, 0
+e_s_clock1:     db "asmrun: cpu clock: ", 0
+e_s_clock2:     db " MHz before, ", 0
+e_s_clock3:     db " MHz now (boot processor, APERF/MPERF over 50 ms)", 10, 0
+e_s_hwp_enabled: db "asmrun: hwp enabled here", 0
+e_s_hwp_on:     db "asmrun: hwp was already on", 0
+e_s_hwp1:       db "; performance levels lowest ", 0
+e_s_hwp2:       db ", guaranteed ", 0
+e_s_hwp3:       db ", highest ", 0
+e_s_hwp4:       db "; every processor asks for the highest (EPP 0)", 10, 0
+e_s_nohwp:      db "asmrun: no hardware P-states (HWP) on this CPU: the clock stays as the firmware set it", 10, 0
 e_s_volume:     db "asmrun: boot volume opened", 10, 0
 e_s_nocfg:      db "asmrun: no asmrun.cfg on the boot volume: using \model.gguf -i", 10, 0
 e_s_args:       db "asmrun: args: ", 0
@@ -1320,12 +1744,15 @@ e_s_cpus3:      db " application processors through EFI_MP_SERVICES_PROTOCOL)", 
 e_s_nomp:       db "asmrun: EFI_MP_SERVICES_PROTOCOL not found: running on the boot processor only", 10, 0
 e_s_exit1:      db 10, "asmrun: exit code ", 0
 e_s_exit2:      db ". Press any key to return to the firmware.", 10, 0
+e_s_stuck1:     db ": ", 0
+e_s_stuck2:     db " worker processor(s) still run asmrun code and cannot be given back to the firmware. Press any key to reset the machine.", 10, 0
 e_s_status:     db " (EFI status ", 0
 e_s_paren_nl:   db ")", 10, 0
 e_s_cannot_open: db "cannot open ", 0
 e_s_bs:         db 8, ' ', 8
 
-e_err_xsave:        db "this CPU has no XSAVE: AVX state cannot be enabled", 0
+e_err_xsave:        db "this CPU has no XSAVE or no AVX: AVX state cannot be enabled", 0
+e_err_tsc:          db "the TSC frequency could not be determined (Stall returned early and CPUID.15H is absent)", 0
 e_err_loaded_image: db "EFI_LOADED_IMAGE_PROTOCOL not found on our image handle", 0
 e_err_sfs:          db "no simple file system on the boot device", 0
 e_err_openvol:      db "OpenVolume failed", 0
@@ -1337,5 +1764,6 @@ e_err_mpcount:      db "GetNumberOfProcessors failed", 0
 e_err_whoami:       db "WhoAmI failed", 0
 e_s_apfail:         db "the firmware would not start an application processor; running with the processors started so far", 0
 e_err_apstart:      db "the application processors did not start running the pool", 0
+e_err_apnoavx:      db "an application processor could not enable AVX state (XSAVE/AVX missing on that core)", 0
 
 section .text

@@ -31,10 +31,13 @@ the same bus, and the differences are inside the run-to-run noise of a desktop
 machine (±5%). asmrun is far behind on the *prompt* phase (17 tok/s against
 Ollama's 74+, which evaluates the prompt as one batch); see the benchmark notes.
 
-The no-OS build (`build\BOOTX64.EFI`, 45 KB) assembles and its PE header is what
+The no-OS build (`build\BOOTX64.EFI`, 48 KB) assembles and its PE header is what
 the EDK2 loader expects, but it has **not been booted yet**: there is no VM on
 the authoring machine, so the first run is the real one (see "Boot it from a USB
-stick"). What it will print on that run is laid out there.
+stick"). What it will print on that run is laid out there. On bare metal the
+runner also owns the clock: without an operating system nothing else would ask
+the cores for more than the firmware's base ratio (800 MHz on the N100), so
+every processor enables Hardware P-states and requests its highest level.
 
 Bring-up took three assembler-caught fixes: two three-register effective
 addresses in `tokenizer.asm` (x86-64 allows only base+index) and one bitwise `&`
@@ -128,8 +131,10 @@ asmrun.exe <model.gguf> -p prompt.txt -n 64 -c 1024 -t 4
 - `<model.gguf>` is an Ollama model blob (see "Pointing it at an Ollama model").
 - `-p FILE` reads the prompt from a UTF-8 file (otherwise it reads stdin).
 - `-n` new tokens, `-c` context, `-t` threads.
-- `-i` interactive: a prompt per line, generation and statistics after each,
-  until an empty line (or end of input). This is what the USB stick runs.
+- `-i` interactive: a prompt per line (on a Windows console each Enter submits
+  the line), generation and statistics after each, until an empty line (or end
+  of input). A prompt longer than the context is refused with a message and the
+  loop goes on. This is what the USB stick runs.
 
 ## Boot it from a USB stick (no operating system)
 
@@ -155,17 +160,28 @@ runs) and boot from the stick (the boot-device menu, or the stick first in the
 boot order). The stick must be **FAT32**: the firmware reads nothing else.
 
 What the screen shows, in order: the banner, `AVX state enabled`, `tsc_mhz=`,
-`boot volume opened`, the arguments, `reading 1296 MB from the boot volume`
-with a dot per 32 MB and the MB/s (the firmware's USB driver sets the pace; a
-minute is normal), the model summary with `threads=`, `processors=4 (the boot
-processor and 3 application processors through EFI_MP_SERVICES_PROTOCOL)`,
-`load_ms`, and a `>` prompt. Type a prompt, press Enter: the text is generated
-on all four cores and the same statistics lines as on Windows follow
-(`gen_tok_s`, `effective_gb_s`, `prof_ms`). An empty line or Esc ends the
-session; the exit code is printed, a key press returns to the firmware's boot
-manager, which continues with the next boot option. Every step before the model
-loads prints one line and every firmware error its EFI status, so if the boot
-stops, the last line says where.
+`cpu clock: N MHz before, M MHz now` (the boot processor measured with
+APERF/MPERF before and after the clock request) and `hwp enabled here` or `hwp
+was already on` with the hardware's performance levels, `boot volume opened`,
+the arguments, `reading 1296 MB from the boot volume` with a dot per 32 MB and
+the MB/s (the firmware's USB driver sets the pace; a minute is normal), the
+model summary with `threads=`, `processors=4 (the boot processor and 3
+application processors through EFI_MP_SERVICES_PROTOCOL)`, `load_ms`, and a `>`
+prompt. Keys pressed while the model was loading are discarded at that first
+prompt, so a stray Enter during the load does not end the session. Type a
+prompt, press Enter: the text is generated on all four cores and the same
+statistics lines as on Windows follow (`gen_tok_s`, `effective_gb_s`,
+`prof_ms`). An empty line or Esc ends the session; the exit code is printed, a
+key press returns to the firmware's boot manager, which continues with the next
+boot option. Every step before the model loads prints one line and every
+firmware error its EFI status, so if the boot stops, the last line says where.
+If a worker core ever fails to come back (a hung job, which the pool reports
+after tens of seconds), the runner says so and resets the machine after the key
+press instead of handing the firmware an image a core still executes.
+
+The firmware console is only required to have Latin glyphs: text the model
+writes in other scripts (Cyrillic, CJK) may show as blanks on the bare-metal
+screen. The Windows build is unaffected.
 
 `asmrun.cfg` takes the same arguments as the Windows command line, so the
 diagnostic modes work bare-metal too: `model.gguf --bw` for the memory bus
@@ -175,10 +191,13 @@ from the stick), `gen_tok_s` and `effective_gb_s`.
 
 Known assumptions (DESIGN.md, "No operating system"): the firmware provides
 `EFI_MP_SERVICES_PROTOCOL` (EDK2-derived firmware such as AMI Aptio does;
-without it the runner says so and uses one core), XSAVE for enabling AVX state,
-and leaves the application processors to us for the whole run. Nothing here is
-Windows-specific: the runtime half is 900 lines of UEFI calls, and the rest of
-the program is the same bytes as `asmrun.exe`.
+without it the runner says so and uses one core), XSAVE and AVX for enabling
+AVX state, and leaves the application processors to us for the whole run. The
+clock request uses Hardware P-states (every Intel core since Skylake and
+Goldmont Plus); on a CPU without them the runner says so and the clock stays as
+the firmware set it. Nothing here is Windows-specific: the runtime half is 1400
+lines of UEFI and MSR code, and the rest of the program is the same bytes as
+`asmrun.exe`.
 
 Diagnostic modes (each needs the model path except `--cpuid` and `--bw`):
 

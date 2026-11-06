@@ -168,7 +168,9 @@ rt_read_file:
 
 ; rt_read_stdin(rcx=&len) -> rax = ptr, *len = bytes. Reads STD_INPUT_HANDLE into
 ; a growing rt_alloc buffer (doubling, old buffer left to the OS) until EOF or a
-; zero-byte read. Clobbers caller-saved registers.
+; zero-byte read; with g_stdin_line set (-i) a read that ends in LF ends the
+; prompt, since a console in line mode returns one line per Enter. Clobbers
+; caller-saved registers.
 rt_read_stdin:
   WINPROLOGUE
   sub  rsp, 64                 ; [rsp+32]=overlapped; [+40]buf [+48]cap [+56]used [+64]read [+72]&len [+80]newbuf [+88]newcap
@@ -211,6 +213,12 @@ rt_read_stdin:
   test eax, eax
   jz   .eof                    ; 0 bytes -> EOF
   add  [rsp+56], rax           ; used += bytesRead
+  cmp  qword [rel g_stdin_line], 0
+  je   .rloop
+  mov  rcx, [rsp+40]
+  add  rcx, [rsp+56]
+  cmp  byte [rcx - 1], 10      ; -i: the line is complete
+  je   .eof
   jmp  .rloop
 .eof:
   mov  rax, [rsp+72]
@@ -253,12 +261,20 @@ rt_cpu_count:
 ; Thread pool start (pool_worker / pool_run are shared, in runtime.asm)
 ; ===========================================================================
 
-; pool_start(rcx=nthreads) — store nthreads and create nthreads-1 worker threads
-; with ids 1..nthreads-1 (tid 0 is the calling thread). rt_fatal if CreateThread
-; fails. Clobbers caller-saved registers.
+; pool_start(rcx=nthreads) — store nthreads (at least 1, at most MAX_THREADS) and
+; create nthreads-1 worker threads with ids 1..nthreads-1 (tid 0 is the calling
+; thread). rt_fatal if CreateThread fails. Clobbers caller-saved registers.
 pool_start:
   WINPROLOGUE
   sub  rsp, 48                 ; args at [rsp+32..48); [rsp+56] = tid counter
+  test rcx, rcx
+  jnz  .nz
+  mov  ecx, 1                  ; -t 0 would leave pool_run waiting for -1 workers
+.nz:
+  cmp  rcx, MAX_THREADS
+  jbe  .cap
+  mov  ecx, MAX_THREADS        ; g_thread_ids has this many slots
+.cap:
   mov  [rel g_nthreads], rcx
   mov  qword [rel g_pool_gen], 0
   mov  qword [rel g_pool_done], 0
@@ -293,9 +309,10 @@ pool_start:
 ; Globals and strings of the Windows half
 ; ===========================================================================
 section .data
+  align 8
 
 g_qpc_freq:     dq 0           ; QueryPerformanceFrequency ticks per second
-g_thread_ids:   times 64 dq 0  ; OS thread ids returned by CreateThread
+g_thread_ids:   times MAX_THREADS dq 0  ; OS thread ids returned by CreateThread
 
 k_err_alloc:    db "out of memory", 0
 k_err_map:      db "cannot open or map file", 0

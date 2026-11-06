@@ -1192,6 +1192,7 @@ tok_cli:
 ; Mutable globals and constants (zero-initialised bytes in .data).
 ; ===========================================================================
 section .data
+  align 8
 
 g_tok_ready:    dq 0           ; 1 once tok_init has built the tables
 g_model:        dq 0           ; Model* (for eos/bos/pad in tok_is_stop)

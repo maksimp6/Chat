@@ -14,7 +14,17 @@
 
 ; EFI_STATUS values (high bit set = error)
 EFI_SUCCESS            equ 0
+EFI_NOT_READY          equ 0x8000000000000006
 EFI_ABORTED            equ 0x8000000000000015
+
+; Model-specific registers (Intel SDM vol. 4), read and written in ring 0 on the
+; bare cores; each only after CPUID has said the feature exists.
+MSR_IA32_MPERF         equ 0xE7         ; ticks at the TSC rate while the core runs (C0)
+MSR_IA32_APERF         equ 0xE8         ; actual core cycles while it runs
+MSR_IA32_ENERGY_PERF_BIAS equ 0x1B0     ; 0 = performance .. 15 = power saving (CPUID.06H:ECX[3])
+MSR_IA32_PM_ENABLE     equ 0x770        ; bit 0: Hardware P-states on (CPUID.06H:EAX[7]); sticky until reset
+MSR_IA32_HWP_CAPABILITIES equ 0x771     ; [7:0] highest [15:8] guaranteed [23:16] most efficient [31:24] lowest level
+MSR_IA32_HWP_REQUEST   equ 0x774        ; [7:0] minimum [15:8] maximum [23:16] desired [31:24] EPP, per logical processor
 
 ; EFI_SYSTEM_TABLE
 ST_ConIn               equ 48          ; EFI_SIMPLE_TEXT_INPUT_PROTOCOL*

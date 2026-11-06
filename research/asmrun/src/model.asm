@@ -478,10 +478,11 @@ model_load:
 .ctx_ok:
   mov  [r15 + Model.n_ctx], rax
   mov  [rel g_n_ctx], rax       ; published for k_attn_job's per-thread score stride
-  mov  [r15 + Model.n_threads], r14
 
   mov  rcx, r14
-  call pool_start
+  call pool_start               ; may lower g_nthreads (UEFI: enabled processors, a processor the firmware would not start, no MP protocol)
+  mov  rax, [rel g_nthreads]    ; the pool that exists, for the summary line and the score scratch
+  mov  [r15 + Model.n_threads], rax
 
   ; KV caches: f32[n_layer][n_ctx][kv_dim] each.
   mov  rax, [r15 + Model.n_layer]
@@ -1050,6 +1051,16 @@ model_generate:
   mov  r12, r8                  ; n
   mov  r13, r9                  ; max_new
 
+  cmp  r12, [rbx + Model.n_ctx]
+  jbe  .fits
+  lea  rcx, [rel s_err_ctx]     ; a prompt beyond n_ctx would write K/V, scores and rope rows past their buffers
+  call rt_fatal
+.fits:
+  lea  rcx, [rel g_prof]        ; the phase profile is per call (the -i loop calls again)
+  xor  edx, edx
+  mov  r8d, 80
+  call rt_memset
+
   mov  rcx, 1024
   call rt_alloc
   mov  [rsp+32], rax            ; decode scratch (one token's bytes)
@@ -1086,8 +1097,8 @@ model_generate:
   mov  rdx, [rbx + Model.n_vocab]
   call k_argmax
   mov  [rsp+56], rax            ; next token
-  PROF_END 9
-  mov  rcx, rax
+  PROF_END 9                    ; (clobbers rax: the token is reloaded)
+  mov  rcx, [rsp+56]
   call tok_is_stop
   test rax, rax
   jnz  .gdone
@@ -1395,6 +1406,7 @@ main:
   jmp  .arg_next
 .opt_i:
   mov  qword [rsp+112], 1
+  mov  qword [rel g_stdin_line], 1 ; rt_read_stdin returns at the end of a line
   jmp  .arg_next
 .arg_next:
   inc  r13
@@ -1533,6 +1545,29 @@ main:
   inc  r9
   call tok_encode
   mov  [rsp+88], rax
+  ; -i from the console: a prompt longer than the context is refused with a
+  ; message and the loop goes on (model_generate would stop the program)
+  mov  rcx, [rsp+56]
+  cmp  rax, [rcx + Model.n_ctx]
+  jbe  .fits
+  cmp  qword [rsp+112], 0
+  je   .fits
+  test rdi, rdi
+  jnz  .fits
+  lea  rcx, [rel s_too_long1]
+  call rt_err_str
+  mov  rcx, [rsp+88]
+  call rt_err_u64
+  lea  rcx, [rel s_too_long2]
+  call rt_err_str
+  mov  rax, [rsp+56]
+  mov  rcx, [rax + Model.n_ctx]
+  call rt_err_u64
+  lea  rcx, [rel s_nl]
+  mov  rdx, 1
+  call rt_err
+  jmp  .prompt_again
+.fits:
   mov  rcx, [rsp+56]
   mov  rdx, [rsp+80]
   mov  r8, [rsp+88]
@@ -1559,6 +1594,7 @@ main:
 ; model.asm mutable globals and read-only text (zero-initialised bytes; no resb)
 ; ===========================================================================
 section .data
+  align 8
 
 g_x:            dq 0           ; f32[n_embd]  residual stream
 g_xn:           dq 0           ; f32[n_embd]  normalised / matvec-output scratch
@@ -1598,6 +1634,9 @@ f_i:        db "-i", 0
 
 m_usage:    db "usage: asmrun <model.gguf> [-n N] [-c CTX] [-t T] [-p FILE] [-i] [--bw|--cpuid|--gguf|--tokenize|--kernels]", 0
 s_prompt_mark: db 10, "> ", 0
+s_err_ctx:     db "the prompt has more tokens than the context (-c); it would not fit the KV cache", 0
+s_too_long1:   db "asmrun: the prompt has ", 0
+s_too_long2:   db " tokens, more than the context of ", 0
 
 s_feat:        db "asmrun: avx2=1 fma=1 f16c=1 avx_vnni=", 0
 s_feat_cores:  db " cores=", 0

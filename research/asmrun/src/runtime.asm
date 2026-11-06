@@ -9,7 +9,8 @@
 ;   rt_alloc      zeroed memory, page granular, never freed
 ;   rt_map_file   whole file in memory (a mapping on Windows, a read on UEFI)
 ;   rt_read_file  whole file in memory, for small files such as the prompt
-;   rt_read_stdin the prompt from standard input / one line typed on the console
+;   rt_read_stdin the prompt from standard input (to its end, or to the end of
+;                 the line when g_stdin_line is set: -i) / one line typed on the console
 ;   rt_now_ns     monotonic nanoseconds
 ;   rt_cpu_count  processors available to the pool
 ;   pool_start    start nthreads-1 workers running pool_worker
@@ -851,6 +852,7 @@ section .data
 g_stdout:       dq 0           ; Windows: STD_OUTPUT_HANDLE; UEFI: tag 1 (the screen)
 g_stderr:       dq 0           ; Windows: STD_ERROR_HANDLE;  UEFI: tag 2 (the screen)
 g_stdin:        dq 0           ; Windows: STD_INPUT_HANDLE;  UEFI: unused
+g_stdin_line:   dq 0           ; 1 (-i): rt_read_stdin returns at the end of a line; 0: reads to the end of input
 g_has_vnni:     dq 0           ; 1 if AVX-VNNI is available, else 0
 g_nthreads:     dq 0           ; pool size (including the calling thread, tid 0)
 g_pool_func:    dq 0           ; current job function pointer
@@ -861,7 +863,7 @@ g_pool_quit:    dq 0           ; 1: idle workers return from pool_worker
 g_argv:         times MAX_ARGS dq 0   ; parsed argument pointers (into the command line)
 
 g_bw_bytes:     dq 0           ; --bw buffer size in bytes
-g_bw_partials:  times 64 dq 0  ; --bw per-thread checksums (keep the reads live)
+g_bw_partials:  times MAX_THREADS dq 0  ; --bw per-thread checksums (keep the reads live)
 
 k_fatal_prefix: db "asmrun: "
 FATAL_PREFIX_LEN equ $ - k_fatal_prefix

@@ -76,7 +76,13 @@ opt_header:
 %else
   dw 3                          ; Subsystem = WINDOWS_CUI (console)
 %endif
-  dw 0                          ; DllCharacteristics (Windows: no dynamic base; UEFI: no NX_COMPAT claim, so a protecting firmware keeps its compatibility mode)
+%ifdef ASMRUN_EFI
+  dw 0x0100                     ; DllCharacteristics: NX_COMPAT. The image is NX-clean (code read-only, nothing
+                                ; executed from data, pages or a stack), so a firmware that enforces the
+                                ; Microsoft memory-mitigation rules keeps its strict mode and need not refuse it
+%else
+  dw 0                          ; DllCharacteristics (no dynamic base)
+%endif
   dq 0x0000000000800000         ; SizeOfStackReserve = 8 MiB
   dq 0x0000000000100000         ; SizeOfStackCommit  = 1 MiB
   dq 0x0000000000100000         ; SizeOfHeapReserve
@@ -94,7 +100,7 @@ opt_header:
   dd 0, 0                       ; 3 Exception
   dd 0, 0                       ; 4 Certificate
 %ifdef ASMRUN_EFI
-  dd RVA(efi_reloc), EFI_RELOC_SIZE ; 5 BaseReloc: one block, one ABSOLUTE entry (nothing to fix up)
+  dd RVA(efi_reloc), EFI_RELOC_SIZE ; 5 BaseReloc: one block of ABSOLUTE entries (nothing to fix up)
 %else
   dd 0, 0                       ; 5 BaseReloc
 %endif
@@ -147,14 +153,15 @@ section_start:
 
 %ifdef ASMRUN_EFI
 ; The base-relocation block the UEFI build advertises: the loader finds one
-; block of 10 bytes whose single entry is IMAGE_REL_BASED_ABSOLUTE, i.e. a no-op
-; (the Linux EFI stub carries exactly this). The code needs no fix-ups.
+; block of 12 bytes (the 32-bit multiple the PE format asks of a block) whose
+; two entries are IMAGE_REL_BASED_ABSOLUTE, i.e. no-ops (the Linux EFI stub
+; carries one such block too). The code needs no fix-ups.
   align 4
 efi_reloc:
-  dd RVA(efi_reloc) + 10        ; VirtualAddress: the page of the entry below
-  dd 10                         ; SizeOfBlock: this 8-byte header + one 2-byte entry
-  dw 0                          ; type 0 (ABSOLUTE), offset 0: nothing to do
-EFI_RELOC_SIZE equ 10
+  dd RVA(section_start)         ; VirtualAddress: the page this block is in (section_start is page-aligned, the block its first bytes)
+  dd 12                         ; SizeOfBlock: this 8-byte header + two 2-byte entries
+  dw 0, 0                       ; type 0 (ABSOLUTE), offset 0: nothing to do
+EFI_RELOC_SIZE equ 12
   align 16
 
 %else

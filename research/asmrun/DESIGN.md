@@ -278,16 +278,16 @@ ten names each platform half must provide. The modules call only these names.
 
 | Platform name | Windows (`win.asm`) | UEFI (`efi.asm`) |
 | --- | --- | --- |
-| `_entry` | PE entry: console handles, QPC frequency, `GetCommandLineW` → argv, `main`, `rt_exit` | `efi_main(ImageHandle, SystemTable)`: save the firmware's registers, enable AVX state, disarm the 5-minute boot watchdog, measure the TSC against `Stall`, open the boot volume, `\asmrun.cfg` → argv (default `model.gguf -i`), `main`, `rt_exit` |
+| `_entry` | PE entry: console handles, QPC frequency, `GetCommandLineW` → argv, `main`, `rt_exit` | `efi_main(ImageHandle, SystemTable)`: save the firmware's registers, CR4, XCR0 and MXCSR, enable AVX state (after CPUID confirms XSAVE, AVX and the XCR0 bits), disarm the 5-minute boot watchdog, measure the TSC against `Stall`, request the highest clock (`efi_cpu_setup`), open the boot volume, `\asmrun.cfg` → argv (default `model.gguf -i`), `main`, `rt_exit` |
 | `rt_write_h(rcx=handle, rdx=ptr, r8=len)` | `WriteFile` | UTF-8 → UCS-2 with CR LF, `ConOut->OutputString`; decoder state kept across calls (a token may end mid-character) |
-| `rt_exit(rcx=code)` | `ExitProcess` | set `g_pool_quit`, wait for the APs to return to the firmware, print the code, wait for a key, return from `_entry`'s frame (`EFI_SUCCESS` / `EFI_ABORTED`) |
+| `rt_exit(rcx=code)` | `ExitProcess` | set `g_pool_quit`, wait for every AP `pool_start` started to return to the firmware, print the code, wait for a key, restore XCR0/CR4 and the firmware's registers, return from `_entry`'s frame (`EFI_SUCCESS` / `EFI_ABORTED`); if an AP has not returned within 3 s (stuck in a job) say so and reset the machine after the key instead of returning |
 | `rt_alloc(rcx=bytes) -> rax` | `VirtualAlloc`, zeroed by the OS | `AllocatePages(EfiLoaderData)`, zeroed here |
 | `rt_map_file(rcx=utf16 path, rdx=&size) -> rax` | read-only mapping | open on the boot volume, `GetInfo` size, pages, `Read` in 8 MB pieces with a progress line |
 | `rt_read_file` | same | same |
-| `rt_read_stdin(rcx=&len) -> rax` | all of stdin to EOF | one line from `ConIn` with echo, Backspace, Enter; Esc gives an empty line |
+| `rt_read_stdin(rcx=&len) -> rax` | all of stdin to EOF; with `-i` (`g_stdin_line`) to the end of the line | one line from `ConIn` with echo, Backspace, Enter; Esc gives an empty line; keys queued before the first prompt are dropped once |
 | `rt_now_ns() -> rax` | `QueryPerformanceCounter` scaled | `rdtsc` scaled by the measured TSC Hz |
 | `rt_cpu_count() -> rax` | `GetSystemInfo` | `EFI_MP_SERVICES_PROTOCOL.GetNumberOfProcessors` (enabled), 1 without the protocol |
-| `pool_start(rcx=nthreads)` | `CreateThread` × (nthreads−1) running `pool_worker` | `StartupThisAP` × (nthreads−1), non-blocking with a wait event and no timeout, running `pool_ap_entry(tid)` on each application processor |
+| `pool_start(rcx=nthreads)` | `CreateThread` × (nthreads−1) running `pool_worker`; nthreads clamped to 1..`MAX_THREADS` | `StartupThisAP` × (nthreads−1), non-blocking with a wait event and no timeout, running `pool_ap_entry(tid)` on each application processor; clamped to 1..`MAX_THREADS` and the enabled processors; a processor the firmware will not start is reported and skipped; `g_ap_started` counts the accepted ones for `rt_exit` |
 
 Workers spin on a generation counter with `pause`; `pool_run` publishes `func`/`arg`,
 increments the generation, runs tid 0 itself and waits for the done counter. Each job
@@ -305,39 +305,64 @@ and it is used at the edges only.
 - **Processors.** `EFI_MP_SERVICES_PROTOCOL` (PI specification; present in EDK2-derived
   firmware such as AMI Aptio) starts a procedure on an application processor.
   `pool_start` starts `pool_ap_entry(tid)` on nthreads−1 of them in non-blocking mode
-  with a wait event and no timeout; the procedure enables AVX state on its core
-  (firmware leaves XCR0 at x87|SSE, and the first VEX instruction would fault), moves to
-  its own 1 MiB stack, checks in and runs `pool_worker` until `g_pool_quit`, then returns
-  to the firmware on the firmware's stack so the processor is the firmware's again when we
-  leave. Interrupts on the APs are as the firmware leaves them for an AP procedure
-  (disabled in EDK2); the boot processor keeps the firmware's timer tick, whose handler
-  saves and restores the SSE state and never executes AVX, so our ymm registers survive it.
-  Without the protocol the pool is the boot processor alone (a message says so).
+  with a wait event and no timeout; the procedure saves the core's CR4, XCR0 and MXCSR,
+  enables AVX state (firmware leaves XCR0 at x87|SSE, and the first VEX instruction would
+  fault), asks the core for its highest clock, moves to its own 1 MiB stack, checks in and
+  runs `pool_worker` until `g_pool_quit`, then restores what it saved and returns to the
+  firmware on the firmware's stack so the processor is the firmware's again when we leave.
+  Interrupts on the APs are as the firmware leaves them for an AP procedure (disabled in
+  EDK2); the boot processor keeps the firmware's timer tick, USB polling and MP status
+  check, whose handlers save and restore only the FXSAVE state (xmm, not the upper ymm
+  halves): the ymm registers survive because firmware code is non-VEX (legacy SSE leaves
+  the upper halves alone). Without the protocol the pool is the boot processor alone (a
+  message says so).
+- **Clock.** Without an operating system nothing sets the P-state after the firmware,
+  which commonly leaves the cores at their base ratio (800 MHz on the N100, whose burst
+  is 3.4 GHz). Every processor runs `efi_cpu_perf`: if CPUID.06H reports Hardware
+  P-states it enables them (`IA32_PM_ENABLE`, sticky until reset) when the firmware has
+  not, and writes `IA32_HWP_REQUEST` with minimum = maximum = the highest level of
+  `IA32_HWP_CAPABILITIES` (desired 0, EPP 0 = performance); `IA32_ENERGY_PERF_BIAS` goes
+  to 0 when CPUID says it exists. The hardware still enforces its power and thermal
+  limits. The boot processor measures its clock with `IA32_APERF`/`IA32_MPERF` against the
+  TSC over 50 ms before and after, and prints both with the levels. Every MSR is touched
+  only behind its CPUID bit: a wrong MSR is a #GP, and the firmware's handler stops the
+  machine with a register dump.
 - **Memory.** `AllocatePages(EfiLoaderData)` for everything; the firmware's page tables
   identity-map all RAM with large pages, so the 1.36 GB model lives in a handful of TLB
   entries instead of Windows's 4 KB pages. The model is read from the stick into pages
   (the firmware's FAT and USB drivers do the I/O; a progress line reports MB/s), not
   mapped. Nothing is freed: the firmware reclaims loader memory when something else boots.
 - **Console.** stdout and stderr are both `ConOut`; UTF-8 is converted to UCS-2 with
-  CR LF line ends, characters outside the BMP print as `?`. Input is `ConIn`: one line
-  with echo and Backspace. `-i` (the default without an `asmrun.cfg`) loops: prompt,
-  generation, statistics, next prompt; an empty line or Esc ends the session.
-- **Clock.** `rdtsc` scaled by the TSC frequency measured over a 100 ms `Stall`
-  (CPUID.15H's figure is printed beside it when the leaf reports a crystal).
+  CR LF line ends, characters outside the BMP print as `?`. The console font is only
+  required to have Latin glyphs (plus box-drawing shapes), so text in other scripts may
+  show as blanks; the firmware does not report it. Input is `ConIn`: one line with echo
+  and Backspace; the keys the firmware queued before the first prompt (pressed during the
+  load) are dropped once, after that typing ahead works. `-i` (the default without an
+  `asmrun.cfg`) loops: prompt, generation, statistics, next prompt; an empty line or Esc
+  ends the session; a prompt longer than the context is refused with a message.
+- **Time.** `rdtsc` scaled by the TSC frequency measured over a 100 ms `Stall`
+  (CPUID.15H's figure is printed beside it when the leaf reports a crystal, and replaces
+  a measurement outside 100 MHz..20 GHz; with neither the run stops with a message rather
+  than divide by a wrong value later).
 - **Arguments.** `\asmrun.cfg` holds the Windows command-line arguments (`model.gguf -p
   prompt.txt -n 64 -t 4`, `model.gguf --bw`, `model.gguf --kernels`, ...) and is turned
   into the same UTF-16 argv `main` parses on Windows; file names are relative to the
   stick's root, `/` and `\` both work.
 - **Leaving.** The 5-minute watchdog the boot manager arms is disarmed at entry.
   `rt_exit` (normal end or `rt_fatal`) hands the processors back, prints the exit code,
-  waits for a key and returns to the boot manager, which continues with the next boot
-  option. Every step before the model loads prints one line and every firmware error
+  waits for a key, restores XCR0 and CR4 and returns to the boot manager, which
+  continues with the next boot option. The boot manager frees an application's pages the
+  moment its entry point returns, so the return happens only when every processor
+  `pool_start` started has come back; a worker stuck inside a job (the case the pool's
+  hang detector reports) cannot be given back, and after the key the machine is reset
+  instead. Every step before the model loads prints one line and every firmware error
   prints its EFI status, so a boot that stops shows where.
 - **Requirements and assumptions.** FAT32 stick (the firmware has no exFAT/NTFS
-  driver); Secure Boot off (the image is unsigned); x86-64 UEFI with XSAVE and the ISA
-  the kernels need. The image carries separate code (read-only) and data (read-write)
-  sections and no NX_COMPAT claim, so both a firmware that protects images and one that
-  does not run it as is.
+  driver); Secure Boot off (the image is unsigned); x86-64 UEFI with XSAVE, AVX and the
+  ISA the kernels need. The image carries separate code (read-only) and data (read-write)
+  sections, executes nothing from data, pages or a stack, and says so with NX_COMPAT, so
+  a firmware that protects images keeps its strict mode and one that does not runs it as
+  is. The HWP request is skipped, with a message, on a CPU without Hardware P-states.
 
 ### gguf (`src/gguf.asm`)
 

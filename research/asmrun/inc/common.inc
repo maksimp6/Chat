@@ -124,6 +124,10 @@ endstruc
 MATVEC_CHUNKS_PER_THREAD equ 8   ; claims per thread per matvec: the tail imbalance is at most 1/8 of a thread's share
 MATVEC_CHUNK_MIN         equ 8
 
+; Pool size cap: the per-thread tables (runtime.asm, win.asm, efi.asm) have this
+; many slots; pool_start clamps -t to it.
+MAX_THREADS equ 64
+
 ; One attention step for the current position. Each thread handles a slice of
 ; the query heads. `scores` is a scratch base; thread t uses scores + t*n_ctx.
 ;   for query head h (kv head h / (n_head/n_head_kv)):
