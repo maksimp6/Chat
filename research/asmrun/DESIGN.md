@@ -302,6 +302,17 @@ uses, so nothing above the runtime changes. Boot services stay active for the wh
 (`ExitBootServices` is never called): the firmware is the only other code on the machine,
 and it is used at the edges only.
 
+First booted 2026-11-06 (DEXP MINI, N100, AMI Aptio): it ran from a FAT32 stick, started
+all four cores through `EFI_MP_SERVICES_PROTOCOL`, read the model at 141 MB/s and generated
+correct text at 14–16.8 tok/s, at parity with the Windows build and bound by the same memory
+bus. It is not faster than Windows and is not expected to be: asmrun already reads at 94% of
+the raw bus under Windows, so there is no OS overhead on the forward loop to remove (four
+pinned threads spinning on the bus; the scheduler never touches them), while bare metal keeps
+the firmware's timer and USB interrupts firing on the boot processor mid-kernel. The requested
+clock was not captured on this boot; whether the `min=max=highest` HWP pin sustains the N100's
+clock under its power limit as well as Windows' adaptive governor (low floor, high ceiling) is
+open, and `--bw` on bare metal plus the `cpu clock:` line will decide it.
+
 - **Processors.** `EFI_MP_SERVICES_PROTOCOL` (PI specification; present in EDK2-derived
   firmware such as AMI Aptio) starts a procedure on an application processor.
   `pool_start` starts `pool_ap_entry(tid)` on nthreads−1 of them in non-blocking mode

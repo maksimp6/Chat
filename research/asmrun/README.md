@@ -12,7 +12,7 @@ was written for), as a Windows console program or as a **UEFI application that
 boots from a USB stick with no operating system at all** (same sources, a
 different runtime half). The architecture is specified in [DESIGN.md](DESIGN.md).
 
-## Status: builds, runs, generates correct text, and runs at the memory bus
+## Status: runs at the memory bus on Windows, and from a USB stick with no OS
 
 It assembles with NASM 3.02 into a 32 KB PE, runs on the Intel N100, and
 generates coherent output ("The capital of France is" → "Paris. The capital of
@@ -31,13 +31,23 @@ the same bus, and the differences are inside the run-to-run noise of a desktop
 machine (±5%). asmrun is far behind on the *prompt* phase (17 tok/s against
 Ollama's 74+, which evaluates the prompt as one batch); see the benchmark notes.
 
-The no-OS build (`build\BOOTX64.EFI`, 48 KB) assembles and its PE header is what
-the EDK2 loader expects, but it has **not been booted yet**: there is no VM on
-the authoring machine, so the first run is the real one (see "Boot it from a USB
-stick"). What it will print on that run is laid out there. On bare metal the
-runner also owns the clock: without an operating system nothing else would ask
-the cores for more than the firmware's base ratio (800 MHz on the N100), so
-every processor enables Hardware P-states and requests its highest level.
+The no-OS build (`build\BOOTX64.EFI`, 48 KB) **has booted and run.** On
+2026-11-06 a DEXP MINI (Intel N100, AMI Aptio firmware) booted it from a FAT32
+USB stick with Secure Boot off, read qwen3:1.7b from the stick at 141 MB/s,
+started all four cores through `EFI_MP_SERVICES_PROTOCOL`, and generated correct
+text at **14–16.8 tok/s** (effective 16.5–19.5 GB/s). That is at parity with the
+Windows build (17–18.3 tok/s) and bound by the same memory bus, **not faster**:
+the runner already reads at 94% of the raw bus on Windows, so there was no OS tax
+to reclaim, and with boot services still live the firmware's own timer and USB
+interrupts land on the boot core mid-kernel, which accounts for the lower end and
+the run-to-run variance. On bare metal the runner owns the clock: every processor
+enables Hardware P-states and requests its highest level, since without an OS
+nothing else would raise the cores above the firmware's base ratio (800 MHz on
+the N100). The `cpu clock:` line scrolled off before it was photographed on this
+boot, so one question is open: whether the rigid min=max HWP pin sustains the
+N100's clock under its power limit as well as Windows' adaptive governor, or
+whether a low floor with a high ceiling (what Windows does) would sustain more.
+A bare-metal `--bw` run and a photo of the top lines settle it.
 
 Bring-up took three assembler-caught fixes: two three-register effective
 addresses in `tokenizer.asm` (x86-64 allows only base+index) and one bitwise `&`
