@@ -24,7 +24,7 @@ Values are JSON scalars, lists and string-keyed dictionaries.
   journal as one durable frame and returns the new sequence number.
 - `transaction()` is the required form for concurrent read-modify-write code.
   Staging belongs to one client instance.
-- `get`, `items(prefix)`, `delete`, `info`, `checkpoint`, `backup`, `restore` and
+- `get`, `items(prefix, where)`, `delete`, `info`, `checkpoint`, `backup`, `restore` and
   `close` complete the API.
 
 Durability and integrity:

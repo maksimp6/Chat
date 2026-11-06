@@ -11,7 +11,7 @@ import hashlib
 import json
 import os
 from bisect import bisect_left, insort
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
@@ -919,8 +919,14 @@ class Kristall:
             if name in self._engine._state.get(self._NAMESPACE, {}):
                 self._engine.delete(self._NAMESPACE, name)
 
-    def items(self, prefix: str = "") -> dict[str, Any]:
-        """Read a detached snapshot of committed and staged named values."""
+    def items(
+        self, prefix: str = "", where: Callable[[Any], bool] | None = None
+    ) -> dict[str, Any]:
+        """Read a detached snapshot of committed and staged named values.
+
+        ``where`` picks values before they are copied, so a rejected value costs
+        no copy. It receives the stored value itself and must only read it.
+        """
         if not isinstance(prefix, str):
             raise KristallError("prefix must be a string")
         with self._engine._view_lock:
@@ -940,7 +946,11 @@ class Kristall:
                 if name.startswith(prefix):
                     selected[name] = value
         # Values are replaced, never mutated in place: copy without the lock.
-        return {name: _copy_value(selected[name]) for name in sorted(selected)}
+        return {
+            name: _copy_value(selected[name])
+            for name in sorted(selected)
+            if where is None or where(selected[name])
+        }
 
 
 class Transaction:

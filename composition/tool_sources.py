@@ -96,7 +96,7 @@ SOURCES = (
     ("government", _government_tools, "Government", Exception),
     ("partner", _partner_tools, "Partner Relations", Exception),
     ("3d", _printing3d_tools, "3D Printing", Exception),
-    ("3d", _model_editor_tools, "Model Editor", ImportError),
+    ("3d", _model_editor_tools, "Model Editor", Exception),
     ("cloud", _cloud_tools, "Cloud tools", Exception),
     ("browser", _browser_tools, "Browser", Exception),
     ("rootagent", _rootagent_tools, "Root agent", Exception),

@@ -29,7 +29,6 @@ Browser (mobile) -> Logos Board HTTP loopback -> BoardStore
 
 - Код сервиса в `project_board/`, UI в `project_board/static/`.
 - База `agent_memory.file_memory_db.FileMemoryDB` уже находится в `master`.
-- `memory_db.py` **не использовать** для долговечных данных: он process-local/test-only.
 - Блокировка `board.memory.board.lock` управляется Logos Board, чтобы не запускать
   два writer-процесса до полной готовности нового Memory DB lock protocol.
 - Если ошибка записи оставила неопределённое состояние, экземпляр

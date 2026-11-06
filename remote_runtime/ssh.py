@@ -208,16 +208,43 @@ class SSHRuntime:
         return normalized
 
     @staticmethod
+    def _resolve_timeout(
+        timeout_seconds: float | None, target: SSHTarget
+    ) -> float | None:
+        """The command's timeout: None takes the target's own, 0 means no limit (None)."""
+        value = (
+            target.command_timeout_seconds
+            if timeout_seconds is None
+            else timeout_seconds
+        )
+        try:
+            timeout = float(value)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise SSHRuntimeError("timeout_seconds must be a number") from exc
+        if timeout == 0:
+            return None
+        if not math.isfinite(timeout) or timeout < 0 or timeout > 3600:
+            raise SSHRuntimeError(
+                "timeout_seconds must be 0 (no limit) or > 0 and <= 3600"
+            )
+        return timeout
+
+    @staticmethod
     def _wrap_remote_command(
-        command: str, timeout: float, home: str | None = None
+        command: str, timeout: float | None, home: str | None = None
     ) -> str:
         """Run the command with a server-side timeout and minimal environment.
 
         Without ``home`` the account keeps its own home: the remote login shell has $HOME from
         the account's passwd entry and expands it before ``env -i`` clears the environment.
-        The timeout uses only the short options that GNU coreutils and BusyBox both accept.
+        The timeout uses only the short options that GNU coreutils and BusyBox both accept;
+        ``timeout=None`` runs the command without one.
         """
-        seconds = max(1, int(math.ceil(timeout)))
+        limit = (
+            ""
+            if timeout is None
+            else f"timeout -s TERM -k 5 {max(1, int(math.ceil(timeout)))} "
+        )
         safe_path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         inner = shlex.quote(command)
         home_value = shlex.quote(home) if home is not None else '"$HOME"'
@@ -225,8 +252,7 @@ class SSHRuntime:
             "env -i "
             f"HOME={home_value} "
             f"PATH={shlex.quote(safe_path)} "
-            "timeout -s TERM -k 5 "
-            f"{seconds} sh -lc {inner}"
+            f"{limit}sh -lc {inner}"
         )
 
     def _ssh_command(
@@ -275,12 +301,7 @@ class SSHRuntime:
             raise SSHRuntimeError("Command is required")
 
         resolved_target, user = self._resolve_target(target, identity_id)
-        try:
-            timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
-        except (TypeError, ValueError, OverflowError) as exc:
-            raise SSHRuntimeError("timeout_seconds must be a number") from exc
-        if not math.isfinite(timeout) or timeout <= 0 or timeout > 3600:
-            raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
+        timeout = self._resolve_timeout(timeout_seconds, resolved_target)
 
         remote_command = self._wrap_remote_command(command, timeout)
         argv = self._ssh_command(resolved_target, user, remote_command)
@@ -295,7 +316,9 @@ class SSHRuntime:
                     # Twice the bound and one byte more: CRLF collapsing can halve the
                     # text, and limit_output still sees a cut stream as too long.
                     stdout, stderr = read_output(
-                        proc, timeout + 10, 2 * resolved_target.max_output_bytes + 1
+                        proc,
+                        None if timeout is None else timeout + 10,
+                        2 * resolved_target.max_output_bytes + 1,
                     )
                 except BaseException:
                     proc.kill()
@@ -397,12 +420,7 @@ class SSHRuntime:
         )
 
         resolved_target, user = self._resolve_target(target, identity_id)
-        try:
-            timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
-        except (TypeError, ValueError, OverflowError) as exc:
-            raise SSHRuntimeError("timeout_seconds must be a number") from exc
-        if not math.isfinite(timeout) or timeout <= 0 or timeout > 3600:
-            raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
+        timeout = self._resolve_timeout(timeout_seconds, resolved_target)
         remote_command = self._wrap_remote_command(script, timeout)
         argv = self._ssh_command(resolved_target, user, remote_command)
 
@@ -414,7 +432,7 @@ class SSHRuntime:
                 input=str(content),
                 capture_output=True,
                 text=True,
-                timeout=timeout + 10,
+                timeout=None if timeout is None else timeout + 10,
             )
         except subprocess.TimeoutExpired as exc:
             raise SSHRuntimeError(

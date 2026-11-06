@@ -2576,6 +2576,7 @@ def list_tool_categories():
         {
             "categories": bound.registry.get_available_categories(),
             "actions": bound.registry.get_tool_actions(),
+            "failed_sources": bound.registry.load_failures,
         }
     )
 

@@ -56,9 +56,8 @@ def main():
         secret = (state / "provider-encryption.key").read_text().strip()
     except OSError as exc:
         raise SystemExit("Provider encryption key is missing") from exc
-    for prefix in ("LOGOS", "ALICE"):
-        env[prefix + "_MEMORY_PATH"] = str(state / "logos.memory")
-        env[prefix + "_PROVIDER_CREDENTIAL_KEY"] = secret
+    env["LOGOS_MEMORY_PATH"] = str(state / "logos.memory")
+    env["LOGOS_PROVIDER_CREDENTIAL_KEY"] = secret
     # The RootAgent tool dispatches a GitHub Actions job and reads its result, so the
     # server needs a token that outlives a run and the repository to call. The deploy
     # writes both to private state files; bridge them when present. Absent, the tool

@@ -69,6 +69,9 @@ def import_runner_yandex_key():
 
 
 CLOUDRU_DEFAULT_TTL = timedelta(days=1)
+# No application limit (AGENTS.md): a key typed by hand lives until it is replaced.
+# A far date, not a null expiry: rotation and status code reads the field as a date.
+MANUAL_KEY_LIFETIME = timedelta(days=36500)
 
 
 def _cloudru_ttl() -> timedelta:
@@ -675,7 +678,7 @@ def update_provider_credentials():
                 for provider, api_key in supplied
             ],
             bound.encrypt_secret,
-            ttl=timedelta(hours=12),
+            ttl=MANUAL_KEY_LIFETIME,
         )
         stored_providers.extend(provider for provider, _ in supplied)
         if previous_yandex is not None and not same_yandex_key:

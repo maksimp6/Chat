@@ -126,9 +126,11 @@ def update_conversation_model(conv_id: str, model: str) -> None:
 def delete_conversation(conv_id: str) -> None:
     store = get_store()
     with store.transaction() as tx:
-        for key, message in store.items(prefix="chat/message/").items():
-            if message["conversation_id"] == conv_id:
-                tx.delete(key)
+        for key in store.items(
+            prefix="chat/message/",
+            where=lambda message: message["conversation_id"] == conv_id,
+        ):
+            tx.delete(key)
         for prefix in (
             "chat/image_request/",
             "chat/message-source/",
@@ -145,11 +147,10 @@ def delete_conversation(conv_id: str) -> None:
 
 
 def get_messages(conv_id: str) -> list[dict[str, Any]]:
-    records = [
-        item
-        for item in get_store().items(prefix="chat/message/").values()
-        if item["conversation_id"] == conv_id
-    ]
+    records = get_store().items(
+        prefix="chat/message/",
+        where=lambda item: item["conversation_id"] == conv_id,
+    ).values()
     return [
         {
             "id": item["id"],

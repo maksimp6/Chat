@@ -31,7 +31,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | --- | --- |
 | [`storage.contracts`](contracts.py) | Provider-neutral storage contracts and the repository-local adapter. |
 | [`storage.generated_images`](generated_images.py) | Private generated image artifacts, kept outside Kristall's bounded text values. |
-| [`storage.memory_db`](memory_db.py) | Small process-local database engine used for deterministic tests and local development. |
+| [`storage.memory_db`](memory_db.py) | The database error type other units catch. |
 | [`storage.records`](records.py) | Logos chat and configuration records in the native durable Kristall journal. |
 
 Other units reach it only through their own ports:

@@ -171,7 +171,14 @@
         function countOf(n, one, few, many) {
           return n + " " + russianPlural(n, one, few, many);
         }
-        listEl.innerHTML = Object.keys(categories)
+        var failedSources = catData.failed_sources || {};
+        var failedNames = Object.keys(failedSources).map(function (source) {
+          return source + " (" + failedSources[source] + ")";
+        });
+        var failedLine = failedNames.length
+          ? '<div class="settings-hint">' + UI.escapeHtml("Не загрузились: " + failedNames.join(", ")) + "</div>"
+          : "";
+        listEl.innerHTML = failedLine + Object.keys(categories)
           .map(function (cat) {
             var label = categoryLabels[cat] || "Модуль: " + cat;
             var functions = categories[cat] || [];

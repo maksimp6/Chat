@@ -144,6 +144,8 @@ class ToolRegistry:
         # Every registered action by name; a category of actions is one tool.
         self._actions: dict[str, dict[str, Any]] = {}
         self._categories: dict[str, list[str]] = {}
+        # Sources that did not load: log label -> exception type.
+        self.load_failures: dict[str, str] = {}
         self._load_all()
 
     @staticmethod
@@ -213,6 +215,7 @@ class ToolRegistry:
                     self._register(category, name, cfg)
             except failure as e:
                 logger.error(f"[REGISTRY] Ошибка загрузки {label}: {e}")
+                self.load_failures[label] = type(e).__name__
 
     @staticmethod
     def _is_open_object(schema: Any) -> bool:
