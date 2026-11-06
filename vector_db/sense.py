@@ -5,10 +5,11 @@ convert it to text". Only the embedding model runs. The best chunk of each of th
 best-matching documents is cut into short phrases at its punctuation, and words that carry no
 meaning are dropped from the ends of each phrase. A word alone joins the phrase before it,
 unless that phrase is already longer than PHRASE_WORDS. A clause that holds a negation is not
-cut, and after a comma, a dash or a sentence end it takes no word alone, so that a phrase does
-not say the opposite of the stored text (a comma, or a quote of several words, can still part a
-negation from what it negates). A phrase the question itself holds is left out, except a word
-alone after another phrase, which can be the answer. Every other phrase is embedded, and
+cut, and after a comma, a semicolon, a dash or a sentence end other than a question mark it
+takes no word alone, so that a phrase does not say the opposite of the stored text. That is no
+guarantee: a comma, or a quote of several words, can still part a negation from what it negates,
+and a word in a bracket can fall under it. A phrase the question itself holds is left out, except
+a word alone after another phrase, which can be the answer. Every other phrase is embedded, and
 SENSE_PHRASES phrases are chosen one by one: the nearest in meaning to the question, each losing
 REPEAT_PENALTY of its likeness to the phrases already chosen (maximal marginal relevance). They
 are joined into one line of text, best first. Tried on the owner's dialogs on 05.11.2026:
@@ -72,8 +73,8 @@ _CLOSING = ".,;:!?'‘’…*`|—–"
 # A sign means something between two words and nothing at the end of a phrase.
 _SIGNS = frozenset(("<", ">", "<=", ">=", "=", "==", "===", "!=", "!==", "<>", "-", "*"))
 # Words that say nothing at the end of a phrase; inside a phrase they stay, so it reads as said.
-# Negations, numbers, "да", "есть", "можно", "надо" and "нужно" are not among them: without one of
-# them a phrase says something else.
+# Negations, numbers, "да", "есть", "можно", "надо", "нужно", "только" and "only" are not among
+# them: without one of them a phrase says something else.
 STOP_WORDS = frozenset(
     """
     а более бы был была были было быть в вам вас вдруг ведь во вот впрочем все всегда всего
@@ -82,11 +83,11 @@ STOP_WORDS = frozenset(
     мой моя мы на над наконец нас него нее ней нибудь ним них
     но ну о об он она они оно опять от перед по под после потом потому почти при про
     просто раз разве с сам свою себе себя сейчас со совсем так такой там тебя тем теперь то тогда
-    того тоже только том тот тут ты у уж уже хм хорошо хоть чего чем через что чтоб чтобы чуть
+    того тоже том тот тут ты у уж уже хм хорошо хоть чего чем через что чтоб чтобы чуть
     эти этого этой этом этот эту я итак ладно значит поэтому
     a about after all also am an and any are as at be because been but by can could did do does
     for from had has have he her here him his how i if in into is it its just like me more most
-    my now of on only or our out she should so some such than that the their them
+    my now of on or our out she should so some such than that the their them
     then there these they this those to too up us was we were what when where which who why will
     with would you your hmm ok okay well
     """.split()
@@ -101,9 +102,10 @@ NEGATIONS = frozenset(
     """.split()
 )
 # A line that ends in a negation is taken for a hard wrap and goes on in the next line, unless the
-# negation opens the line (an answer) or directly follows a colon (a value). So a finished line
-# with no full stop fuses with the next one: only a length could tell it from a wrap (a script's
-# "gc.pruneExpire never", then "pin_tips").
+# negation opens the line (an answer) or directly follows a colon (a value), or the next line opens
+# with a mark of _LIST_MARK, which ends the item there. So a finished line with no full stop fuses
+# with a next line that opens with no such mark: only a length could tell it from a wrap (a
+# script's "gc.pruneExpire never", then "pin_tips").
 _WRAPPED_NEGATION = re.compile(
     r"(?<=[^\s:] )(" + "|".join(map(re.escape, NEGATIONS)) + r")\n[ \t]*(?=\S)", re.IGNORECASE
 )
@@ -160,8 +162,8 @@ def phrases(text: str) -> list[str]:
     if they hold a negation.
 
     A word alone joins the phrase before it, where it means something ("Логос: Барсик.", "г. Москва"),
-    unless that phrase is already longer than PHRASE_WORDS, or holds a negation and a comma, a dash
-    or a sentence end parts them ("Порт не 8080, а 9090.")."""
+    unless that phrase is already longer than PHRASE_WORDS, or holds a negation and a comma, a
+    semicolon, a dash or a sentence end other than a question mark parts them ("Порт не 8080, а 9090.")."""
     found: list[list[str]] = []
     parted = False
     pieces = _CLAUSE_END.split(_WRAPPED_NEGATION.sub(r"\1 ", _LABEL.sub(" ", _LIST_MARK.sub(".\n", text))))
@@ -180,7 +182,7 @@ def phrases(text: str) -> list[str]:
 
 def _usable(text: str, asked_text: str) -> list[str]:
     """The phrases of ``text`` that add to the question: what it says itself adds nothing, but a word
-    alone after another phrase can be the answer ("Можно или нельзя?", "Логос: Нельзя.")."""
+    alone after another phrase can be the answer ("Мысли Логоса: Файла нет.", "Логос: Нет.")."""
     found = phrases(text)
     return [
         phrase for index, phrase in enumerate(found)
