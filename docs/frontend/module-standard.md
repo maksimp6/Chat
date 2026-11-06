@@ -1,118 +1,31 @@
-# Logos frontend module standard v1
+# Logos frontend status and transport
 
-Frontend modules use a C-like API boundary. A module receives a table of allowed Core API functions and does not access Core internals, another module's private state, or transport primitives directly.
-
-## Module contract
-
-Every module has:
-- a stable `id`;
-- a semantic `version`;
-- an `apiVersion`;
-- declared `dependencies`;
-- declared `capabilities`;
-- lifecycle entry points: `init`, `start`, `stop`, `destroy`.
-
-The browser implementation uses `window.LogosCoreAPI`. Its shape is intentionally C-like: stable function tables, explicit boundaries, and capability checks.
-
-```text
-Module
-  |
-  | Module Context / Core API
-  v
-Core
-  +-- status
-  +-- trace
-  +-- security
-  +-- revocation
-```
+The page's scripts share `window.LogosCoreAPI`, defined in `static/core_api.js`, and send their requests through `window.LogosDispatcher`, defined in `static/dispatcher.js`.
 
 ## User-visible system status
 
-Modules publish current state through `Core.status`. The UI aggregates these states into the system-status indicator, similar to a vehicle dashboard.
+Scripts publish current state through `LogosCoreAPI.status`. The UI aggregates these states into the system-status indicator, similar to a vehicle dashboard.
 
 Allowed states:
 
-`ready`, `running`, `waiting`, `degraded`, `blocked`, `revoked`, `error`, `stopped`.
+`ready`, `running`, `waiting`, `degraded`, `blocked`, `error`, `stopped`.
 
-The module reports state and a short human-readable message. The UI decides presentation.
-
-```js
-context.status.set("running", "Чтение памяти");
-```
-
-The module does not manipulate the status panel directly.
-
-## Tracing
-
-Every module can create an operation trace through the Core API.
+A script reports its name, a state and a short human-readable message. The UI decides presentation.
 
 ```js
-const trace = context.trace.begin("load_facts", {
-  source: "memory"
-});
-
-trace.event("started", {count: 10});
-trace.toolCall("memory.read", {scope: "global"});
-trace.response({count: 10});
-trace.end("completed");
+window.LogosCoreAPI.status.set("core", "ready", "Ядро готово");
 ```
 
-Trace payloads are sanitized at the Core boundary. Frontend traces are bounded in memory and are diagnostic context; server-side `ExecutionTrace` remains the authoritative persistent execution record.
+Three names report today: `core`, `network` and `ui`. A script does not manipulate the status panel directly. `status.subscribe` and `status.snapshot` read the current states; `static/system_status.js` draws them.
 
-## Sensitive-data boundary
-
-Sensitive values must not reach traces, status metadata, events, or other diagnostic output.
-
-Keys matching credential-like names are replaced with `[REDACTED]`, including API keys, authorization headers, passwords, tokens, credentials, cookies, and private keys.
-
-Sanitization happens inside Core, even when a module forgets to sanitize.
-
-```text
-Module data
-    |
-    v
-Security / Redaction
-    |
-    v
-Trace / Status / Events
-```
-
-Modules must not depend on the caller to perform redaction.
-
-## Revocation
-
-Capabilities and module access can be revoked by Core.
-
-```js
-context.security.require("storage.read");
-
-core.revocation.revoke(
-  "capability",
-  "memory:storage.read",
-  "policy_changed"
-);
-```
-
-A module-wide revocation invalidates its module access and all declared capabilities:
-
-```js
-core.revocation.revokeAll(
-  "memory",
-  "user_requested"
-);
-```
-
-After revocation, capability checks fail with a controlled `Capability revoked` error. Revocation is not bypassed by retaining an older module context.
+Messages and metadata pass through redaction before they are stored: keys matching credential-like names become `[REDACTED]`, and so do credential-like pairs inside a string.
 
 ## Transport boundary
 
-Frontend modules do not call `fetch` directly. All application transport goes through the Dispatcher.
+Application requests go through the Dispatcher, not `fetch`.
 
 ```text
-Module
-  |
-  v
-Core API
+Script
   |
   v
 Dispatcher
@@ -121,20 +34,9 @@ Dispatcher
 Network
 ```
 
-The Dispatcher also records request-level frontend trace events and publishes live network status.
+`LogosDispatcher.request(input, init, options)` applies the time limit and publishes live network status under the name `network`. `LogosDispatcher.adopt(pending, abort, options)` takes over a request the page started before its scripts ran. `LogosDispatcher.hold()` keeps the page busy for work that outlives its request, and `LogosDispatcher.isBusy()` tells the update check to wait.
 
-## Isolation rules
-
-A module must not:
-- access another module's private state;
-- mutate another module's owned DOM;
-- access another module's styles;
-- call transport directly;
-- use forbidden timer primitives;
-- bypass capability checks;
-- write unsanitized sensitive diagnostics.
-
-Communication between modules happens through declared public APIs and Core events.
+Three requests use `fetch` directly: the first history read in `templates/index.html`, which starts ahead of the scripts, the version check in `static/boot.js`, and the `keepalive` delete in `static/file_manager.js`, which runs while the page goes away.
 
 ## Validation
 

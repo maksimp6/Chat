@@ -78,7 +78,6 @@
       contentClassName: "ssh-runtime-modal-content",
       body: content,
     });
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
     var sshStatusEl = document.getElementById("ssh-settings-status");

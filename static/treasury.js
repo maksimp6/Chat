@@ -93,7 +93,6 @@
     treasuryStatus.setAttribute("role", "status");
 
     body.append(balanceCard, topUpSection, expensesSection, treasuryStatus);
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(treasuryModal);
   }
 
   function setTreasuryStatus(message, isError) {

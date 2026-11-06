@@ -256,7 +256,7 @@
   async function send(blob, options) {
     const settings = options || {};
     const uploadId = typeof settings.uploadId === "string" && settings.uploadId ? settings.uploadId : newUploadId();
-    const release = typeof window.LogosDispatcher.hold === "function" ? window.LogosDispatcher.hold() : function () {};
+    const release = window.LogosDispatcher.hold();
     try {
       return await upload(blob, settings, uploadId);
     } catch (error) {
@@ -275,7 +275,7 @@
   function discard(uploadId) {
     if (!uploadId) return Promise.resolve();
     // The page waits for it before an automatic reload, so the copy is not left behind.
-    const release = typeof window.LogosDispatcher.hold === "function" ? window.LogosDispatcher.hold() : function () {};
+    const release = window.LogosDispatcher.hold();
     return persist(function () {
       return request("/api/uploads/" + encodeURIComponent(uploadId), { method: "DELETE" }, BASE_WAIT_MS).catch(
         function (error) {

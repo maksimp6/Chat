@@ -35,7 +35,6 @@
       body: list,
     });
 
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
     UI.modal.open(modal);
 
     window.LogosDispatcher.request("/api/departments", { headers: { Accept: "application/json" } })

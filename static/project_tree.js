@@ -63,7 +63,6 @@
       closeAction: "project-tree.close",
       body: body,
     });
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
     UI.modal.open(modal);
 
     var state = body;
@@ -90,8 +89,6 @@
         state.appendChild(retry);
       });
   }
-
-  window.ProjectTree = { load: loadProjectTree, open: openTree };
 
   var actions = window.LogosCoreAPI.ui.actions;
   actions.register("project-tree.close", function (payload) {

@@ -7,28 +7,10 @@
   // Work that outlives its request (a live answer still streaming after its headers) keeps the page busy too.
   let holds = 0;
 
-  function requestPath(input) {
-    try {
-      const value = typeof input === "string" ? input : input && input.url ? input.url : "";
-      const url = new URL(value, window.location.href);
-      return url.pathname || "/";
-    } catch (error) {
-      return "<invalid-url>";
-    }
-  }
-
-  function beginRequestTrace(input) {
-    if (!window.LogosCoreAPI || !window.LogosCoreAPI.trace) return null;
-    return window.LogosCoreAPI.trace.begin("dispatcher", "http.request", {
-      path: requestPath(input),
-    });
-  }
-
   function setNetworkStatus(status, message) {
     if (!window.LogosCoreAPI || !window.LogosCoreAPI.status) return;
     window.LogosCoreAPI.status.set("network", status, message, {
       activeRequests: activeRequests,
-      revocable: false,
     });
   }
 
@@ -143,24 +125,23 @@
       requestInit.signal = requestInit.signal ? combineSignals(requestInit.signal, limit.signal) : limit.signal;
       limit.arm();
     }
-    return follow(input, function () { return fetch(input, requestInit); }, limit);
+    return follow(function () { return fetch(input, requestInit); }, limit);
   }
 
   // A request the page started before this script (templates/index.html asks for the open chat's history first, ahead
   // of the scripts): from now on it is one of this dispatcher's, with the same time limit counted from now (it already
   // had its head start), and ``abort(reason)`` ends it when the limit runs out.
-  function adopt(input, pending, abort, options) {
+  function adopt(pending, abort, options) {
     const limit = limitFor(options);
     if (limit) {
       limit.signal.addEventListener("abort", function () { abort(limit.signal.reason); }, { once: true });
       limit.arm();
     }
-    return follow(input, function () { return pending; }, limit);
+    return follow(function () { return pending; }, limit);
   }
 
   // Counts the request as active until its headers, then holds its body to the limit.
-  function follow(input, start, limit) {
-    const trace = beginRequestTrace(input);
+  function follow(start, limit) {
     activeRequests += 1;
     setNetworkStatus("running", "Сетевой запрос выполняется");
 
@@ -172,14 +153,6 @@
         // The headers came: from here on only silence ends the request.
         if (limit) limit.arm();
         const response = limit ? withIdleBody(received, limit) : received;
-        if (trace) {
-          trace.event("response", {
-            path: requestPath(input),
-            status: response.status,
-            ok: response.ok,
-          });
-          trace.end(response.ok ? "completed" : "http_error");
-        }
         setNetworkStatus(
           response.ok ? (activeRequests ? "running" : "ready") : "degraded",
           response.ok ? "Соединение активно" : "HTTP " + response.status,
@@ -189,10 +162,6 @@
       function (error) {
         activeRequests = Math.max(activeRequests - 1, 0);
         if (limit) limit.stop();
-        if (trace) {
-          trace.error(error);
-          trace.end("error");
-        }
         setNetworkStatus("error", "Сетевой запрос завершился ошибкой");
         throw error;
       },
@@ -210,18 +179,9 @@
     };
   }
 
-  function dispatch(action, payload) {
-    if (action !== "request") {
-      return Promise.reject(new Error("Unknown dispatcher action: " + action));
-    }
-    const data = payload || {};
-    return request(data.input, data.init, data.options);
-  }
-
   window.LogosDispatcher = Object.freeze({
     request,
     adopt,
-    dispatch,
     hold,
     isBusy: () => activeRequests + holds > 0,
   });

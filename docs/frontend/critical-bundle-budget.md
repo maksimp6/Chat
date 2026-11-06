@@ -151,8 +151,8 @@ HTML/CSS/critical-script chain (~89 KiB) has arrived but the remaining
   critical set. Until it loads, clicking send does nothing.
 - **The conversation sidebar is inert.** Populating and navigating
   `#conv-list` is `static/sidebar.js`.
-- **Model selection is unavailable.** The model modal is populated and
-  wired by `static/models.js`.
+- **The 🤖 models window stays empty.** It lists the model catalog and is
+  filled by `static/models.js`.
 - **Settings, MCP configuration, provider credentials, SSH runtime, file
   manager, project tree, treasury, departments, environments, partner
   relations, memory panel, trace viewer, voice input, and the logs window** are

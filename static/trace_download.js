@@ -56,13 +56,6 @@
     button.textContent = text;
   }
 
-  function defer(callback, delayMs) {
-    if (window.LogosCoreAPI && window.LogosCoreAPI.scheduler) {
-      return window.LogosCoreAPI.scheduler.defer(callback, delayMs);
-    }
-    throw new Error("Core scheduler unavailable");
-  }
-
   function download() {
     var button = document.getElementById(buttonId);
     setButtonState(button, "Готовим…", true);
@@ -78,16 +71,16 @@
       document.body.appendChild(link);
       link.click();
       link.remove();
-      defer(function () {
+      setTimeout(function () {
         URL.revokeObjectURL(url);
       }, 1000);
       setButtonState(button, "Скачано", true);
-      defer(function () {
+      setTimeout(function () {
         setButtonState(button, DOWNLOAD_LABEL, false);
       }, 1200);
     } catch (error) {
       setButtonState(button, "Не скачано", true);
-      defer(function () {
+      setTimeout(function () {
         setButtonState(button, DOWNLOAD_LABEL, false);
       }, 1600);
       LogosToast.error("Не удалось подготовить трассировку");
@@ -188,7 +181,7 @@
       currentTrace = trace;
       var result = original.apply(this, arguments);
       window.requestAnimationFrame(installButton);
-      defer(installButton, 50);
+      setTimeout(installButton, 50);
       return result;
     }
     wrapped.__downloadHook = true;

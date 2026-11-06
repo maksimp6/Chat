@@ -11,9 +11,6 @@
   }
 
   function registerHeaderActions() {
-    if (window.__logosHeaderActionsBound === true) return;
-    window.__logosHeaderActionsBound = true;
-
     var actions = window.LogosCoreAPI.ui.actions;
     actions.register("header.tools.open", call("openToolsModal"));
     actions.register("header.ssh.open", call("openSshRuntimeModal"));

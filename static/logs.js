@@ -86,7 +86,6 @@
     body.appendChild(more);
 
     var modal = UI.modal.create({ id: MODAL_ID, title: "Логи", body: body });
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
     UI.modal.open(modal);
 
     var level = "";

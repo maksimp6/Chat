@@ -217,5 +217,5 @@
     return root;
   }
 
-  window.LogosModelView = { render: render, views: views, lazy: lazy };
+  window.LogosModelView = { render: render, lazy: lazy };
 })();

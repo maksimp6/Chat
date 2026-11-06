@@ -127,7 +127,6 @@
     });
     // Shown at once with its loading line; the categories fill it when they arrive. A click on the backdrop and Escape
     // close it through LogosCoreAPI.ui.modal.
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
     var categoryLabels = {
@@ -636,11 +635,10 @@
     md.innerHTML =
       tabsHeader + tabOllama + tabGen + tabOutput + tabRouting + tabAdv + tabTheme + footer;
     loadOllamaSettings(md.querySelector("#ollama-settings-body"), UI);
+    // Keep the shared modal's accessible title and close action in the sticky header.
     var heading = md.querySelector(".settings-modal-heading");
     heading.appendChild(title);
     heading.appendChild(closeButton);
-    // Keep the shared modal's accessible title and close action in the sticky header.
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
     md.querySelector("#set-status").textContent = unknownAtOpen

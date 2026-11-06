@@ -31,7 +31,6 @@ let currentModelType = "text";
 let modelsData = { text: {}, voice: {}, image: {} };
 let modelSelectionSequence = 0;
 const modelSelectionSaves = new Map();
-let coreInitialized = false;
 let coreEnhancementStarted = false;
 let modelLoadState = { status: "idle", message: "" };
 // Conversation list load: "idle" | "loading" | "ready" | "failed".
@@ -90,10 +89,6 @@ window.LogosTheme = {
   },
 };
 
-// Keys renamed in #1316; stored conversations may still carry the old names.
-const LEGACY_MODEL_KEYS = {
-};
-
 const savedTheme = window.LogosTheme.getStored();
 window.LogosTheme.apply(savedTheme, false);
 
@@ -103,9 +98,6 @@ function fetchWithTimeout(input, init, timeoutMs) {
 
 window.isDialogModel = function (modelKey) {
   if (typeof modelKey !== "string" || !modelKey.trim()) return false;
-  if (/^(?:emb|cls):\/\//.test(modelKey) || /(?:^|\/)(?:classifier-|text-search-|text-embeddings)/.test(modelKey)) {
-    return false;
-  }
   var textModels = modelsData.text || {};
   var voiceModels = modelsData.voice || {};
   var imageModels = modelsData.image || {};
@@ -181,12 +173,9 @@ window.changeModel = function (newModel, skipPatch) {
 function initializeShell() {
   window.LogosTheme.apply(savedTheme, false);
 
-  if (!window.__logosThemeActionRegistered) {
-    window.LogosCoreAPI.ui.actions.register("theme.cycle", function () {
-      window.LogosTheme.cycle();
-    });
-    window.__logosThemeActionRegistered = true;
-  }
+  window.LogosCoreAPI.ui.actions.register("theme.cycle", function () {
+    window.LogosTheme.cycle();
+  });
 }
 
 function loadCachedConversations() {
@@ -325,18 +314,13 @@ async function enhanceCore() {
     }
     if (typeof updateUIForModel === "function") updateUIForModel();
     if (window.LogosCoreAPI && window.LogosCoreAPI.status) {
-      window.LogosCoreAPI.status.set("core", "ready", "Ядро готово", { revocable: false });
+      window.LogosCoreAPI.status.set("core", "ready", "Ядро готово");
     }
   } catch (error) {
     if (conversationsLoadState === "loading") conversationsLoadState = "failed";
     console.error("[CORE] Enhancement initialization error:", error);
     if (window.LogosCoreAPI && window.LogosCoreAPI.status) {
-      window.LogosCoreAPI.status.set(
-        "core",
-        "degraded",
-        "Расширенная инициализация завершилась ошибкой",
-        { revocable: false },
-      );
+      window.LogosCoreAPI.status.set("core", "degraded", "Расширенная инициализация завершилась ошибкой");
     }
     if (!conversations.length) applyConversationCache();
     if (typeof updateUIForModel === "function") updateUIForModel();
@@ -352,13 +336,8 @@ window.retryConversationsLoad = function () {
 };
 
 function initCore() {
-  if (coreInitialized) return;
-  coreInitialized = true;
-
   if (window.LogosCoreAPI && window.LogosCoreAPI.status) {
-    window.LogosCoreAPI.status.set("core", "running", "Ядро выполняет инициализацию", {
-      revocable: false,
-    });
+    window.LogosCoreAPI.status.set("core", "running", "Ядро выполняет инициализацию");
   }
   initializeShell();
   applyConversationCache();
@@ -380,18 +359,6 @@ function initCore() {
 // Deferred scripts run after HTML parsing. Starting here keeps later optional
 // resources from delaying the usable shell until DOMContentLoaded.
 initCore();
-
-function getMessages(id) {
-  try {
-    return JSON.parse(localStorage.getItem("messages_" + id) || "[]");
-  } catch (e) {
-    return [];
-  }
-}
-
-function saveMessages(id, msgs) {
-  localStorage.setItem("messages_" + id, JSON.stringify(msgs));
-}
 
 // A model reads photos when its catalog entry says so; the server accepts photos only for those models.
 window.modelAcceptsPhotos = function (modelKey) {

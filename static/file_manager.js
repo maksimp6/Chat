@@ -1,58 +1,58 @@
-window.fetchVectorStores = function () {
-  // Same budget as the file list (LIST_TIMEOUT_MS below): the server may wait 30 s per attempt.
-  return window.LogosDispatcher.request("/api/vector-stores", undefined, { timeoutMs: 90000 })
-    .then(function (r) {
-      return r
-        .json()
-        .catch(function () {
-          return {};
-        })
-        .then(function (data) {
-          if (!r.ok) {
-            var message = "HTTP " + r.status;
-            if (data && typeof data === "object") {
-              if (typeof data.error === "string") message = data.error;
-              else if (data.error && typeof data.error.message === "string")
-                message = data.error.message;
-            }
-            var failure = new Error("Векторные хранилища: " + message);
-            failure.status = r.status;
-            throw failure;
-          }
-          return data;
-        });
-    })
-    .then(function (data) {
-      var candidate = data;
-      for (var i = 0; i < 3; i++) {
-        if (Array.isArray(candidate)) return candidate;
-        if (!candidate || typeof candidate !== "object") break;
-
-        var next = null;
-        if (Array.isArray(candidate.data)) return candidate.data;
-        if (Array.isArray(candidate.vector_stores)) return candidate.vector_stores;
-        if (Array.isArray(candidate.stores)) return candidate.stores;
-        if (Array.isArray(candidate.items)) return candidate.items;
-
-        if (candidate.data && typeof candidate.data === "object") next = candidate.data;
-        else if (candidate.vector_stores && typeof candidate.vector_stores === "object")
-          next = candidate.vector_stores;
-        else if (candidate.stores && typeof candidate.stores === "object") next = candidate.stores;
-        else if (candidate.items && typeof candidate.items === "object") next = candidate.items;
-
-        if (!next || next === candidate) break;
-        candidate = next;
-      }
-
-      throw new Error("Некорректный ответ векторных хранилищ: ожидался массив хранилищ.");
-    });
-};
-
 (function () {
   "use strict";
 
   var LIST_TIMEOUT_MS = 90000;
   var NO_ANSWER_TEXT = "Сервер не ответил вовремя или нет связи. Повторите.";
+
+  function fetchVectorStores() {
+    // Same budget as the file list: the server may wait 30 s per attempt.
+    return window.LogosDispatcher.request("/api/vector-stores", undefined, { timeoutMs: LIST_TIMEOUT_MS })
+      .then(function (r) {
+        return r
+          .json()
+          .catch(function () {
+            return {};
+          })
+          .then(function (data) {
+            if (!r.ok) {
+              var message = "HTTP " + r.status;
+              if (data && typeof data === "object") {
+                if (typeof data.error === "string") message = data.error;
+                else if (data.error && typeof data.error.message === "string")
+                  message = data.error.message;
+              }
+              var failure = new Error("Векторные хранилища: " + message);
+              failure.status = r.status;
+              throw failure;
+            }
+            return data;
+          });
+      })
+      .then(function (data) {
+        var candidate = data;
+        for (var i = 0; i < 3; i++) {
+          if (Array.isArray(candidate)) return candidate;
+          if (!candidate || typeof candidate !== "object") break;
+
+          var next = null;
+          if (Array.isArray(candidate.data)) return candidate.data;
+          if (Array.isArray(candidate.vector_stores)) return candidate.vector_stores;
+          if (Array.isArray(candidate.stores)) return candidate.stores;
+          if (Array.isArray(candidate.items)) return candidate.items;
+
+          if (candidate.data && typeof candidate.data === "object") next = candidate.data;
+          else if (candidate.vector_stores && typeof candidate.vector_stores === "object")
+            next = candidate.vector_stores;
+          else if (candidate.stores && typeof candidate.stores === "object") next = candidate.stores;
+          else if (candidate.items && typeof candidate.items === "object") next = candidate.items;
+
+          if (!next || next === candidate) break;
+          candidate = next;
+        }
+
+        throw new Error("Некорректный ответ векторных хранилищ: ожидался массив хранилищ.");
+      });
+  }
 
   // A non-OK response as an Error that keeps its status, so a gateway timeout can be told apart.
   function statusError(r, message) {
@@ -98,8 +98,7 @@ window.fetchVectorStores = function () {
 
   function keepUpload(uploadId) {
     if (keptUploads.has(uploadId)) return;
-    var release = typeof window.LogosDispatcher.hold === "function" ? window.LogosDispatcher.hold() : function () {};
-    keptUploads.set(uploadId, release);
+    keptUploads.set(uploadId, window.LogosDispatcher.hold());
   }
 
   function releaseKept(uploadId) {
@@ -165,7 +164,6 @@ window.fetchVectorStores = function () {
       "</div>",
     ].join("");
 
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
     function formatBytes(bytes) {
@@ -259,7 +257,7 @@ window.fetchVectorStores = function () {
           var original = this.textContent;
           copyToClipboard(this.dataset.id || "").then(function (ok) {
             self.textContent = ok ? "скопировано!" : "не скопировано";
-            window.LogosCoreAPI.scheduler.defer(function () {
+            setTimeout(function () {
               self.textContent = original;
             }, 1500);
           });
@@ -310,8 +308,7 @@ window.fetchVectorStores = function () {
     function loadVsList() {
       var cont = document.getElementById("vs-manager-list");
       if (cont) cont.innerHTML = '<div class="file-manager-state">Загрузка...</div>';
-      window
-        .fetchVectorStores()
+      fetchVectorStores()
         .then(function (list) {
           renderVsManagerList(list);
         })
@@ -399,7 +396,6 @@ window.fetchVectorStores = function () {
 
       panel.appendChild(fileListEl);
       panel.appendChild(confirm);
-      (document.querySelector(".logos-pro-app") || document.body).appendChild(bg);
       CoreUI.modal.open(bg);
 
       function closeAddModal() {
@@ -565,7 +561,7 @@ window.fetchVectorStores = function () {
           var orig = this.textContent;
           copyToClipboard(this.getAttribute("data-id")).then(function (ok) {
             self.textContent = ok ? "скопировано!" : "не скопировано";
-            window.LogosCoreAPI.scheduler.defer(function () {
+            setTimeout(function () {
               self.textContent = orig;
             }, 1500);
           });

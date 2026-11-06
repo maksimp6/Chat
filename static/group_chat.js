@@ -132,7 +132,6 @@
       closeAction: "group.close",
       body: body,
     });
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
     UI.modal.open(modal);
   }
 

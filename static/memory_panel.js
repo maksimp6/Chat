@@ -21,7 +21,7 @@
     });
   }
 
-  window.loadMemoryData = async function () {
+  async function loadMemoryData() {
     // Old facts stay out of view while the request runs (пункт 51).
     var pending = byId("memoryFactsList");
     if (pending) pending.textContent = "Загрузка…";
@@ -79,16 +79,13 @@
       if (failed) failed.replaceChildren();
       reportStatus(window.LogosErrorText("Не удалось загрузить память", error));
     }
-  };
+  }
 
   function bindMemoryPanelEvents() {
-    if (window.__logosMemoryPanelBound === true) return;
-    window.__logosMemoryPanelBound = true;
-
     document.addEventListener("logos:modal:before-open", function (event) {
       var detail = event && event.detail;
       if (!detail || detail.modalId !== "memoryModal") return;
-      window.loadMemoryData();
+      loadMemoryData();
     });
 
   }

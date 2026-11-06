@@ -1,33 +1,13 @@
 "use strict";
 
 (function () {
-  var MODULE_API_VERSION = "1";
-  var MAX_TRACE_COUNT = 200;
   var MAX_DATA_DEPTH = 6;
   var MAX_STRING_LENGTH = 2048;
   var SENSITIVE_KEY_RE =
     /(?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)/i;
 
-  var modules = new Map();
   var statuses = new Map();
   var subscribers = new Set();
-  var revoked = new Set();
-  var traces = new Map();
-  var traceCounter = 0;
-  var SYSTEM_MODULES = {
-    core: true,
-    network: true,
-    ui: true,
-    dispatcher: true,
-  };
-
-  function makeId(prefix) {
-    traceCounter += 1;
-    if (window.crypto && typeof window.crypto.randomUUID === "function") {
-      return prefix + ":" + window.crypto.randomUUID();
-    }
-    return prefix + ":" + Date.now().toString(36) + ":" + traceCounter.toString(36);
-  }
 
   function redact(value, depth, seen) {
     if (depth > MAX_DATA_DEPTH) return "[MAX_DEPTH]";
@@ -82,99 +62,13 @@
     return redact(value, 0, new WeakSet());
   }
 
-  function assertModuleId(moduleId) {
-    if (typeof moduleId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(moduleId)) {
-      throw new Error("Invalid module id");
-    }
-  }
-
-  function assertCapability(moduleId, capability) {
-    assertModuleId(moduleId);
-    if (typeof capability !== "string" || !capability) {
-      throw new Error("Invalid capability");
-    }
-    if (isRevoked("capability", moduleId + ":" + capability) || isRevoked("module", moduleId)) {
-      throw new Error("Capability revoked");
-    }
-    var record = modules.get(moduleId);
-    if (!record || record.capabilities.indexOf(capability) === -1) {
-      throw new Error("Capability denied: " + capability);
-    }
-    return true;
-  }
-
-  function registerModule(descriptor) {
-    descriptor = descriptor || {};
-    assertModuleId(descriptor.id);
-    if (modules.has(descriptor.id)) throw new Error("Module already registered: " + descriptor.id);
-
-    var capabilities = Array.isArray(descriptor.capabilities)
-      ? descriptor.capabilities.map(String)
-      : [];
-
-    modules.set(
-      descriptor.id,
-      Object.freeze({
-        id: descriptor.id,
-        version: String(descriptor.version || "0.0.0"),
-        apiVersion: String(descriptor.apiVersion || MODULE_API_VERSION),
-        dependencies: Array.isArray(descriptor.dependencies) ? descriptor.dependencies.slice() : [],
-        capabilities: capabilities,
-      }),
-    );
-
-    setStatus(descriptor.id, "ready", "Зарегистрирован", {
-      revocable: true,
-    });
-    return createModuleContext(descriptor.id);
-  }
-
-  function createModuleContext(moduleId) {
-    var record = modules.get(moduleId);
-    if (!record) throw new Error("Unknown module: " + moduleId);
-
-    return Object.freeze({
-      module: Object.freeze({
-        id: record.id,
-        version: record.version,
-        apiVersion: record.apiVersion,
-      }),
-      status: Object.freeze({
-        set: function (status, message, metadata) {
-          return setStatus(moduleId, status, message, metadata);
-        },
-      }),
-      trace: Object.freeze({
-        begin: function (operation, metadata) {
-          return beginTrace(moduleId, operation, metadata);
-        },
-      }),
-      security: Object.freeze({
-        redact: safeData,
-        require: function (capability) {
-          return assertCapability(moduleId, capability);
-        },
-      }),
-      revoke: Object.freeze({
-        isRevoked: function () {
-          return isRevoked("module", moduleId);
-        },
-      }),
-    });
-  }
-
   function setStatus(moduleId, status, message, metadata) {
-    assertModuleId(moduleId);
-    if (!SYSTEM_MODULES[moduleId] && !modules.has(moduleId)) {
-      throw new Error("Module is not registered: " + moduleId);
-    }
     var allowed = {
       ready: true,
       running: true,
       waiting: true,
       degraded: true,
       blocked: true,
-      revoked: true,
       error: true,
       stopped: true,
     };
@@ -192,17 +86,6 @@
     return Object.freeze(Object.assign({}, value));
   }
 
-  function clearStatus(moduleId) {
-    statuses.delete(moduleId);
-    notify({
-      moduleId: moduleId,
-      status: "stopped",
-      message: "",
-      metadata: {},
-      timestamp: Date.now(),
-    });
-  }
-
   function notify(value) {
     var safeValue = safeData(value);
     subscribers.forEach(function (callback) {
@@ -212,7 +95,6 @@
         console.error("[CORE STATUS]", error);
       }
     });
-    window.dispatchEvent(new CustomEvent("logos:status", { detail: safeValue }));
   }
 
   function subscribeStatus(callback) {
@@ -224,140 +106,6 @@
     return function () {
       subscribers.delete(callback);
     };
-  }
-
-  function isRevoked(type, id) {
-    return revoked.has(String(type) + ":" + String(id));
-  }
-
-  function revoke(type, id, reason) {
-    var key = String(type) + ":" + String(id);
-    revoked.add(key);
-
-    // An unknown module can still be revoked; there is no status record to update.
-    if (type === "module" && (SYSTEM_MODULES[String(id)] || modules.has(String(id)))) {
-      setStatus(String(id), "revoked", "Доступ отозван", {
-        reason: typeof reason === "string" ? reason : "revoked",
-        revocable: true,
-      });
-    }
-
-    window.dispatchEvent(
-      new CustomEvent("logos:revocation", {
-        detail: {
-          type: String(type),
-          id: String(id),
-          reason: typeof reason === "string" ? redactString(reason).slice(0, 300) : "revoked",
-          timestamp: Date.now(),
-        },
-      }),
-    );
-
-    return true;
-  }
-
-  function revokeAll(moduleId, reason) {
-    assertModuleId(moduleId);
-    revoke("module", moduleId, reason || "module_revoked");
-    var record = modules.get(moduleId);
-    if (record) {
-      record.capabilities.forEach(function (capability) {
-        revoke("capability", moduleId + ":" + capability, reason || "module_revoked");
-      });
-    }
-    return true;
-  }
-
-  function beginTrace(moduleId, operation, metadata) {
-    assertModuleId(moduleId);
-    var traceId = makeId("trace");
-    var entry = {
-      traceId: traceId,
-      moduleId: moduleId,
-      operation: typeof operation === "string" ? operation.slice(0, 200) : "operation",
-      startedAt: Date.now(),
-      events: [],
-      errors: [],
-      metadata: safeData(metadata || {}),
-    };
-
-    traces.set(traceId, entry);
-    if (traces.size > MAX_TRACE_COUNT) {
-      traces.delete(traces.keys().next().value);
-    }
-
-    function add(eventType, payload) {
-      entry.events.push({
-        type: eventType,
-        timestamp: Date.now(),
-        data: safeData(payload),
-      });
-      return traceId;
-    }
-
-    function end(status) {
-      entry.completedAt = Date.now();
-      entry.status = status || "completed";
-      return safeData(entry);
-    }
-
-    return Object.freeze({
-      traceId: traceId,
-      event: function (name, payload) {
-        return add(String(name || "event"), payload);
-      },
-      toolCall: function (tool, args) {
-        return add("tool_call:" + String(tool || "unknown"), args);
-      },
-      response: function (response) {
-        return add("response", response);
-      },
-      error: function (error) {
-        var message = error && error.message ? error.message : String(error || "error");
-        entry.errors.push({
-          timestamp: Date.now(),
-          message: redactString(message).slice(0, 500),
-        });
-        return traceId;
-      },
-      end: end,
-      snapshot: function () {
-        return safeData(entry);
-      },
-    });
-  }
-
-  function defer(callback, delayMs) {
-    if (typeof callback !== "function") throw new Error("Scheduler callback must be a function");
-    var ms = Math.min(Math.max(Number(delayMs || 0), 0), 30000);
-    if (ms === 0 && typeof queueMicrotask === "function") {
-      var cancelled = false;
-      queueMicrotask(function () {
-        if (!cancelled) callback();
-      });
-      return Object.freeze({
-        cancel: function () {
-          cancelled = true;
-        },
-      });
-    }
-    if (typeof AbortSignal === "undefined" || typeof AbortSignal.timeout !== "function") {
-      throw new Error("Scheduler is unavailable: AbortSignal.timeout is required");
-    }
-    var signal = AbortSignal.timeout(ms);
-    var active = true;
-    var listener = function () {
-      if (!active) return;
-      active = false;
-      callback();
-    };
-    signal.addEventListener("abort", listener, { once: true });
-    return Object.freeze({
-      cancel: function () {
-        active = false;
-        signal.removeEventListener("abort", listener);
-      },
-    });
   }
 
   function getStatusSnapshot() {
@@ -468,18 +216,14 @@
 
   if (!pageScriptsRan) {
     // DOMContentLoaded listeners of later scripts run after this one, so the held tap waits one more turn for them.
-    if (typeof document.addEventListener === "function") {
-      document.addEventListener(
-        "DOMContentLoaded",
-        function () {
-          setTimeout(runHeldTap, 0);
-        },
-        { once: true },
-      );
-    }
-    if (typeof window.addEventListener === "function") {
-      window.addEventListener("load", runHeldTap, { once: true });
-    }
+    document.addEventListener(
+      "DOMContentLoaded",
+      function () {
+        setTimeout(runHeldTap, 0);
+      },
+      { once: true },
+    );
+    window.addEventListener("load", runHeldTap, { once: true });
   }
 
   function mountClickDispatcher(root) {
@@ -577,6 +321,7 @@
     content.appendChild(title);
     if (options.body) content.appendChild(options.body);
     modal.appendChild(content);
+    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
     return modal;
   }
 
@@ -716,9 +461,7 @@
     if (dialog.dispatchEvent(new Event("cancel", { cancelable: true })) && dialog.open) dialog.close();
   }
 
-  if (typeof document.addEventListener === "function") {
-    document.addEventListener("keydown", onEscapeKey);
-  }
+  document.addEventListener("keydown", onEscapeKey);
 
   function modalFromPayload(payload) {
     var modalId = payload && payload.params && payload.params.modal;
@@ -747,39 +490,17 @@
   });
 
   window.LogosCoreAPI = Object.freeze({
-    apiVersion: MODULE_API_VERSION,
-    module: Object.freeze({
-      register: registerModule,
-      context: createModuleContext,
-      list: function () {
-        return Array.from(modules.values()).map(function (item) {
-          return safeData(item);
-        });
-      },
-    }),
     status: Object.freeze({
       set: setStatus,
-      clear: clearStatus,
       subscribe: subscribeStatus,
       snapshot: getStatusSnapshot,
-    }),
-    trace: Object.freeze({
-      begin: beginTrace,
-    }),
-    revocation: Object.freeze({
-      revoke: revoke,
-      isRevoked: isRevoked,
-      revokeAll: revokeAll,
     }),
     security: Object.freeze({
       redact: safeData,
     }),
-    scheduler: Object.freeze({
-      defer: defer,
-    }),
     ui: Object.freeze({
       button: createButton,
-      actions: Object.freeze({ register: registerAction, dispatch: dispatchAction }),
+      actions: Object.freeze({ register: registerAction }),
       events: Object.freeze({ mountClicks: mountClickDispatcher }),
       modal: Object.freeze({ create: createModal, open: openModal, close: closeModal }),
     }),

@@ -1,6 +1,4 @@
 function initSidebar() {
-  if (document.documentElement.dataset.sidebarInitialized === "true") return;
-  document.documentElement.dataset.sidebarInitialized = "true";
   var sidebar = document.getElementById("sidebar");
   var menuBtn = document.getElementById("menu-btn");
   var closeBtn = document.getElementById("close-sidebar-btn");
@@ -69,10 +67,7 @@ function initSidebar() {
     closeSidebar(true);
   });
   if (typeof renderSidebar === "function") renderSidebar();
-  if (window.__logosSidebarHistoryBound !== true) {
-    window.addEventListener("popstate", handleHistoryNavigation);
-    window.__logosSidebarHistoryBound = true;
-  }
+  window.addEventListener("popstate", handleHistoryNavigation);
 }
 
 if (document.readyState === "loading") {
@@ -455,7 +450,6 @@ function deleteConv(id) {
     return c.id !== id;
   });
   localStorage.setItem("conversations", JSON.stringify(conversations));
-  localStorage.removeItem("messages_" + id);
 
   if (currentConvId === id) {
     // The next dialog opens, never a pinned one.

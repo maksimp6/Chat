@@ -7,7 +7,6 @@
     waiting: 1,
     degraded: 2,
     blocked: 3,
-    revoked: 4,
     error: 4,
     stopped: 1,
   };
@@ -18,7 +17,6 @@
     waiting: "Ожидание",
     degraded: "Ограниченный режим",
     blocked: "Заблокировано",
-    revoked: "Доступ отозван",
     error: "Ошибка",
     stopped: "Остановлено",
   };
@@ -28,7 +26,7 @@
   }
 
   function statusIcon(state) {
-    if (state === "error" || state === "revoked" || state === "blocked") return "✕";
+    if (state === "error" || state === "blocked") return "✕";
     if (state === "degraded") return "!";
     if (state === "running" || state === "waiting") return "◐";
     return "✓";
@@ -87,39 +85,19 @@
         row.appendChild(indicator);
         row.appendChild(text);
 
-        if (item.metadata && item.metadata.revocable === true && item.status !== "revoked") {
-          var revokeButton = document.createElement("button");
-          revokeButton.type = "button";
-          revokeButton.className = "logos-btn logos-system-status-revoke";
-          revokeButton.textContent = "Отозвать";
-          revokeButton.addEventListener("click", function () {
-            window.LogosCoreAPI.revocation.revoke("module", moduleId, "user_requested");
-          });
-          row.appendChild(revokeButton);
-        }
-
         list.appendChild(row);
       });
   }
 
   function bind() {
     var button = document.getElementById("system-status-btn");
-    if (!button || !getRoot() || button.dataset.statusBound === "true") return;
-
-    button.dataset.statusBound = "true";
+    if (!button || !getRoot()) return;
 
     // A subscriber is told about one module at a time; the window always lists every module.
     var unsubscribe = window.LogosCoreAPI.status.subscribe(function () {
       render(window.LogosCoreAPI.status.snapshot());
     });
-    window.LogosCoreAPI.status.set("ui", "ready", "Приборная панель активна", { revocable: false });
-
-    window.addEventListener("logos:revocation", function (event) {
-      var detail = event.detail || {};
-      if (detail.type === "module") {
-        render(window.LogosCoreAPI.status.snapshot());
-      }
-    });
+    window.LogosCoreAPI.status.set("ui", "ready", "Приборная панель активна");
 
     window.addEventListener("beforeunload", unsubscribe, { once: true });
   }

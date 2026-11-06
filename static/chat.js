@@ -1071,7 +1071,7 @@ async function streamHistory(convId, options) {
     // same time limit as any other read from here on.
     const early = query ? null : takeEarlyHistory(convId);
     const response = await (early
-      ? window.LogosDispatcher.adopt(path, early.response, early.abort)
+      ? window.LogosDispatcher.adopt(early.response, early.abort)
       : window.LogosDispatcher.request(path, { headers: { Accept: HISTORY_STREAM_TYPE + ", application/json" } }));
     if (!response.ok) {
       const error = new Error("HTTP " + response.status);
@@ -2170,7 +2170,7 @@ document.addEventListener("DOMContentLoaded", function () {
       turn.typingEl = typingEl;
     }
     // A live answer read again keeps the page busy until it ends, as the send that started it did.
-    if (turn.chatRequestId && typeof window.LogosDispatcher.hold === "function") turn.hold = window.LogosDispatcher.hold();
+    if (turn.chatRequestId) turn.hold = window.LogosDispatcher.hold();
     syncSendButton();
     const resuming = turn.chatRequestId ? resumeSavedLiveTurn(turn, recovery, question) : Promise.resolve(false);
     resuming.then(function (shown) {
@@ -3244,7 +3244,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const chatController = new AbortController();
         activeChatRequests.set(turn.conversationId, chatController);
         // A live answer keeps streaming after its headers: the page stays busy (no automatic reload) until the turn ends.
-        if (typeof window.LogosDispatcher.hold === "function") turn.hold = window.LogosDispatcher.hold();
+        turn.hold = window.LogosDispatcher.hold();
         syncSendButton();
         const live = liveTurnSupported(turn.params);
         response = await postChatTurn(turn, JSON.stringify({

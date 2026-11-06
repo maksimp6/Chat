@@ -1,7 +1,4 @@
 function initModels() {
-  if (document.documentElement.dataset.modelsInitialized === "true") return;
-  document.documentElement.dataset.modelsInitialized = "true";
-
   document.addEventListener("logos:modal:before-open", function (event) {
     var detail = event && event.detail;
     if (!detail || detail.modalId !== "model-modal") return;

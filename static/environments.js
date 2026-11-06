@@ -120,7 +120,6 @@
       closeAction: "environments.close",
       body: body,
     });
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(node);
     node.querySelector(".environments-refresh").onclick = load;
     let creating = false;
     node.querySelector(".environments-create").onsubmit = async (event) => {

@@ -79,7 +79,6 @@
     body.appendChild(connect);
 
     var modal = CoreUI.modal.create({ id: "rdc-modal", title: "RDC", body: body });
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
     CoreUI.modal.open(modal);
 
     var serverId = null;
@@ -146,7 +145,6 @@
       body: md,
     });
     // The window wears the shared modal shell (static/style.css), so no look is set inline here.
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
     function renderList(servers) {

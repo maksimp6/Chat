@@ -129,7 +129,7 @@
     var UI = window.LogosCoreAPI.ui;
     var body = document.createElement("div");
     body.className = "provider-credentials-body";
-    var modal = UI.modal.create({
+    UI.modal.create({
       id: "provider-credentials-modal",
       title: "Ключи провайдеров",
       className: "provider-credentials-modal",
@@ -234,8 +234,6 @@
     output.id = "provider-credentials-status";
     output.className = "provider-credentials-status";
     box.appendChild(output);
-    var app = document.querySelector(".logos-pro-app");
-    (app || document.body).appendChild(modal);
   }
 
   window.LogosCoreAPI.ui.actions.register("provider-credentials.close", function (payload) {

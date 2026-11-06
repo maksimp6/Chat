@@ -116,7 +116,6 @@
       contentClassName: "logos-dept-card",
       body: body,
     });
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
     UI.modal.open(modal);
 
     api("/api/court/hearings")

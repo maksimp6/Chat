@@ -4,7 +4,6 @@
   var currentScript = document.currentScript;
   var config = currentScript && currentScript.dataset ? currentScript.dataset : {};
 
-  window.__LOGOS_USER_ID = window.__LOGOS_USER_ID || "";
   window.__LOGOS_BASE_PATH = config.basePath || "";
   window.__LOGOS_STATIC_BASE = config.staticBase || "/static";
   window.__LOGOS_STATIC_VERSION = config.staticVersion || "";
@@ -30,16 +29,13 @@
   }
 
   function degradedStatus() {
-    return typeof document.getElementById === "function"
-      ? document.getElementById("frontend-degraded-status")
-      : null;
+    return document.getElementById("frontend-degraded-status");
   }
 
   function showDegradedStatus() {
     var status = degradedStatus();
     if (status) status.hidden = false;
-    var root =
-      typeof document.getElementById === "function" ? document.getElementById("app-root") : null;
+    var root = document.getElementById("app-root");
     if (root) root.setAttribute("data-enhancement-state", "degraded");
   }
 
@@ -50,8 +46,7 @@
     }
     var status = degradedStatus();
     if (status) status.hidden = true;
-    var root =
-      typeof document.getElementById === "function" ? document.getElementById("app-root") : null;
+    var root = document.getElementById("app-root");
     if (root) root.setAttribute("data-enhancement-state", "ready");
     return true;
   }
@@ -79,23 +74,16 @@
   }
 
   function takeEarlyTap() {
-    if (typeof document.removeEventListener === "function") {
-      document.removeEventListener("click", recordEarlyTap, true);
-    }
+    document.removeEventListener("click", recordEarlyTap, true);
     var tap = earlyTap;
     earlyTap = null;
     return tap;
   }
 
-  if (typeof document.addEventListener === "function") {
-    document.addEventListener("click", recordEarlyTap, true);
-  }
+  document.addEventListener("click", recordEarlyTap, true);
 
   window.LogosBoot = Object.freeze({
     markShellReady: markShellReady,
-    failedCriticalScripts: function () {
-      return failedCriticalScripts.slice();
-    },
     takeEarlyTap: takeEarlyTap,
   });
 
@@ -112,7 +100,6 @@
     );
     var logger = console[level] || console.error;
     logger.call(console, "[BOOT]", details);
-    window.dispatchEvent(new CustomEvent("logos:diagnostic", { detail: details }));
     if (level === "error") reportDiagnostic(details);
   }
 
@@ -193,14 +180,6 @@
       var url = prefixUrl(input.url);
       if (url !== input.url) target = new Request(url, input);
     }
-
-    init = init || {};
-    var headers = new Headers(
-      init.headers ||
-        (typeof Request !== "undefined" && target instanceof Request ? target.headers : {}),
-    );
-    if (window.__LOGOS_USER_ID) headers.set("X-Logos-User-ID", window.__LOGOS_USER_ID);
-    init.headers = headers;
     return originalFetch(target, init);
   };
 
@@ -214,54 +193,6 @@
     patchedEventSource.OPEN = NativeEventSource.OPEN;
     patchedEventSource.CLOSED = NativeEventSource.CLOSED;
     window.EventSource = patchedEventSource;
-  }
-
-  function cleanupLegacyServiceWorkers() {
-    try {
-      if (
-        !navigator.serviceWorker ||
-        typeof navigator.serviceWorker.getRegistrations !== "function"
-      )
-        return;
-      navigator.serviceWorker
-        .getRegistrations()
-        .then(function (registrations) {
-          return Promise.all(
-            registrations.map(function (registration) {
-              return registration.unregister();
-            }),
-          );
-        })
-        .catch(function (error) {
-          console.warn("[BOOT] Service worker cleanup failed:", error);
-        });
-    } catch (error) {
-      console.warn("[BOOT] Service worker cleanup unavailable:", error);
-    }
-  }
-
-  function cleanupLegacyCaches() {
-    try {
-      if (!window.caches || typeof window.caches.keys !== "function") return;
-      window.caches
-        .keys()
-        .then(function (keys) {
-          return Promise.all(
-            keys
-              .filter(function (key) {
-                return /^logos-pro-/i.test(key);
-              })
-              .map(function (key) {
-                return window.caches.delete(key);
-              }),
-          );
-        })
-        .catch(function (error) {
-          console.warn("[BOOT] Cache cleanup failed:", error);
-        });
-    } catch (error) {
-      console.warn("[BOOT] Cache cleanup unavailable:", error);
-    }
   }
 
   // The page retains its loaded UI version until a safe reload. A backend checkout
@@ -281,7 +212,7 @@
   }
 
   function safeToRefresh() {
-    if (document.readyState === "loading" || typeof document.querySelectorAll !== "function") return false;
+    if (document.readyState === "loading") return false;
     if (window.LogosDispatcher && typeof window.LogosDispatcher.isBusy === "function" && window.LogosDispatcher.isBusy()) return false;
     // A reply, voice recording, settings dialog, file selection or draft must survive updates.
     if (document.querySelector(".typing") || document.querySelector(".recording")) return false;
@@ -316,7 +247,6 @@
       versionBadge("pending", "обновление готово, ожидаю окончания работы");
       return false;
     }
-    if (!window.location || typeof window.location.reload !== "function") return false;
     reloadingVersion = true;
     versionBadge("reloading", "обновляю интерфейс");
     // Reload the current URL, preserving its selected conversation and query parameters.
@@ -356,19 +286,13 @@
       });
   }
 
-  window.LogosVersion = Object.freeze({ check: checkVersion, refreshIfSafe: refreshIfSafe });
   function startVersionChecks() {
     if (!window.__LOGOS_STATIC_VERSION) return;
     checkVersion();
-    if (typeof window.setInterval === "function") window.setInterval(checkVersion, 30000);
+    window.setInterval(checkVersion, 30000);
   }
-  if (typeof document.addEventListener === "function") {
-    document.addEventListener("DOMContentLoaded", startVersionChecks);
-    document.addEventListener("visibilitychange", function () {
-      if (!document.hidden) checkVersion();
-    });
-  }
-
-  cleanupLegacyServiceWorkers();
-  cleanupLegacyCaches();
+  document.addEventListener("DOMContentLoaded", startVersionChecks);
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) checkVersion();
+  });
 })();

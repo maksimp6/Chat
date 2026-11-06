@@ -136,8 +136,7 @@
 
 - [Структура интерфейса](frontend/overview.md) — структура пользовательского интерфейса; ресурсы загружаются только по локальным путям
 - [Execution Surface](frontend/execution-surface.md) — read-only проекция ExecutionTrace `logos.execution_surface.v1`
-- [Стандарт модулей v1](frontend/module-standard.md) — C-подобная граница API фронтенд-модулей
-- [Политика исходников модулей](frontend/module-policy.md) — проверка исходника до выполнения модуля
+- [Статус и транспорт фронтенда](frontend/module-standard.md) — панель состояния и Dispatcher
 - [Critical bundle budget](frontend/critical-bundle-budget.md) — методика и замер: помещается ли минимальная рабочая версия в 50 KB (#223)
 - [Progressive enhancement audit](frontend/progressive-enhancement-audit.md) — исходный аудит перед следующим срезом (#227)
 - [AI theme assistant](frontend/theme-assistant.md) — локальный инструмент `set_ui_theme`

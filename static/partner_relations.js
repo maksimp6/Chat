@@ -86,7 +86,6 @@
       contentClassName: "logos-dept-card",
       body: card,
     });
-    (document.querySelector(".logos-pro-app") || document.body).appendChild(modal);
     UI.modal.open(modal);
 
     function load() {
