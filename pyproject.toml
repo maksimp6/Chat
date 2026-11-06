@@ -45,7 +45,6 @@ roots = [
     "scripts/rotate_cloudru_provider_key.py",
 ]
 entry-blocks = [
-    "agent_memory/extractor.py",
     "yandex_client_modules/sdk.py",
     "project_board/seed.py",
     "project_board/server.py",
@@ -160,7 +159,6 @@ copies = [
 canonical = "observability/trace_security.py"
 copies = [
     "agent_context/_vendor/trace_security.py",
-    "agent_memory/_vendor/trace_security.py",
     "agent_retrieval/_vendor/trace_security.py",
     "cloud/_vendor/trace_security.py",
     "scripts/narration_trace_security.py",

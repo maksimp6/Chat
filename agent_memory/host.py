@@ -17,6 +17,7 @@ from agent_memory._binding import Binding, HostNotBound
 class Host:
     kristall_Kristall: Any  # kristall.Kristall
     memory_file_path: Any  # storage.records.memory_file_path
+    vector_add: Any  # vector_db.store.add
 
 
 _binding: Binding[Host] = Binding("agent_memory")
@@ -33,8 +34,13 @@ __all__ = [
     "current",
     "memory_file_path",
     "provide",
+    "vector_add",
 ]
 
 
 def memory_file_path(*args: Any, **kwargs: Any) -> Any:
     return current().memory_file_path(*args, **kwargs)
+
+
+def vector_add(*args: Any, **kwargs: Any) -> Any:
+    return current().vector_add(*args, **kwargs)

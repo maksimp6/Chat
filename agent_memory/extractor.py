@@ -12,7 +12,7 @@ from typing import Any
 import requests
 
 from agent_memory.client import get_memory_client
-from agent_memory.host import memory_file_path
+from agent_memory.host import memory_file_path, vector_add
 
 API_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 _FACT_PREFIX = "global_fact:"
@@ -55,11 +55,6 @@ def names_removed_tool(fact: str) -> bool:
     return any(name in fact for name in _REMOVED_TOOL_NAMES)
 
 
-def init_global_memory() -> None:
-    """Open the native journal. There is no SQL schema to initialize."""
-    get_memory_client(memory_file_path())
-
-
 def list_global_memory_facts() -> list[dict[str, Any]]:
     """Return detached facts, most recent first, with stable tie ordering.
 
@@ -93,11 +88,15 @@ def list_global_memory_facts() -> list[dict[str, Any]]:
 def save_global_memory_facts(
     facts: list[dict[str, Any]], *, now: int | None = None
 ) -> int:
-    """Atomically insert facts; a repeated fact refreshes its category and time."""
+    """Atomically insert facts; a repeated fact refreshes its category and time.
+
+    Every accepted fact then goes into the vector database, where ``remember`` finds it;
+    a repeated fact replaces its document there."""
     if not isinstance(facts, list):
         raise ValueError("facts must be a list")
     timestamp = int(time.time()) if now is None else int(now)
     saved = 0
+    accepted: dict[str, tuple[str, str]] = {}
     store = get_memory_client(memory_file_path())
     with store.transaction() as tx:
         for entry in facts:
@@ -110,7 +109,8 @@ def save_global_memory_facts(
             if not fact or len(fact) > 8192 or names_removed_tool(fact):
                 continue
             category = entry.get("category", "general")
-            key = _FACT_PREFIX + hashlib.sha256(fact.encode("utf-8")).hexdigest()
+            digest = hashlib.sha256(fact.encode("utf-8")).hexdigest()
+            key = _FACT_PREFIX + digest
             existing = tx.get(key)
             if not isinstance(category, str) or not category.strip():
                 # A missing category never overwrites the one already stored.
@@ -123,6 +123,9 @@ def save_global_memory_facts(
             if existing is None:
                 saved += 1
             tx.set(key, {"category": category, "fact": fact, "updated_at": timestamp})
+            accepted[digest] = (fact, category)
+    for digest, (fact, category) in accepted.items():
+        vector_add("memory_facts", fact, digest, {"category": category})
     return saved
 
 
@@ -177,23 +180,3 @@ def extract_and_save_facts(dialog_messages: list) -> int:
     except (KeyError, ValueError, TypeError, requests.RequestException) as exc:
         logger.warning("memory fact extraction failed: %s", type(exc).__name__)
         return 0
-
-
-def get_global_memory_summary() -> str:
-    """Format current native memory facts for the system prompt."""
-    records = sorted(
-        list_global_memory_facts(), key=lambda row: (row["category"], row["fact"])
-    )
-    if not records:
-        return ""
-    return "\n[ГЛОБАЛЬНАЯ ПАМЯТЬ ПРОЕКТОВ]\n" + "".join(
-        f"- [{row['category'].upper()}] {row['fact']}\n" for row in records
-    )
-
-
-if __name__ == "__main__":
-    from composition import wiring
-
-    wiring.register_all()
-    print("Текущая глобальная память:")
-    print(get_global_memory_summary() or "Память пока пуста.")

@@ -2,7 +2,7 @@
 
 `agent_memory` · Stores shared, source-linked memory facts for Logos agents.
 
-Shared memory for Logos agents on native Kristall: the Kristall client lifecycle, source-linked memory records, fact extraction, the memory panel's controls and HTTP API, and durable conversation-ownership and user-identity records.
+Shared memory for Logos agents on native Kristall: the Kristall client lifecycle, fact extraction, the memory panel's controls and HTTP API, and durable conversation-ownership and user-identity records.
 
 ## Role in a dialog
 
@@ -13,19 +13,15 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 
 ## Public API
 
-`from agent_memory import …`: `AgentMemoryStore`, `MemoryLookup`, `MemoryRecord`.
+`from agent_memory import …`: `client`, `conversation_ownership_store`, `extractor`, `manager`, `routes`.
 
 | Module | Purpose |
 | --- | --- |
 | [`agent_memory.client`](client.py) | Logos-owned lifecycle for the standalone explicit-commit Kristall. |
 | [`agent_memory.conversation_ownership_store`](conversation_ownership_store.py) | Durable conversation ownership records on the native Kristall engine. |
-| [`agent_memory.extractor`](extractor.py) | Extract facts and persist individual records directly in native Kristall. |
+| [`agent_memory.extractor`](extractor.py) | Extract facts and persist individual records directly in native Kristall; each accepted fact also goes into `vector_db` (collection `memory_facts`). |
 | [`agent_memory.manager`](manager.py) | Native Kristall configuration and fact controls. |
-| [`agent_memory.routes`](routes.py) | HTTP API of the global memory panel: configuration, facts and clearing. |
-
-Command line:
-
-- `python -m agent_memory.extractor`
+| [`agent_memory.routes`](routes.py) | HTTP API of the global memory panel: configuration and facts, read-only. |
 
 Other units reach it only through their own ports:
 
@@ -44,6 +40,7 @@ Everything `agent_memory` uses from other units is a field of `Host` in [`agent_
 | --- | --- |
 | `kristall_Kristall` | `kristall.Kristall` |
 | `memory_file_path` | `storage.records.memory_file_path` |
+| `vector_add` | `vector_db.store.add` |
 
 ## Install
 

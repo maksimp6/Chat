@@ -255,7 +255,7 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | `agent_runtime/`   | Provider-agnostic Agent Gateway, Responses tool loop, local tool agent, headless issue runner   |
 | `agent_shell/`     | Minimal shell for agent tasks: task store, runner and CLI                                       |
 | `agent_context/`   | Deterministic task-context contracts and cache                                                  |
-| `agent_memory/`    | GitHub-first shared memory contracts                                                            |
+| `agent_memory/`    | Shared memory of Logos agents on native Kristall                                                |
 | `agent_retrieval/` | Hybrid deterministic retrieval over cache, shared memory and repository indexes                 |
 | `agent_rules/`     | Proposed provider-independent Agent Rules Registry and controller                               |
 | `agent_skills/`    | Reusable Agent Skill discovery and runtime helpers                                              |

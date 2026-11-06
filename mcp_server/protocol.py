@@ -63,7 +63,7 @@ def _jsonrpc_result(request_id: Any, result: Any) -> Response:
     )
 
 
-def _jsonrpc_error(
+def _error_response(
     request_id: Any,
     code: int,
     message: str,
@@ -84,25 +84,6 @@ def _jsonrpc_error(
         status=status,
         mimetype="application/json",
         headers=dict(headers or {}),
-    )
-
-
-def _error_response(
-    request_id: Any,
-    code: int,
-    message: str,
-    data: Any = None,
-    *,
-    status: int = 400,
-    headers: Mapping[str, str] | None = None,
-) -> Response:
-    return _jsonrpc_error(
-        request_id,
-        code,
-        message,
-        data,
-        status=status,
-        headers=headers,
     )
 
 

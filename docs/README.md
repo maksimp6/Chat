@@ -54,7 +54,6 @@
 - [Execution Trace и расчёт стоимости](architecture/execution_trace.md) — один `ExecutionTrace` на логическую операцию запроса
 - [Cloud Gateway и Local Tool Agent](architecture/local_tool_agent.md) — разделение центрального Gateway и локального исполнителя
 - [SSH Runtime](architecture/ssh_runtime.md) — команды и файловые операции на удалённых Linux-хостах через OpenSSH
-- [Общая память агентов](architecture/agent-memory.md) — GitHub-first хранилище памяти агентов репозитория (issue #578)
 - [Индекс ревизий репозитория](architecture/repository-revision-index.md) — неизменяемый Python-индекс в `scripts/build_ai_index.py` (#538)
 - [Branch Environments: architecture review](architecture/branch-environments.md) — design review до реализации (#13, PR #330)
 - [ChatGPT Browser Tool](architecture/chatgpt-browser-tool.md) — граница внешнего инструмента для persistent Chrome Worker
