@@ -128,12 +128,10 @@
     if (document.getElementById("provider-credentials-modal")) return;
     var UI = window.LogosCoreAPI.ui;
     var body = document.createElement("div");
-    body.className = "provider-credentials-body";
     UI.modal.create({
       id: "provider-credentials-modal",
       title: "Ключи провайдеров",
       className: "provider-credentials-modal",
-      contentClassName: "provider-credentials-box",
       closeAction: "provider-credentials.close",
       body: body,
     });
@@ -254,5 +252,4 @@
     var output = document.getElementById("provider-credentials-status");
     await fetchStatus(output);
   };
-  document.addEventListener("DOMContentLoaded", build);
 })();

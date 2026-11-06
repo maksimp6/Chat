@@ -24,7 +24,7 @@
   }
 
   function fold(title, body) {
-    var details = el("details", "msg-model-view-fold");
+    var details = el("details");
     details.appendChild(el("summary", "msg-model-view-fold-summary", title));
     details.appendChild(body);
     return details;
@@ -68,7 +68,7 @@
   }
 
   function renderTools(tools) {
-    var list = el("div", "msg-model-view-list");
+    var list = el("div");
     (tools.groups || []).forEach(function (group) {
       var row = el("div", "msg-model-view-row");
       var deferred = number(group.deferred) ? " · отложено " + fmt(group.deferred) : "";
@@ -90,7 +90,7 @@
   };
 
   function renderInput(input) {
-    var list = el("div", "msg-model-view-list");
+    var list = el("div");
     (input.items || []).forEach(function (item) {
       var row = el("div", "msg-model-view-row");
       if (item.type === "omitted") {
@@ -112,7 +112,7 @@
     if (!all.length) return null;
     var usage = usageByStep(trace);
     var first = all[0].view;
-    var root = el("details", "msg-meta-details msg-model-view");
+    var root = el("details", "msg-meta-details");
     var tools = first.tools || {};
     var instructions = first.instructions || {};
     root.appendChild(
@@ -131,7 +131,7 @@
           " симв.)",
       ),
     );
-    var body = el("div", "msg-meta-detail-list msg-model-view-body");
+    var body = el("div", "msg-meta-detail-list");
     var seenInstructions = null;
     var seenTools = null;
     all.forEach(function (entry, index) {
@@ -187,7 +187,7 @@
 
   // A stored message keeps only a reference to its trace: the block loads it when opened.
   function lazy(load) {
-    var root = el("details", "msg-meta-details msg-model-view");
+    var root = el("details", "msg-meta-details");
     var summary = el("summary", "msg-meta-summary", "👁 Что видит модель");
     root.appendChild(summary);
     var state = "idle";

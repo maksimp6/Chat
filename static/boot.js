@@ -230,7 +230,7 @@
       .concat(Array.from(document.querySelectorAll('[contenteditable="true"]')));
     for (var fieldIndex = 0; fieldIndex < fields.length; fieldIndex += 1) {
       var field = fields[fieldIndex];
-      // Closed settings contain saved defaults, not an active unsent draft.
+      // A field in a window is no draft: an open window has already stopped the refresh above.
       if (typeof field.closest === "function" && field.closest(".modal")) continue;
       if (field.hidden || (typeof field.closest === "function" && field.closest("[hidden]"))) continue;
       if (field.type === "file" && field.files && field.files.length) return false;

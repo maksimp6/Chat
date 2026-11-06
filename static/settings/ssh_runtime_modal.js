@@ -60,22 +60,15 @@
     ].join("");
 
     var content = document.createElement("div");
-    content.className = "ssh-runtime-body";
     content.innerHTML = tabSsh;
     // Настройки только для чтения: форма закрыта и после ответа GET.
-    var sshControls = content.querySelectorAll("input, textarea, button");
-    function setSshFormLocked(locked) {
-      sshControls.forEach(function (el) {
-        el.disabled = locked;
-      });
-    }
-    setSshFormLocked(true);
+    content.querySelectorAll("input, textarea, button").forEach(function (el) {
+      el.disabled = true;
+    });
 
     var ov = CoreUI.modal.create({
       id: "ssh-runtime-modal-custom",
       title: "Среда SSH",
-      className: "ssh-runtime-modal-custom",
-      contentClassName: "ssh-runtime-modal-content",
       body: content,
     });
     CoreUI.modal.open(ov);

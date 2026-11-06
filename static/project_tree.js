@@ -60,7 +60,6 @@
     var modal = UI.modal.create({
       id: "project-tree-modal",
       title: "Структура проекта",
-      closeAction: "project-tree.close",
       body: body,
     });
     UI.modal.open(modal);
@@ -68,7 +67,6 @@
     var state = body;
     loadProjectTree()
       .then(function (data) {
-        state.textContent = data.root;
         var tree = document.createElement("div");
         tree.className = "project-tree";
         if (!data.nodes.length) tree.textContent = "Пусто";
@@ -91,10 +89,6 @@
   }
 
   var actions = window.LogosCoreAPI.ui.actions;
-  actions.register("project-tree.close", function (payload) {
-    var modal = payload.element.closest(".modal");
-    if (modal) modal.remove();
-  });
   actions.register("project-tree.retry", function (payload) {
     var modal = payload.element.closest(".modal");
     if (modal) modal.remove();

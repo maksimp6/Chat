@@ -124,13 +124,11 @@
 
     var CoreUI = window.LogosCoreAPI.ui;
     var body = document.createElement("div");
-    body.className = "file-manager-body";
     var ov = CoreUI.modal.create({
       id: "file-manager-modal",
       title: "Файловый менеджер",
       className: "file-manager-modal",
       contentClassName: "file-manager-box",
-      closeAction: "file-manager.close",
       body: body,
     });
     var md = body;
@@ -279,7 +277,6 @@
             danger: true,
           }).then(function (confirmed) {
             if (!confirmed) return;
-            var originalText = button.textContent;
             button.disabled = true;
             button.textContent = "...";
             window.LogosDispatcher.request("/api/vector-stores/" + encodeURIComponent(vsId), {
@@ -296,7 +293,6 @@
               })
               .catch(function (error) {
                 button.disabled = false;
-                button.textContent = originalText;
                 button.textContent = "Удалить";
                 LogosToast.error(window.LogosErrorText("Не удалось удалить", error));
               });
@@ -373,13 +369,10 @@
       if (existingBg) existingBg.remove();
 
       var addBody = document.createElement("div");
-      addBody.className = "file-manager-add-body";
       var bg = CoreUI.modal.create({
         id: "vs-add-files-modal",
         title: "Файлы → " + (vsName || vsId.substring(0, 8)),
         className: "file-manager-add-modal",
-        contentClassName: "file-manager-add-box",
-        closeAction: "file-manager.add.close",
         body: addBody,
       });
       var panel = addBody;
@@ -804,12 +797,4 @@
     loadVsList();
     loadFiles();
   };
-  window.LogosCoreAPI.ui.actions.register("file-manager.close", function (payload) {
-    var modal = payload.element.closest(".modal");
-    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
-  });
-  window.LogosCoreAPI.ui.actions.register("file-manager.add.close", function (payload) {
-    var modal = payload.element.closest(".modal");
-    if (modal) window.LogosCoreAPI.ui.modal.close(modal);
-  });
 })();

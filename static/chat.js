@@ -1,18 +1,15 @@
-// Shown when a tool needs the owner's approval: the approval UI was removed, so the action is not run.
-const APPROVAL_OFF_TEXT = "Действие требует подтверждения владельца, поэтому не выполнено. Подтверждение в чате отключено.";
+// A note about a turn, kept per chat: shown now if that chat is open, else when it is opened again.
+const pendingChatNotes = {};
 
-// Output of an approved action, kept per chat: shown now if that chat is open, else when it is opened again.
-const pendingApprovalOutputs = {};
-
-function deliverApprovalOutput(convId, render) {
+function deliverChatNote(convId, render) {
   if (convId === currentConvId) return render();
-  (pendingApprovalOutputs[convId] = pendingApprovalOutputs[convId] || []).push(render);
+  (pendingChatNotes[convId] = pendingChatNotes[convId] || []).push(render);
 }
 
-function flushApprovalOutputs(convId) {
+function flushChatNotes(convId) {
   if (convId !== currentConvId) return;
-  const renders = pendingApprovalOutputs[convId] || [];
-  delete pendingApprovalOutputs[convId];
+  const renders = pendingChatNotes[convId] || [];
+  delete pendingChatNotes[convId];
   renders.forEach(function (render) {
     render();
   });
@@ -235,9 +232,6 @@ var CHAT_ERROR_TEXTS = {
   invalid_role: "Роль не найдена. Выберите роль из списка.",
   model_not_available_for_dialog: "Эта модель недоступна для диалога. Выберите другую модель.",
   model_catalog_unavailable: "Список моделей провайдера сейчас недоступен. Повторите позже.",
-  tool_action_failed: "Инструмент не выполнил действие. Причина записана в журнале сервера. Попросите модель повторить действие в чате.",
-  tool_execution_failed: "Сервер не завершил подтверждённое действие. Проверьте, выполнилось ли оно, прежде чем повторять.",
-  approval_followup_failed: "Действие выполнено, но модель не дописала ответ. Повторять действие не нужно: проверьте результат в диалоге.",
   turn_request_conflict: "Этот вопрос уже отправлен с другим текстом или фото. Отправьте его заново.",
   turn_lost: "Сервер перезапустился, пока модель отвечала, и ответ не сохранился. Вопрос сохранён: нажмите «Повторить», чтобы получить ответ.",
   turn_request_not_found: "Сервер не нашёл этот запрос. Если ответа нет в диалоге, отправьте вопрос ещё раз.",
@@ -365,7 +359,6 @@ function markCourtProofs(root) {
     COURT_PROOF_PATTERN.lastIndex = 0;
     const fragment = document.createDocumentFragment();
     let last = 0;
-    COURT_PROOF_PATTERN.lastIndex = 0;
     let match;
     while ((match = COURT_PROOF_PATTERN.exec(node.nodeValue)) !== null) {
       fragment.appendChild(document.createTextNode(node.nodeValue.slice(last, match.index)));
@@ -376,7 +369,6 @@ function markCourtProofs(root) {
       last = match.index + match[0].length;
     }
     fragment.appendChild(document.createTextNode(node.nodeValue.slice(last)));
-    COURT_PROOF_PATTERN.lastIndex = 0;
     node.parentNode.replaceChild(fragment, node);
   });
 }
@@ -585,21 +577,33 @@ function addMessage({
     if (traceObj && typeof traceObj === "object" && Object.keys(traceObj).length > 0) {
       // A stored message keeps only a reference to its trace, which is read on demand; summarising the reference would show the run as unfinished.
       const storedReference = traceObj.storage === "invocation";
+      // One download serves both blocks of the message; a failed one can be tried again.
+      let storedTrace = null;
+      const loadStoredTrace = function () {
+        if (!storedTrace) {
+          storedTrace = window.LogosDispatcher.request(
+            `/api/invocations/${encodeURIComponent(traceObj.invocation_id)}/trace`,
+            {},
+            { timeoutMs: 60000 },
+          ).then(function (res) {
+            if (!res.ok) {
+              const httpError = new Error("HTTP " + res.status);
+              httpError.status = res.status;
+              throw httpError;
+            }
+            return res.json();
+          }).catch(function (error) {
+            storedTrace = null;
+            throw error;
+          });
+        }
+        return storedTrace;
+      };
       if (window.LogosModelView && !storedReference) {
         const modelView = window.LogosModelView.render(traceObj);
         if (modelView) metaWrap.appendChild(modelView);
       } else if (window.LogosModelView && storedReference && traceObj.invocation_id) {
-        metaWrap.appendChild(
-          window.LogosModelView.lazy(async function () {
-            const res = await window.LogosDispatcher.request(
-              `/api/invocations/${encodeURIComponent(traceObj.invocation_id)}/trace`,
-              {},
-              { timeoutMs: 60000 },
-            );
-            if (!res.ok) throw await window.LogosHttpError(res);
-            return res.json();
-          }),
-        );
+        metaWrap.appendChild(window.LogosModelView.lazy(loadStoredTrace));
       }
       if (window.LogosExecutionSurface && !storedReference) {
         const surface = window.LogosExecutionSurface.project(traceObj);
@@ -666,17 +670,7 @@ function addMessage({
           openTraceBtn.disabled = true;
           openTraceBtn.textContent = "🔍 Загружаем трассировку…";
           try {
-            const res = await window.LogosDispatcher.request(
-              `/api/invocations/${encodeURIComponent(traceObj.invocation_id)}/trace`,
-              {},
-              { timeoutMs: 60000 },
-            );
-            if (!res.ok) {
-              const httpError = new Error("HTTP " + res.status);
-              httpError.status = res.status;
-              throw httpError;
-            }
-            loaded = await res.json();
+            loaded = await loadStoredTrace();
           } catch (err) {
             // The reason is named (a missing trace, the server, the connection), and the same button loads it again.
             const reason = err && err.status === 404
@@ -1102,7 +1096,7 @@ async function streamHistory(convId, options) {
     showHeld();
     if (fresh && !chatbox.querySelector(".msg")) showEmptyChat(chatbox, end);
     end.remove();
-    flushApprovalOutputs(convId);
+    flushChatNotes(convId);
   } catch (err) {
     if (!current()) {
       end.remove();
@@ -1287,7 +1281,7 @@ function refreshHistory(convId, shown) {
         console.error("[CHAT] Render history error:", renderErr);
         chatbox.appendChild(historyErrorBlock(convId, "Не удалось показать диалог. Нажмите «Повторить» или обновите страницу."));
       }
-      flushApprovalOutputs(convId);
+      flushChatNotes(convId);
     })
     .catch((err) => {
       if (!current()) return;
@@ -1734,53 +1728,21 @@ document.addEventListener("DOMContentLoaded", function () {
     return Boolean(modelsData && modelsData.voice && modelsData.voice[modelKey]);
   }
 
-  // Group chat: the user's own message goes to the first chosen model, then each other chosen model is asked
-  // to speak into the same chat. Without two chosen models this is an ordinary send.
-  // «Стоп» ends the whole chain, not only the answer being written.
+  // Group chat: the model answers the user's message, then the Court speaks over what is stored.
+  // Without both chosen this is an ordinary send. «Стоп» or a failed turn (its text is back in the
+  // input) leaves the Court out.
   let groupStopped = false;
   async function sendGroupAware() {
     const group = window.LogosGroupChat ? window.LogosGroupChat.models() : [];
     if (group.length < 2 || !input || !input.value.trim() || pendingImages.length) return sendTurn(null);
-    const original = currentModel;
     groupStopped = false;
+    await sendTurn(null);
+    if (groupStopped || input.value || !currentConvId || pendingConversations.has(currentConvId)) return;
     try {
-      for (let index = 0; index < group.length; index += 1) {
-        if (group[index] === window.LogosGroupChat.COURT) {
-          // The Court speaks over what is already stored: the user's words alone, when it is the only
-          // other participant, are sent first so there is a record to judge.
-          if (index === 0) {
-            window.changeModel(group.find(function (k) { return k !== window.LogosGroupChat.COURT; }) || original, true);
-            await sendTurn(null);
-            if (groupStopped || input.value) break;
-          }
-          if (!currentConvId || pendingConversations.has(currentConvId)) break;
-          try {
-            await window.LogosGroupChat.courtTurn(currentConvId);
-            loadHistory(currentConvId);
-          } catch (error) {
-            LogosToast.error(window.LogosErrorText("Суд не сказал слова", error));
-            break;
-          }
-          if (groupStopped) break;
-          continue;
-        }
-        if (index > 0) {
-          if (!currentConvId || pendingConversations.has(currentConvId)) break;
-          input.value = window.LogosGroupChat.followUpText(group[index], group);
-        }
-        window.changeModel(group[index], true);
-        await sendTurn(null);
-        if (groupStopped) break;
-        // A turn that failed puts its text back into the input: the chain stops there, and a
-        // follow-up that was never the user's own words is not left in the input.
-        if (input.value) {
-          if (index > 0) input.value = "";
-          break;
-        }
-      }
-    } finally {
-      window.changeModel(original, true);
-      if (typeof updateModelButton === "function") updateModelButton();
+      await window.LogosGroupChat.courtTurn(currentConvId);
+      loadHistory(currentConvId);
+    } catch (error) {
+      LogosToast.error(window.LogosErrorText("Суд не сказал слова", error));
     }
   }
 
@@ -1811,13 +1773,11 @@ document.addEventListener("DOMContentLoaded", function () {
   // The chat is a live region: the label is read out once and when it changes, the per-second timer is not read out.
   function createTurnStatus(chatbox, startedAt) {
     const el = document.createElement("div");
-    el.className = "typing-status";
     const labelEl = document.createElement("span");
     const timeEl = document.createElement("span");
     timeEl.setAttribute("aria-hidden", "true");
     // The tools of the turn stay listed in their order; a new one never hides the one before.
     const toolsEl = document.createElement("ol");
-    toolsEl.className = "typing-tools";
     toolsEl.hidden = true;
     el.append(toolsEl, labelEl, timeEl);
     let label = "Отправляем запрос";
@@ -2183,7 +2143,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (typingEl) typingEl.remove();
       if (turn.status) turn.status.remove();
       if (recovery.cancelled) {
-        deliverApprovalOutput(convId, function () {
+        deliverChatNote(convId, function () {
           addMessage({ text: stopNotice(true), role: "error" });
         });
         watchStoppedTurn(turn);
@@ -2520,7 +2480,6 @@ document.addEventListener("DOMContentLoaded", function () {
     reasoningEl.className = "reasoning-content";
     details.append(summary, reasoningEl);
     const textEl = document.createElement("div");
-    textEl.className = "live-text";
     bubble.append(details, textEl);
     el.appendChild(bubble);
 
@@ -2872,7 +2831,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // The lost notice is final for this request: a later history load must not read its saved request id again.
     if (turn.chatRequestId) forgetLiveTurn(turn.conversationId, turn.chatRequestId);
     const retryable = Boolean(question) && !(question.attachments && question.attachments.images);
-    deliverApprovalOutput(turn.conversationId, function () {
+    deliverChatNote(turn.conversationId, function () {
       const lostNode = addMessage({
         // Without a retry button the server's explanation may tell the user to press «Повторить», so the photo text is used.
         text: retryable
@@ -3093,13 +3052,6 @@ document.addEventListener("DOMContentLoaded", function () {
         // The chat takes the conversation title the server stored, also when the turn then failed at the provider. A Problem
         // Details body (it has «type») is skipped: its «title» describes the error.
         if (!data.type) applyConversationTitle(turn.conversationId, data.title);
-        // A reply is persisted and comes back with the history; an approval request is not, so it waits for its chat.
-        if (data.requires_approval) {
-          deliverApprovalOutput(turn.conversationId, function () {
-            addMessage({ text: APPROVAL_OFF_TEXT, role: "error" });
-          });
-          return null;
-        }
         // The backend persists this turn; never paint its late answer into a different conversation.
         if (currentConvId !== turn.conversationId) return null;
         if (data.error === "conversation_not_found") {
@@ -3191,7 +3143,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const storedId = Number.isInteger(data.user_message_id) && data.user_message_id > 0
           ? data.user_message_id
           : turn.serverUserMessageId || turn.userMessageId;
-        deliverApprovalOutput(turn.conversationId, function () {
+        deliverChatNote(turn.conversationId, function () {
           const lostNode = addMessage({
             text: data.detail || CHAT_ERROR_TEXTS.turn_lost,
             role: "error",
@@ -3305,7 +3257,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // The server stored the question and finishes the answer: the text is not put back (a send would store it
         // twice). What already came stays in the chat until the stored answer replaces it.
         if (turn.live) turn.live.freeze();
-        deliverApprovalOutput(turn.conversationId, function () {
+        deliverChatNote(turn.conversationId, function () {
           addMessage({ text: stopNotice(true), role: "error" });
         });
         watchStoppedTurn(turn);
@@ -3324,12 +3276,12 @@ document.addEventListener("DOMContentLoaded", function () {
           : error && error.name === "TimeoutError"
             ? "Ответ идёт дольше 5 минут. Ждём его, он сохраняется на сервере. Нажмите ■, чтобы перестать ждать."
             : "Соединение прервалось. Ждём ответ, он сохраняется на сервере.";
-        deliverApprovalOutput(turn.conversationId, function () {
+        deliverChatNote(turn.conversationId, function () {
           addMessage({ text: waitNote, role: "error" });
         });
         recoverTurn(turn, recovery, function () {
           if (turn.live) turn.live.remove();
-          deliverApprovalOutput(turn.conversationId, function () {
+          deliverChatNote(turn.conversationId, function () {
             // A question the server accepted is stored: it is not put back for a second send.
             if (!turn.accepted) {
               restoreImages();
@@ -3341,7 +3293,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (turn.status) turn.status.remove();
           // Stopped during the wait: the same outcome as stopping the request itself.
           if (recovery.cancelled) {
-            deliverApprovalOutput(turn.conversationId, function () {
+            deliverChatNote(turn.conversationId, function () {
               if (!turn.accepted) {
                 restoreImages();
                 if (!input.value) input.value = turn.text;
@@ -3355,7 +3307,7 @@ document.addEventListener("DOMContentLoaded", function () {
       } else if (stopped && isImageModel(turn.model)) {
         // The generation goes on after «Стоп», so the prompt is not put back for a second paid run:
         // «Повторить» reads the stored result, it never starts a new generation.
-        deliverApprovalOutput(turn.conversationId, function () {
+        deliverChatNote(turn.conversationId, function () {
           addMessage({
             text: "Ожидание изображения остановлено. Сервер может его создать: «Повторить» покажет результат без новой генерации.",
             role: "error",
@@ -3369,7 +3321,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (turn.accepted) turn.live.freeze();
           else turn.live.remove();
         }
-        deliverApprovalOutput(turn.conversationId, function () {
+        deliverChatNote(turn.conversationId, function () {
           // A question the server accepted is stored: it is not put back for a second send.
           if (!turn.accepted) {
             restoreImages();

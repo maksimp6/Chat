@@ -31,7 +31,6 @@
       id: "departments-modal",
       title: "Отделы",
       contentClassName: "logos-dept-card",
-      closeAction: "departments.close",
       body: list,
     });
 
@@ -92,6 +91,5 @@
       });
   }
 
-  window.LogosCoreAPI.ui.actions.register("departments.close", close);
   window.openDepartmentsModal = open;
 })();

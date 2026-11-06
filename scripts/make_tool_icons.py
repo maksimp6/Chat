@@ -5,7 +5,7 @@ Tool names are read statically from tool_providers/*.py, the tool files of the
 units listed in UNIT_TOOL_FILES, every unit module composition/tool_sources.py imports
 and the bridge tools of mcp_server/tools.py (the same names the registry exposes). Each tool gets the first glyph whose keyword
 appears in its name; unmatched tools get the generic glyph. Output:
-static/icons/tools/<tool>.svg and static/icons/tools/index.json.
+static/icons/tools/<tool>.svg.
 
 Run from the repository root: python3 scripts/make_tool_icons.py
 """
@@ -13,7 +13,6 @@ Run from the repository root: python3 scripts/make_tool_icons.py
 from __future__ import annotations
 
 import ast
-import json
 import pathlib
 import sys
 
@@ -289,14 +288,8 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     for stale in OUT.glob("*.svg"):
         stale.unlink()
-    index = {}
     for name in names:
-        glyph = glyph_for(name)
-        (OUT / f"{name}.svg").write_text(svg_for(glyph), encoding="utf-8")
-        index[name] = glyph
-    (OUT / "index.json").write_text(
-        json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+        (OUT / f"{name}.svg").write_text(svg_for(glyph_for(name)), encoding="utf-8")
     print(f"tools: {len(names)}")
     return 0
 

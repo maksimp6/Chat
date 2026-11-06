@@ -1161,7 +1161,7 @@ button.logos-trace-error-card{cursor:pointer}
       tabBar.appendChild(node);
     });
     inner.appendChild(tabBar);
-    var content = el("div", "logos-trace-tab-content");
+    var content = el("div");
     if (item.kind === "overview") {
       if (selected === "Обзор") renderOverviewTab(content);
       else if (selected === "Вопрос и параметры") {
@@ -1315,5 +1315,4 @@ button.logos-trace-error-card{cursor:pointer}
   }
 
   window.openTraceViewer = open;
-  window.dispatchEvent(new CustomEvent("logos:trace-viewer-ready"));
 })();

@@ -13,19 +13,10 @@
 
   var CATEGORY_LABELS = { general: "общее" };
 
-  // Settings are read-only: the memory configuration is shown, never saved.
-  function lockConfigControls() {
-    ["memEnabled", "memLimit"].forEach(function (id) {
-      var control = byId(id);
-      if (control) control.disabled = true;
-    });
-  }
-
   async function loadMemoryData() {
     // Old facts stay out of view while the request runs (пункт 51).
     var pending = byId("memoryFactsList");
     if (pending) pending.textContent = "Загрузка…";
-    lockConfigControls();
     try {
       var response = await window.LogosDispatcher.request("/api/memory/manage");
       if (!response.ok) throw await window.LogosHttpError(response);
@@ -44,7 +35,6 @@
           Number.isInteger(config.max_context_facts) ? config.max_context_facts : 100,
         );
       }
-      lockConfigControls();
       if (count) count.textContent = facts.length;
       reportStatus("");
       if (!list) return;
@@ -66,7 +56,6 @@
         category.className = "memory-fact-category";
         category.textContent = CATEGORY_LABELS[fact.category] || String(fact.category || "общее");
         var text = document.createElement("span");
-        text.className = "memory-fact-text";
         text.textContent = String(fact.fact || "");
         item.appendChild(category);
         item.appendChild(text);
@@ -74,7 +63,6 @@
       });
     } catch (error) {
       console.error("[Memory] Failed to load memory:", error);
-      lockConfigControls();
       var failed = byId("memoryFactsList");
       if (failed) failed.replaceChildren();
       reportStatus(window.LogosErrorText("Не удалось загрузить память", error));

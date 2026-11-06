@@ -132,7 +132,6 @@
     if (existing) existing.remove();
 
     var md = document.createElement("div");
-    md.className = "settings-mcp-body";
     md.innerHTML =
       '<div class="mcp-manager-note">Настройки только для чтения: серверы показаны без изменения.</div>' +
       '<div id="mcp-mgr-list"></div>';
@@ -140,8 +139,6 @@
     var ov = CoreUI.modal.create({
       id: "mcp-manager-modal",
       title: "MCP серверы",
-      className: "mcp-manager-modal",
-      contentClassName: "settings-mcp-modal-content",
       body: md,
     });
     // The window wears the shared modal shell (static/style.css), so no look is set inline here.

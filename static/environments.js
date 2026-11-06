@@ -103,7 +103,6 @@
 
     const UI = window.LogosCoreAPI.ui;
     const body = document.createElement("div");
-    body.className = "environments-body";
     body.innerHTML = [
       '<div class="environments-head"><div><p>Неизменяемые окружения веток</p></div>',
       '<button class="logos-btn environments-refresh" type="button">Обновить</button></div>',
@@ -115,9 +114,6 @@
     node = UI.modal.create({
       id: "environments-modal",
       title: "Окружения",
-      className: "environments-modal",
-      contentClassName: "environments-box",
-      closeAction: "environments.close",
       body: body,
     });
     node.querySelector(".environments-refresh").onclick = load;
@@ -262,12 +258,6 @@
     window.LogosCoreAPI.ui.modal.open(modal());
     load();
   }
-
-  window.LogosCoreAPI.ui.actions.register("environments.close", function (payload) {
-    const node = payload.element.closest(".modal");
-    if (node) window.LogosCoreAPI.ui.modal.close(node);
-  });
-
 
   window.openEnvironmentsModal = open;
 })();

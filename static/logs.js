@@ -51,7 +51,7 @@
     if (existing) existing.remove();
 
     var UI = window.LogosCoreAPI.ui;
-    var body = el("div", "logs-body");
+    var body = el("div");
     var tools = el("div", "logs-tools");
     var search = el("input", "logs-search");
     search.type = "search";
@@ -76,7 +76,7 @@
     });
     var status = el("div", "logs-status", "Загрузка…");
     status.setAttribute("role", "status");
-    var list = el("div", "logs-list");
+    var list = el("div");
     var more = el("button", "logos-btn logs-more", "Показать ещё");
     more.type = "button";
     more.hidden = true;

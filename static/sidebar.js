@@ -18,11 +18,6 @@ function initSidebar() {
   }
 
   if (menuBtn) {
-    menuBtn.setAttribute(
-      "aria-expanded",
-      sidebar ? (sidebar.classList.contains("open") ? "true" : "false") : "false",
-    );
-    menuBtn.setAttribute("aria-controls", "sidebar");
     window.LogosCoreAPI.ui.actions.register("sidebar.toggle", function (payload, event) {
       if (!sidebar) return;
       if (sidebar.classList.contains("open")) {
@@ -419,14 +414,6 @@ function selectConv(id, updateHistory) {
     newUrl.searchParams.set("conversation_id", id);
     window.history.pushState({ convId: id }, "", newUrl);
   }
-  var conv = conversations.find(function (c) {
-    return c.id === id;
-  });
-  if (conv) {
-    if (typeof window.changeModel === "function") {
-      window.changeModel(conv.model || "ollama-qwen3-4b", true);
-    }
-  }
   if (typeof window.loadServerConvSettings === "function") {
     window.loadServerConvSettings(id).catch(function (error) {
       console.warn("[SIDEBAR] Settings load failed:", error);
@@ -467,9 +454,6 @@ function deleteConv(id) {
       newUrl.searchParams.delete("conversation_id");
       window.history.replaceState(null, "", newUrl);
       showSidebarEmptyChat();
-      if (typeof window.changeModel === "function") {
-        window.changeModel("ollama-qwen3-4b", true);
-      }
     }
   }
   if (typeof renderSidebar === "function") renderSidebar();

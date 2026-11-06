@@ -8,8 +8,7 @@ files identify their changes. No Wikifunctions service is called at runtime.
 | Function | Implementation and revision | Local API | Existing callers |
 | --- | --- | --- | --- |
 | Z21951 Clamp | Z21953, 162115 | `core.wikifunctions.clamp_integer` | File-search result count; HTTP/shell/session timeouts; two Cloud.ru list limits |
-| Z12316 regex replacement | Z12317, 285821 | `LogosWikifunctions.replaceRegex` | Browser text whitespace normalization; trace export filenames |
-| Z10079 trim | Z10081, 143512 | `LogosWikifunctions.trim` | Browser text whitespace normalization |
+| Z12316 regex replacement | Z12317, 285821 | `LogosWikifunctions.replaceRegex` | Trace export filenames |
 | Z13078 deduplicate list | Python Z19201, 283594; function definition 326886 | `core.wikifunctions.unique_strings` | `SkillRegistry.load_many`, invoked by `/api/chat` before composing selected skill instructions |
 
 ## Chat skill selection
@@ -51,11 +50,10 @@ at their original call sites. The catalog's natural-number function is adapted
 to these existing integer inputs, including negative values clamped to the
 positive lower bound; floats and JavaScript clamp operations are not migrated.
 
-The JavaScript functions use the same ECMAScript `replace`, `RegExp` and `trim`
-operations. Callers retain their original `String(value || fallback)` conversion,
-patterns and `g` flag. Trace filenames still apply `.slice(0, 80) || "trace"`.
-The shared JavaScript file is served before callers and is also directly
-importable by the Node emulator.
+The JavaScript function uses the same ECMAScript `replace` and `RegExp`
+operations. Its caller retains the original `String(value || fallback)` conversion,
+pattern and `g` flag. Trace filenames still apply `.slice(0, 80) || "trace"`.
+The shared JavaScript file is served before its caller.
 
 HTML escaping was excluded: Z31475 changes the quote policy, while the
 Z31709 composition can normalize newlines. Neither is a drop-in replacement

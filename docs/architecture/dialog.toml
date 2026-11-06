@@ -45,7 +45,7 @@ units = ["chat", "economy", "conversations", "storage", "kristall"]
 kristall = "chat/conversation/*, installation/shared-owner-id"
 
 [[operation]]
-name = "Choose a model"
+name = "See the model catalog"
 ui = "static/core.js loadModels, static/models.js"
 routes = ["GET /api/models"]
 backend = ["provider_accounts.model_routes:list_models"]
@@ -83,8 +83,8 @@ units = ["conversations", "chat", "yandex_client_modules", "tool_providers"]
 kristall = "— (nothing stored: global maximal settings)"
 
 [[operation]]
-name = "Rename a dialog or change its model"
-ui = "static/sidebar.js saveTitle, static/core.js changeModel"
+name = "Rename a dialog"
+ui = "static/sidebar.js saveTitle"
 routes = ["PATCH /api/conversations/<conv_id>"]
 backend = ["conversations.routes:patch_conversation"]
 units = ["conversations", "provider_accounts", "storage", "kristall"]
@@ -120,7 +120,7 @@ kristall = "mcp/server/*, global_fact:*"
 
 [[operation]]
 name = "Approve a tool action"
-ui = "static/chat.js renderApprovalCard"
+ui = "not on the page: agent_runtime/cli.py execute_approved"
 routes = ["POST /api/mcp/execute-approved"]
 backend = ["chat.mcp_routes:execute_approved"]
 units = ["chat", "tool_providers", "economy", "storage", "kristall"]

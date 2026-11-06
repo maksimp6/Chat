@@ -10,7 +10,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 - **List dialogs**: `GET /api/conversations`
 - **Create a dialog**: `POST /api/conversations`
 - **Open a dialog and read its history**: `GET /api/conversations/<conv_id>/messages`
-- **Rename a dialog or change its model**: `PATCH /api/conversations/<conv_id>`
+- **Rename a dialog**: `PATCH /api/conversations/<conv_id>`
 - **Send a message (the turn)**: `POST /api/chat`
 - **Tools during the turn**: `POST /api/chat`, `GET /api/mcp-servers`
 - **Approve a tool action**: `POST /api/mcp/execute-approved`

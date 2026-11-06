@@ -27,10 +27,7 @@ let conversations = [];
 // The one model of Logos: every dialog answers with it, whatever a dialog stored.
 const CHAT_MODEL_KEY = "ollama-qwen3-4b";
 let currentModel = CHAT_MODEL_KEY;
-let currentModelType = "text";
 let modelsData = { text: {}, voice: {}, image: {} };
-let modelSelectionSequence = 0;
-const modelSelectionSaves = new Map();
 let coreEnhancementStarted = false;
 let modelLoadState = { status: "idle", message: "" };
 // Conversation list load: "idle" | "loading" | "ready" | "failed".
@@ -110,69 +107,14 @@ window.isDialogModel = function (modelKey) {
     entry.dialog_selectable !== false && entry.available !== false);
 };
 
-window.changeModel = function (newModel, skipPatch) {
-  newModel = CHAT_MODEL_KEY;
-  if (!window.isDialogModel(newModel)) {
-    // A dialog opened from its stored model: that model is retired or no longer offered, and every
-    // turn answers with the chat model anyway, so opening the dialog must not show an error.
-    if (skipPatch) return false;
-    if (window.LogosToast) window.LogosToast.error("Эта модель не предназначена для диалога");
-    return false;
-  }
-  if (!skipPatch && currentConvId && modelSelectionSaves.has(currentConvId)) {
-    if (window.LogosToast) window.LogosToast.error("Дождитесь сохранения выбранной модели");
-    return false;
-  }
-  var previousModel = currentModel;
-  var previousType = currentModelType;
-  var previousStoredModel = localStorage.getItem("current_model");
-  var voiceModels = modelsData.voice || {};
-  var imageModels = modelsData.image || {};
-  currentModel = newModel;
-  currentModelType = voiceModels[currentModel] ? "voice" : imageModels[currentModel] ? "image" : "text";
-  localStorage.setItem("current_model", currentModel);
-
-  if (!skipPatch && currentConvId) {
-    var selectedConvId = currentConvId;
-    var conv = conversations.find(function (c) {
-      return c.id === selectedConvId;
-    });
-    var previousConversationModel = conv && conv.model;
-    var selectionId = ++modelSelectionSequence;
-    modelSelectionSaves.set(selectedConvId, selectionId);
-    window.LogosDispatcher.request("/api/conversations/" + selectedConvId, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: newModel }),
-    }).then(function (response) {
-      if (!response.ok) return window.LogosHttpError(response).then(function (e) { throw e; });
-    }).catch(function (e) {
-      console.error("[CORE] Model save failed:", e);
-      if (modelSelectionSaves.get(selectedConvId) !== selectionId) return;
-      if (conv && conv.model === newModel) conv.model = previousConversationModel;
-      if (currentConvId === selectedConvId && currentModel === newModel) {
-        currentModel = previousModel;
-        currentModelType = previousType;
-        if (previousStoredModel === null) localStorage.removeItem("current_model");
-        else localStorage.setItem("current_model", previousStoredModel);
-        if (typeof updateModelButton === "function") updateModelButton();
-        if (typeof updateUIForModel === "function") updateUIForModel();
-      }
-      if (window.LogosToast) window.LogosToast.error(window.LogosErrorText("Не удалось сохранить выбранную модель", e));
-    }).finally(function () {
-      if (modelSelectionSaves.get(selectedConvId) === selectionId) modelSelectionSaves.delete(selectedConvId);
-    });
-    if (conv) conv.model = newModel;
-  }
-
+// The page has one model and never calls this; scripts/redmi_screenshot_capture.py still does.
+window.changeModel = function () {
   if (typeof updateModelButton === "function") updateModelButton();
   if (typeof updateUIForModel === "function") updateUIForModel();
   return true;
 };
 
 function initializeShell() {
-  window.LogosTheme.apply(savedTheme, false);
-
   window.LogosCoreAPI.ui.actions.register("theme.cycle", function () {
     window.LogosTheme.cycle();
   });
@@ -294,24 +236,15 @@ async function enhanceCore() {
       // Model selection is optional; conversations and history remain usable.
     }
 
-    if (currentConvId) {
-      var conv = conversations.find(function (c) {
-        return c.id === currentConvId;
-      });
-      if (conv && conv.model) window.changeModel(conv.model, true);
-
-      if (typeof window.loadServerConvSettings === "function") {
-        try {
-          await window.loadServerConvSettings(currentConvId);
-        } catch (e) {
-          console.error("[CORE] Failed to sync conversation settings:", e);
-        }
+    if (currentConvId && typeof window.loadServerConvSettings === "function") {
+      try {
+        await window.loadServerConvSettings(currentConvId);
+      } catch (e) {
+        console.error("[CORE] Failed to sync conversation settings:", e);
       }
     }
 
-    if (!currentConvId && typeof updateModelButton === "function") {
-      updateModelButton();
-    }
+    if (typeof updateModelButton === "function") updateModelButton();
     if (typeof updateUIForModel === "function") updateUIForModel();
     if (window.LogosCoreAPI && window.LogosCoreAPI.status) {
       window.LogosCoreAPI.status.set("core", "ready", "Ядро готово");
@@ -341,11 +274,6 @@ function initCore() {
   }
   initializeShell();
   applyConversationCache();
-  // Restore the open conversation's model from the local cache, so replies do not go to the default model while the server list loads.
-  var cachedCurrentConv = conversations.find(function (c) {
-    return c.id === currentConvId;
-  });
-  if (cachedCurrentConv && cachedCurrentConv.model) window.changeModel(cachedCurrentConv.model, true);
   if (typeof updateUIForModel === "function") updateUIForModel();
   if (typeof updateModelButton === "function") updateModelButton();
   if (window.LogosBoot && typeof window.LogosBoot.markShellReady === "function") {

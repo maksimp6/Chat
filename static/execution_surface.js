@@ -3,7 +3,6 @@
 
   // Read-only projection of a sanitized ExecutionTrace. Only whitelisted metadata
   // is copied out: never prompts, payloads, tool arguments or credentials.
-  var SCHEMA = "logos.execution_surface.v1";
 
   var STATE_LABELS = {
     working: "⏳ Выполняется",
@@ -198,28 +197,6 @@
     return result;
   }
 
-  function latestEvent(events) {
-    for (var i = events.length - 1; i >= 0; i--) {
-      var event = events[i];
-      if (event && typeof event.type === "string") {
-        return { type: event.type.slice(0, 64), timestamp: finite(event.timestamp) };
-      }
-    }
-    return null;
-  }
-
-  // WIKIFUNCTIONS-CANDIDATE WF-17: https://www.wikifunctions.org/wiki/Z19202.
-  // Заменить ядро stable dedup строк; адаптер сохраняет извлечение raw.model, text(..., 80),
-  // пропуск пустых значений и порядок первого появления; не менять UTF-16 усечение text().
-  function models(responses) {
-    var seen = new Set();
-    responses.forEach(function (response) {
-      var model = text(response && response.raw && response.raw.model, 80);
-      if (model) seen.add(model);
-    });
-    return Array.from(seen);
-  }
-
   function project(input) {
     var trace = asTrace(input);
     if (!trace) return null;
@@ -230,14 +207,10 @@
     var blocker = findBlocker(events, errors);
     var state = deriveState(trace, responses, errors, blocker, terminalStatus(events));
     return {
-      schema: SCHEMA,
-      trace_id: text(trace.trace_id, 64) || null,
       state: state,
       stages: stages(trace, responses, tools, state),
-      latest_event: latestEvent(events),
       blocker: state === "done" ? null : blocker,
       warnings: state === "done" ? warningsOf(errors) : [],
-      models: models(responses),
       tool_calls: tools.length,
       model_calls: responses.length,
       duration_ms: finite((trace.timings || {}).total_duration_ms),
@@ -326,11 +299,7 @@
   }
 
   window.LogosExecutionSurface = Object.freeze({
-    SCHEMA: SCHEMA,
     project: project,
     render: render,
-    summary: function (surface) {
-      return summaryParts(surface).join(" · ");
-    },
   });
 })();

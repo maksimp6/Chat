@@ -8,9 +8,9 @@ Model-provider accounts: deployment credentials and their API, provider-agnostic
 
 Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
 
-- **Choose a model**: `GET /api/models`
+- **See the model catalog**: `GET /api/models`
 - **Create a dialog**: `POST /api/conversations`
-- **Rename a dialog or change its model**: `PATCH /api/conversations/<conv_id>`
+- **Rename a dialog**: `PATCH /api/conversations/<conv_id>`
 - **Send a message (the turn)**: `POST /api/chat`
 - **Photos, pictures and voice**: `POST /api/images/generate`, `GET /api/images/requests/<request_id>`, `POST /api/voice/session`, `GET /api/voice/events`, `POST /api/voice/text`, `POST /api/voice/audio`
 

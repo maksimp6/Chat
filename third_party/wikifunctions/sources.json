@@ -10,16 +10,6 @@
     "original_code": "def Z21951(Z21951K1, Z21951K2, Z21951K3):\n    if Z21951K2 < Z21951K1:\n\t    return Z21951K1\n    if Z21951K2 > Z21951K3:\n\t    return Z21951K3\n    return Z21951K2"
   },
   {
-    "function": "Z10079",
-    "implementation": "Z10081",
-    "revision": 143512,
-    "timestamp": "2024-12-03T05:26:13Z",
-    "source_url": "https://www.wikifunctions.org/w/index.php?title=Z10081&oldid=143512",
-    "license": "Apache-2.0",
-    "original_code_sha256": "3a82792c2e5492b02c945c70f13ae83e0664404aafeeb7126a053dd664331ff2",
-    "original_code": "function Z10079( Z10079K1 ) {\n\treturn Z10079K1.trim();\n}"
-  },
-  {
     "function": "Z12316",
     "implementation": "Z12317",
     "revision": 285821,

@@ -94,12 +94,10 @@
     if (!button || !getRoot()) return;
 
     // A subscriber is told about one module at a time; the window always lists every module.
-    var unsubscribe = window.LogosCoreAPI.status.subscribe(function () {
+    window.LogosCoreAPI.status.subscribe(function () {
       render(window.LogosCoreAPI.status.snapshot());
     });
     window.LogosCoreAPI.status.set("ui", "ready", "Приборная панель активна");
-
-    window.addEventListener("beforeunload", unsubscribe, { once: true });
   }
 
   function init() {

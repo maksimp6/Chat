@@ -8,7 +8,7 @@ Provider-neutral secret resolution: typed references with redacted values, resol
 
 Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
 
-- **Choose a model**: `GET /api/models`
+- **See the model catalog**: `GET /api/models`
 - **Send a message (the turn)**: `POST /api/chat`
 
 ## Public API

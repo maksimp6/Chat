@@ -41,18 +41,6 @@
     return (ms / 1000).toFixed(ms < 10000 ? 2 : 1) + " с";
   }
 
-  function usageTotals(trace) {
-    var result = { input: 0, output: 0, total: 0 };
-    (trace.responses || []).forEach(function (response) {
-      var usage = response && response.raw && response.raw.usage;
-      if (!usage) return;
-      result.input += Number(usage.input_tokens || 0);
-      result.output += Number(usage.output_tokens || 0);
-      result.total += Number(usage.total_tokens || 0);
-    });
-    return result;
-  }
-
   function modelName(trace) {
     var responses = Array.isArray(trace.responses) ? trace.responses : [];
     for (var i = responses.length - 1; i >= 0; i--) {
@@ -259,14 +247,7 @@
       });
     }
 
-    var usage = usageTotals(trace);
     var totalMs = durationMs(trace);
-    var cost =
-      finite(trace.cost) !== null
-        ? finite(trace.cost)
-        : trace.billing && finite(trace.billing.total_cost) !== null
-          ? finite(trace.billing.total_cost)
-          : null;
 
     var errorCount = failedToolCount + standaloneErrors.length;
     var parts = [];
@@ -278,15 +259,6 @@
     return {
       title: "⚙️ Что сделал Логос" + (parts.length ? " · " + parts.join(" · ") : ""),
       items: items,
-      metrics: {
-        api_requests: apiCount,
-        tools: tools.length,
-        errors: errorCount,
-        duration_ms: totalMs,
-        tokens: usage.total,
-        cost: cost,
-        model: model,
-      },
     };
   }
 

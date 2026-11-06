@@ -8,7 +8,7 @@ Process-wide configuration: the model catalog and pricing, the runtime view of t
 
 Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#life-of-a-dialog):
 
-- **Choose a model**: `GET /api/models`
+- **See the model catalog**: `GET /api/models`
 
 ## Public API
 

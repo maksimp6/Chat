@@ -3,15 +3,15 @@
 Issue: #537
 
 `static/execution_surface.js` (`window.LogosExecutionSurface`) projects a
-sanitized ExecutionTrace into one read-only schema, `logos.execution_surface.v1`.
+sanitized ExecutionTrace into one read-only object.
 The frontend keeps no execution state of its own. The projection holds:
 
 - `state`: `working`, `blocked`, `done`, `partial`, `error`, `timeout` or
   `cancelled`. It is derived from response statuses, errors, blocking events
   (quota, tool access, approval) and trace completion.
-- `stages`: request, model, tools (when used) and finish, each `done`, `active`
-  or `pending`.
-- `latest_event`, `blocker`, `models`, `model_calls`, `tool_calls`, `duration_ms`.
+- `stages`: request, model, tools (when used) and finish, each `done`, `active`,
+  `pending`, `error` or `partial`.
+- `blocker`, `warnings`, `model_calls`, `tool_calls`, `duration_ms`.
 - `usage`: `measured` token counts (billing items or response usage, cached
   tokens included), otherwise `unknown`.
 - `cost`: `calculated` or `partial` (a tariff calculation from billing),

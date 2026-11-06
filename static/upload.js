@@ -148,7 +148,6 @@
         return body;
       });
     }, passes, signal);
-    if (typeof settings.onCreated === "function") settings.onCreated(uploadId);
     const path = "/api/uploads/" + encodeURIComponent(uploadId);
     let received = created.received;
     let pieceBytes = MIN_PIECE_BYTES;
@@ -247,7 +246,7 @@
 
   // Sends ``blob`` and resolves with the completion answer: for a file what POST /api/files answers, for an image
   // {upload_id, size}. options: name, kind ("file" | "image"), purpose, signal, onProgress(received, size),
-  // onCreated(uploadId), onCompleting(), onCompletionWaiting() (a file's completion waits for Files and can be stopped
+  // onCompleting(), onCompletionWaiting() (a file's completion waits for Files and can be stopped
   // now), uploadId (go on with an upload made before), resumable (the caller can repeat a failed completion), force
   // (complete although Files may have stored the file: the person checked). The page stays busy (no automatic
   // reload) until the upload ends. A stopped or failed upload drops its copy on the server, except when everything

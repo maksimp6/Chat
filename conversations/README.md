@@ -12,7 +12,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 - **Create a dialog**: `POST /api/conversations`
 - **Open a dialog and read its history**: `GET /api/conversations/<conv_id>/messages`
 - **Settings and tools (global, read-only)**: `GET /api/settings`, `GET /api/tools/categories`
-- **Rename a dialog or change its model**: `PATCH /api/conversations/<conv_id>`
+- **Rename a dialog**: `PATCH /api/conversations/<conv_id>`
 - **Send a message (the turn)**: `POST /api/chat`
 - **Delete a dialog**: `DELETE /api/conversations/<conv_id>`
 - **Read dialogs from outside (MCP)**: `POST {MCP_PATH}`

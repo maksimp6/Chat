@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  // Group chat: one question of the user is answered by every chosen model in turn, in the same chat.
-  // The panel keeps the chosen models; chat.js asks it for them when a message is sent.
+  // Group chat: the model answers the user's question, then the Court speaks, in the same chat.
+  // The panel keeps the chosen participants; chat.js asks it for them when a message is sent.
   var STORE_KEY = "group_chat_models";
   var modal = null;
 
@@ -68,11 +68,6 @@
     button.title = on ? "Групповой чат: модель и Суд Логоса" : "Групповой чат";
   }
 
-  function close() {
-    if (!modal) return;
-    window.LogosCoreAPI.ui.modal.close(modal);
-  }
-
   function open() {
     if (modal) {
       modal.remove();
@@ -129,22 +124,9 @@
       id: "group-chat-modal",
       title: "Групповой чат",
       contentClassName: "logos-dept-card",
-      closeAction: "group.close",
       body: body,
     });
     UI.modal.open(modal);
-  }
-
-  // The turn that is not the user's own words: it asks the next model to speak into the chat.
-  function followUpText(key, all) {
-    var court = all.includes(COURT)
-      ? " В чате заседает Суд Логоса: он судит реплики агентов по записи (вердикты ПРАВО, БЕСПОЛЕЗНОЕ, СКОЛЬЗКО, ТЯЖКОЕ с цитатой и правилом); его слово выше можно обсуждать, оспаривать и уточнять."
-      : "";
-    return (
-      "[Групповой чат] Участники: " + all.map(label).join(", ") + ". Сейчас отвечает " + label(key) +
-      ". Выше вопрос пользователя и реплики других участников." + court + " Ты сам решаешь, отвечать ли: если есть что " +
-      "добавить, напиши реплику, не повторяя сказанное; если нет, ответь одним словом «Пропускаю»."
-    );
   }
 
   // The Court's turn: no model is asked, the server judges and writes the verdicts into the chat.
@@ -159,14 +141,10 @@
     });
   }
 
-  window.LogosGroupChat = {
-    models: models, followUpText: followUpText, label: label, open: open, COURT: COURT, courtTurn: courtTurn,
-  };
+  window.LogosGroupChat = { models: models, courtTurn: courtTurn };
   window.openGroupChatModal = open;
-  window.LogosCoreAPI.ui.actions.register("group.close", close);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", syncButton, { once: true });
   else syncButton();
   // The catalog loads after the page: the button is checked again once it has.
   window.addEventListener("logos:model-changed", syncButton);
-  window.addEventListener("load", function () { setTimeout(syncButton, 3000); });
 })();

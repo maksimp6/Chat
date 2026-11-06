@@ -30,15 +30,11 @@
 
     const UI = window.LogosCoreAPI.ui;
     const body = document.createElement("div");
-    body.className = "treasury-modal-body";
 
     treasuryModal = UI.modal.create({
       id: "treasury-modal",
       title: "Казна",
-      className: "treasury-modal",
-      contentClassName: "treasury-modal-content",
       closeLabel: "Закрыть казну",
-      closeAction: "treasury.close",
       body: body,
     });
 
@@ -216,12 +212,6 @@
     }
   }
 
-  function closeTreasuryModal() {
-    if (!treasuryModal) return;
-    window.LogosCoreAPI.ui.modal.close(treasuryModal);
-    document.removeEventListener("keydown", treasuryModal._escapeHandler);
-  }
-
   async function openTreasuryPanel() {
     ensureTreasuryModal();
     window.LogosCoreAPI.ui.modal.open(treasuryModal);
@@ -229,15 +219,6 @@
     treasuryBalance.textContent = "…";
     treasuryExpenses.textContent = "Загрузка…";
     treasuryAmount.focus();
-
-    // Opening twice must not leave a second Escape listener behind.
-    if (treasuryModal._escapeHandler) {
-      document.removeEventListener("keydown", treasuryModal._escapeHandler);
-    }
-    treasuryModal._escapeHandler = function (event) {
-      if (event.key === "Escape") closeTreasuryModal();
-    };
-    document.addEventListener("keydown", treasuryModal._escapeHandler);
 
     try {
       const account = await loadTreasuryAccount();
@@ -249,7 +230,6 @@
     }
   }
 
-  window.LogosCoreAPI.ui.actions.register("treasury.close", closeTreasuryModal);
   window.LogosCoreAPI.ui.actions.register("treasury.top-up", performTreasuryTopUp);
 
   window.openTreasuryPanel = openTreasuryPanel;

@@ -1702,38 +1702,6 @@ body {
   }
 }
 
-.logos-pro-app .trace-viewer-auto-button {
-  font-size: 12px;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  color: inherit;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.logos-pro-app .trace-viewer-auto-details {
-  width: auto;
-  display: inline-block;
-  margin-top: 4px;
-}
-
-.logos-pro-app .theme-rollback-card {
-  padding: 8px 12px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.logos-pro-app .theme-rollback-button {
-  border: 1px solid var(--border-color);
-  background: var(--btn-bg);
-  color: var(--text-main);
-  border-radius: 8px;
-  padding: 7px 10px;
-  cursor: pointer;
-}
-
 /* Providers (provider_credentials.js): the fields are the shared text field, so focus shows the same gold edge. */
 .logos-pro-app .provider-field {
   margin: 14px 0;

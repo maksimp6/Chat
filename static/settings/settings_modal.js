@@ -46,7 +46,6 @@
     if (existing) existing.remove();
 
     var md = document.createElement("div");
-    md.className = "settings-tools-body";
 
     md.innerHTML = [
       '<div class="settings-lead">Локальные и встроенные инструменты. Настройки только для чтения.</div>',
@@ -121,8 +120,6 @@
     var ov = CoreUI.modal.create({
       id: "tools-modal-custom",
       title: "Инструменты",
-      className: "tools-modal-custom",
-      contentClassName: "settings-tools-modal-content",
       body: md,
     });
     // Shown at once with its loading line; the categories fill it when they arrive. A click on the backdrop and Escape

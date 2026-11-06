@@ -174,8 +174,7 @@
   }
 
   function hook() {
-    if (typeof window.openTraceViewer !== "function" || window.openTraceViewer.__downloadHook)
-      return;
+    if (typeof window.openTraceViewer !== "function") return;
     var original = window.openTraceViewer;
     function wrapped(trace) {
       currentTrace = trace;
@@ -184,13 +183,8 @@
       setTimeout(installButton, 50);
       return result;
     }
-    wrapped.__downloadHook = true;
     window.openTraceViewer = wrapped;
   }
 
   hook();
-  window.addEventListener("logos:trace-viewer-ready", function () {
-    hook();
-    installButton();
-  });
 })();

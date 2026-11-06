@@ -173,7 +173,7 @@
       actions.className = "logos-dialog-actions";
       var cancelButton = document.createElement("button");
       cancelButton.type = "button";
-      cancelButton.className = "logos-btn logos-dialog-cancel";
+      cancelButton.className = "logos-btn";
       cancelButton.textContent = settings.cancelText || "Отмена";
       var acceptButton = document.createElement("button");
       acceptButton.type = "submit";
