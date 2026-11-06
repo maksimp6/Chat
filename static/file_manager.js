@@ -15,7 +15,7 @@ window.fetchVectorStores = function () {
               else if (data.error && typeof data.error.message === "string")
                 message = data.error.message;
             }
-            var failure = new Error("Vector Stores: " + message);
+            var failure = new Error("Векторные хранилища: " + message);
             failure.status = r.status;
             throw failure;
           }
@@ -44,7 +44,7 @@ window.fetchVectorStores = function () {
         candidate = next;
       }
 
-      throw new Error("Некорректный ответ Vector Stores: ожидался массив хранилищ.");
+      throw new Error("Некорректный ответ векторных хранилищ: ожидался массив хранилищ.");
     });
 };
 
@@ -196,7 +196,7 @@ window.fetchVectorStores = function () {
       if (!Array.isArray(stores)) {
         var invalid = document.createElement("div");
         invalid.className = "file-manager-state file-manager-state-error";
-        invalid.textContent = "Ошибка: список Vector Stores имеет неожиданный формат.";
+        invalid.textContent = "Ошибка: список векторных хранилищ имеет неожиданный формат.";
         cont.appendChild(invalid);
         return;
       }

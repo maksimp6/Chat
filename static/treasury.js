@@ -68,11 +68,11 @@
     treasuryAmount.inputMode = "decimal";
     treasuryAmount.placeholder = "Сумма";
     treasuryAmount.className = "treasury-amount-input";
-    treasuryAmount.setAttribute("aria-label", "Сумма DEMO-пополнения");
+    treasuryAmount.setAttribute("aria-label", "Сумма демо-пополнения");
 
     const topUpButton = UI.button({
       className: "treasury-action-btn btn-primary",
-      text: "Пополнить DEMO",
+      text: "Пополнить демо",
       action: "treasury.top-up",
     });
     topUpRow.append(treasuryAmount, topUpButton);
@@ -187,7 +187,7 @@
     if (topUpInFlight) return;
     const amount = Number(treasuryAmount.value);
     if (!Number.isFinite(amount) || amount <= 0) {
-      setTreasuryStatus("Введите положительную сумму DEMO-пополнения.", true);
+      setTreasuryStatus("Введите положительную сумму демо-пополнения.", true);
       treasuryAmount.focus();
       return;
     }
@@ -208,7 +208,7 @@
       );
       treasuryAmount.value = "";
       renderTreasuryAccount(data.account);
-      setTreasuryStatus("DEMO-пополнение выполнено.");
+      setTreasuryStatus("Демо-пополнение выполнено.");
     } catch (error) {
       setTreasuryStatus(error.message, true);
     } finally {

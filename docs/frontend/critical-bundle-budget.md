@@ -156,8 +156,8 @@ HTML/CSS/critical-script chain (~89 KiB) has arrived but the remaining
 - **Settings, MCP configuration, provider credentials, SSH runtime, file
   manager, project tree, treasury, departments, environments, partner
   relations, memory panel, trace viewer, voice input, and the logs window** are
-  each owned by their own deferred module (`settings.js` and
-  `static/settings/*.js`, `provider_credentials.js`,
+  each owned by their own deferred module (`static/settings/*.js`,
+  `provider_credentials.js`,
   `settings/ssh_runtime_modal.js`, `file_manager.js`, `project_tree.js`,
   `treasury.js`, `departments.js`, `environments.js`,
   `partner_relations.js`, `memory_panel.js`, `trace_viewer*.js`, `voice.js`,

@@ -7,7 +7,7 @@
     if (existing) existing.remove();
     var tabSsh = [
       '<div id="tab-ssh" class="llm-tab-content">',
-      '<div id="ssh-settings-status" style="font-size:12px;color:var(--m-muted,#666);margin-bottom:10px;">Загрузка конфигурации...</div>',
+      '<div id="ssh-settings-status" class="settings-lead">Загрузка конфигурации...</div>',
       UI.chk("set-ssh-enabled", false, "<strong>🔐 Среда SSH</strong> включена"),
       UI.gap2(
         "<div>" + UI.chk("set-ssh-readonly", false, "Только чтение") + "</div>",
@@ -25,16 +25,16 @@
         "<div>" + UI.chk("set-ssh-allow-exec", true, "Разрешить команды") + "</div>",
         "<div>" + UI.chk("set-ssh-allow-write", true, "Разрешить запись файлов") + "</div>",
       ),
-      '<div style="margin-top:10px;">' +
+      '<div class="settings-field-wide">' +
         UI.lbl("Общий known_hosts (серверный путь)") +
         UI.inp("set-ssh-known-hosts", "text", "", {"placeholder": "/srv/logos/ssh/known_hosts"}) +
         "</div>",
-      '<fieldset id="ssh-inactive-restrictions" disabled style="margin-top:10px;border:1px solid var(--m-border,#ddd);border-radius:6px;padding:10px;">',
+      '<fieldset id="ssh-inactive-restrictions" class="settings-fieldset" disabled>',
       '<legend>Ограничения отключены</legend>',
-      '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:8px;">' +
-        "Список разрешённых команд и ограничения privileged-команд не применяются. Подтверждения операций не запрашиваются. Прежние значения ниже сохраняются без изменений." +
+      '<div class="settings-lead">' +
+        "Список разрешённых команд и ограничения привилегированных команд не применяются. Подтверждения операций не запрашиваются. Прежние значения ниже сохраняются без изменений." +
         "</div>",
-      '<div style="margin-top:10px;">' +
+      '<div class="settings-field-wide">' +
         UI.lbl("Список разрешённых команд (regex, один шаблон на строку)") +
         UI.ta(
           "set-ssh-command-allowlist",
@@ -42,18 +42,18 @@
           "height:80px;font-family:monospace;font-size:11px;",
         ) +
         "</div>",
-      UI.chk("set-ssh-allow-privileged", false, "Разрешать privileged-команды (sudo/su/doas/pkexec)"),
+      UI.chk("set-ssh-allow-privileged", false, "Разрешать привилегированные команды (sudo/su/doas/pkexec)"),
       UI.chk("set-ssh-approval-write", true, "Требовать подтверждение записи файлов"),
-      UI.chk("set-ssh-approval-privileged", true, "Требовать подтверждение privileged-команд"),
+      UI.chk("set-ssh-approval-privileged", true, "Требовать подтверждение привилегированных команд"),
       "</fieldset>",
-      '<div style="margin-top:10px;">' +
+      '<div class="settings-field-wide">' +
         UI.lbl("Именованные цели (JSON)") +
         UI.ta("set-ssh-targets", "", "height:180px;font-family:monospace;font-size:11px;") +
         "</div>",
-      '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">',
+      '<div class="settings-hint">',
       "Приватный ключ и его содержимое никогда не передаются через этот интерфейс. В targets указывается только серверный путь к существующему ключу и known_hosts.",
       "</div>",
-      '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">',
+      '<div class="settings-hint">',
       "Настройки среды SSH только для чтения: изменить их здесь нельзя.",
       "</div>",
       "</div>",
@@ -62,7 +62,7 @@
     var content = document.createElement("div");
     content.className = "ssh-runtime-body";
     content.innerHTML = tabSsh;
-    // Форма закрыта до ответа GET: иначе значения по умолчанию перезаписали бы сохранённую конфигурацию (пункт 62)
+    // Настройки только для чтения: форма закрыта и после ответа GET.
     var sshControls = content.querySelectorAll("input, textarea, button");
     function setSshFormLocked(locked) {
       sshControls.forEach(function (el) {
@@ -86,7 +86,7 @@
     function setSshStatus(message, error) {
       if (!sshStatusEl) return;
       sshStatusEl.textContent = message;
-      sshStatusEl.style.color = error ? "var(--m-danger,#c33)" : "var(--m-muted,#666)";
+      sshStatusEl.classList.toggle("is-error", Boolean(error));
     }
 
     function showLastTest(last) {

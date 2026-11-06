@@ -142,26 +142,6 @@
   --msg-user-text: var(--text);
 }
 
-/* Settings, MCP and file-manager windows read the --m-* names that settings/ui_helpers.js injects after this sheet;
-   html:root outranks that injected :root/[data-theme] block, so those windows use the same tokens. */
-html:root {
-  --m-bg: var(--surface-1);
-  --m-text: var(--text);
-  --m-border: var(--border-strong);
-  --m-input-bg: var(--surface-2);
-  --m-input-text: var(--text);
-  --m-section: var(--text-muted);
-  --m-section-border: var(--border);
-  --m-card: var(--surface-2);
-  --m-editor: var(--surface-2);
-  --m-muted: var(--text-muted);
-  --m-accent: var(--accent);
-  --m-danger: var(--danger);
-  --m-success: var(--success);
-  --m-overlay: var(--backdrop);
-  --m-shadow: var(--shadow-color);
-}
-
 html,
 body {
   height: 100%;
@@ -2321,7 +2301,6 @@ body {
   background: var(--surface-3);
 }
 .settings-btn-accent,
-.settings-btn-success,
 .btn-primary {
   background: var(--accent);
   color: var(--accent-ink);
@@ -2329,7 +2308,6 @@ body {
   font-weight: 600;
 }
 .settings-btn-accent:hover:not(:disabled),
-.settings-btn-success:hover:not(:disabled),
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
@@ -2700,16 +2678,213 @@ body {
 .logos-pro-app:not(.logos-model-multimodal) #attach-btn { display: none; }
 
 /* Settings dialog: one height for every tab, so switching tabs does not move the dialog.
-   The status line and the buttons stay at the bottom (margin-top:auto in settings_modal.js). */
+   The status line stays at the bottom (margin-top:auto on #set-status). */
 .logos-pro-app .settings-modal-panel {
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
-/* Dialog footer buttons get the same 44px touch target as the other buttons. */
-.logos-pro-app .settings-modal-footer .logos-btn {
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 10px;
+.logos-pro-app .settings-modal-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
 }
+.logos-pro-app .settings-modal-heading > .modal-title {
+  margin: 0;
+}
+
+/* Parts of the settings, tools and SSH windows (settings/ui_helpers.js, settings_modal.js, ssh_runtime_modal.js). */
+.logos-pro-app .settings-lead {
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.logos-pro-app .settings-fieldset .settings-lead {
+  margin-bottom: 8px;
+}
+.logos-pro-app #ssh-settings-status {
+  margin-bottom: 10px;
+}
+.logos-pro-app #ssh-settings-status.is-error {
+  color: var(--danger);
+}
+.logos-pro-app .settings-hint {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.logos-pro-app .settings-status {
+  min-height: 16px;
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.logos-pro-app #set-status {
+  margin-top: auto;
+}
+/* Both titles outrank the window-title rule for h3 in .modal-content. */
+.logos-pro-app .modal-content .settings-subtitle {
+  margin: 12px 0 8px;
+  font-size: 14px;
+}
+.logos-pro-app .modal-content .settings-section {
+  margin: 16px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.logos-pro-app .settings-field {
+  margin-top: 8px;
+}
+.logos-pro-app .settings-field-wide {
+  margin-top: 10px;
+}
+.logos-pro-app .settings-rule {
+  margin: 14px 0;
+  border: none;
+  border-top: 1px solid var(--border-strong);
+}
+.logos-pro-app .settings-rule-wide {
+  margin: 18px 0;
+}
+.logos-pro-app .settings-fieldset {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+.logos-pro-app .settings-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+  font-size: 13px;
+}
+/* Top-aligned so a wrapped caption keeps the box on its first line; size and spacing match the shared checkbox. */
+.logos-pro-app .settings-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+/* Width only: height, padding, radius, colours and the gold focus edge come from the shared field rule. A border set
+   here would block that focus edge, and 13px text makes iOS zoom in on focus. */
+.logos-pro-app .settings-control {
+  box-sizing: border-box;
+  width: 100%;
+}
+.logos-pro-app #set-js-name {
+  margin-bottom: 8px;
+}
+.logos-pro-app .settings-grid-2,
+.logos-pro-app .settings-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+.logos-pro-app .settings-grid-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.logos-pro-app .settings-defer-note {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.logos-pro-app .settings-ultra-note {
+  margin-bottom: 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+.logos-pro-app .tool-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.logos-pro-app .tool-category {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.logos-pro-app .tool-category-main {
+  flex: 1;
+}
+.logos-pro-app .tool-category-name {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.logos-pro-app .tool-category-count {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.logos-pro-app .tool-category-actions {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.logos-pro-app .tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.logos-pro-app .tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 10px 2px 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.logos-pro-app .tool-chip-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  -webkit-mask: var(--tool-icon);
+  mask: var(--tool-icon);
+}
+.logos-pro-app #ollama-settings-body {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.logos-pro-app .ollama-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.logos-pro-app .ollama-table td:first-child {
+  padding: 4px 12px 4px 0;
+  color: var(--text-muted);
+  vertical-align: top;
+  white-space: nowrap;
+}
+.logos-pro-app .ollama-table td:last-child {
+  padding: 4px 0;
+  word-break: break-word;
+}
+.logos-pro-app .ollama-empty {
+  color: var(--text-muted);
+}
+.logos-pro-app .ollama-pre {
+  margin: 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.logos-pro-app .ollama-table + .ollama-pre {
+  margin-top: 6px;
+}
+.logos-pro-app .ollama-error {
+  margin-top: 8px;
+  color: var(--danger);
+}
+
 /* «Трассировка» is a text action with a full touch target. */
 .logos-pro-app .logos-trace-open-viewer {
   min-height: 44px;

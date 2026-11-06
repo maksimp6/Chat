@@ -15,9 +15,8 @@
   function toolChip(name) {
     var url = "url('" + TOOL_ICON_BASE + encodeURIComponent(name) + ".svg') center / contain no-repeat";
     return (
-      '<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 10px 2px 0;font-size:11px;color:var(--m-muted,#666);">' +
-      '<span aria-hidden="true" style="width:16px;height:16px;flex:none;background-color:currentColor;-webkit-mask:' +
-      url + ";mask:" + url + ';"></span>' +
+      '<span class="tool-chip">' +
+      '<span class="tool-chip-icon" aria-hidden="true" style="--tool-icon:' + url + ';"></span>' +
       window.SettingsUI.escapeHtml(name) +
       "</span>"
     );
@@ -50,38 +49,38 @@
     md.className = "settings-tools-body";
 
     md.innerHTML = [
-      '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:12px;">Управление локальными и встроенными инструментами. Отключенные инструменты не передаются модели.</div>',
-      '<h3 style="font-size:14px;margin:12px 0 8px;">Локальные инструменты</h3>',
-      '<div id="tools-category-list" style="display:flex;flex-direction:column;gap:8px;">Загрузка инструментов...</div>',
-      '<div style="margin-top:12px;font-size:13px;"><strong>⏳ Defer Loading</strong> — всегда включено: модель видит инструмент только после поиска инструментов провайдера. Отключить нельзя.</div>',
-      '<div style="margin-top:8px;">' +
+      '<div class="settings-lead">Локальные и встроенные инструменты. Настройки только для чтения.</div>',
+      '<h3 class="settings-subtitle">Локальные инструменты</h3>',
+      '<div id="tools-category-list" class="tool-category-list">Загрузка инструментов...</div>',
+      '<div class="settings-defer-note"><strong>⏳ Отложенная загрузка</strong> — всегда включена: модель видит инструмент только после поиска инструментов провайдера. Отключить нельзя.</div>',
+      '<div class="settings-field">' +
         UI.lbl("Категории без отложенной загрузки (всегда загружены)") +
         UI.inp("tools-defer-eager", "text", eager, {"placeholder": "rootagent, filesystem"}) +
         "</div>",
-      '<hr style="margin:18px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
-      '<h3 style="font-size:14px;margin:12px 0 8px;">Встроенные инструменты Yandex AI Studio</h3>',
+      '<hr class="settings-rule settings-rule-wide">',
+      '<h3 class="settings-subtitle">Встроенные инструменты Yandex AI Studio</h3>',
       UI.chk(
         "tools-ws-en",
         // An absent setting means on, as the server applies it.
         ws.enabled !== false,
-        "<strong>🌐 Web Search</strong> (поиск в интернете)",
+        "<strong>🌐 Поиск в интернете</strong>",
       ),
-      '<div style="margin-top:8px;">' +
-        UI.lbl("Search Context Size") +
+      '<div class="settings-field">' +
+        UI.lbl("Размер контекста поиска") +
         UI.sel(
           "tools-ws-context",
           '<option value="low"' +
             (ws.context_size === "low" ? " selected" : "") +
-            ">Low</option>" +
+            ">Низкий</option>" +
             '<option value="medium"' +
             (ws.context_size === "medium" ? " selected" : "") +
-            ">Medium</option>" +
+            ">Средний</option>" +
             '<option value="high"' +
             (!ws.context_size || ws.context_size === "high" ? " selected" : "") +
-            ">High</option>",
+            ">Высокий</option>",
         ) +
         "</div>",
-      '<div style="margin-top:8px;">' +
+      '<div class="settings-field">' +
         UI.lbl("Разрешённые домены") +
         UI.inp(
           "tools-ws-allow",
@@ -90,20 +89,20 @@
           {"placeholder": "example.com, wikipedia.org"},
         ) +
         "</div>",
-      '<div style="margin-top:8px;">' +
+      '<div class="settings-field">' +
         UI.lbl("Заблокированные домены") +
         UI.inp("tools-ws-block", "text", ws.blocked_domains || "", {"placeholder": "example.org"}) +
         "</div>",
-      '<hr style="margin:14px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
-      UI.chk("tools-ci-en", ci.enabled !== false, "<strong>🧮 Code Interpreter</strong> (Python)"),
-      '<hr style="margin:14px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
+      '<hr class="settings-rule">',
+      UI.chk("tools-ci-en", ci.enabled !== false, "<strong>🧮 Выполнение кода</strong> (Python)"),
+      '<hr class="settings-rule">',
       UI.chk(
         "tools-fs-en",
         fs.enabled !== false,
-        "<strong>📚 File Search</strong> (поиск по Vector Store)",
+        "<strong>📚 Поиск по файлам</strong> (векторные хранилища)",
       ),
-      '<div style="margin-top:8px;">' +
-        UI.lbl("Vector Store IDs (основное хранилище знаний подключено всегда)") +
+      '<div class="settings-field">' +
+        UI.lbl("ID векторных хранилищ (основное хранилище знаний подключено всегда)") +
         UI.inp(
           "tools-fs-vids",
           "text",
@@ -111,12 +110,12 @@
           {"placeholder": "vs_xxx, vs_yyy"},
         ) +
         "</div>",
-      '<div style="margin-top:8px;">' +
+      '<div class="settings-field">' +
         UI.lbl("Максимум результатов") +
         UI.inp("tools-fs-max", "number", fs.max_results || 50, {"min": "1", "max": "50"}) +
         "</div>",
-      '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">Эти инструменты выполняются на стороне Yandex AI Studio. Они независимы от MCP и локального Tool Registry.</div>',
-      '<div id="tools-status" role="status" style="color:var(--m-muted,#666);font-size:12px;min-height:16px;margin-top:12px;"></div>',
+      '<div class="settings-hint">Эти инструменты выполняются на стороне Yandex AI Studio. Они независимы от MCP и локального реестра инструментов.</div>',
+      '<div id="tools-status" class="settings-status" role="status"></div>',
     ].join("");
     disableControls(md);
     var ov = CoreUI.modal.create({
@@ -132,11 +131,11 @@
     CoreUI.modal.open(ov);
 
     var categoryLabels = {
-      termux: "📱 Termux Hardware (батарея, буфер, сенсоры, TTS, тосты)",
-      git: "🌿 Local Git (статус, ветки, diff, коммиты)",
+      termux: "📱 Устройство Termux (батарея, буфер, сенсоры, TTS, тосты)",
+      git: "🌿 Локальный Git (статус, ветки, diff, коммиты)",
       filesystem: "⚙️ Файловая система (чтение, запись, apply_patch)",
       system: "🔧 Системные драйверы Termux",
-      wikipedia: "📚 Wikipedia Engine (поиск и сводка статей)",
+      wikipedia: "📚 Википедия (поиск и сводка статей)",
       profiler: "⏱️ Профайлер и инспекция состояния",
       court: "⚖️ Суд Логоса (суды над диалогом и зал заседаний)",
     };
@@ -180,14 +179,9 @@
     var loadingEl = document.getElementById("tools-category-list");
     // «Повторить» replaces the error with the loading line, so a repeated tap cannot start a second load.
     if (loadingEl) loadingEl.textContent = "Загрузка инструментов...";
-    Promise.all([
-      window.LogosDispatcher.request("/api/tools/categories").then(readOk),
-      // Settings are global: every category is active in every dialog.
-      Promise.resolve({ active_tool_categories: null }),
-    ])
-      .then(function (results) {
-        var catData = results[0];
-        var activeData = results[1];
+    window.LogosDispatcher.request("/api/tools/categories")
+      .then(readOk)
+      .then(function (catData) {
         var listEl = document.getElementById("tools-category-list");
         var categories = catData.categories || {};
         // One tool, one function: the function picks the action; these are its actions.
@@ -198,36 +192,29 @@
           var word = mod10 === 1 && mod100 !== 11 ? one : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? few : many;
           return n + " " + word;
         }
-        var active =
-          activeData && activeData.active_tool_categories !== null
-            ? activeData.active_tool_categories
-            : Object.keys(categories);
         listEl.innerHTML = Object.keys(categories)
           .map(function (cat) {
-            var isChecked = active.indexOf(cat) !== -1;
             var label = categoryLabels[cat] || "Модуль: " + cat;
             var functions = categories[cat] || [];
             var actions = actionsOf[cat] || [];
             var summary = countOf(functions.length, "функция", "функции", "функций");
             if (actions.length) summary += " · " + countOf(actions.length, "действие", "действия", "действий");
             return (
-              '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--m-border,#ddd);border-radius:6px;background:var(--m-card,#fff);cursor:pointer;">' +
-              '<input type="checkbox" class="tool-cat-chk" disabled value="' +
+              '<label class="tool-category">' +
+              '<input type="checkbox" class="tool-cat-chk" disabled checked value="' +
               UI.escapeHtml(cat) +
-              '" ' +
-              (isChecked ? "checked" : "") +
-              ">" +
-              '<div style="flex:1;"><div style="font-weight:600;font-size:13px;color:var(--m-text,#222);">' +
+              '">' +
+              '<div class="tool-category-main"><div class="tool-category-name">' +
               UI.escapeHtml(label) +
               "</div>" +
-              '<div style="font-size:11px;color:var(--m-muted,#666);">' +
+              '<div class="tool-category-count">' +
               UI.escapeHtml(summary) +
               "</div>" +
-              '<div style="display:flex;flex-wrap:wrap;margin-top:4px;">' +
+              '<div class="tool-chips">' +
               functions.map(toolChip).join("") +
               "</div>" +
               (actions.length
-                ? '<details style="margin-top:4px;font-size:11px;color:var(--m-muted,#666);"><summary>Действия функции</summary>' +
+                ? '<details class="tool-category-actions"><summary>Действия функции</summary>' +
                   UI.escapeHtml(actions.join(", ")) +
                   "</details>"
                 : "") +
@@ -266,25 +253,9 @@
 
   // === 2. Полное окно конфигурации параметров LLM ===
   function ultraProfileFor(modelKey) {
-    var storage = window.SettingsStorage;
-    var text = typeof modelsData !== "undefined" && modelsData.text ? modelsData.text : {};
-    var profile = typeof storage.ultraProfileFor === "function"
-      ? storage.ultraProfileFor(modelKey)
-      : (text[modelKey] || {}).ultra_profile;
+    var profile = window.SettingsStorage.ultraProfileFor(modelKey);
     return profile && profile.default_profile === "ultra" && profile.settings_defaults
       ? profile : null;
-  }
-
-  function applyUltraProfile(settings, profile) {
-    var userCap = parseInt(settings.max_output_tokens, 10) || 0;
-    Object.keys(profile.settings_defaults).forEach(function (key) {
-      settings[key] = profile.settings_defaults[key];
-    });
-    // An output cap the user set is kept; 0 means no cap.
-    if (userCap > 0) settings.max_output_tokens = userCap;
-    settings.model_profile = "ultra";
-    settings.model_profile_id = profile.profile_id;
-    return settings;
   }
 
   function ultraProfileNote(profile) {
@@ -294,7 +265,7 @@
       ? "параметр не передаётся для этой модели"
       : defaults.reasoning_effort;
     return (
-      '<div style="margin-bottom:12px;font-size:13px;color:var(--m-text,#222);">' +
+      '<div class="settings-ultra-note">' +
       "<strong>Профиль: Ultra</strong><br>" +
       "Ответ — максимум провайдера, если поле токенов пустое или 0; контекст не обрезается; " +
       "глубина размышлений — " + window.SettingsUI.escapeHtml(depth) + "." +
@@ -302,28 +273,28 @@
     );
   }
 
-  // IDs, display values and readers live together so a field has one binding.
+  // IDs and display values live together so a field has one binding.
   var SETTINGS_FIELDS = {
     temperature: {
-      id: "set-temp", label: "Temperature", type: "number", read: "float", fallback: 0.7,
+      id: "set-temp", label: "Температура", type: "number",
       extra: {"step": "0.1", "min": "0", "max": "2"},
     },
     top_p: {
-      id: "set-topp", label: "Top P", type: "number", read: "float", fallback: 1.0,
+      id: "set-topp", label: "Top P", type: "number",
       extra: {"step": "0.05", "min": "0", "max": "1"},
     },
     max_output_tokens: {
       id: "set-tokens", label: "Токены ответа (0 — максимум провайдера)",
-      type: "number", read: "integer", fallback: 0, extra: {"step": "100", "min": "0"},
+      type: "number", extra: {"step": "100", "min": "0"},
     },
     truncation: {
-      id: "set-trunc", label: "Truncation", type: "select", ultraFixed: true,
-      choices: [["disabled", "Disabled"], ["auto", "Auto"]],
+      id: "set-trunc", label: "Обрезка контекста", type: "select",
+      choices: [["disabled", "Выключена"], ["auto", "Автоматически"]],
     },
     reasoning_effort: {
       id: "set-reasoning", label: "Глубина размышлений", type: "select",
-      displayFallback: "high", ultraFixed: true,
-      choices: [["disabled", "Disabled"], ["low", "Low"], ["medium", "Medium"], ["high", "High"]],
+      displayFallback: "high",
+      choices: [["disabled", "Выключена"], ["low", "Низкий"], ["medium", "Средний"], ["high", "Высокий"]],
     },
     store: { id: "set-store", label: "Сохранять ответы", type: "checkbox", enabledByDefault: true },
     background: { id: "set-bg", label: "Фоновый опрос", type: "checkbox", enabledByDefault: false },
@@ -339,59 +310,59 @@
     text_verbosity: {
       id: "set-verbosity", label: "Детализация (Verbosity)", type: "select", displayFallback: "high",
       // The provider accepts low, medium and high (request_builder validation).
-      choices: [["low", "Low"], ["medium", "Medium"], ["high", "High"]],
+      choices: [["low", "Низкий"], ["medium", "Средний"], ["high", "Высокий"]],
     },
     json_schema_name: {
-      id: "set-js-name", label: "Название схемы", type: "text", read: "trim",
-      displayFallback: "response", extra: {"style": "margin-bottom:8px;"},
+      id: "set-js-name", label: "Название схемы", type: "text",
+      displayFallback: "response",
     },
     json_schema: {
-      id: "set-js-schema", label: "JSON Schema definition", type: "textarea", read: "trim",
+      id: "set-js-schema", label: "Определение JSON Schema", type: "textarea",
       displayFallback: "", extra: "height:100px;font-family:monospace;font-size:11px;",
     },
     tool_choice: {
-      id: "set-tool-choice", label: "Tool Choice", type: "select",
-      choices: [["auto", "Auto"], ["required", "Required"], ["none", "None"]],
+      id: "set-tool-choice", label: "Выбор инструмента", type: "select",
+      choices: [["auto", "Автоматически"], ["required", "Обязательно"], ["none", "Нет"]],
     },
     max_tool_calls: {
-      id: "set-max-tools", label: "Max Tool Calls", type: "number", read: "integer",
-      fallback: null, displayFallback: "", extra: {"min": "1"},
+      id: "set-max-tools", label: "Макс. вызовов инструментов", type: "number",
+      displayFallback: "", extra: {"min": "1"},
     },
     parallel_tool_calls: {
-      id: "set-parallel-tools", label: "Параллельные вызовы (Parallel Tool Calls)",
+      id: "set-parallel-tools", label: "Параллельные вызовы",
       type: "checkbox", enabledByDefault: true,
     },
     top_logprobs: {
-      id: "set-logprobs", label: "Top Logprobs", type: "number", read: "integer",
-      fallback: 0, displayFallback: 0, extra: {"min": "0", "max": "5"},
+      id: "set-logprobs", label: "Вероятности токенов", type: "number",
+      displayFallback: 0, extra: {"min": "0", "max": "5"},
     },
     service_tier: {
-      id: "set-tier", label: "Service Tier", type: "select",
-      choices: [["auto", "Auto (Default)"], ["priority", "Priority"]],
+      id: "set-tier", label: "Уровень обслуживания", type: "select",
+      choices: [["auto", "Автоматически"], ["priority", "Приоритетный"]],
     },
     previous_response_id: {
-      id: "set-prev-id", label: "Previous Response ID", type: "text", read: "trim",
+      id: "set-prev-id", label: "ID предыдущего ответа", type: "text",
       displayFallback: "", extra: {"placeholder": "UUID"},
     },
     prompt_cache_key: {
-      id: "set-cache-key", label: "Prompt Cache Key", type: "text", read: "trim",
+      id: "set-cache-key", label: "Ключ кэша промпта", type: "text",
       displayFallback: "", extra: {"placeholder": "cache-id"},
     },
     prompt_id: {
-      id: "set-prompt-id", label: "Prompt ID (Шаблон)", type: "text", read: "trim",
+      id: "set-prompt-id", label: "ID шаблона промпта", type: "text",
       displayFallback: "", extra: {"placeholder": "Шаблон Yandex Studio"},
     },
     prompt_version: {
-      id: "set-prompt-ver", label: "Prompt Version", type: "text", read: "trim",
+      id: "set-prompt-ver", label: "Версия промпта", type: "text",
       displayFallback: "", extra: {"placeholder": "latest"},
     },
     prompt_variables: {
-      id: "set-prompt-vars", label: "Prompt Variables (JSON)", type: "text", read: "trim",
+      id: "set-prompt-vars", label: "Переменные промпта (JSON)", type: "text",
       displayFallback: "", extra: {"placeholder": "{\"key\":\"val\"}"},
     },
     conv_metadata: {
-      id: "set-conv-meta", label: "Диалоговые метаданные (Metadata JSON)", type: "textarea",
-      read: "trim", displayFallback: "", extra: "height:60px;font-family:monospace;font-size:11px;",
+      id: "set-conv-meta", label: "Метаданные диалога (JSON)", type: "textarea",
+      displayFallback: "", extra: "height:60px;font-family:monospace;font-size:11px;",
     },
   };
 
@@ -401,13 +372,13 @@
 
   function ollamaRows(rows, UI) {
     return (
-      '<table style="width:100%;border-collapse:collapse;">' +
+      '<table class="ollama-table">' +
       rows
         .map(function (row) {
           return (
-            '<tr><td style="color:var(--m-muted,#666);padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap;">' +
+            "<tr><td>" +
             UI.escapeHtml(row[0]) +
-            '</td><td style="padding:4px 0;word-break:break-word;">' +
+            "</td><td>" +
             UI.escapeHtml(row[1] === undefined || row[1] === null ? "—" : String(row[1])) +
             "</td></tr>"
           );
@@ -471,7 +442,7 @@
                 );
               })
               .join("")
-          : '<div style="color:var(--m-muted,#666);">Ни одна модель не загружена.</div>';
+          : '<div class="ollama-empty">Ни одна модель не загружена.</div>';
         Object.keys(data.models || {}).forEach(function (key) {
           var model = data.models[key];
           var details = model.details || {};
@@ -486,21 +457,21 @@
           );
           if (model.parameters) {
             html +=
-              '<pre style="white-space:pre-wrap;font-size:12px;margin:6px 0 0;">' +
+              '<pre class="ollama-pre">' +
               UI.escapeHtml(model.parameters) +
               "</pre>";
           }
         });
         html += UI.section("Инструкции модели");
         html +=
-          '<pre style="white-space:pre-wrap;font-size:12px;margin:0;">' +
+          '<pre class="ollama-pre">' +
           UI.escapeHtml(s.instructions || "") +
           "</pre>";
         var errors = data.errors || {};
         var errorKeys = Object.keys(errors);
         if (errorKeys.length) {
           html +=
-            '<div style="color:var(--m-danger,#b3412e);margin-top:8px;">Ollama не ответила: ' +
+            '<div class="ollama-error">Ollama не ответила: ' +
             UI.escapeHtml(
               errorKeys.map(function (k) { return k + ": " + errors[k]; }).join("; "),
             ) +
@@ -521,7 +492,6 @@
     var settings = Storage.load();
     var unknownAtOpen = Storage.isUnknown();
     var ultra = ultraProfileFor(typeof currentModel !== "undefined" ? currentModel : "");
-    if (ultra) settings = applyUltraProfile(settings, ultra);
 
     var existing = document.getElementById("settings-modal-custom");
     if (existing) {
@@ -534,20 +504,11 @@
       title: "Настройки",
       contentClassName: "settings-modal-panel",
     });
-    ov.style.zIndex = "10002";
     var md = ov.querySelector(".modal-content");
-    // Layout only: background, border, radius and shadow come from the shared window shell (style.css).
-    md.style.cssText = "display:flex;flex-direction:column;";
     var title = md.querySelector(".modal-title");
-    // Size, weight and colour come from the shared window-title rule (static/style.css).
-    title.style.cssText = "margin:0;";
     var closeButton = md.querySelector(".modal-close");
     closeButton.id = "set-close-btn";
     closeButton.classList.add("settings-contract-btn");
-
-    function fieldElement(key) {
-      return md.querySelector("#" + SETTINGS_FIELDS[key].id);
-    }
 
     function fieldHtml(key) {
       var field = SETTINGS_FIELDS[key];
@@ -586,13 +547,13 @@
 
     var tabsHeader = [
       '<div class="settings-modal-top">',
-      '<div class="settings-modal-heading" style="display:flex;justify-content:space-between;align-items:flex-start;"></div>',
+      '<div class="settings-modal-heading"></div>',
       '<div class="llm-tabs">',
       '    <button class="logos-btn llm-tab-btn active settings-contract-btn" data-tab="tab-ollama">Ollama</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-gen">Сэмплинг</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-output">Формат вывода</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-routing">Маршрутизация вызовов</button>',
-      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-adv">Промпты & Кэш</button>',
+      '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-adv">Промпты и кэш</button>',
       '    <button class="logos-btn llm-tab-btn settings-contract-btn" data-tab="tab-theme">Оформление</button>',
       "</div>",
       "</div>",
@@ -603,29 +564,29 @@
     var tabOllama = [
       '<div id="tab-ollama" class="llm-tab-content">',
       UI.section("Ollama на ПК владельца"),
-      '<div id="ollama-settings-body" style="font-size:13px;line-height:1.5;">Загружаю…</div>',
+      '<div id="ollama-settings-body">Загружаю…</div>',
       "</div>",
     ].join("");
 
     var tabGen = [
-      '<div id="tab-gen" class="llm-tab-content" style="display:none;">',
+      '<div id="tab-gen" class="llm-tab-content" hidden>',
       UI.section("Базовый сэмплинг"),
       ultraProfileNote(ultra),
       row(["temperature", "top_p"]),
       row(["max_output_tokens", "truncation"]),
       row(["reasoning_effort", null]),
       row(["store", "background", "stream"]),
-      '<div style="margin-top:10px;">' + fieldHtml("instructions") + "</div>",
+      '<div class="settings-field-wide">' + fieldHtml("instructions") + "</div>",
       "</div>",
     ].join("");
 
     var tabOutput = [
-      '<div id="tab-output" class="llm-tab-content" style="display:none;">',
-      UI.section("Структура ответа (Text / JSON Schema)"),
+      '<div id="tab-output" class="llm-tab-content" hidden>',
+      UI.section("Структура ответа (текст или JSON Schema)"),
       row(["text_format", "text_verbosity"]),
-      '<div id="json-schema-wrap" style="' +
-        (settings.text_format === "json" ? "" : "display:none;") +
-        'margin-top:10px;">',
+      '<div id="json-schema-wrap" class="settings-field-wide"' +
+        (settings.text_format === "json" ? "" : " hidden") +
+        ">",
       fieldHtml("json_schema_name"),
       fieldHtml("json_schema"),
       "</div>",
@@ -633,8 +594,8 @@
     ].join("");
 
     var tabRouting = [
-      '<div id="tab-routing" class="llm-tab-content" style="display:none;">',
-      UI.section("Политики Tool Calling"),
+      '<div id="tab-routing" class="llm-tab-content" hidden>',
+      UI.section("Вызов инструментов"),
       row(["tool_choice", "max_tool_calls"]),
       row(["parallel_tool_calls", "top_logprobs"]),
       UI.section("Приоритеты облака"),
@@ -643,42 +604,34 @@
     ].join("");
 
     var tabAdv = [
-      '<div id="tab-adv" class="llm-tab-content" style="display:none;">',
+      '<div id="tab-adv" class="llm-tab-content" hidden>',
       UI.section("Промпт-шаблоны и кэширование"),
       row(["prompt_cache_key", "prompt_id"]),
       row(["prompt_version", "prompt_variables"]),
-      '<div style="margin-top:10px;">' + fieldHtml("conv_metadata") + "</div>",
+      '<div class="settings-field-wide">' + fieldHtml("conv_metadata") + "</div>",
       "</div>",
     ].join("");
 
-    var activeTheme = window.LogosTheme ? window.LogosTheme.getStored() : "light";
-    var themes = (window.LogosTheme && window.LogosTheme.themes) || {
-      light: "Светлая",
-      dark: "Тёмная",
-      dim: "Приглушённая",
-      "high-contrast": "Высокий контраст",
-    };
+    var activeTheme = window.LogosTheme.getStored();
+    var themes = window.LogosTheme.themes;
     var themeOptions = Object.keys(themes).map(function (key) {
-      var label = ((window.LogosTheme && window.LogosTheme.themes) || {})[key] || key;
       return '<option value="' + UI.escapeHtml(key) + '"' +
         (activeTheme === key ? " selected" : "") + ">" +
-        UI.escapeHtml(label) + "</option>";
+        UI.escapeHtml(themes[key]) + "</option>";
     }).join("");
 
     var tabTheme = [
-      '<div id="tab-theme" class="llm-tab-content" style="display:none;">',
+      '<div id="tab-theme" class="llm-tab-content" hidden>',
       UI.section("Цветовая схема"),
       UI.lbl("Схема интерфейса"),
       UI.sel("set-theme", themeOptions),
-      '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">',
+      '<div class="settings-hint">',
       "Выбор сохраняется локально на устройстве и не передаётся модели. Переключатель в шапке циклически меняет схемы.",
       "</div>",
       "</div>",
     ].join("");
 
-    var footer = [
-      '<div id="set-status" role="status" style="color:var(--m-muted,#666);font-size:12px;min-height:16px;margin-top:auto;"></div>',
-    ].join("");
+    var footer = '<div id="set-status" class="settings-status" role="status"></div>';
 
     md.innerHTML =
       tabsHeader + tabOllama + tabGen + tabOutput + tabRouting + tabAdv + tabTheme + footer;
@@ -704,24 +657,18 @@
           b.classList.remove("active");
         });
         md.querySelectorAll(".llm-tab-content").forEach(function (c) {
-          c.style.display = "none";
+          c.hidden = true;
         });
         btn.classList.add("active");
         var target = md.querySelector("#" + btn.getAttribute("data-tab"));
-        if (target) target.style.display = "block";
+        if (target) target.hidden = false;
       });
     });
 
     var themeSelect = md.querySelector("#set-theme");
     themeSelect.addEventListener("change", function () {
-      if (window.LogosTheme) window.LogosTheme.apply(this.value, true);
+      window.LogosTheme.apply(this.value, true);
     });
-
-    fieldElement("text_format").addEventListener("change", function () {
-      md.querySelector("#json-schema-wrap").style.display =
-        this.value === "json" ? "block" : "none";
-    });
-
   };
 })();
 

@@ -63,10 +63,9 @@
   function syncButton() {
     var button = document.getElementById("group-chat-btn");
     if (!button) return;
-    var count = models().length;
-    var on = count >= 2;
+    var on = models().length >= 2;
     button.classList.toggle("active", on);
-    button.title = on ? "Групповой чат: " + count + " модели отвечают по очереди" : "Групповой чат";
+    button.title = on ? "Групповой чат: модель и Суд Логоса" : "Групповой чат";
   }
 
   function close() {
@@ -90,7 +89,7 @@
     );
     var chosen = new Set(models());
     var keys = dialogModels();
-    if (!keys.length) body.appendChild(el("div", { class: "group-chat-intro" }, "Каталог моделей ещё не загружен."));
+    if (!keys.length) body.appendChild(el("div", { class: "group-chat-intro" }, "Модель чата сейчас недоступна."));
     // The Court is listed last: it speaks after the models, over what they said.
     keys = keys.concat([COURT]);
     keys.forEach(function (key) {
@@ -120,10 +119,9 @@
     });
     var status = el("div", { class: "group-chat-status", role: "status" }, "");
     function summary() {
-      var count = models().length;
-      return count >= 2
-        ? "Групповой чат включён: " + count + " модели."
-        : "Групповой чат выключен: отмечено меньше двух моделей.";
+      return models().length >= 2
+        ? "Групповой чат включён: отвечают модель и Суд Логоса."
+        : "Групповой чат выключен: отмечено меньше двух участников.";
     }
     status.textContent = summary();
     body.insertBefore(status, body.firstChild.nextSibling);

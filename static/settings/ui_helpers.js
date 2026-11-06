@@ -1,39 +1,6 @@
 (function () {
   "use strict";
 
-  function injectModalStyles() {
-    if (document.getElementById("settings-modal-theme")) return;
-    var s = document.createElement("style");
-    s.id = "settings-modal-theme";
-    s.textContent = [
-      ':root,[data-theme="light"],.theme-light{',
-      "--m-bg:#fff;--m-text:#222;--m-border:#ddd;--m-input-bg:#f5f5f5;",
-      "--m-input-text:#222;--m-section:#666;--m-section-border:#eee;",
-      "--m-card:#fff;--m-editor:#f8f9fa;--m-muted:#6e6e73;",
-      "--m-accent:#4a90d9;--m-danger:#c33;--m-success:#28a745;",
-      "--m-overlay:rgba(0,0,0,0.6);--m-shadow:rgba(0,0,0,0.3)}",
-      '[data-theme="dark"],.dark,.theme-dark,body.dark,html.dark{',
-      "--m-bg:#1a1a2e;--m-text:#e0e0e0;--m-border:#3a3a4e;--m-input-bg:#2a2a3e;",
-      "--m-input-text:#e0e0e0;--m-section:#888;--m-section-border:#2a2a3e;",
-      "--m-card:#1e1e2e;--m-editor:#252535;--m-muted:#9a9aa3;",
-      "--m-accent:#4a90d9;--m-danger:#e55;--m-success:#4caf50;",
-      "--m-overlay:rgba(0,0,0,0.7);--m-shadow:rgba(0,0,0,0.5)}",
-      '[data-theme="dim"]{',
-      "--m-bg:#24292f;--m-text:#e6edf3;--m-border:#444c56;--m-input-bg:#2d333b;",
-      "--m-input-text:#e6edf3;--m-section:#8b949e;--m-section-border:#444c56;",
-      "--m-card:#24292f;--m-editor:#2d333b;--m-muted:#9ea7b3;",
-      "--m-accent:#58a6ff;--m-danger:#f85149;--m-success:#3fb950;",
-      "--m-overlay:rgba(0,0,0,0.7);--m-shadow:rgba(0,0,0,0.5)}",
-      '[data-theme="high-contrast"]{',
-      "--m-bg:#ffffff;--m-text:#000000;--m-border:#000000;--m-input-bg:#ffffff;",
-      "--m-input-text:#000000;--m-section:#000000;--m-section-border:#000000;",
-      "--m-card:#ffffff;--m-editor:#ffffff;--m-muted:#333333;",
-      "--m-accent:#004c99;--m-danger:#b00020;--m-success:#1e7e34;",
-      "--m-overlay:rgba(0,0,0,0.6);--m-shadow:rgba(0,0,0,0.3)}",
-    ].join("");
-    document.head.appendChild(s);
-  }
-
   // WIKIFUNCTIONS-CANDIDATE WF-16: https://www.wikifunctions.org/wiki/Z12316.
   // Собрать escape через четыре regex replacements в порядке & < > "; сохранить
   // null/undefined -> "", String(str), g и НЕ экранировать апостроф (generic HTML escape не подходит).
@@ -49,14 +16,12 @@
   // Keep the public HTML-string contract while letting the DOM serialize values and attributes.
   // Markup arguments are composed by settings code; user/provider text goes through textContent
   // or setAttribute before serialization.
-  function element(tag, css, attrs) {
+  function element(tag, className, attrs) {
     var node = document.createElement(tag);
-    if (css) node.style.cssText = css;
+    if (className) node.className = className;
     Object.keys(attrs || {}).forEach(function (name) {
       var value = attrs[name];
-      if (name === "style") {
-        node.style.cssText += ";" + String(value || "");
-      } else if (value !== false && value !== null && value !== undefined) {
+      if (value !== false && value !== null && value !== undefined) {
         node.setAttribute(name, value === true ? "" : String(value));
       }
     });
@@ -68,12 +33,8 @@
     return node;
   }
 
-  // Width only: height, padding, radius, colours and the gold focus edge come from the shared field rule in
-  // style.css. An inline border would block that focus edge, and 13px text makes iOS zoom in on focus.
-  var INPUT_STYLE = "width:100%;box-sizing:border-box;";
-
   function inp(id, type, val, extra) {
-    var node = element("input", INPUT_STYLE, extra);
+    var node = element("input", "settings-control", extra);
     node.id = String(id);
     node.type = String(type);
     node.setAttribute("value", val === null || val === undefined ? "" : String(val));
@@ -81,21 +42,20 @@
   }
 
   function sel(id, options, extra) {
-    var node = element("select", INPUT_STYLE, extra);
+    var node = element("select", "settings-control", extra);
     node.id = String(id);
     markup(node, options);
     return node.outerHTML;
   }
 
   function lbl(text, hint) {
-    var node = element("label", "font-size:13px;display:block;margin-bottom:4px;color:var(--m-text,#222);");
+    var node = element("label", "settings-label");
     if (hint) node.title = String(hint);
     return markup(node, text).outerHTML;
   }
 
   function chk(id, checked, text, extra, hint) {
-    // Top-aligned so a wrapped caption keeps the box on its first line; size and spacing match the shared checkbox.
-    var label = element("label", "font-size:13px;display:flex;align-items:flex-start;gap:8px;color:var(--m-text,#222);");
+    var label = element("label", "settings-check");
     if (hint) label.title = String(hint);
     var input = element("input", "", extra);
     input.id = String(id);
@@ -109,41 +69,25 @@
   }
 
   function gap2(c1, c2) {
-    return markup(element("div", "display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;align-items:end;"), String(c1 || "") + String(c2 || "")).outerHTML;
+    return markup(element("div", "settings-grid-2"), String(c1 || "") + String(c2 || "")).outerHTML;
   }
 
   function gap3(c1, c2, c3) {
-    return markup(element("div", "display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;align-items:end;"), String(c1 || "") + String(c2 || "") + String(c3 || "")).outerHTML;
+    return markup(element("div", "settings-grid-3"), String(c1 || "") + String(c2 || "") + String(c3 || "")).outerHTML;
   }
 
   function section(title) {
-    return markup(element("h3", "font-size:14px;margin:16px 0 8px;color:var(--m-section,#666);border-bottom:1px solid var(--m-section-border,#eee);padding-bottom:4px;"), title).outerHTML;
-  }
-
-  function toolSection(title, id, content) {
-    var node = element("details", "margin-bottom:10px;border:1px solid var(--m-border,#ddd);border-radius:6px;padding:10px;background:var(--m-card,#fff);");
-    node.appendChild(markup(element("summary", "cursor:pointer;font-weight:bold;color:var(--m-text,#222);"), title));
-    var body = markup(element("div", "margin-top:10px;"), content);
-    body.id = String(id);
-    node.appendChild(body);
-    return node.outerHTML;
+    return markup(element("h3", "settings-section"), title).outerHTML;
   }
 
   function ta(id, val, extra) {
-    var node = element("textarea", INPUT_STYLE + String(extra || ""));
+    var node = element("textarea", "settings-control");
+    if (extra) node.style.cssText = String(extra);
     node.id = String(id);
     node.textContent = val === null || val === undefined ? "" : String(val);
     return node.outerHTML;
   }
 
-  function btn(id, text, bg, extra) {
-    var variant = bg === "accent" || bg === "success" || bg === "danger" ? bg : "default";
-    var node = element("button");
-    node.id = String(id);
-    node.type = "button";
-    node.className = "logos-btn settings-btn settings-btn-" + variant + (extra ? " settings-btn-extra" : "");
-    return markup(node, text).outerHTML;
-  }
   function deepMerge(target, source) {
     for (var key in source) {
       if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
@@ -164,21 +108,8 @@
     }
     return target;
   }
-  // WIKIFUNCTIONS-CANDIDATE WF-18: https://www.wikifunctions.org/wiki/Z25614 + Z873 + Z872 + Z10079.
-  // Заменить нормализатор списка композицией split(",") -> map(trim) -> filter(nonempty);
-  // адаптер сохраняет falsy -> [], порядок и повторные значения, не добавляет dedup.
-  function strToArr(str) {
-    if (!str) return [];
-    return str
-      .split(",")
-      .map(function (d) {
-        return d.trim();
-      })
-      .filter(Boolean);
-  }
 
   window.SettingsUI = {
-    injectModalStyles: injectModalStyles,
     escapeHtml: escapeHtml,
     inp: inp,
     sel: sel,
@@ -187,11 +118,8 @@
     gap2: gap2,
     gap3: gap3,
     section: section,
-    toolSection: toolSection,
     ta: ta,
-    btn: btn,
     deepMerge: deepMerge,
-    strToArr: strToArr,
   };
 })();
 

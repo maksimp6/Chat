@@ -48,7 +48,7 @@
     var notice = h(
       "div",
       { class: "logos-partner-note" },
-      "Партнёры и история принадлежат текущему пользователю. Отправка внешних сообщений выполняется через AI tool с подтверждением.",
+      "Партнёры и история принадлежат текущему пользователю. Отправка внешних сообщений выполняется через инструмент модели.",
     );
     card.appendChild(notice);
 
@@ -228,7 +228,7 @@
         );
       });
 
-      detail.appendChild(h("h5", {}, "Follow-up (" + (partner.followups || []).length + ")"));
+      detail.appendChild(h("h5", {}, "Напоминания (" + (partner.followups || []).length + ")"));
       if (!(partner.followups || []).length) detail.appendChild(emptyLine("Пока пусто."));
       (partner.followups || []).forEach(function (followup) {
         var line = h("div", { class: "logos-partner-line" });

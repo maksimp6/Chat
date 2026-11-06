@@ -26,20 +26,17 @@
     return mcpFetchPromise;
   };
 
-  // The OAuth connect of one MCP server (``serverId`` may be a promise of it). The window for the provider's sign-in
-  // opens now, inside the tap, so the browser lets it open, and goes to the sign-in page once the server has started
-  // the connect; with that window blocked, this page itself goes there.
+  // The OAuth connect of one MCP server. The window for the provider's sign-in opens now, inside the tap, so the browser
+  // lets it open, and goes to the sign-in page once the server has started the connect; with that window blocked, this
+  // page itself goes there.
   window.startMcpOAuth = function (serverId) {
     var popup = window.open("", "mcp_oauth", "width=520,height=680");
     var redirectUri = window.location.origin + "/api/mcp/oauth/callback";
-    return Promise.resolve(serverId)
-      .then(function (sid) {
-        return window.LogosDispatcher.request("/api/mcp-servers/" + encodeURIComponent(sid) + "/oauth/start", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ redirect_uri: redirectUri }),
-        });
-      })
+    return window.LogosDispatcher.request("/api/mcp-servers/" + encodeURIComponent(serverId) + "/oauth/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ redirect_uri: redirectUri }),
+    })
       .then(function (r) {
         return r.json().then(function (body) {
           if (!r.ok || !body.authorize_url) {
@@ -128,23 +125,9 @@
     load();
   };
 
-  function closeMcpManagerModal(modal) {
-    if (!modal) return;
-    window.LogosCoreAPI.ui.modal.close(modal);
-    var onClose = modal._onClose;
-    modal._onClose = null;
-    if (typeof onClose === "function") onClose();
-  }
-
-  window.LogosCoreAPI.ui.actions.register("mcp-manager.close", function (payload) {
-    var modalId = payload && payload.params && payload.params.modal;
-    closeMcpManagerModal(modalId ? document.getElementById(modalId) : null);
-  });
-
-  window.openMcpManagerModal = function (onClose) {
+  window.openMcpManagerModal = function () {
     var UI = window.SettingsUI;
     var CoreUI = window.LogosCoreAPI.ui;
-    UI.injectModalStyles();
 
     var existing = document.getElementById("mcp-manager-modal");
     if (existing) existing.remove();
@@ -160,17 +143,11 @@
       title: "MCP серверы",
       className: "mcp-manager-modal",
       contentClassName: "settings-mcp-modal-content",
-      closeAction: "mcp-manager.close",
       body: md,
     });
-    ov._onClose = onClose;
     // The window wears the shared modal shell (static/style.css), so no look is set inline here.
     (document.querySelector(".logos-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
-
-    ov.addEventListener("click", function (e) {
-      if (e.target === ov) closeMcpManagerModal(ov);
-    });
 
     function renderList(servers) {
       var list = document.getElementById("mcp-mgr-list");
