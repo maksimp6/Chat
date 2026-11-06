@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import time
 from collections.abc import Mapping
 from typing import Any
@@ -16,38 +15,8 @@ from organization.host import get_current_owner_id, get_store
 government_bp = Blueprint("government", __name__, url_prefix="/api/government")
 
 CASE_TYPES = ("IP_REGISTRATION", "TAX_RETURN", "GOV_REQUEST")
-CASE_STATUSES = (
-    "DRAFT",
-    "PENDING_USER_DATA",
-    "VALIDATING",
-    "READY_FOR_APPROVAL",
-    "SUBMITTED",
-    "PROCESSING",
-    "COMPLETED",
-    "REJECTED",
-    "ARCHIVED",
-)
 EDITABLE_STATUSES = ("DRAFT", "PENDING_USER_DATA", "READY_FOR_APPROVAL")
 IP_REQUIRED_FIELDS = ("full_name", "birth_date", "citizenship", "passport")
-
-
-def _json(value: Any) -> str:
-    return json.dumps(value if value is not None else {}, ensure_ascii=False)
-
-
-def _parse(value: Any, default: Any) -> Any:
-    try:
-        return json.loads(value or "")
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return default
-
-
-def prepare_government_records() -> None:
-    get_store()
-
-
-# Former name, kept for existing callers.
-init_government_tables = prepare_government_records
 
 
 def _current_owner() -> str | None:
@@ -570,10 +539,8 @@ __all__ = [
     "ensure_government_department",
     "get_case",
     "government_bp",
-    "init_government_tables",
     "prepare_application",
     "prepare_documents",
-    "prepare_government_records",
     "process_response",
     "request_approval",
     "requirements",

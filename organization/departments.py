@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import time
 from collections.abc import Mapping
 from typing import Any
@@ -14,25 +13,6 @@ from organization.host import create_session, get_session, get_store
 
 departments_bp = Blueprint("departments", __name__, url_prefix="/api/departments")
 _DEPT_ID_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789-_"
-
-
-def _json(value: Any) -> str:
-    return json.dumps(value if value is not None else {}, ensure_ascii=False)
-
-
-def _parse(value: Any, default: Any) -> Any:
-    try:
-        return json.loads(value or "")
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return default
-
-
-def prepare_department_records() -> None:
-    get_store()
-
-
-# Former name, kept for existing callers.
-init_department_tables = prepare_department_records
 
 
 def _validate_id(value: str) -> str:

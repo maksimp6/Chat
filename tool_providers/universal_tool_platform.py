@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import math
 import time
-import warnings
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
@@ -18,21 +17,6 @@ from typing import Any
 from tool_providers._vendor.restrictions import restrictions_lifted
 from tool_providers.host import enqueue_local_tool_job, wait_for_local_tool_job
 from tool_providers.read_only_policy import ReadOnlyToolPolicy
-
-
-def _warn_deprecated_execution_hooks(hooks: Mapping[str, Any]) -> None:
-    """Compatibility adapter for callbacks removed from shared tool execution."""
-    unsupported = set(hooks) - {"authorize", "policy", "approval"}
-    if unsupported:
-        names = ", ".join(sorted(unsupported))
-        raise TypeError(f"Unexpected tool execution keyword arguments: {names}")
-    if hooks:
-        warnings.warn(
-            "Tool execution callbacks authorize, policy and approval are deprecated "
-            "and have no effect; remove these keyword arguments",
-            DeprecationWarning,
-            stacklevel=3,
-        )
 
 
 @dataclass(frozen=True)
@@ -366,9 +350,7 @@ class UniversalToolExecutor:
         call: UniversalToolCall | Mapping[str, Any],
         *,
         server_configs: list[dict[str, Any]] | None = None,
-        **legacy_hooks: Any,
     ) -> dict[str, Any]:
-        _warn_deprecated_execution_hooks(legacy_hooks)
         if not isinstance(call, UniversalToolCall):
             if not isinstance(call, Mapping):
                 return UniversalToolResult(
@@ -565,10 +547,9 @@ class UniversalToolExecutor:
         trace,
         *,
         server_configs: list[dict[str, Any]] | None = None,
-        **legacy_hooks: Any,
     ) -> dict[str, Any]:
         if trace is None:
-            return self.execute(call, server_configs=server_configs, **legacy_hooks)
+            return self.execute(call, server_configs=server_configs)
 
         try:
             # The trace records the action; execute() reports a wrong action name itself.
@@ -603,9 +584,7 @@ class UniversalToolExecutor:
         result = trace.track_tool_execution(
             call.tool_name,
             arguments,
-            lambda: self.execute(
-                traced_call, server_configs=server_configs, **legacy_hooks
-            ),
+            lambda: self.execute(traced_call, server_configs=server_configs),
             call_id=call.call_id,
             step=None,
             trace_arguments=trace_arguments,

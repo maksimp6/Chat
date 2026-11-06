@@ -15,7 +15,6 @@ import logging
 import math
 import os
 import platform
-import signal
 import subprocess
 import sys
 import tempfile
@@ -24,15 +23,13 @@ import time
 import uuid
 from typing import Any
 
-from tool_providers._vendor.output import limit_output, newline_text, read_output
+from tool_providers._vendor.output import limit_output
 from tool_providers.host import vector_add
+from tool_providers.runtime_tools import _MAX_OUTPUT_BYTES, run_bounded
 
 __all__ = ["PYTHON_TOOLS", "python"]
 
 logger = logging.getLogger("logos.tool_providers.python_exec")
-
-# limit_output's bound for the code's output (run_command's bound). Bytes past it are read and dropped.
-_MAX_OUTPUT_BYTES = 1048576
 
 # Only what Python needs. The backend's own environment holds provider and deployment secrets.
 _ENV_NAMES = ("PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "USER", "LOGNAME", "PREFIX", "LD_LIBRARY_PATH")
@@ -87,49 +84,14 @@ def _run_process(argv: list[str], *, cwd: str, timeout: float | None, stdin: str
     """Run ``argv`` and give its output, exit code and duration; the process leads its own session."""
     started = time.perf_counter()
     try:
-        with subprocess.Popen(
-            argv,
-            shell=False,
-            stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=cwd,
-            env=_environment(),
-            start_new_session=True,
-        ) as proc:
-            try:
-                if stdin is not None and proc.stdin is not None:
-                    try:
-                        proc.stdin.write(stdin.encode("utf-8"))
-                    except BrokenPipeError:
-                        pass  # the code ended before reading its input
-                    proc.stdin.close()
-                # Twice the bound and one byte more: CRLF collapsing can halve the
-                # text, and limit_output still sees a cut stream as too long.
-                stdout, stderr = read_output(proc, timeout, 2 * _MAX_OUTPUT_BYTES + 1)
-            except subprocess.TimeoutExpired as exc:
-                # The code leads its own session: kill its children too, or they outlive the timeout.
-                if os.name == "posix":
-                    try:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass  # the group exited right at the deadline
-                    proc.wait()
-                else:
-                    proc.kill()
-                    out, err = proc.communicate()
-                    exc.stdout, exc.stderr = newline_text(out or b""), newline_text(err or b"")
-                raise
-            except BaseException:
-                proc.kill()
-                raise
+        completed = run_bounded(argv, cwd=cwd, env=_environment(), timeout=timeout, stdin=stdin)
         return {
-            "success": proc.returncode == 0,
-            "stdout": limit_output(newline_text(stdout), _MAX_OUTPUT_BYTES),
-            "stderr": limit_output(newline_text(stderr), _MAX_OUTPUT_BYTES),
-            "exit_code": proc.returncode,
+            "success": completed.returncode == 0,
+            "stdout": limit_output(completed.stdout, _MAX_OUTPUT_BYTES),
+            "stderr": limit_output(completed.stderr, _MAX_OUTPUT_BYTES),
+            "exit_code": completed.returncode,
             "seconds": round(time.perf_counter() - started, 3),
-            **({} if proc.returncode == 0 else {"error": f"Python exited with code {proc.returncode}"}),
+            **({} if completed.returncode == 0 else {"error": f"Python exited with code {completed.returncode}"}),
         }
     except subprocess.TimeoutExpired as exc:
         return {

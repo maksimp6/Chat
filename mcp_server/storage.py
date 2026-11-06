@@ -36,22 +36,6 @@ _DEFAULTS = {
 }
 # Fields the server owns; a request body can never set them.
 _SERVER_OWNED_FIELDS = ("id", "owner_id", "created_at")
-DEFAULT_CONFIGS = {
-    "local_git": {
-        "repo_path": "",
-        "timeout": 15,
-        "default_log_limit": 5,
-        "allowed_commands": ["status", "log", "diff", "branch", "show"],
-    }
-}
-
-
-def open_journal_store() -> None:
-    get_store()
-
-
-# Former name, kept for existing callers.
-init_db = open_journal_store
 
 
 def _seal_fields(data: dict[str, Any]) -> dict[str, Any]:
@@ -179,24 +163,3 @@ def update_server(server_id: str, owner_id: str, data: dict[str, Any]) -> bool:
             },
         )
     return True
-
-
-def delete_server(server_id: str, owner_id: str) -> None:
-    key = "mcp/server/" + server_id
-    with get_store().transaction() as tx:
-        if isinstance(tx.get(key), dict):
-            tx.delete(key)
-
-
-def get_server_config(server_id: str, *, owner_id: str) -> dict[str, Any]:
-    server = get_server(server_id, owner_id=owner_id)
-    if server is None:
-        return {}
-    return {
-        **DEFAULT_CONFIGS.get(server["connector_id"], {}),
-        **server.get("config", {}),
-    }
-
-
-def set_server_config(server_id: str, owner_id: str, cfg: dict[str, Any]) -> None:
-    update_server(server_id, owner_id, {"config": cfg})

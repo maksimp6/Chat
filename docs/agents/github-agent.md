@@ -1,7 +1,8 @@
 # Logos as a GitHub agent
 
-Logos can take a GitHub issue and work on its own code. The workflow is
-`.github/workflows/logos.yml`; the headless runner is `issue_runner.py`.
+Logos can take a GitHub issue and work on its own code. The headless runner is
+`issue_runner.py`. No workflow in this repository starts it: a person runs it by
+hand, and the workflow named below is the one the runner was built for.
 
 ## How it works
 

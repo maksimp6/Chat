@@ -15,7 +15,7 @@ from functools import partial
 from webframe import Application
 
 from agent_memory.routes import install as install_memory_routes
-from agent_runtime.local_gateway import prepare_local_agent_records, local_agent_bp
+from agent_runtime.local_gateway import local_agent_bp
 from chat.classification_routes import classification_bp
 from chat.completion_routes import completion_bp
 from chat.embedding_routes import embedding_bp
@@ -25,7 +25,7 @@ from invocation.manager import fail_interrupted_invocations
 from chat.voice_routes import voice_bp
 from cloud.cloudru.iam_routes import cloudru_iam_bp
 from conversations.routes import install as install_conversation_routes
-from court.hearings import court_bp, prepare_court_records
+from court.hearings import court_bp
 from rag_sync.routes import rag_bp
 from vector_db.routes import vectors_bp
 from economy.treasury_routes import install as install_treasury_routes
@@ -34,12 +34,8 @@ from forge.routes import printing3d_bp
 from mcp_server import chatgpt_mcp_bp
 from mcp_server.storage import ensure_rdc_server
 from mcp_server.tools import register_mcp_tools
-from organization.departments import departments_bp, prepare_department_records
-from organization.government import (
-    ensure_government_department,
-    government_bp,
-    prepare_government_records,
-)
+from organization.departments import departments_bp
+from organization.government import ensure_government_department, government_bp
 from organization.partner_relations import (
     ensure_partner_department,
     prepare_partner_relations_records,
@@ -91,16 +87,12 @@ _BOOTED_AT = time.time()
 
 STORAGE_INITIALIZERS = (
     open_journal_store,
-    prepare_local_agent_records,
     prepare_printing_records,
-    prepare_department_records,
     prepare_partner_relations_records,
     ensure_partner_department,
-    prepare_government_records,
     ensure_government_department,
     prepare_environment_records,
     ensure_rdc_server,
-    prepare_court_records,
     partial(fail_interrupted_invocations, before=_BOOTED_AT),
 )
 

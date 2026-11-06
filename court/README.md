@@ -112,5 +112,4 @@ The device needs `git`, `git-lfs`, `age` and `age-keygen` on `PATH`; without the
 - `composition/wiring.py` registers the `court` host factory (`register_all()`, or `register_units("court")` for this unit alone); the host is built on first use.
 - `composition/wiring.py` passes `court.filing.file_case` to the `invocation` host as `file_court_case`; `invocation.manager.fail_invocation` calls it for every failed invocation.
 - `composition/web.py` registers the blueprint `court_bp` (`court.hearings`).
-- Storage start-up (`web_shell`) runs `court.hearings.prepare_court_records`.
 - `composition/tool_sources.py` adds the `court` tool category from `court.tools`.

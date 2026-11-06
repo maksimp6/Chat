@@ -18,12 +18,6 @@ SUPPORTED_PROTOCOL_VERSIONS = {
 DEFAULT_PROTOCOL_VERSION = "2026-07-28"
 SERVER_NAME = "Logos Pro"
 SERVER_VERSION = os.environ.get("LOGOS_VERSION", "dev")
-OAUTH_SCOPE = os.environ.get("LOGOS_MCP_OAUTH_SCOPE", "logos.read")
-PUBLIC_BASE_URL = os.environ.get("LOGOS_MCP_PUBLIC_URL", "").rstrip("/")
-
-
-def _public_base_url() -> str:
-    return os.environ.get("LOGOS_MCP_PUBLIC_URL", "").rstrip("/") or PUBLIC_BASE_URL
 
 
 def _sanitize_error_string(value: Any) -> str:

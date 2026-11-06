@@ -9,22 +9,16 @@ from __future__ import annotations
 
 import copy
 import json
-import logging
 import os
 import re
-import subprocess
-import time
 from collections.abc import Mapping, MutableMapping
 from typing import Any, cast
 
 from remote_runtime._vendor.restrictions import restrictions_lifted
-from remote_runtime.host import get_config, get_current_trace, set_config
+from remote_runtime.host import get_config
 from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
 
-logger = logging.getLogger("logos.remote_runtime.ssh_settings")
-
 SETTINGS_KEY = "ssh_runtime_settings"
-LAST_TEST_KEY = "ssh_runtime_last_test"
 # Shell separators and substitutions. An allowlist pattern matches the whole command, so a command
 # that chains a second one ("echo ok; sudo ...") would otherwise pass as the first.
 _SHELL_CONTROL_RE = re.compile(r"[;&`\n\r]|\$\(")
@@ -183,39 +177,8 @@ def get_settings() -> dict[str, Any]:
     return validate_settings(_raw_settings())
 
 
-def save_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
-    validated = validate_settings(settings)
-    set_config(SETTINGS_KEY, validated)
-    trace = get_current_trace()
-    if trace is not None:
-        trace.add_event(
-            "ssh_runtime_settings_updated",
-            {
-                "enabled": validated["enabled"],
-                "targets": sorted(validated["targets"]),
-                "read_only": validated["read_only"],
-                "allow_command_execution": validated["allow_command_execution"],
-                "allow_write_operations": validated["allow_write_operations"],
-                "allow_privileged_operations": validated["allow_privileged_operations"],
-                "command_allowlist_count": len(validated["command_allowlist"]),
-            },
-        )
-    logger.info(
-        "SSH Runtime settings updated: enabled=%s targets=%s read_only=%s",
-        validated["enabled"],
-        sorted(validated["targets"]),
-        validated["read_only"],
-    )
-    return validated
-
-
 def public_settings() -> dict[str, Any]:
-    settings = get_settings()
-    result = copy.deepcopy(settings)
-    last_test = get_config(LAST_TEST_KEY, None)
-    if last_test is not None:
-        result["last_test"] = copy.deepcopy(last_test)
-    return result
+    return get_settings()
 
 
 def build_runtime() -> SSHRuntime:
@@ -316,121 +279,6 @@ def _check_operation(
         raise SSHRuntimeError("SSH Runtime is configured as read-only")
 
 
-def record_test_result(result: Mapping[str, Any]) -> None:
-    set_config(LAST_TEST_KEY, dict(result))
-
-
-# OpenSSH client messages and the cause each names, checked in this order: a missing or
-# unreadable key file is reported before the "Permission denied" that follows it.
-_SSH_FAILURE_CODES = (
-    ("Host key verification failed", "ssh_host_key_rejected"),
-    ("REMOTE HOST IDENTIFICATION HAS CHANGED", "ssh_host_key_rejected"),
-    ("Could not resolve hostname", "ssh_host_not_found"),
-    ("Connection refused", "ssh_connection_refused"),
-    ("Connection timed out", "ssh_connection_timeout"),
-    ("Operation timed out", "ssh_connection_timeout"),
-    ("No route to host", "ssh_host_unreachable"),
-    ("Network is unreachable", "ssh_host_unreachable"),
-    ("not accessible", "ssh_identity_file_unavailable"),
-    ("UNPROTECTED PRIVATE KEY FILE", "ssh_identity_file_unavailable"),
-    ("Load key", "ssh_identity_file_unavailable"),
-    ("Permission denied", "ssh_authentication_failed"),
-)
-
-
-def _ssh_failure_code(stderr: str) -> str:
-    """The cause code of a failed ssh run, read from the client's stderr."""
-    for marker, code in _SSH_FAILURE_CODES:
-        if marker in stderr:
-            return code
-    return "ssh_connection_failed"
-
-
-def test_connection(target_name: str, identity_id: str | None) -> dict[str, Any]:
-    try:
-        runtime = build_runtime()
-    except SSHRuntimeError as exc:
-        if exc.code:
-            raise
-        # The saved settings failed validation; the message names the field in the log.
-        raise SSHRuntimeError(str(exc), code="ssh_settings_invalid") from exc
-    target, user = runtime._resolve_target(target_name, identity_id)
-    known_hosts = target.known_hosts or runtime._default_known_hosts
-    started = time.perf_counter()
-    argv = runtime._ssh_command(target, user, "true")
-    try:
-        completed = subprocess.run(
-            argv,
-            shell=False,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=max(2, int(target.connect_timeout_seconds)) + 5,
-        )
-    except subprocess.TimeoutExpired as exc:
-        result = {
-            "success": False,
-            "target": target.name,
-            "host": target.host,
-            "linux_user": user,
-            "status": "timeout",
-            "error": f"SSH connection timed out after {target.connect_timeout_seconds:g}s",
-            "duration_ms": round((time.perf_counter() - started) * 1000, 2),
-        }
-        record_test_result(result)
-        raise SSHRuntimeError(result["error"], code="ssh_connection_timeout") from exc
-    except OSError as exc:
-        result = {
-            "success": False,
-            "target": target.name,
-            "host": target.host,
-            "linux_user": user,
-            "status": "error",
-            "error": f"Unable to start ssh: {exc}",
-            "duration_ms": round((time.perf_counter() - started) * 1000, 2),
-        }
-        record_test_result(result)
-        raise SSHRuntimeError(result["error"], code="ssh_client_unavailable") from exc
-
-    result = {
-        "success": completed.returncode == 0,
-        "target": target.name,
-        "host": target.host,
-        "linux_user": user,
-        "status": "ok" if completed.returncode == 0 else "failed",
-        "error": completed.stderr.strip() or None,
-        "exit_code": completed.returncode,
-        "duration_ms": round((time.perf_counter() - started) * 1000, 2),
-        "known_hosts_configured": bool(known_hosts),
-    }
-    record_test_result(result)
-    trace = get_current_trace()
-    if trace is not None:
-        trace.add_event(
-            "ssh_runtime_connection_test",
-            {
-                "target": target.name,
-                "linux_user": user,
-                "success": result["success"],
-                "status": result["status"],
-                "duration_ms": result["duration_ms"],
-            },
-        )
-    logger.info(
-        "SSH Runtime connection test: target=%s user=%s success=%s exit_code=%s",
-        target.name,
-        user,
-        result["success"],
-        completed.returncode,
-    )
-    if completed.returncode != 0:
-        raise SSHRuntimeError(
-            result["error"] or "SSH connection test failed",
-            code=_ssh_failure_code(completed.stderr or ""),
-        )
-    return result
-
-
 __all__ = [
     "SETTINGS_KEY",
     "assert_operation_allowed",
@@ -440,7 +288,5 @@ __all__ = [
     "is_privileged_command",
     "public_settings",
     "runtime_for_operation",
-    "save_settings",
-    "test_connection",
     "validate_settings",
 ]

@@ -6,7 +6,6 @@ remote OS identity, so Linux permissions remain the authorization boundary.
 
 from __future__ import annotations
 
-import json
 import math
 import os
 import posixpath
@@ -56,7 +55,7 @@ class SSHRuntime:
 
     def __init__(
         self,
-        targets: Mapping[str, Mapping[str, Any]] | None = None,
+        targets: Mapping[str, Mapping[str, Any]],
         *,
         known_hosts: str | None = None,
     ) -> None:
@@ -67,26 +66,10 @@ class SSHRuntime:
 
     @staticmethod
     def _load_targets(
-        targets: Mapping[str, Mapping[str, Any]] | None,
+        targets: Mapping[str, Mapping[str, Any]],
     ) -> dict[str, SSHTarget]:
-        if targets is None:
-            text = os.environ.get("LOGOS_SSH_TARGETS_JSON", "").strip()
-            if not text:
-                return {}
-            try:
-                parsed = json.loads(text)
-            except json.JSONDecodeError as exc:
-                raise SSHRuntimeError(
-                    "LOGOS_SSH_TARGETS_JSON is not valid JSON"
-                ) from exc
-            if not isinstance(parsed, dict):
-                raise SSHRuntimeError("LOGOS_SSH_TARGETS_JSON must be an object")
-            raw: Mapping[str, Mapping[str, Any]] = parsed
-        else:
-            raw = targets
-
         result: dict[str, SSHTarget] = {}
-        for name, cfg in raw.items():
+        for name, cfg in targets.items():
             if not isinstance(cfg, Mapping):
                 raise SSHRuntimeError(f"SSH target '{name}' must be an object")
             host = str(cfg.get("host") or "").strip()

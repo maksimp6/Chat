@@ -1,7 +1,7 @@
 """The tool platform: provider-agnostic tool contracts and the execution pipeline, the
 shared tool registry, and the built-in tool sources (git, Termux, system, filesystem,
-Wikipedia, profiler, theme, SSH runtime) with JSON Schema helpers and the read-only
-policy.
+Wikipedia, profiler, theme, SSH runtime, PTY terminal sessions) with JSON Schema helpers
+and the read-only policy.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
-__all__ = ["filesystem", "registry", "runtime_tools", "universal_tool_platform"]
+__all__ = ["filesystem", "registry", "runtime_tools", "tty", "universal_tool_platform"]
 
 
 def __getattr__(name: str) -> Any:

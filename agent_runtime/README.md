@@ -69,4 +69,3 @@ Everything `agent_runtime` uses from other units is a field of `Host` in [`agent
 
 - `composition/wiring.py` registers the `agent_runtime` host factory (`register_all()`, or `register_units("agent_runtime")` for this unit alone); the host is built on first use.
 - `composition/web.py` registers the blueprint `local_agent_bp` (`agent_runtime.local_gateway`).
-- Storage start-up (`web_shell`) runs `agent_runtime.local_gateway.prepare_local_agent_records`.

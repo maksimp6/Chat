@@ -80,11 +80,6 @@ def write_op(func):
     return wrapper
 
 
-PROJECT_DIR = os.path.realpath(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
-
-
 def _allowed_roots(cfg: dict) -> list[str]:
     # The same roots that relative repository names are searched under.
     base_dir = cfg.get("repos_base_dir") or "/sdcard/repo"

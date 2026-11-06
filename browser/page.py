@@ -157,7 +157,6 @@ INPUT_TYPES = frozenset(
     }
 )
 BUTTON_INPUT_TYPES = frozenset({"submit", "button", "reset", "image"})
-_TEXT_LIKE = frozenset({"text", "search", "email", "url", "tel", "password"})
 _FORM_ASSOCIATED = frozenset(
     {"button", "fieldset", "input", "object", "output", "select", "textarea"}
 )
@@ -1259,10 +1258,6 @@ class PageModel:
         self._ensure_stats()
         assert self._text_len is not None
         return self._text_len[element.index]
-
-    def link_text_length(self, element: Element) -> int:
-        self._ensure_stats()
-        return self._link_len[element.index]
 
     def visible_text_length(self) -> int:
         return self.text_length(self.body)

@@ -18,16 +18,13 @@ class Host:
     ExecutionTrace: Any  # observability.trace_manager.ExecutionTrace
     RuntimeDispatcher: Any  # runtime.RuntimeDispatcher
     RuntimeLoader: Any  # runtime.RuntimeLoader
-    RuntimeNotFound: Any  # runtime.RuntimeNotFound
     bind_runtime_request: Any  # runtime.request_context.bind_runtime_request
     close_memory_clients: Any  # agent_memory.client.close_memory_clients
     create_invocation_trace: Any  # invocation.trace.create_invocation_trace
     get_config: Any  # storage.records.get_config
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id
-    get_current_trace: Any  # observability.trace_manager.get_current_trace
     get_store: Any  # storage.records.get_store
     init_runtime_db: Any  # storage.records.open_journal_store
-    set_config: Any  # storage.records.set_config
 
 
 _binding: Binding[Host] = Binding("remote_runtime")
@@ -47,11 +44,9 @@ __all__ = [
     "current",
     "get_config",
     "get_current_owner_id",
-    "get_current_trace",
     "get_store",
     "init_runtime_db",
     "provide",
-    "set_config",
 ]
 
 
@@ -75,17 +70,9 @@ def get_current_owner_id(*args: Any, **kwargs: Any) -> Any:
     return current().get_current_owner_id(*args, **kwargs)
 
 
-def get_current_trace(*args: Any, **kwargs: Any) -> Any:
-    return current().get_current_trace(*args, **kwargs)
-
-
 def get_store(*args: Any, **kwargs: Any) -> Any:
     return current().get_store(*args, **kwargs)
 
 
 def init_runtime_db(*args: Any, **kwargs: Any) -> Any:
     return current().init_runtime_db(*args, **kwargs)
-
-
-def set_config(*args: Any, **kwargs: Any) -> Any:
-    return current().set_config(*args, **kwargs)

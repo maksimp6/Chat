@@ -17,7 +17,6 @@ disk, which the code imports and the architecture map uses, does not change.
 | **Tavuro** | `agent_runtime` | Provider-agnostic agent gateway, remote tool agents and GitHub issue runner. |
 | **Zorumi** | `agent_shell` | Minimal command line to add, run and approve agent tasks on a durable Kristall store. |
 | **Pelisu** | `agent_skills` | Finds repository Agent Skills and loads their instructions into chats. |
-| **Ilmane** | `agents` | Reserved namespace for agent transport adapters; no modules yet. |
 | **Heravo** | `api` | Holds Yandex API contracts and gates the Yandex calls routed through its transport. |
 | **Dulena** | `browser` | Web browsing tools for pages, forms, search and downloads. |
 | **Kelura** | `chat` | Serves chat turns, voice, images, embeddings and completions. |
@@ -28,7 +27,6 @@ disk, which the code imports and the architecture map uses, does not change.
 | **Veridu** | `court` | Opens GitHub cases for errors and censors rule-breaking replies. |
 | **Ferino** | `economy` | Tracks each reply's cost, billing, budgets and paper treasury ledger. |
 | **Velisa** | `forge` | Exposes 3D-printing quotes and print orders as routes and tools. |
-| **Oriselo** | `identity` | Placeholder for the local installation's identity; no modules yet. |
 | **Kalumi** | `invocation` | Manages each invocation's lifecycle, execution trace and request context. |
 | **Derako** | `keel` | Reconciles deployments with cloud state, plus health checks and recovery. |
 | **Kristall** | `kristall` | Typed key/value store with explicit commits on an append-only journal. |

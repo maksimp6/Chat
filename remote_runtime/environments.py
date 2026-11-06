@@ -28,8 +28,6 @@ from remote_runtime.host import (
     init_runtime_db,
 )
 
-ENV_STATUSES = ("CREATING", "RUNNING", "STOPPED", "FAILED", "DELETING")
-
 _runtime_dispatcher_instance = None
 _runtime_dispatcher_lock = threading.Lock()
 _RUNTIME_WORKERS: dict[str, "EnvironmentRuntime"] = {}
@@ -45,26 +43,12 @@ _ALLOWED_TRANSITIONS = {
 }
 
 
-def _invoke_revision_runtime(context, payload):
-    """Dispatcher boundary for code loaded from an immutable revision snapshot."""
-    with _RUNTIME_WORKERS_LOCK:
-        runtime = _RUNTIME_WORKERS.get(context.runtime_id)
-    if runtime is None or not runtime.loader.loaded:
-        raise RuntimeError("revision runtime is not loaded")
-    return runtime.loader.invoke(
-        str(payload.get("operation") or ""), payload.get("payload")
-    )
-
-
 def _runtime_dispatcher() -> Any:
     """The process dispatcher for preview runtimes, created on first use."""
     global _runtime_dispatcher_instance
     with _runtime_dispatcher_lock:
         if _runtime_dispatcher_instance is None:
             _runtime_dispatcher_instance = bound.RuntimeDispatcher()
-            _runtime_dispatcher_instance.register_operation(
-                "revision.invoke", _invoke_revision_runtime
-            )
         return _runtime_dispatcher_instance
 
 
@@ -157,10 +141,6 @@ def prepare_environment_records() -> None:
                         "stopped_at": row["stopped_at"] or int(time.time()),
                     },
                 )
-
-
-# Former name, kept for existing callers.
-init_environment_tables = prepare_environment_records
 
 
 def _transition(current: str, target: str) -> None:
@@ -406,25 +386,6 @@ class EnvironmentRuntime:
             close_memory_clients(self.data_dir / "logos.memory")
             raise
 
-    def submit(
-        self,
-        operation: str,
-        payload: dict[str, Any] | None = None,
-        *,
-        timeout: float = 30.0,
-    ) -> Any:
-        if not self._thread.is_alive():
-            raise RuntimeError("environment runtime is not running")
-        result: queue.Queue = queue.Queue(maxsize=1)
-        self._jobs.put(("call", operation, dict(payload or {}), result))
-        try:
-            kind, value = result.get(timeout=timeout)
-        except queue.Empty as exc:
-            raise TimeoutError("environment runtime operation timed out") from exc
-        if kind == "error":
-            raise value
-        return value
-
     def submit_http(
         self,
         payload: dict[str, Any],
@@ -538,78 +499,13 @@ class EnvironmentRuntime:
                 self._active_streams.pop(cancel, None)
 
     def _run(self) -> None:
-        while True:
-            job = self._jobs.get()
-            if job is _RUNTIME_STOP:
-                return
-            kind = job[0]
-            if kind == "call":
-                _, operation, payload, result = job
-                try:
-                    with bind_runtime_request(
-                        self.runtime_id,
-                        "",
-                        data_root=str(self.data_dir),
-                    ):
-                        value = _runtime_dispatcher().dispatch(
-                            self.runtime_id, operation, payload
-                        )
-                    result.put(("result", value))
-                except Exception as exc:
-                    result.put(("error", exc))
-                continue
+        while self._jobs.get() is not _RUNTIME_STOP:
+            pass
 
 
 def register_runtime_operation(name: str, handler) -> None:
     """Register a dispatcher operation available to managed runtime threads."""
     _runtime_dispatcher().register_operation(name, handler)
-
-
-def authorize_environment_runtime(
-    environment_id: str,
-    owner_id: str | None,
-) -> None:
-    """Resolve an existing environment without an owner authorization gate."""
-    item = _get(environment_id)
-    try:
-        _runtime_dispatcher().authorize(environment_id, owner_id)
-        return
-    except bound.RuntimeNotFound:
-        # Stopped environments intentionally have no dispatcher context. The
-        # gateway distinguishes a stopped environment (503) from a missing one (404).
-        if not item:
-            raise
-
-
-def dispatch_environment_operation(
-    environment_id: str,
-    operation: str,
-    payload: dict[str, Any] | None = None,
-    *,
-    timeout: float = 30.0,
-) -> Any:
-    with _RUNTIME_WORKERS_LOCK:
-        runtime = _RUNTIME_WORKERS.get(environment_id)
-    if runtime is None:
-        raise RuntimeError("environment runtime is not running")
-    _runtime_dispatcher().context(environment_id)
-    return runtime.submit(operation, payload, timeout=timeout)
-
-
-def dispatch_environment_revision(
-    environment_id: str,
-    operation: str,
-    payload: dict[str, Any] | None = None,
-    *,
-    timeout: float = 30.0,
-) -> Any:
-    """Invoke the constrained revision application through its dispatcher scope."""
-    return dispatch_environment_operation(
-        environment_id,
-        "revision.invoke",
-        {"operation": operation, "payload": dict(payload or {})},
-        timeout=timeout,
-    )
 
 
 def dispatch_environment_http(

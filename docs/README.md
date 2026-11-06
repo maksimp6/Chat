@@ -151,7 +151,6 @@
 
 - [Shared local access](security/github-login.md) — текущий режим доступа (обновлён 2026-10-24)
 - [Менеджер криптографии и ключей](security/key_manager.md) — единая граница управления секретами и их шифрованное хранение
-- [Граница local-files](security/local-files-confinement.md) — `GET /api/local-files` только внутри настроенного корня
 - [Cloud.ru Secret Management](security/cloudru-secret-management.md) — адаптер и границы прав для секретов Logos
 - [Issue #650: owner unlock protocol](security/issue-650-owner-unlock-protocol.md) — только дизайн, без разблокировки устройства
 

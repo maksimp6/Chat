@@ -20,13 +20,13 @@ Design constraints from issue #477, enforced here rather than left to callers:
   a key pair that should be granted a viewer-only Secret Management role in
   Cloud.ru IAM. This is deliberately a different pair from the admin
   ``CLOUDRU_IAM_KEY_ID``/``CLOUDRU_IAM_KEY_SECRET`` used elsewhere
-  (``cloud/cloudru/iam.py``, ``provider_key_rotation.py``) for key/version
+  (``cloud/cloudru/iam.py``, ``provider_accounts/key_rotation.py``) for key/version
   administration, so an ordinary session/model process that only needs to
   resolve a pinned secret never holds admin rights. Bootstrapping this
   identity from plain environment variables (not from a secret this client
   itself would need to read) avoids a circular dependency.
 - Only ``get_secret_value`` returns plaintext, and only to its direct caller.
-  ``list_versions``/``get_secret_metadata`` never return the payload, so they
+  ``list_versions``/``get_version_status`` never return the payload, so they
   are safe to route through the shared, trace-safe :class:`CloudRuClient`
   like any other Cloud.ru service call.
 - ``get_secret_value`` is deliberately NOT routed through

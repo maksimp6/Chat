@@ -2,7 +2,7 @@
 
 `tool_providers` · Tool contracts, a policy-checked execution pipeline and built-in tool sources.
 
-The tool platform: provider-agnostic tool contracts and the execution pipeline, the shared tool registry, and the built-in tool sources (git, Termux, system, filesystem, Wikipedia, profiler, theme, SSH runtime, PTY terminal sessions, cache) with JSON Schema helpers and the read-only policy.
+The tool platform: provider-agnostic tool contracts and the execution pipeline, the shared tool registry, and the built-in tool sources (git, Termux, system, filesystem, Wikipedia, profiler, theme, SSH runtime, PTY terminal sessions) with JSON Schema helpers and the read-only policy.
 
 ## Role in a dialog
 
@@ -50,19 +50,12 @@ Everything `tool_providers` uses from other units is a field of `Host` in [`tool
 
 | Port | Provided by |
 | --- | --- |
-| `Config` | `core.config.Config` |
-| `EMBEDDING_MODELS` | `core.config.EMBEDDING_MODELS` |
-| `EmbeddingError` | `yandex_client_modules.embeddings.EmbeddingError` |
 | `KristallError` | `kristall.KristallError` |
 | `SSHRuntimeError` | `remote_runtime.ssh.SSHRuntimeError` |
-| `build_runtime` | `remote_runtime.ssh_settings.build_runtime` |
-| `YandexClientError` | `yandex_client_modules.errors.YandexClientError` |
-| `YandexResponsesClient` | `yandex_client_modules.client.YandexResponsesClient` |
-| `embed_texts` | `yandex_client_modules.embeddings.embed_texts` |
 | `enqueue_local_tool_job` | `agent_runtime.local_gateway.enqueue_local_tool_job` |
 | `external_tool_sources` | `composition.tool_sources.SOURCES` |
-| `knowledge_vector_store_ids` | `yandex_client_modules.tool_config.knowledge_vector_store_ids` |
 | `memory_file_path` | `storage.records.memory_file_path` |
+| `runtime_for_operation` | `remote_runtime.ssh_settings.runtime_for_operation` |
 | `wait_for_local_tool_job` | `agent_runtime.local_gateway.wait_for_local_tool_job` |
 
 ## Install

@@ -2,7 +2,7 @@
 
 `agent_memory` · Stores shared, source-linked memory facts for Logos agents.
 
-Shared memory for Logos agents on native Kristall: the Kristall client lifecycle, fact extraction, the memory panel's controls and HTTP API, and durable conversation-ownership and user-identity records.
+Shared memory for Logos agents on native Kristall: the Kristall client lifecycle, fact extraction, the memory panel's HTTP API, and durable conversation-ownership and user-identity records.
 
 ## Role in a dialog
 

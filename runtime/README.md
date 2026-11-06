@@ -25,7 +25,7 @@ Other units reach it only through their own ports:
 | --- | --- |
 | `runtime.RuntimeDispatcher` | `mcp_server`, `remote_runtime` |
 | `runtime.RuntimeLoader` | `remote_runtime` |
-| `runtime.RuntimeNotFound` | `mcp_server`, `remote_runtime` |
+| `runtime.RuntimeNotFound` | `mcp_server` |
 | `runtime.RuntimeOperationNotFound` | `mcp_server` |
 | `runtime.RuntimeScopeViolation` | `mcp_server` |
 | `runtime.current_runtime_base_path` | `web_shell` |

@@ -36,21 +36,12 @@ PARTNER_STATUSES = (
     "archived",
 )
 MESSAGE_DIRECTIONS = ("incoming", "outgoing")
-MESSAGE_STATUSES = ("prepared", "queued", "recorded")
 FOLLOWUP_STATUSES = ("open", "completed", "cancelled")
 _MAX_METADATA_CHARS = 8000
 
 
 def _json(value: Any) -> str:
     return json.dumps(value if value is not None else {}, ensure_ascii=False)
-
-
-def _parse(value: Any, default: Any) -> Any:
-    try:
-        parsed = json.loads(value or "")
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return default
-    return parsed
 
 
 def _trusted_owner(cfg: dict[str, Any] | None = None) -> str:
@@ -74,10 +65,6 @@ def prepare_partner_relations_records() -> None:
     if not _owner_keys_migrated:
         _migrate_owner_keys()
         _owner_keys_migrated = True
-
-
-# Former name, kept for existing callers.
-init_partner_relations_tables = prepare_partner_relations_records
 
 
 def _validate_status(value: object, allowed: tuple[str, ...], field: str) -> str:
@@ -1168,7 +1155,6 @@ def ensure_partner_department() -> None:
 __all__ = [
     "PARTNER_TOOLS",
     "ensure_partner_department",
-    "init_partner_relations_tables",
     "partner_relations_bp",
     "prepare_partner_relations_records",
 ]

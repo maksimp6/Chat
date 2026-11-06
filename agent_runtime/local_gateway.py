@@ -165,14 +165,6 @@ def _notify_job_change() -> None:
         _job_changes.notify_all()
 
 
-def prepare_local_agent_records() -> None:
-    get_store()
-
-
-# Former name, kept for existing callers.
-init_local_agent_tables = prepare_local_agent_records
-
-
 def enqueue_local_tool_job(
     agent_id: str,
     tool_name: str,
@@ -574,8 +566,6 @@ def local_agent_health():
 
 __all__ = [
     "enqueue_local_tool_job",
-    "init_local_agent_tables",
     "local_agent_bp",
-    "prepare_local_agent_records",
     "wait_for_local_tool_job",
 ]

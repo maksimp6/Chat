@@ -227,7 +227,6 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | `invocation/`     | Invocation lifecycle, `InvocationContext`, trace persistence on Kristall, problem responses     |
 | `observability/`  | `ExecutionTrace` (per-invocation diagnostics) and the system log                               |
 | `runtime/`        | Scoped preview runtime primitives and `RuntimeDispatcher`                                      |
-| `identity/`       | Local shared installation; visitor sign-in has been removed                                    |
 | `workspace/`      | File routes and project tree                                                                   |
 
 </details>
@@ -260,7 +259,6 @@ application; what it serves is assembled in `composition/web.py`), `start.sh`,
 | `agent_rules/`     | Proposed provider-independent Agent Rules Registry and controller                               |
 | `agent_skills/`    | Reusable Agent Skill discovery and runtime helpers                                              |
 | `agent_office/`    | Tools that watch the GitHub "agent office": Claude, Codex, Copilot and Logos                    |
-| `agents/`          | Placeholder package for Alice Pro agent transports (no modules yet)                             |
 | `repository_index/`| Shared contracts for immutable repository indexes                                               |
 | `.agents/skills/`  | Canonical repository skill tree (`SKILL.md` per skill)                                          |
 | `.codex/`          | Codex defaults and the Cloud.ru management skill                                                |
@@ -348,7 +346,6 @@ Use `.env` or a deployment secret manager. `.env.example` is the template.
 | `LOGOS_MEMORY_PATH`                   | Kristall journal path; use persistent storage                                               |
 | `LOGOS_PROVIDER_CREDENTIAL_KEY`       | Encrypts saved provider credentials; keep it stable across restarts                         |
 | `LOGOS_OWNER_ID`                      | Identifies new accounting/data records; not a password                                      |
-| `LOGOS_MCP_PUBLIC_URL`                | Public base URL of the ChatGPT Apps SDK / MCP endpoint                                       |
 | `LOGOS_SSH_TARGETS_JSON`              | Named SSH runtime targets; reference server-side key files, never inline private keys       |
 | `LOGOS_CPU_WATTS_PER_CORE`            | Watts per busy core for compute energy accounting (default `15`)                            |
 | `LOGOS_ELECTRICITY_PRICE_RUB_PER_KWH` | Electricity price; without it energy is recorded in the trace but not charged               |

@@ -74,7 +74,6 @@ class _Writer:
         self.kind, self.client, self.store_id, self.ledger, self.totals = kind, client, store_id, ledger, totals
         self.stamp, self.part = _now(), 0
         self.parts: list[str] = []
-        self.keys: list[str] = []
         self.size = 0
         self.last: tuple[str, list[str]] | None = None  # cursor and the keys stored at it
 
@@ -93,7 +92,6 @@ class _Writer:
         if self.parts and self.size + encoded > PACK_LIMIT:
             self.flush()
         self.parts.append(text)
-        self.keys.append(key)
         self.size += encoded
         if self.last and self.last[0] == cursor:
             self.last[1].append(key)
@@ -122,7 +120,7 @@ class _Writer:
         _save_ledger(self.ledger)
         self.totals["files"] += 1
         self.totals["records"] += len(self.parts)
-        self.parts, self.keys, self.size = [], [], 0
+        self.parts, self.size = [], 0
         _set_state(totals=dict(self.totals), stage=f"{self.kind}: {name} stored")
 
 

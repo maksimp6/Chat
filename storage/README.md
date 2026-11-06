@@ -65,7 +65,6 @@ Other units reach it only through their own ports:
 | `storage.records.memory_file_path` | `agent_memory`, `conversations`, `invocation`, `sessions`, `tool_providers`, `web_shell` |
 | `storage.records.normalize_conversation_title` | `chat` |
 | `storage.records.open_journal_store` | `remote_runtime` |
-| `storage.records.set_config` | `remote_runtime` |
 | `storage.records.set_yandex_conversation` | `chat` |
 | `storage.records.update_conversation_model` | `conversations` |
 | `storage.records.update_conversation_title` | `conversations` |

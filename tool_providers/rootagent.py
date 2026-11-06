@@ -351,8 +351,6 @@ def _results_file(
 CLI_RELATIVE = ("scripts", "redmi_root_agent.py")
 ROOT_ENV = ("LOGOS_PROJECT_ROOT", "LOGOS_LOCAL_REPO_DIR", "LOGOS_APP_DIR")
 LOCAL_TIMEOUT_SECONDS = 330
-# Commands whose worker result carries a screenshot as png_base64.
-CAPTURE_COMMANDS = ("capture", "browse", "batch")
 
 
 def _local_cli() -> str | None:

@@ -27,7 +27,7 @@ Other units reach it only through their own ports:
 | --- | --- |
 | `observability.trace_manager.ExecutionTrace` | `chat`, `invocation`, `remote_runtime`, `yandex_client_modules` |
 | `observability.trace_manager.bind_current_trace` | `chat`, `mcp_server` |
-| `observability.trace_manager.get_current_trace` | `chat`, `cloud`, `remote_runtime`, `secret_store` |
+| `observability.trace_manager.get_current_trace` | `chat`, `cloud`, `secret_store` |
 | `observability.trace_manager.reset_current_trace` | `chat`, `mcp_server` |
 | `observability.trace_manager.traced_operation` | `chat`, `provider_accounts` |
 

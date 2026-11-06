@@ -42,10 +42,6 @@ def _git(root: Path, *args: str) -> bytes:
         raise GitError(f"git {args[0]}: {detail.decode(errors='replace').strip() or exc}") from exc
 
 
-def head(root: Path) -> str:
-    return _git(root, "rev-parse", "HEAD").decode().strip()
-
-
 def new_commits(root: Path, since: str | None) -> list[str]:
     """Commits reachable from HEAD and not from ``since``, oldest first."""
     spec = [f"{since}..HEAD"] if since else ["HEAD"]

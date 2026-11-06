@@ -56,7 +56,6 @@ __all__ = [
 
 VERDICTS = ("ПРАВО", "БЕСПОЛЕЗНОЕ", "СКОЛЬЗКО", "ТЯЖКОЕ")
 _RANK = {verdict: rank for rank, verdict in enumerate(VERDICTS)}
-INDELIBLE = "ТЯЖКОЕ"
 CASE_VERDICTS = frozenset({"ТЯЖКОЕ", "БЕСПОЛЕЗНОЕ"})
 
 CODE_CLEAN = 0

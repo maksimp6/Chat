@@ -312,16 +312,6 @@ class ToolRegistry:
 
     # --- tools: one function per category of actions ---
 
-    def category_of(self, action: str) -> str | None:
-        """The tool (category) an action belongs to."""
-        for category, names in self._categories.items():
-            if action in names:
-                return category
-        return None
-
-    def is_tool(self, name: str) -> bool:
-        return name in self._categories
-
     def _offered_actions(
         self,
         category: str,

@@ -87,8 +87,7 @@ the smoke-only environment variable names:
 - `YANDEX_API_KEY` → `LOGOS_LAUNCH_SMOKE_YANDEX_API_KEY`
 - `YANDEX_PROJECT_ID` → `LOGOS_LAUNCH_SMOKE_YANDEX_PROJECT_ID`
 
-Those secret names are already used by `.github/workflows/logos.yml`; this
-workflow does not create a second credential source. The secret mappings are
+This workflow does not create a second credential source. The secret mappings are
 scoped only to the live smoke step. It also references the existing
 `production` GitHub Environment so its approval boundary remains
 separate from ordinary PR CI. Adding or changing credentials remains an

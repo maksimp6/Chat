@@ -58,22 +58,6 @@ corrupt another invocation, session, or trace.
 
 ## Timeout semantics
 
-`AgentGateway` can observe a handler timeout while that handler's worker thread is
-still running. The current implementation performs the call inside a
-`ThreadPoolExecutor` context; leaving that context waits for the running worker.
-Consequently the same `invoke()` call does not return its final error result until
-that worker finishes or is released. The timeout is therefore not a hard
-caller-visible deadline.
-
-Required behavior proven by the current regression:
-
-- once the slow invocation can return, its result is `error`, never a false
-  `completed`;
-- an independent sibling gateway call can complete after the slow timeout has been
-  observed and before the slow worker is released;
-- timeout accounting is based on observed timeout behavior, not arbitrary sleeps;
-- tests synchronize on the timeout transition when proving ordering.
-
 Native cancellation of running Python threads is not part of the contract.
 
 ## Transaction coverage
@@ -143,7 +127,6 @@ The current regression surface includes:
 - worker-side `ContextVar` / bound ExecutionTrace propagation through `asyncio.to_thread`;
 - cancellation without sibling corruption;
 - late `finish_invocation()` after external cancellation cannot overwrite terminal state;
-- AgentGateway timeout observation plus sibling isolation;
 - representative invocation lifecycle task cleanup;
 - native Kristall transaction execution (SQLite and PostgreSQL are retired).
 

@@ -52,7 +52,6 @@ __all__ = [
     "interrogate",
     "list_hearings",
     "open_hearing",
-    "prepare_court_records",
     "record_reply",
     "rejudge_hearing",
     "reopen_hearing",
@@ -80,10 +79,6 @@ DECISIONS = (
 
 class HearingNotFound(LookupError):
     pass
-
-
-def prepare_court_records() -> None:
-    get_store()
 
 
 def _owner() -> str | None:

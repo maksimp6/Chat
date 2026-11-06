@@ -232,10 +232,3 @@ def _handle_call(
         raise
     finally:
         reset_current_trace(trace_token)
-
-
-def __getattr__(name: str) -> Any:
-    """Compatibility for ``mcp_runtime_dispatcher``, now created on first use."""
-    if name == "mcp_runtime_dispatcher":
-        return runtime_dispatcher()
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

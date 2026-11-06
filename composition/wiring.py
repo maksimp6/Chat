@@ -747,31 +747,25 @@ def _remote_runtime():
     from observability.trace_manager import ExecutionTrace
     from runtime import RuntimeDispatcher
     from runtime import RuntimeLoader
-    from runtime import RuntimeNotFound
     from runtime.request_context import bind_runtime_request
     from agent_memory.client import close_memory_clients
     from invocation.trace import create_invocation_trace
     from storage.records import get_config
     from economy.treasury_identity import get_current_owner_id
-    from observability.trace_manager import get_current_trace
     from storage.records import get_store
     from storage.records import open_journal_store as init_runtime_db
-    from storage.records import set_config
 
     return host.Host(
         ExecutionTrace=ExecutionTrace,
         RuntimeDispatcher=RuntimeDispatcher,
         RuntimeLoader=RuntimeLoader,
-        RuntimeNotFound=RuntimeNotFound,
         bind_runtime_request=bind_runtime_request,
         close_memory_clients=close_memory_clients,
         create_invocation_trace=create_invocation_trace,
         get_config=get_config,
         get_current_owner_id=get_current_owner_id,
-        get_current_trace=get_current_trace,
         get_store=get_store,
         init_runtime_db=init_runtime_db,
-        set_config=set_config,
     )
 
 
@@ -830,38 +824,20 @@ def _storage():
 
 def _tool_providers():
     from tool_providers import host
-    from core.config import Config
-    from core.config import EMBEDDING_MODELS
-    from yandex_client_modules.embeddings import EmbeddingError
     from kristall import KristallError
     from remote_runtime.ssh import SSHRuntimeError
-    from yandex_client_modules.errors import YandexClientError
-    from yandex_client_modules.client import YandexResponsesClient
-    from remote_runtime.ssh_settings import assert_operation_allowed
-    from remote_runtime.ssh_settings import build_runtime
-    from yandex_client_modules.embeddings import embed_texts
     from agent_runtime.local_gateway import enqueue_local_tool_job
     from composition.tool_sources import SOURCES as external_tool_sources
-    from yandex_client_modules.tool_config import knowledge_vector_store_ids
     from storage.records import memory_file_path
     from remote_runtime.ssh_settings import runtime_for_operation
     from vector_db.store import add as vector_add
     from agent_runtime.local_gateway import wait_for_local_tool_job
 
     return host.Host(
-        Config=Config,
-        EMBEDDING_MODELS=EMBEDDING_MODELS,
-        EmbeddingError=EmbeddingError,
         KristallError=KristallError,
         SSHRuntimeError=SSHRuntimeError,
-        YandexClientError=YandexClientError,
-        YandexResponsesClient=YandexResponsesClient,
-        assert_operation_allowed=assert_operation_allowed,
-        build_runtime=build_runtime,
-        embed_texts=embed_texts,
         enqueue_local_tool_job=enqueue_local_tool_job,
         external_tool_sources=external_tool_sources,
-        knowledge_vector_store_ids=knowledge_vector_store_ids,
         memory_file_path=memory_file_path,
         runtime_for_operation=runtime_for_operation,
         vector_add=vector_add,

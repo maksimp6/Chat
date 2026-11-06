@@ -90,6 +90,63 @@ def _command_environment() -> dict[str, str]:
 _MAX_OUTPUT_BYTES = 1048576
 
 
+def run_bounded(
+    argv: list[str],
+    *,
+    cwd: str,
+    env: dict[str, str],
+    timeout: float | None,
+    stdin: str | None = None,
+) -> subprocess.CompletedProcess:
+    """Run ``argv`` as the leader of its own session and give its exit code and output.
+
+    Raises ``subprocess.TimeoutExpired``, carrying the output read so far, past ``timeout``.
+    """
+    with subprocess.Popen(
+        argv,
+        shell=False,
+        stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=cwd,
+        env=env,
+        start_new_session=True,
+    ) as proc:
+        try:
+            if stdin is not None and proc.stdin is not None:
+                try:
+                    proc.stdin.write(stdin.encode("utf-8"))
+                except BrokenPipeError:
+                    pass  # the process ended before reading its input
+                proc.stdin.close()
+            # Twice the bound and one byte more: CRLF collapsing can halve the
+            # text, and limit_output still sees a cut stream as too long.
+            stdout, stderr = read_output(proc, timeout, 2 * _MAX_OUTPUT_BYTES + 1)
+        except subprocess.TimeoutExpired as exc:
+            # The process leads its own session: kill its children too, or they outlive the timeout.
+            if os.name == "posix":
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass  # the group exited right at the deadline
+                proc.wait()
+            else:
+                proc.kill()
+                out, err = proc.communicate()
+                # Text mode used to translate newlines here too.
+                exc.stdout, exc.stderr = (
+                    newline_text(out or b""),
+                    newline_text(err or b""),
+                )
+            raise
+        except BaseException:
+            proc.kill()
+            raise
+    return subprocess.CompletedProcess(
+        proc.args, proc.returncode, newline_text(stdout), newline_text(stderr)
+    )
+
+
 def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     """Execute a shell command on the host running the Logos backend."""
     command = str(args.get("command") or "").strip()
@@ -119,42 +176,11 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     )
 
     try:
-        with subprocess.Popen(
+        completed = run_bounded(
             [shutil.which("bash") or "sh", "-lc", command],
-            shell=False,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
             cwd=cwd,
             env=_command_environment(),
-            start_new_session=True,
-        ) as proc:
-            try:
-                # Twice the bound and one byte more: CRLF collapsing can halve the
-                # text, and limit_output still sees a cut stream as too long.
-                stdout, stderr = read_output(proc, timeout, 2 * _MAX_OUTPUT_BYTES + 1)
-            except subprocess.TimeoutExpired as exc:
-                # The shell leads its own session: kill its children too, or they outlive the timeout.
-                if os.name == "posix":
-                    try:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass  # the group exited right at the deadline
-                    proc.wait()
-                else:
-                    proc.kill()
-                    out, err = proc.communicate()
-                    # Text mode used to translate newlines here too.
-                    exc.stdout, exc.stderr = (
-                        newline_text(out or b""),
-                        newline_text(err or b""),
-                    )
-                raise
-            except BaseException:
-                proc.kill()
-                raise
-        completed = subprocess.CompletedProcess(
-            proc.args, proc.returncode, newline_text(stdout), newline_text(stderr)
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired as exc:
         result = {

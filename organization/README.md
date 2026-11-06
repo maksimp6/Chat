@@ -29,6 +29,6 @@ Everything `organization` uses from other units is a field of `Host` in [`organi
 
 - `composition/wiring.py` registers the `organization` host factory (`register_all()`, or `register_units("organization")` for this unit alone); the host is built on first use.
 - `composition/web.py` registers the blueprints `partner_relations_bp` (`organization.partner_relations`), `departments_bp` (`organization.departments`), `government_bp` (`organization.government`).
-- Storage start-up (`web_shell`) runs `organization.departments.prepare_department_records`, `organization.partner_relations.prepare_partner_relations_records`, `organization.partner_relations.ensure_partner_department`, `organization.government.prepare_government_records`, `organization.government.ensure_government_department`.
+- Storage start-up (`web_shell`) runs `organization.partner_relations.prepare_partner_relations_records`, `organization.partner_relations.ensure_partner_department`, `organization.government.ensure_government_department`.
 - `composition/tool_sources.py` adds the `government` tool category from `organization.government`.
 - `composition/tool_sources.py` adds the `partner` tool category from `organization.partner_relations`.

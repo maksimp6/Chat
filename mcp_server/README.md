@@ -13,7 +13,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 
 ## Public API
 
-`from mcp_server import …`: `MCP_PATH`, `SUPPORTED_PROTOCOL_VERSIONS`, `DEFAULT_PROTOCOL_VERSION`, `SERVER_NAME`, `SERVER_VERSION`, `OAUTH_SCOPE`, `PUBLIC_BASE_URL`, `registry`, `mcp_runtime_dispatcher`, `chatgpt_mcp_bp`, `mcp_options`, `mcp_get`, `mcp_post`.
+`from mcp_server import …`: `MCP_PATH`, `SUPPORTED_PROTOCOL_VERSIONS`, `DEFAULT_PROTOCOL_VERSION`, `SERVER_NAME`, `SERVER_VERSION`, `registry`, `chatgpt_mcp_bp`, `mcp_options`, `mcp_get`, `mcp_post`.
 
 | Module | Purpose |
 | --- | --- |

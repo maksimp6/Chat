@@ -473,7 +473,6 @@ for _name, _executable in _REQUIRED_EXECUTABLES.items():
 
 SYSTEM_TOOLS = {name: TOOL_REGISTRY[name] for name in _REQUIRED_EXECUTABLES}
 
-# Алиасы для обратной совместимости
 # Reads and captures of private data (location, contacts, SMS, camera) need the owner's approval.
 for _private_tool in (
     "get_device_location",
@@ -482,11 +481,3 @@ for _private_tool in (
     "take_camera_photo",
 ):
     TOOL_REGISTRY[_private_tool]["requires_approval"] = True
-
-TERMUX_TOOLS = TOOL_REGISTRY
-
-
-def execute_termux_tool(tool_name: str, arguments: dict, cfg: dict = None) -> dict:
-    if tool_name not in TOOL_REGISTRY:
-        return {"error": f"Неизвестный инструмент Termux: {tool_name}"}
-    return TOOL_REGISTRY[tool_name]["func"](arguments, cfg or {})

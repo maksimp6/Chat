@@ -76,7 +76,7 @@ instance, including when two revisions run simultaneously.
 The entry point must define `create_runtime(host)` and return an object with
 `invoke(operation, payload)`. Imports (including dynamic import) are rejected in
 this first slice. Host resources are reached only through the supplied API and
-`RuntimeDispatcher`; invocation uses the `revision.invoke` dispatcher operation.
+`RuntimeDispatcher`. No dispatcher operation calls the loaded entry point yet.
 
 This contract prevents accidental module and module-global collisions; it does
 not make arbitrary or hostile Python safe. Python reflection, native extensions,

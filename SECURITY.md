@@ -80,7 +80,7 @@ In scope:
 | Cloud.ru credentials | Cloud.ru API keys and Secret Management values. Logos keeps only a reference to the pinned version; the value must not reach logs, traces, MCP, UI or errors. | [Cloud.ru Secret Management](docs/security/cloudru-secret-management.md) |
 | MCP bearer tokens | Bearer tokens and other credentials must not appear in MCP arguments, prompts, ExecutionTrace or logs. The Logos MCP transport itself has no bearer-token checks. | [MCP access and data](docs/mcp/chatgpt_apps.md#access-and-data) |
 | Trace and log sanitization | Secrets are sanitized at the trace/log boundary. ExecutionTrace, ordinary logs, API responses and frontend storage must never contain secret values. | [Execution Trace and system log](docs/backend/logging.md), [key manager policy](docs/security/key_manager.md) |
-| Local tool execution | `UniversalToolExecutor`, local and MCP tools, and the `GET /api/local-files` directory-listing boundary. | [Local-files directory boundary](docs/security/local-files-confinement.md) |
+| Local tool execution | `UniversalToolExecutor`, local and MCP tools. | [Tool providers](tool_providers/README.md) |
 | Other secrets | SSH credentials, signing keys and passwords, user passwords and session secrets. | [README: configuration and security](README.md#configuration-and-security) |
 
 Out of scope:
@@ -108,7 +108,6 @@ described in the [provider key lifecycle](docs/provider-key-rotation.md).
 - [Shared local access](docs/security/github-login.md): current access model
 - [Key manager](docs/security/key_manager.md): encrypted secret storage and `key_ref`
 - [Cloud.ru Secret Management](docs/security/cloudru-secret-management.md): version references for externally managed secrets
-- [Local-files directory boundary](docs/security/local-files-confinement.md): `GET /api/local-files` confinement
 - [Owner-authorized unlock protocol](docs/security/issue-650-owner-unlock-protocol.md): design only, no device unlock
 - [Provider key lifecycle and rotation](docs/provider-key-rotation.md)
 - [Execution Trace and system log](docs/backend/logging.md)

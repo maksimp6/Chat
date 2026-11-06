@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
 from typing import Any
 
 from mcp_server.auth import _auth_mode
@@ -23,28 +22,6 @@ from mcp_server.host import (
     tool_call_requires_approval,
 )
 from mcp_server.protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
-
-
-def _tool(
-    name: str,
-    title: str,
-    description: str,
-    input_schema: dict[str, Any],
-    handler: Callable[[dict[str, Any], str | None], dict[str, Any]],
-) -> tuple[dict[str, Any], Callable[[dict[str, Any], str | None], dict[str, Any]]]:
-    meta = {
-        "openai/toolInvocation/invoking": f"{title}…",
-        "openai/toolInvocation/invoked": f"{title}: готово",
-    }
-    descriptor = {
-        "name": name,
-        "title": title,
-        "description": description,
-        "inputSchema": input_schema,
-        "securitySchemes": [],
-        "_meta": meta,
-    }
-    return descriptor, handler
 
 
 def _system_status(_arguments: dict[str, Any], _user: str | None) -> dict[str, Any]:

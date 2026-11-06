@@ -5,7 +5,7 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
-__all__ = ["file_routes", "project_tree"]
+__all__ = ["file_routes", "project_tree", "upload_routes"]
 
 
 def __getattr__(name: str) -> Any:

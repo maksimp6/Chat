@@ -3,11 +3,9 @@
 Toasts, vibration, battery, torch, clipboard, speech, notifications and the camera are
 the system category's tools (termux_system.py); they are not repeated here."""
 
-import os
-
-"""Local Termux:API integration tools for Android OS."""
 import json
 import logging
+import os
 import shutil
 import subprocess
 
@@ -148,13 +146,3 @@ _REQUIRED_EXECUTABLES = {
 }
 for _name, _executable in _REQUIRED_EXECUTABLES.items():
     TERMUX_TOOLS[_name]["metadata"] = {"requires_executables": [_executable]}
-
-
-def execute_termux_tool(tool_name: str, arguments: dict, cfg: dict = None) -> dict:
-    if tool_name not in TERMUX_TOOLS:
-        return {"error": f"Неизвестный Termux инструмент: {tool_name}"}
-    try:
-        return TERMUX_TOOLS[tool_name]["func"](arguments, cfg or {})
-    except Exception as e:
-        logger.exception(f"Ошибка вызова инструмента {tool_name}: {e}")
-        return {"error": f"Внутренняя ошибка вызова: {str(e)}"}

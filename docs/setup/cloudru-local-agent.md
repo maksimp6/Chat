@@ -9,7 +9,6 @@
 \`\`\`env
 HOST=0.0.0.0
 PORT=8080
-LOGOS_MCP_PUBLIC_URL=https://<public-host>
 LOGOS_LOCAL_AGENT_BOOTSTRAP_TOKEN=<long-random-secret>
 \`\`\`
 
