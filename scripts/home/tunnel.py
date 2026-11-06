@@ -83,8 +83,9 @@ def _openssl(*args: str) -> bytes:
 
 
 def _password() -> str:
-    """The secret shared with the server. It never travels: each side derives it from its own
-    private key and the other's public key, so only public keys pass between them."""
+    """The secret shared with the server. Each side derives it from its own private key and the
+    other's public key, so setting it up exchanges only public keys. After that it is sent only
+    inside TLS, at login."""
     ROOT.mkdir(parents=True, exist_ok=True)
     ROOT.chmod(0o700)
     if not PRIVATE_KEY.exists():

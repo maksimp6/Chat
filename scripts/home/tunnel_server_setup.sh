@@ -10,8 +10,8 @@
 #                                                  # REDMI_KEY is the base64 line of public.pem
 #                                                  # in ~/.config/tunnel on the Redmi
 #
-# Both sides derive the password from their own private key and the other's public key, so the
-# password itself never travels.
+# Both sides derive the password from their own private key and the other's public key, so only
+# public keys are exchanged to set it up. After that it is sent only inside TLS, at login.
 #
 # After connect, 192.168.10.0/24 (the home network) is routed through tunnel.maxxxpavlov.ru,
 # and UDP 443 here takes what the Redmi's SOCKS5 proxy carries out to the internet.
@@ -48,6 +48,8 @@ connect)
   password=$(sha256sum "$work/shared" | cut -d' ' -f1)
 
   # dns_mode: its default for a route like this one would take over the server's own DNS.
+  # The quic rules: the proxy's way out is the internet, not this machine or its networks.
+  # Names are resolved first, so the check sees the addresses the connection then uses.
   cat >"$ROOT/config.json" <<EOF
 {
   "log": {"level": "warn", "timestamp": true},
@@ -90,7 +92,11 @@ connect)
   "route": {
     "auto_detect_interface": true,
     "default_domain_resolver": "local",
-    "rules": [{"inbound": ["quic"], "action": "route", "outbound": "direct"}]
+    "rules": [
+      {"inbound": ["quic"], "action": "resolve"},
+      {"inbound": ["quic"], "ip_is_private": true, "action": "reject"},
+      {"inbound": ["quic"], "action": "route", "outbound": "direct"}
+    ]
   }
 }
 EOF
