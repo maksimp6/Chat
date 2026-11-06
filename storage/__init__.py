@@ -1,5 +1,5 @@
-"""Logos records in the native Kristall journal (``storage.records``; ``storage.db`` is its
-former name), provider-neutral storage contracts and generated image artifacts."""
+"""Logos records in the native Kristall journal (``storage.records``), provider-neutral
+storage contracts and generated image artifacts."""
 
 from storage.contracts import (
     LocalDirectoryStorage,

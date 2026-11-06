@@ -6,7 +6,6 @@ from webframe import Application, jsonify, request
 
 from conversations.ownership import _conversation_record, check_access, delete_owner
 from conversations.host import (
-    bound,
     delete_conversation,
     get_current_owner_id,
     global_settings,
@@ -29,10 +28,8 @@ def patch_conversation(conv_id):
             data["model"] = validate_dialog_model(data["model"])
         except ValueError:
             return jsonify({"error": "model_not_available_for_dialog"}), 400
-        except bound.ModelDiscoveryError:
-            return jsonify({"error": "model_catalog_unavailable"}), 503
     if "title" in data:
-        update_conversation_title(conv_id, data["title"], owner_id)
+        update_conversation_title(conv_id, data["title"])
     if "model" in data:
         update_conversation_model(conv_id, data["model"])
     return jsonify({"status": "ok"})
@@ -45,7 +42,7 @@ def set_conv_title(conv_id):
     title = (request.get_json(silent=True) or {}).get("title")
     if not title:
         return jsonify({"error": "Title is required"}), 400
-    update_conversation_title(conv_id, title, owner_id)
+    update_conversation_title(conv_id, title)
     record = _conversation_record(conv_id)
     return jsonify(
         {"status": "ok", "title": record["title"] if record is not None else title}

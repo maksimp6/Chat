@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 
 import requests
@@ -12,7 +13,7 @@ import requests
 from webframe import Blueprint, jsonify, request, send_file
 
 from chat._error_details import DETAILS, error_body
-from chat.mcp_routes import logos_client_type
+from chat.mcp_routes import _file_court_failure, logos_client_type
 from chat.host import (
     add_message,
     bound,
@@ -26,6 +27,7 @@ from chat.host import (
     provider_request_headers,
     request_image,
     save_image_file,
+    vector_add,
 )
 
 image_bp = Blueprint("images", __name__)
@@ -43,6 +45,21 @@ def _headers():
 
 def _request_key(conv_id, request_id):
     return "chat/image_request/" + conv_id + "/" + request_id
+
+
+def _embed_prompt(conv_id, request_id, message_id, prompt):
+    """The picture's description joins the dialogs collection in its own thread; a failure
+    is a Court case and never stops the generation."""
+    try:
+        vector_add(
+            "dialogs",
+            prompt,
+            f"{conv_id}-image-{request_id}",
+            {"conversation_id": conv_id, "message_id": message_id, "request_id": request_id},
+        )
+    except Exception as exc:
+        logger.exception("[VECTORS] The image prompt was not embedded")
+        _file_court_failure(conv_id, "dialog_embedding_failed", exc, message_id=message_id)
 
 
 def _image_reply(conv_id, request_id):
@@ -232,7 +249,7 @@ def generate_image():
         return _request_response(conv_id, request_id, existing)
 
     try:
-        add_message(
+        prompt_message_id = add_message(
             conv_id,
             "user",
             prompt,
@@ -240,6 +257,13 @@ def generate_image():
             source="image-request:" + request_id,
             deduplicate_source=True,
         )
+        if prompt_message_id is not None:
+            threading.Thread(
+                target=_embed_prompt,
+                args=(conv_id, request_id, prompt_message_id, prompt),
+                name="logos-embed-turn",
+                daemon=True,
+            ).start()
         image, mime_type = request_image(headers, payload)
     except requests.RequestException as exc:
         response = getattr(exc, "response", None)

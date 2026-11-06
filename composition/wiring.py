@@ -115,7 +115,6 @@ def _chat():
     from yandex_client_modules.image_generation import ImageGenerationError
     from yandex_client_modules.image_generation import MAX_PROMPT_CHARS
     from yandex_client_modules.realtime import MODEL_UPSTREAMS
-    from provider_accounts.model_discovery import ModelDiscoveryError
     from provider_accounts.credentials import NoActiveCredentialError
     from yandex_client_modules.realtime import OUTPUT_RATE
     from provider_accounts.quotas import ProviderQuotaExceeded
@@ -155,7 +154,6 @@ def _chat():
     from yandex_client_modules.image_generation import build_generation_payload
     from court.hearings import censor_reply
     from conversations.ownership import check_access
-    from core.model_profiles import completion_model_keys
     from agent_skills.registry import compose_skill_instructions
     from storage.records import create_conversation
     from invocation.manager import create_invocation
@@ -223,7 +221,6 @@ def _chat():
         ImageGenerationError=ImageGenerationError,
         MAX_PROMPT_CHARS=MAX_PROMPT_CHARS,
         MODEL_UPSTREAMS=MODEL_UPSTREAMS,
-        ModelDiscoveryError=ModelDiscoveryError,
         NoActiveCredentialError=NoActiveCredentialError,
         OUTPUT_RATE=OUTPUT_RATE,
         ProviderQuotaExceeded=ProviderQuotaExceeded,
@@ -253,7 +250,6 @@ def _chat():
         build_generation_payload=build_generation_payload,
         censor_reply=censor_reply,
         check_access=check_access,
-        completion_model_keys=completion_model_keys,
         compose_skill_instructions=compose_skill_instructions,
         create_conversation=create_conversation,
         create_invocation=create_invocation,
@@ -343,7 +339,6 @@ def _cloud():
 def _conversations():
     from conversations import host
     from agent_memory.conversation_ownership_store import ConversationOwnershipStore
-    from provider_accounts.model_discovery import ModelDiscoveryError
     from storage.records import delete_conversation
     from storage.records import get_conversations
     from economy.treasury_identity import get_current_owner_id
@@ -358,7 +353,6 @@ def _conversations():
     return host.Host(
         ollama_status=ollama_status,
         ConversationOwnershipStore=ConversationOwnershipStore,
-        ModelDiscoveryError=ModelDiscoveryError,
         delete_conversation=delete_conversation,
         get_conversations=get_conversations,
         get_current_owner_id=get_current_owner_id,

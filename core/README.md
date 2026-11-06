@@ -40,7 +40,6 @@ Other units reach it only through their own ports:
 | `core.config.registry_key_for_upstream` | `provider_accounts` |
 | `core.config.upstream_model_id` | `yandex_client_modules` |
 | `core.model_profiles.annotate_catalog` | `provider_accounts` |
-| `core.model_profiles.completion_model_keys` | `chat` |
 | `core.model_profiles.ultra_profiles` | `yandex_client_modules` |
 | `core.model_profiles.ultra_reasoning_controllable` | `yandex_client_modules` |
 | `core.model_profiles.ultra_request_defaults` | `yandex_client_modules` |

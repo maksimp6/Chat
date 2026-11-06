@@ -41,7 +41,7 @@ Other units reach it only through their own ports:
 Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`](host.py), read only when a function runs. Functions keep their names as call shims; other ports are `bound.<name>`.
 
 <details>
-<summary>70 ports</summary>
+<summary>69 ports</summary>
 
 | Port | Provided by |
 | --- | --- |
@@ -54,7 +54,6 @@ Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`]
 | `KnowledgeCostConfig` | `economy.knowledge_economics.KnowledgeCostConfig` |
 | `MAX_PROMPT_CHARS` | `yandex_client_modules.image_generation.MAX_PROMPT_CHARS` |
 | `MODEL_UPSTREAMS` | `yandex_client_modules.realtime.MODEL_UPSTREAMS` |
-| `ModelDiscoveryError` | `provider_accounts.model_discovery.ModelDiscoveryError` |
 | `OUTPUT_RATE` | `yandex_client_modules.realtime.OUTPUT_RATE` |
 | `ProviderQuotaExceeded` | `provider_accounts.quotas.ProviderQuotaExceeded` |
 | `RealtimeError` | `yandex_client_modules.realtime.RealtimeError` |
@@ -75,7 +74,6 @@ Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`]
 | `build_ai_billing_item` | `economy.billing.build_ai_billing_item` |
 | `censor_reply` | `court.hearings.censor_reply` |
 | `check_access` | `conversations.ownership.check_access` |
-| `completion_model_keys` | `core.model_profiles.completion_model_keys` |
 | `compose_skill_instructions` | `agent_skills.registry.compose_skill_instructions` |
 | `create_conversation` | `storage.records.create_conversation` |
 | `create_invocation` | `invocation.manager.create_invocation` |
@@ -85,7 +83,6 @@ Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`]
 | `record_court_reply` | `court.hearings.record_reply` |
 | `finish_invocation` | `invocation.manager.finish_invocation` |
 | `generate_realtime` | `yandex_client_modules.realtime.generate_realtime` |
-| `get_conv_settings` | `storage.records.get_conv_settings` |
 | `get_conversation_title` | `storage.records.get_conversation_title` |
 | `get_current_owner_id` | `economy.treasury_identity.get_current_owner_id` |
 | `get_current_trace` | `observability.trace_manager.get_current_trace` |
@@ -110,7 +107,6 @@ Everything `chat` uses from other units is a field of `Host` in [`chat/host.py`]
 | `request_image` | `yandex_client_modules.image_generation.generate_image` |
 | `reserve_request` | `provider_accounts.quotas.reserve_request` |
 | `reset_current_trace` | `observability.trace_manager.reset_current_trace` |
-| `save_conv_settings` | `storage.records.save_conv_settings` |
 | `save_image_file` | `storage.generated_images.save_image_file` |
 | `set_owner` | `conversations.ownership.set_owner` |
 | `set_yandex_conversation` | `storage.records.set_yandex_conversation` |

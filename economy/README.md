@@ -62,4 +62,3 @@ Everything `economy` uses from other units is a field of `Host` in [`economy/hos
 
 - `composition/wiring.py` registers the `economy` host factory (`register_all()`, or `register_units("economy")` for this unit alone); the host is built on first use.
 - `composition/web.py` calls `economy.treasury_routes.install(app)`.
-- Storage start-up (`web_shell`) runs `economy.treasury.prepare_treasury_records`.

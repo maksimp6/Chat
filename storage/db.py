@@ -1,60 +1,7 @@
-"""Former name of :mod:`storage.records`; existing ``storage.db`` imports keep working."""
+"""Former name of :mod:`storage.records`; a check scenario still imports these two names here."""
 
 from __future__ import annotations
 
-from storage.records import (  # noqa: F401
-    DB_PATH,
-    _update_conversation,
-    add_message,
-    create_conversation,
-    delete_conversation,
-    get_config,
-    get_conv_settings,
-    get_conversation_title,
-    get_conversations,
-    get_message,
-    get_messages,
-    get_store,
-    get_yandex_conversation,
-    init_config_table,
-    init_db,
-    is_provider_pending,
-    maybe_update_conversation_title,
-    memory_file_path,
-    normalize_conversation_title,
-    open_journal_store,
-    reset_memory_db,
-    save_conv_settings,
-    set_config,
-    set_yandex_conversation,
-    update_conversation_model,
-    update_conversation_title,
-)
+from storage.records import get_messages, get_store
 
-__all__ = [
-    "DB_PATH",
-    "add_message",
-    "create_conversation",
-    "delete_conversation",
-    "get_config",
-    "get_conv_settings",
-    "get_conversation_title",
-    "get_conversations",
-    "get_message",
-    "get_messages",
-    "get_store",
-    "get_yandex_conversation",
-    "init_config_table",
-    "init_db",
-    "is_provider_pending",
-    "maybe_update_conversation_title",
-    "memory_file_path",
-    "normalize_conversation_title",
-    "open_journal_store",
-    "reset_memory_db",
-    "save_conv_settings",
-    "set_config",
-    "set_yandex_conversation",
-    "update_conversation_model",
-    "update_conversation_title",
-]
+__all__ = ["get_messages", "get_store"]

@@ -33,7 +33,6 @@ from chat.host import (
     build_ai_billing_item,
     censor_reply,
     check_access,
-    completion_model_keys,
     compose_skill_instructions,
     create_conversation,
     create_invocation,
@@ -94,31 +93,6 @@ def _tool_rounds(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError("max_rounds must be a positive integer or null")
     return value
-
-
-def _tool_call_parts(tool_call: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
-    function = tool_call.get("function")
-    if not isinstance(function, dict):
-        function = {}
-    name = tool_call.get("name") or function.get("name")
-    if name and "<|" in name:
-        name = name.split("<|", 1)[0].strip()
-
-    arguments = (
-        tool_call["arguments"]
-        if "arguments" in tool_call
-        else function.get("arguments", {})
-    )
-    if isinstance(arguments, str):
-        try:
-            arguments = _json.loads(arguments)
-        except ValueError:
-            raise ValueError(
-                "Invalid tool arguments: expected a valid JSON object"
-            ) from None
-    if not isinstance(arguments, dict):
-        raise ValueError("Invalid tool arguments: expected a JSON object")
-    return name, arguments
 
 
 # WIKIFUNCTIONS-CANDIDATE WF-05: https://www.wikifunctions.org/wiki/Z873 + Z872 + Z10079.
@@ -474,26 +448,6 @@ SCREEN_DESCRIBER_ROLE = (
 )
 
 
-IMAGE_HISTORY_TURNS = 20
-IMAGE_HISTORY_TEXT_CHARS = 4000
-_MARKDOWN_PICTURE = re.compile(r"!\[[^\]]*\]\(data:image/[^)]*\)")
-
-
-def _image_turn_history(conv_id):
-    """Earlier turns for a Chat Completions request: text only, pictures replaced by a marker."""
-    turns = [m for m in get_messages(conv_id) if m.get("role") in ("user", "assistant")]
-    if turns and turns[-1]["role"] == "user":
-        turns = turns[:-1]  # the current message is sent separately
-    history = []
-    for turn in turns[-IMAGE_HISTORY_TURNS:]:
-        text = _MARKDOWN_PICTURE.sub("[картинка]", str(turn.get("text") or ""))[
-            :IMAGE_HISTORY_TEXT_CHARS
-        ]
-        if text.strip():
-            history.append({"role": turn["role"], "text": text})
-    return history
-
-
 MAX_IMAGES_PER_MESSAGE = 4
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
@@ -580,24 +534,6 @@ def _define_logos_client(base: type) -> type:
     """The chat client class on top of the provider client (built once, on first use)."""
 
     class LogosClient(base):
-        def ask(
-            self,
-            message: Any,
-            model_key: Any,
-            conversation_id: Any = None,
-            params: Any = None,
-            execution_trace: Any = None,
-            trace_step: Any = None,
-        ) -> Any:
-            return super().ask(
-                message,
-                model_key,
-                conversation_id,
-                params,
-                execution_trace=execution_trace,
-                trace_step=trace_step,
-            )
-
         def _ask_provider(self, **kwargs: Any) -> Any:
             return super().ask_with_mcp(**kwargs)
 
@@ -765,21 +701,20 @@ def _define_logos_client(base: type) -> type:
 
             def round_result(response):
                 """The round's final text, the same extraction the stored reply uses."""
-                if isinstance(response, dict):
-                    received.append(response)
-                    reasoning, said = self.extract_reasoning_and_text(response)
-                    if (reasoning or said).strip():
-                        thought["text"] = reasoning or said
-                if sink is None or not isinstance(response, dict):
+                if not isinstance(response, dict):
                     return
+                received.append(response)
                 reasoning, text = self.extract_reasoning_and_text(response)
+                if (reasoning or text).strip():
+                    thought["text"] = reasoning or text
                 emit({"kind": "round_result", "text": text, "reasoning": reasoning})
 
             # Every provider response of this turn, in order: the reply keeps what each one said.
             received = []
-            # Owner's rule: the first request of every turn requires a tool call
-            # (the provider gets "auto" when the turn has no tool at all); follow_up
-            # releases it, so the model can answer once it has used a tool.
+            # Owner's rule for the Yandex client, the only one that reads tool_choice: the
+            # first request of every turn requires a tool call (the provider gets "auto" when
+            # the turn has no tool at all); follow_up releases it, so the model can answer
+            # once it has used a tool.
             start_round("initial")
             response = self._ask_provider(
                 message=message,
@@ -1147,20 +1082,20 @@ def chat_client(model_key: Any) -> Any:
 
 
 def __getattr__(name: str) -> Any:
-    """Compatibility for ``from chat.mcp_routes import LogosClient`` / ``IMAGE_INPUT_MODEL_KEYS``."""
+    """Compatibility for ``from chat.mcp_routes import LogosClient``."""
     if name == "LogosClient":
         return logos_client_type()
-    if name == "IMAGE_INPUT_MODEL_KEYS":
-        return image_input_model_keys()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _turn_cost(billing: dict[str, Any]) -> float | None:
     """The cost recorded on a reply: the priced part of the turn.
 
-    With an unpriced item the total is the known part (``cost_status`` partial);
-    it is not posted to the treasury, and that is filed for the owner by
-    ``_file_unsettled``. Only a turn with no priced model call has no cost."""
+    The provider has already billed the tokens, so a failed treasury posting does
+    not hide the price (#1664). With an unpriced item the total is the known part
+    (``cost_status`` partial); it is not posted to the treasury, and that is filed
+    for the owner by ``_file_unsettled``. Only a turn with no priced model call has
+    no cost."""
     total = billing.get("total_cost")
     if total is None:
         return None
@@ -1231,7 +1166,7 @@ def _embed_turn(
             if isinstance(question, dict) else ""
         ) + (
             ("Мысли Логоса: " + reasoning.strip() + "\n\n") if reasoning and reasoning.strip() else ""
-        ) + "Логос: " + reply
+        ) + (("Логос: " + reply) if reply else "")
         vector_add(
             "dialogs",
             text,
@@ -1242,6 +1177,17 @@ def _embed_turn(
     except Exception as exc:
         logger.exception("[VECTORS] The turn was not embedded")
         _file_court_failure(conv_id, "dialog_embedding_failed", exc, message_id=reply_message_id)
+
+
+def _start_embed_turn(
+    conv_id: str, user_message_id: Any, reply_message_id: Any, reply: Any, reasoning: Any = ""
+) -> None:
+    threading.Thread(
+        target=_embed_turn,
+        args=(conv_id, user_message_id, reply_message_id, str(reply), str(reasoning or "")),
+        name="logos-embed-turn",
+        daemon=True,
+    ).start()
 
 
 def _file_court_failure(conv_id: str, code: str, exc: Exception, **ids: Any) -> None:
@@ -1255,17 +1201,6 @@ def _file_court_failure(conv_id: str, code: str, exc: Exception, **ids: Any) -> 
         )
     except Exception:
         logger.exception("[COURT] The Court's own failure was not filed")
-
-
-def _settled_turn_cost(
-    billing: dict[str, Any], settlement: dict[str, Any]
-) -> float | None:
-    """The turn's cost, whether or not the treasury could charge it.
-
-    The provider has already billed the tokens, so the price is a fact of the
-    turn; a failed posting is reported separately as ``settlement`` and must not
-    hide the price (#1664)."""
-    return _turn_cost(billing)
 
 
 def _append_post_final_error(trace_data, source, message, error_type):
@@ -1319,6 +1254,20 @@ def _calls_deleted_tool(response) -> bool:
     )
 
 
+def _message_item(role, text):
+    """One stored message as a plain-text Responses item."""
+    return {
+        "type": "message",
+        "role": role,
+        "content": [
+            {
+                "type": "input_text" if role == "user" else "output_text",
+                "text": text,
+            }
+        ],
+    }
+
+
 def _dialog_items(conv_id, message):
     """The chat's stored messages as plain-text Responses items.
 
@@ -1335,21 +1284,11 @@ def _dialog_items(conv_id, message):
     ]
     if said and said[-1].get("role") == "user" and said[-1].get("text") == message:
         said = said[:-1]
-    items = [
-        {
-            "type": "message",
-            "role": m["role"],
-            "content": [
-                {
-                    "type": "input_text" if m["role"] == "user" else "output_text",
-                    "text": m["text"],
-                }
-            ],
-        }
+    return [
+        _message_item(m["role"], m["text"])
         for m in said
         if m.get("role") in ("user", "assistant")
     ]
-    return items
 
 
 def _rebuild_provider_conversation(client, conv_id, message, trace):
@@ -1365,56 +1304,10 @@ def _rebuild_provider_conversation(client, conv_id, message, trace):
     return set_yandex_conversation(conv_id, provider_id, replace=True)
 
 
-def _validate_chat_payload(conv_id, model_key, message, attachments):
+def _validate_chat_payload(conv_id, message, attachments):
     """Validate the turn content before creating an invocation or storing a message."""
     if not isinstance(conv_id, str) or not conv_id.strip():
         return None, None, (jsonify(error_body("conversation_id is required")), 400)
-    if not isinstance(model_key, str):
-        return None, None, (jsonify(error_body("model must be a string")), 400)
-    # These technologies have their own transports; never substitute a text turn.
-    endpoint = None
-    if (
-        model_key in bound.VOICE_MODELS
-        or model_key.startswith("speech-realtime-")
-        or "/speech-realtime-" in model_key
-    ):
-        endpoint = "/api/voice/session"
-    elif model_key in bound.IMAGE_MODELS or model_key.startswith("art://"):
-        endpoint = "/api/images/generate"
-    elif model_key in bound.EMBEDDING_MODELS or model_key.startswith("emb://"):
-        endpoint = "/api/embeddings"
-    elif (
-        model_key in bound.CLASSIFIER_MODELS
-        or model_key.startswith("cls://")
-        or "/classifier-" in model_key
-    ):
-        endpoint = "/api/classify"
-    if endpoint is not None:
-        return (
-            None,
-            None,
-            (
-                jsonify(
-                    error_body("model_requires_dedicated_api", endpoint=endpoint)
-                ),
-                400,
-            ),
-        )
-    if isinstance(model_key, str) and model_key in completion_model_keys():
-        # These models speak the completion API; sending them through Responses is wrong.
-        return (
-            None,
-            None,
-            (
-                jsonify(
-                    error_body(
-                        "model_uses_completion_api",
-                        endpoint="/api/completion",
-                    )
-                ),
-                400,
-            ),
-        )
     try:
         images = _validated_images(attachments)
     except ValueError as exc:
@@ -1431,7 +1324,7 @@ def _validate_chat_payload(conv_id, model_key, message, attachments):
             None,
             (jsonify(error_body("message or attachments are required")), 400),
         )
-    if images and model_key not in image_input_model_keys():
+    if images and bound.CHAT_MODEL not in image_input_model_keys():
         return None, None, (jsonify(error_body("model_does_not_accept_images")), 400)
 
     return message, images, None
@@ -1929,7 +1822,7 @@ def _finalize_chat_turn(
 
     trace_data.setdefault("billing", {})["settlement"] = settlement
     billing = trace_data.get("billing") or {}
-    cost = _settled_turn_cost(billing, settlement)
+    cost = _turn_cost(billing)
     if billing.get("items") and billing.get("total_tokens"):
         # The reply shows the tokens of the whole turn, every model call, the same total its cost is billed on.
         # A turn of the embeddings dialog makes no model call: it keeps the embedding tokens it reports.
@@ -1994,21 +1887,25 @@ def _finalize_chat_turn(
                 "partial_output": partial_output or None,
             },
         )
+        # What the model said and thought is embedded; the failure notice is no part of the dialog.
+        if reply_message_id is not None and (partial_output or reasoning):
+            _start_embed_turn(
+                invocation.conversation_id,
+                user_message_id,
+                reply_message_id,
+                partial_output or "",
+                reasoning,
+            )
     else:
         finish_invocation(invocation.invocation_id, result=outcome)
         if reply and reply_message_id is not None:
-            threading.Thread(
-                target=_embed_turn,
-                args=(
-                    invocation.conversation_id,
-                    user_message_id,
-                    reply_message_id,
-                    str(reply),
-                    str(reasoning or ""),
-                ),
-                name="logos-embed-turn",
-                daemon=True,
-            ).start()
+            _start_embed_turn(
+                invocation.conversation_id,
+                user_message_id,
+                reply_message_id,
+                reply,
+                reasoning,
+            )
         # The facts are read out by the chat model, which the embeddings dialog must not wake.
         if reply and model_key and invocation.conversation_id != VECTOR_CONVERSATION_ID:
             threading.Thread(
@@ -2092,7 +1989,6 @@ def _chat_error_response(
     conv_id,
     can_write,
     error_message,
-    is_temperature_error,
     user_message_id=None,
     error_detail=None,
     request_id=None,
@@ -2111,14 +2007,6 @@ def _chat_error_response(
             trace_data, "chat_pipeline", recorded_error, type(error).__name__
         )
     else:
-        if is_temperature_error:
-            trace.add_event(
-                "validation_failed",
-                {
-                    "field": "temperature",
-                    "error": error_message,
-                },
-            )
         trace.record_error(
             "chat_pipeline",
             recorded_error,
@@ -2171,7 +2059,7 @@ def _chat_error_response(
             if str(settlement_error) == "insufficient balance":
                 settlement["reason"] = "insufficient_balance"
         trace_data.setdefault("billing", {})["settlement"] = settlement
-        cost = _settled_turn_cost(billing, settlement)
+        cost = _turn_cost(billing)
         _file_unsettled(
             settlement,
             invocation_id=invocation.invocation_id,
@@ -2202,6 +2090,10 @@ def _chat_error_response(
         )
     if invocation is not None:
         fail_invocation(invocation.invocation_id, error={"message": recorded_error})
+    if error_message_id is not None and (partial_output or partial_reasoning):
+        _start_embed_turn(
+            conv_id, user_message_id, error_message_id, partial_output, partial_reasoning
+        )
 
     return jsonify(
         {
@@ -2483,7 +2375,7 @@ def _chat_turn(*, t_start, admission=None, live=None):
             return jsonify(error_body("invalid_params", message=str(exc))), 400
 
         message, images, invalid_payload = _validate_chat_payload(
-            conv_id, model_key, message, data.get("attachments")
+            conv_id, message, data.get("attachments")
         )
         if invalid_payload is not None:
             return invalid_payload
@@ -2627,30 +2519,20 @@ def _chat_turn(*, t_start, admission=None, live=None):
     except Exception as e:
         logger.exception("[CHAT] Ошибка")
         internal_error_message = str(e)
-        is_temperature_error = (
-            isinstance(e, ValueError)
-            and "temperature" in internal_error_message.lower()
-        )
-        turn_error_text = None if is_temperature_error else _turn_error_text(e)
+        turn_error_text = _turn_error_text(e)
         # An unexpected failure keeps its class and text for the log, the trace («Детали»)
         # and the failed invocation; the reply says what to do in Russian. A provider
         # failure with its own Russian text keeps its technical cause the same way.
         error_detail = (
-            None
-            if is_temperature_error
-            else f"Ошибка провайдера ({type(e).__name__}: {internal_error_message[:200]})"
+            f"Ошибка провайдера ({type(e).__name__}: {internal_error_message[:200]})"
             if turn_error_text is not None and turn_error_text == _provider_user_text(e)
             else None
             if turn_error_text
             else f"Внутренняя ошибка обработки запроса ({type(e).__name__}: {internal_error_message[:200]})"
         )
         error_message = (
-            "Некорректное значение temperature"
-            if is_temperature_error
-            else (
-                turn_error_text
-                or "Сервер не смог обработать запрос. Повторите его; причина записана в трассировке: откройте «Детали» под сообщением."
-            )
+            turn_error_text
+            or "Сервер не смог обработать запрос. Повторите его; причина записана в трассировке: откройте «Детали» под сообщением."
         )
 
         try:
@@ -2680,7 +2562,6 @@ def _chat_turn(*, t_start, admission=None, live=None):
                 conv_id=conv_id,
                 can_write=can_write,
                 error_message=error_message,
-                is_temperature_error=is_temperature_error,
                 user_message_id=user_message_id,
                 error_detail=error_detail,
                 request_id=request_id,
@@ -2816,28 +2697,11 @@ VECTOR_DIALOG_MODEL = "qwen3-embedding:0.6b"
 _COURT_DIALOG_LOCK = threading.Lock()
 
 
-def ensure_court_dialog(owner_id: str) -> None:
+def _ensure_pinned_dialog(conv_id: str, title: str, owner_id: str) -> None:
     with _COURT_DIALOG_LOCK:
-        if get_conversation_title(COURT_CONVERSATION_ID) is None:
-            create_conversation(
-                COURT_CONVERSATION_ID,
-                COURT_CONVERSATION_TITLE,
-                bound.CHAT_MODEL,
-                provider_pending=True,
-            )
-        set_owner(COURT_CONVERSATION_ID, owner_id)
-
-
-def ensure_vector_dialog(owner_id: str) -> None:
-    with _COURT_DIALOG_LOCK:
-        if get_conversation_title(VECTOR_CONVERSATION_ID) is None:
-            create_conversation(
-                VECTOR_CONVERSATION_ID,
-                VECTOR_CONVERSATION_TITLE,
-                bound.CHAT_MODEL,
-                provider_pending=True,
-            )
-        set_owner(VECTOR_CONVERSATION_ID, owner_id)
+        if get_conversation_title(conv_id) is None:
+            create_conversation(conv_id, title, bound.CHAT_MODEL, provider_pending=True)
+        set_owner(conv_id, owner_id)
 
 
 @mcp_bp.route("/api/conversations", methods=["GET", "POST"])
@@ -2853,8 +2717,6 @@ def conversations():
             model = validate_dialog_model(data.get("model") or bound.CHAT_MODEL)
         except ValueError:
             return jsonify(error_body("model_not_available_for_dialog")), 400
-        except bound.ModelDiscoveryError:
-            return jsonify(error_body("model_catalog_unavailable")), 503
         creation_trace = bound.ExecutionTrace()
         creation_trace.set_request(
             {
@@ -2884,8 +2746,8 @@ def conversations():
             }
         ), 201
 
-    ensure_court_dialog(owner_id)
-    ensure_vector_dialog(owner_id)
+    _ensure_pinned_dialog(COURT_CONVERSATION_ID, COURT_CONVERSATION_TITLE, owner_id)
+    _ensure_pinned_dialog(VECTOR_CONVERSATION_ID, VECTOR_CONVERSATION_TITLE, owner_id)
     rows = [
         {**row, "court": True}
         if row["id"] == COURT_CONVERSATION_ID
@@ -2945,8 +2807,6 @@ def fork_dialog(
         model = validate_dialog_model(model)
     except ValueError:
         raise ForkError("model_not_available_for_dialog", 400)
-    except bound.ModelDiscoveryError:
-        raise ForkError("model_catalog_unavailable", 503)
     if bound.conversation_turn_running(conv_id):
         raise ForkError("conversation_turn_running", 409)
     said = [
@@ -2979,19 +2839,7 @@ def fork_dialog(
         for m in said
         if m["id"] not in drops
     ]
-    items = [
-        {
-            "type": "message",
-            "role": m["role"],
-            "content": [
-                {
-                    "type": "input_text" if m["role"] == "user" else "output_text",
-                    "text": m["text"],
-                }
-            ],
-        }
-        for m in turns
-    ]
+    items = [_message_item(m["role"], m["text"]) for m in turns]
     # A local chat model keeps no provider conversation: the copy's stored messages are its history.
     provider_id = None
     if not is_local_model(bound.CHAT_MODEL):
@@ -3296,7 +3144,7 @@ def execute_approved():
                     "conversation_id": conv_id,
                 },
             )
-            cost = _settled_turn_cost(billing, settlement)
+            cost = _turn_cost(billing)
             settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
             try:
                 settlement = settle_billing_to_treasury(billing, owner_id)
@@ -3323,6 +3171,8 @@ def execute_approved():
                 source="error" if followup_failed else None,
             )
             _court_record(conv_id, followup_message_id, judged, owner_id)
+            if followup_message_id is not None and reply:
+                _start_embed_turn(conv_id, None, followup_message_id, reply)
         except Exception:
             logger.exception(
                 "[TOOL_APPROVAL] Could not store the approval reply after the action ran"

@@ -23,14 +23,6 @@ def _money(value: Any) -> Decimal:
     return result
 
 
-def prepare_treasury_records() -> None:
-    get_store()
-
-
-# Former name, kept for existing callers.
-init_treasury_tables = prepare_treasury_records
-
-
 def _empty_account(owner_id: str) -> dict[str, Any]:
     return {
         "owner_id": owner_id,
@@ -167,16 +159,3 @@ def demo_top_up(
 def post_expense(owner_id: str, amount: Any, description: str, reference: str) -> bool:
     """Debit once per reference. Returns whether this call posted it, without reading the ledger."""
     return _record(owner_id, amount, description, "debit", reference)
-
-
-def record_expense(
-    owner_id: str,
-    amount: Any,
-    description: str,
-    reference: str | None = None,
-    *,
-    return_status: bool = False,
-) -> Any:
-    created = _record(owner_id, amount, description, "debit", reference)
-    account = get_account(owner_id)
-    return (account, created) if return_status else account

@@ -34,7 +34,6 @@ Other units reach it only through their own ports:
 | --- | --- |
 | `provider_accounts.credentials.bootstrap_credential` | `agent_runtime` |
 | `provider_accounts.credentials.resolve_client_credential` | `yandex_client_modules` |
-| `provider_accounts.model_discovery.ModelDiscoveryError` | `chat`, `conversations` |
 | `provider_accounts.model_discovery.get_model_discovery` | `chat` |
 | `provider_accounts.model_discovery.validate_dialog_model` | `chat`, `conversations` |
 | `provider_accounts.quotas.ProviderQuotaExceeded` | `chat`, `yandex_client_modules` |

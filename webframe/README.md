@@ -18,7 +18,7 @@ the third-party packages of the independence check.
 | [`webframe.formparser`](formparser.py) | URL-encoded and streaming multipart forms; file parts spool to disk past 512 KiB. |
 | [`webframe.json`](json.py) | `JSONProvider`: how `jsonify` serializes; an application replaces `app.json` to change it. |
 | [`webframe.serving`](serving.py) | The HTTP/1.1 server: a thread per connection, keep-alive, chunked streaming flushed per piece, `Range`-friendly bodies. |
-| [`webframe.testing`](testing.py) | `Client`: in-process requests through the application (`chat.inprocess`, the environment gateway). |
+| [`webframe.testing`](testing.py) | `Client`: in-process requests through the application (the environment gateway). |
 | [`webframe.exceptions`](exceptions.py) | `HTTPError` and the status-code errors (`NotFound`, `MethodNotAllowed`, …), each with its own response. |
 | [`webframe.datastructures`](datastructures.py) | `Headers`, `MultiDict`, `FileStorage`, `Accept`. |
 | [`webframe.http`](http.py) | Dates, entity tags, ranges, media types, `Content-Disposition`. |

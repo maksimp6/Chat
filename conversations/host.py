@@ -18,7 +18,6 @@ class Host:
     ConversationOwnershipStore: (
         Any  # agent_memory.conversation_ownership_store.ConversationOwnershipStore
     )
-    ModelDiscoveryError: Any  # provider_accounts.model_discovery.ModelDiscoveryError
     delete_conversation: Any  # storage.records.delete_conversation
     get_conversations: Any  # storage.records.get_conversations
     get_current_owner_id: Any  # economy.treasury_identity.get_current_owner_id

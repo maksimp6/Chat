@@ -28,6 +28,7 @@ from chat.mcp_routes import (
     _court_censor,
     _court_record,
     _provider_conversation_id,
+    _start_embed_turn,
     logos_client_type,
 )
 from chat.host import (
@@ -327,16 +328,19 @@ def _speechkit_turn(
 def _process(session: VoiceSession) -> None:
     transcript = session.text or ""
     input_saved = False
+    input_message_id = None
 
     def save_input(value: str) -> None:
-        nonlocal transcript, input_saved
+        nonlocal transcript, input_saved, input_message_id
         transcript = value
         if (
             value
             and not input_saved
             and check_access(session.conversation_id, session.owner_id)
         ):
-            add_message(session.conversation_id, "user", value, source="voice")
+            input_message_id = add_message(
+                session.conversation_id, "user", value, source="voice"
+            )
             maybe_update_conversation_title(session.conversation_id, value)
             input_saved = True
 
@@ -467,6 +471,10 @@ def _process(session: VoiceSession) -> None:
                 session.owner_id,
                 voice_session_id=session.session_id,
             )
+            if voice_message_id is not None and reply_text:
+                _start_embed_turn(
+                    session.conversation_id, input_message_id, voice_message_id, reply_text
+                )
             _emit(
                 session,
                 "response.output_text.done",

@@ -2,7 +2,7 @@
 
 `storage` · Saves chats and settings in the Kristall journal and generated images as private files.
 
-Logos chat and configuration records in the native durable Kristall journal (`storage.records`; `storage.db` is its former name and still works), provider-neutral storage contracts, generated image artifacts, journal maintenance and the process-local engine used in development.
+Logos chat and configuration records in the native durable Kristall journal (`storage.records`; `storage.db` is its former name and still gives `get_store` and `get_messages`), provider-neutral storage contracts, generated image artifacts, journal maintenance and the process-local engine used in development.
 
 ## Role in a dialog
 
@@ -54,7 +54,6 @@ Other units reach it only through their own ports:
 | `storage.records.create_conversation` | `chat` |
 | `storage.records.delete_conversation` | `conversations` |
 | `storage.records.get_config` | `remote_runtime` |
-| `storage.records.get_conv_settings` | `chat`, `conversations`, `yandex_client_modules` |
 | `storage.records.get_conversation_title` | `chat` |
 | `storage.records.get_conversations` | `conversations` |
 | `storage.records.get_message` | `chat` |
@@ -66,7 +65,6 @@ Other units reach it only through their own ports:
 | `storage.records.memory_file_path` | `agent_memory`, `conversations`, `invocation`, `sessions`, `tool_providers`, `web_shell` |
 | `storage.records.normalize_conversation_title` | `chat` |
 | `storage.records.open_journal_store` | `remote_runtime` |
-| `storage.records.save_conv_settings` | `chat`, `conversations` |
 | `storage.records.set_config` | `remote_runtime` |
 | `storage.records.set_yandex_conversation` | `chat` |
 | `storage.records.update_conversation_model` | `conversations` |

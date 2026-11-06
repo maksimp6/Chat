@@ -24,12 +24,10 @@ from chat.mcp_routes import mcp_bp
 from invocation.manager import compress_stored_values_in_background, fail_interrupted_invocations
 from chat.voice_routes import voice_bp
 from cloud.cloudru.iam_routes import cloudru_iam_bp
-from conversations.ownership import prepare_conversation_ownership_records
 from conversations.routes import install as install_conversation_routes
 from court.hearings import court_bp, prepare_court_records
 from rag_sync.routes import rag_bp
 from vector_db.routes import vectors_bp
-from economy.treasury import prepare_treasury_records
 from economy.treasury_routes import install as install_treasury_routes
 from forge import prepare_printing_records
 from forge.routes import printing3d_bp
@@ -97,9 +95,7 @@ _BOOTED_AT = time.time()
 STORAGE_INITIALIZERS = (
     open_journal_store,
     prepare_local_agent_records,
-    prepare_treasury_records,
     prepare_printing_records,
-    prepare_conversation_ownership_records,
     prepare_department_records,
     prepare_quota_records,
     prepare_partner_relations_records,

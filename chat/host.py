@@ -31,7 +31,6 @@ class Host:
     )
     MAX_PROMPT_CHARS: Any  # yandex_client_modules.image_generation.MAX_PROMPT_CHARS
     MODEL_UPSTREAMS: Any  # yandex_client_modules.realtime.MODEL_UPSTREAMS
-    ModelDiscoveryError: Any  # provider_accounts.model_discovery.ModelDiscoveryError
     NoActiveCredentialError: (
         Any  # provider_accounts.credentials.NoActiveCredentialError
     )
@@ -73,7 +72,6 @@ class Host:
     )
     censor_reply: Any  # court.hearings.censor_reply
     check_access: Any  # conversations.ownership.check_access
-    completion_model_keys: Any  # core.model_profiles.completion_model_keys
     compose_skill_instructions: Any  # agent_skills.registry.compose_skill_instructions
     create_conversation: Any  # storage.records.create_conversation
     create_invocation: Any  # invocation.manager.create_invocation
@@ -156,7 +154,6 @@ __all__ = [
     "build_generation_payload",
     "censor_reply",
     "check_access",
-    "completion_model_keys",
     "compose_skill_instructions",
     "create_conversation",
     "create_invocation",
@@ -230,10 +227,6 @@ def build_generation_payload(*args: Any, **kwargs: Any) -> Any:
 
 def check_access(*args: Any, **kwargs: Any) -> Any:
     return current().check_access(*args, **kwargs)
-
-
-def completion_model_keys(*args: Any, **kwargs: Any) -> Any:
-    return current().completion_model_keys(*args, **kwargs)
 
 
 def compose_skill_instructions(*args: Any, **kwargs: Any) -> Any:

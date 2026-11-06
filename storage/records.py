@@ -1,6 +1,6 @@
 """Logos chat and configuration records in the native durable Kristall journal.
 
-This was ``storage.db``; that module name still works and re-exports these names.
+This was ``storage.db``; that module name still gives ``get_store`` and ``get_messages``.
 """
 
 from __future__ import annotations
@@ -45,20 +45,6 @@ def get_store() -> Any:
 def open_journal_store() -> None:
     """Open the process journal, so requests reuse the one shared writer."""
     get_store()
-
-
-# Former name, kept for existing callers.
-init_db = open_journal_store
-
-
-def reset_memory_db() -> None:
-    """Reset chat/config records in explicitly isolated test clients."""
-    store = get_store()
-    with store.transaction() as tx:
-        for key in store.items(prefix="chat/"):
-            tx.delete(key)
-        for key in store.items(prefix="config/"):
-            tx.delete(key)
 
 
 def get_conversations() -> list[dict[str, Any]]:
@@ -109,9 +95,7 @@ def _update_conversation(conv_id: str, changes: dict[str, Any]) -> None:
             tx.set(key, {**record, **changes, "updated_at": int(time.time())})
 
 
-def update_conversation_title(
-    conv_id: str, title: Any, owner_id: str | None = None
-) -> None:
+def update_conversation_title(conv_id: str, title: Any) -> None:
     """Update the title of a shared local conversation."""
     _update_conversation(conv_id, {"title": normalize_conversation_title(title)})
 
@@ -197,7 +181,6 @@ def add_message(
     cost: float | None = 0.0,
     timings: Any = None,
     usage: Any = None,
-    model: Any = None,
     source: Any = None,
     trace: Any = None,
     attachments: Any = None,
@@ -273,15 +256,6 @@ def get_message(conv_id: str, message_id: int) -> dict[str, Any] | None:
     return record
 
 
-def save_conv_settings(conv_id: str, settings_dict: dict[str, Any]) -> None:
-    with get_store().transaction() as tx:
-        tx.set("chat/settings/" + conv_id, settings_dict)
-
-
-def get_conv_settings(conv_id: str) -> dict[str, Any] | None:
-    return get_store().get("chat/settings/" + conv_id)
-
-
 def get_yandex_conversation(conv_id: str) -> str | None:
     return get_store().get("chat/yandex/" + conv_id)
 
@@ -302,10 +276,6 @@ def set_yandex_conversation(conv_id: str, yandex_id: str, *, replace: bool = Fal
 def is_provider_pending(conv_id: str) -> bool:
     record = get_store().get("chat/conversation/" + conv_id) or {}
     return bool(record.get("provider_pending"))
-
-
-def init_config_table() -> None:
-    init_db()
 
 
 def get_config(key: str, default: Any = None) -> Any:
@@ -334,22 +304,17 @@ __all__ = [
     "create_conversation",
     "delete_conversation",
     "get_config",
-    "get_conv_settings",
     "get_conversation_title",
     "get_conversations",
     "get_message",
     "get_messages",
     "get_store",
     "get_yandex_conversation",
-    "init_config_table",
-    "init_db",
     "is_provider_pending",
     "maybe_update_conversation_title",
     "memory_file_path",
     "normalize_conversation_title",
     "open_journal_store",
-    "reset_memory_db",
-    "save_conv_settings",
     "set_config",
     "set_yandex_conversation",
     "update_conversation_model",
