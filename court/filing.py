@@ -107,7 +107,7 @@ def _q(value: Any) -> str:
     )
 
 
-# --- encrypted LFS evidence (same steps as scripts/redmi_publish_diagnostics.sh)
+# --- encrypted LFS evidence (same steps as scripts/redmi_python_runner.py) ----
 
 
 def _sha256_file(path: Path) -> str:

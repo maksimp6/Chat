@@ -183,9 +183,8 @@ python app.py
 ```
 
 Open `http://localhost:8080` when using the template's `PORT=8080`; without
-`PORT`, `app.py` defaults to `5000`. `start.sh` is a wrapper that creates `logs/`,
-installs `requests` and `websockets` if they are missing, and runs
-`python3 app.py`.
+`PORT`, `app.py` defaults to `5000`. `start.sh` is a wrapper that creates `logs/`
+and runs `python3 app.py`; it installs nothing.
 
 ### 4. The model provider
 

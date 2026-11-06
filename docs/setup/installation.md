@@ -44,9 +44,8 @@ python app.py
 Порт задаёт переменная окружения `PORT`: в `.env.example` это `8080`,
 а без переменной `app.py` использует `5000`.
 
-`start.sh` создаёт `logs/` и запускает `python3 app.py`, но проверяет только
-`requests` и `websockets`. Поэтому он не заменяет установку
-`requirements.txt`, где также находятся `python-dotenv` и `cryptography`.
+`start.sh` создаёт `logs/` и запускает `python3 app.py`. Зависимости он
+не проверяет и не устанавливает: сначала установите `requirements.txt`.
 
 ## Подключение к Ollama
 

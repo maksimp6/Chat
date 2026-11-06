@@ -158,9 +158,7 @@
 - [Обновления через GitHub runner](setup/redmi9-auto-update.md) — runner `redmi9-python` как единственный автоматический путь обновления
 - [Termux shell runner](redmi-python-runner.md) — задания GitHub Actions прямо в Termux на Redmi 9
 - [RootAgent CLI](redmi-root-agent.md) — проверка root, снимок экрана и ввод мыши из задания runner
-- [Android diagnostics](redmi-android-diagnostics.md) — сбор logcat и диагностики в Termux
 - [Скриншоты UI](redmi-screenshots.md) — автоматические снимки интерфейса через workflow сервера
-- [Архив репозитория](redmi-repository-backup.md) — резервная копия репозитория из shell-задания Termux
 - [RootAgent: приёмка на устройстве (#650)](testing/rootagent-redmi9-650.md) — аппаратные наблюдения от 2026-10-13
 
 ## Keel Platform

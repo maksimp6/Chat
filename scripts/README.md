@@ -9,13 +9,6 @@ There are no compatibility copies at the old root paths; update external shortcu
 
 | Command | Purpose | Side effects / verification boundary |
 | --- | --- | --- |
-| `bash scripts/analyze_logs.sh` | Summarize legacy log files | Reads local logs; legacy format assumptions remain |
-| `bash scripts/analyze_modules.sh` | Count module activity | Reads local logs; token counts are estimates |
-| `bash scripts/debug.sh logs` | Show recent application log lines | Reads local logs |
-| `bash scripts/view_logs.sh` | Interactive log viewer | Includes a separately confirmed log deletion menu; not exercised by relocation tests |
-| `bash scripts/view_module_logs.sh` | View module logs | Reads local logs; use `all` at the prompt for a snapshot |
-| `bash scripts/file.sh` | Create a project dump | Writes `project_dump.txt`; inspect content before sharing because tracked files/logs can contain private data |
-| `bash scripts/crl.sh` | Historical manual Git-tool chat exercise | Calls local API, may create a conversation and invoke tools; not an offline test |
 | `bash scripts/install_protobuf_env.sh` | Historical Termux SDK setup | Installs/upgrades packages; never run as part of relocation checks |
 | `python scripts/send_logs.py` | Historical execution-log uploader | Reads checkout `execution_logs/`; upload endpoint and placeholder auth remain unverified |
 

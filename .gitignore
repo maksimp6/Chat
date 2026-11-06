@@ -26,7 +26,6 @@ app.log
 api_debug.txt
 
 # Local project dumps and archives
-project_dump.txt
 project_files.txt
 
 # Dependencies and tooling caches

@@ -35,8 +35,8 @@ DEFAULT_STATE = Path.home() / "github-python-runner"
 
 
 WORKSPACE_BRANCH = "data/redmi9-job-workspaces"
-# Month keys of the workspace archive, separate from the diagnostics key:
-# a month's key is published once the following month is over.
+# Month keys of the workspace archive: a month's key is published once the
+# following month is over.
 WORKSPACE_KEYS = Path(
     os.environ.get(
         "LOGOS_WORKSPACE_KEYS_DIR",
@@ -49,7 +49,7 @@ def b64(data):
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
-# --- encrypted LFS archive (same steps as scripts/redmi_publish_diagnostics.sh) --
+# --- encrypted LFS archive (same steps as court/filing.py) --------------------
 
 
 def sha256_file(path):
