@@ -33,7 +33,7 @@ _READ_BLOCK = 256 * 1024
 _LEVELS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
 # The log window asks for new records every few seconds. Its answered requests stay out of the
 # plain list, which they would bury; a search finds them, and one that failed stays in the list.
-_OWN_POLL = re.compile(r'"GET /api/logs[^"]*" 200 ')
+_OWN_POLL = re.compile(r'"GET /api/logs(\?\S*)? HTTP/[\d.]+" 200 ')
 _lock = threading.Lock()
 _mirroring = threading.local()
 
@@ -185,13 +185,16 @@ def _entry(line: bytes, floor: int, needle: str) -> dict[str, Any] | None:
     message = str(entry.get("message") or "")
     if _LEVELS.get(str(entry.get("level")), 0) < floor:
         return None
+    poll = _OWN_POLL.search(message)
     if not needle:
-        return None if _OWN_POLL.search(message) else entry
+        return None if poll else entry
+    # The search is repeated in the query of the window's own polls, which must not match it.
+    query = poll.group(1) if poll else None
     logger = str(entry.get("logger") or "").removeprefix(f"{ROOT_LOGGER_NAME}.")
     held = (
         entry.get("level"),
         logger,
-        message,
+        message.replace(query, "") if query else message,
         entry.get("exception"),
         entry.get("trace_id"),
         entry.get("invocation_id"),

@@ -1114,10 +1114,11 @@ body {
   position: relative;
 }
 /* Кнопка закрытия: липкая справа сверху, поэтому остаётся видимой при прокрутке .modal-content (пункты 23, 30).
-   Вынесена в поток через float, а не absolute: при absolute она уезжала вместе с прокруткой. */
+   Вынесена в поток через float, а не absolute: при absolute она уезжала вместе с прокруткой. A sticky box is held at the
+   content edge, inside the padding: top: -8px lets it rest where its float is, so it never sits on the first control. */
 .logos-pro-app .modal-close {
   position: sticky;
-  top: 0;
+  top: -8px;
   z-index: 1;
   float: right;
   display: flex;
@@ -2526,10 +2527,6 @@ body {
   font-weight: 600;
 }
 /* The settings header and tabs stay visible while the panel body scrolls. The panel is a column flex box, so the block must not shrink: a shrunk tab row clips the 44px labels. */
-/* The heading is a flex row, so the sticky offset that holds the × down in other windows does not apply here. */
-.logos-pro-app #set-close-btn {
-  margin-top: 0;
-}
 .logos-pro-app .settings-modal-top {
   flex: 0 0 auto;
   position: sticky;
