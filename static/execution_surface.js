@@ -37,9 +37,17 @@
     return Array.isArray(value) ? value : [];
   }
 
-  var finite = window.LogosTraceSummary.finite;
+  function finite(value) {
+    if (value === null || value === undefined || value === "") return null;
+    var number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
   // A stage with a failed call is not shown as done: the marks must agree with the reason line.
-  var toolFailed = window.LogosTraceSummary.toolFailed;
+  function toolFailed(call) {
+    var result = call && call.result;
+    return Boolean(call && call.error) || Boolean(result && typeof result === "object" && (result.error || result.success === false));
+  }
 
   function text(value, limit) {
     if (typeof value !== "string") return "";

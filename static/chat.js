@@ -128,10 +128,15 @@ function loadRendererScript(name) {
 loadRendererScript("markdown");
 loadRendererScript("texmath");
 
+// Own copy: a reply must still draw when the settings script did not load.
+function escapeAttribute(text) {
+  return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 // A message drawn before its renderer arrived keeps its source on its own element, so nothing outlives the element
 // (a live answer is drawn again every 250 ms).
 function pendingMarkdownHtml(source, html) {
-  return '<div class="md-pending" data-md-source="' + window.SettingsUI.escapeHtml(source) + '">' + html + "</div>";
+  return '<div class="md-pending" data-md-source="' + escapeAttribute(source) + '">' + html + "</div>";
 }
 
 function isPinned(chatbox) {

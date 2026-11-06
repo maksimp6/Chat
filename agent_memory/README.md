@@ -19,7 +19,7 @@ Where this unit sits in the [life of a dialog](../docs/architecture/modules.md#l
 | --- | --- |
 | [`agent_memory.client`](client.py) | Logos-owned lifecycle for the standalone explicit-commit Kristall. |
 | [`agent_memory.conversation_ownership_store`](conversation_ownership_store.py) | Durable conversation ownership records on the native Kristall engine. |
-| [`agent_memory.extractor`](extractor.py) | Extract facts and persist individual records directly in native Kristall; each accepted fact also goes into `vector_db` (collection `memory_facts`). |
+| [`agent_memory.extractor`](extractor.py) | Extract facts and persist individual records directly in native Kristall; each stored fact also goes into `vector_db` (collection `memory_facts`). |
 | [`agent_memory.manager`](manager.py) | Native Kristall configuration and fact controls. |
 | [`agent_memory.routes`](routes.py) | HTTP API of the global memory panel: configuration and facts, read-only. |
 
@@ -41,6 +41,7 @@ Everything `agent_memory` uses from other units is a field of `Host` in [`agent_
 | `kristall_Kristall` | `kristall.Kristall` |
 | `memory_file_path` | `storage.records.memory_file_path` |
 | `vector_add` | `vector_db.store.add` |
+| `vector_has` | `vector_db.store.has` |
 
 ## Install
 

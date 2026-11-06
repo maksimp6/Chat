@@ -3144,8 +3144,10 @@ def execute_approved():
                 source="error" if followup_failed else None,
             )
             _court_record(conv_id, followup_message_id, judged, owner_id)
-            if followup_message_id is not None and reply:
-                _start_embed_turn(conv_id, None, followup_message_id, reply)
+            # The failure notice is no part of the dialog: only what the model wrote is embedded.
+            said = followup_reply.strip() if followup_failed else reply
+            if followup_message_id is not None and said:
+                _start_embed_turn(conv_id, None, followup_message_id, said)
         except Exception:
             logger.exception(
                 "[TOOL_APPROVAL] Could not store the approval reply after the action ran"

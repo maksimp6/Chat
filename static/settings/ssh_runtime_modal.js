@@ -81,20 +81,6 @@
       sshStatusEl.classList.toggle("is-error", Boolean(error));
     }
 
-    function showLastTest(last) {
-      if (last) {
-        setSshStatus(
-          "Последняя проверка: " +
-            (last.success ? "успешна" : "ошибка") +
-            (last.target ? " · " + last.target : "") +
-            (last.duration_ms != null ? " · " + last.duration_ms + " мс" : ""),
-          !last.success,
-        );
-      } else {
-        setSshStatus("Конфигурация загружена.");
-      }
-    }
-
     function populateSshSettings(data) {
       var ssh = data || {};
       document.getElementById("set-ssh-enabled").checked = ssh.enabled === true;
@@ -113,7 +99,7 @@
       document.getElementById("set-ssh-approval-privileged").checked =
         ssh.approval_required_for_privileged !== false;
       document.getElementById("set-ssh-targets").value = JSON.stringify(ssh.targets || {}, null, 2);
-      showLastTest(ssh.last_test);
+      setSshStatus("Конфигурация загружена.");
     }
 
     window.LogosDispatcher.request("/api/ssh-runtime/settings")

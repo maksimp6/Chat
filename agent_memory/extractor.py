@@ -12,7 +12,7 @@ from typing import Any
 import requests
 
 from agent_memory.client import get_memory_client
-from agent_memory.host import memory_file_path, vector_add
+from agent_memory.host import memory_file_path, vector_add, vector_has
 
 API_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 _FACT_PREFIX = "global_fact:"
@@ -85,19 +85,29 @@ def list_global_memory_facts() -> list[dict[str, Any]]:
     return sorted(facts, key=lambda row: (-row["updated_at"], row["id"]))
 
 
+def _embed_facts() -> None:
+    """Put every stored fact the vector database lacks there, where ``remember`` finds it.
+
+    Extraction repeats the facts of the whole dialog every turn, so only a missing document is
+    embedded. A failure is logged and never stops the turn: the next save tries again."""
+    try:
+        for row in list_global_memory_facts():
+            if not vector_has("memory_facts", row["id"]):
+                vector_add("memory_facts", row["fact"], row["id"], {"category": row["category"]})
+    except Exception:
+        logger.exception("[VECTORS] Memory facts were not embedded")
+
+
 def save_global_memory_facts(
     facts: list[dict[str, Any]], *, now: int | None = None
 ) -> int:
     """Atomically insert facts; a repeated fact refreshes its category and time.
 
-    A fact not yet in the vector database then goes there, where ``remember`` finds it. Each
-    fact is embedded once, though extraction repeats the facts of the whole dialog every turn;
-    one that fails is embedded when it next comes up, and the failure never stops the turn."""
+    The facts then go into the vector database, see ``_embed_facts``."""
     if not isinstance(facts, list):
         raise ValueError("facts must be a list")
     timestamp = int(time.time()) if now is None else int(now)
     saved = 0
-    waiting: dict[str, tuple[str, str]] = {}
     store = get_memory_client(memory_file_path())
     with store.transaction() as tx:
         for entry in facts:
@@ -123,21 +133,8 @@ def save_global_memory_facts(
                 )
             if existing is None:
                 saved += 1
-            embedded = isinstance(existing, dict) and existing.get("embedded") is True
-            tx.set(
-                key,
-                {"category": category, "fact": fact, "updated_at": timestamp, "embedded": embedded},
-            )
-            if not embedded:
-                waiting[digest] = (fact, category)
-    try:
-        for digest, (fact, category) in waiting.items():
-            vector_add("memory_facts", fact, digest, {"category": category})
-            with store.transaction() as tx:
-                key = _FACT_PREFIX + digest
-                tx.set(key, {**tx.get(key), "embedded": True})
-    except Exception:
-        logger.exception("[VECTORS] Memory facts were not embedded")
+            tx.set(key, {"category": category, "fact": fact, "updated_at": timestamp})
+    _embed_facts()
     return saved
 
 

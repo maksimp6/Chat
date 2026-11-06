@@ -32,7 +32,7 @@ from typing import Any
 
 from vector_db.host import embed_texts, get_store
 
-__all__ = ["CHUNK_CHARS", "add", "collections", "delete", "drop", "search", "unit_vectors"]
+__all__ = ["CHUNK_CHARS", "add", "collections", "delete", "drop", "has", "search", "unit_vectors"]
 
 logger = logging.getLogger("logos.vector_db")
 
@@ -159,6 +159,11 @@ def _trace(trace: Any, event: str, payload: dict[str, Any]) -> None:
 
 def _doc_prefix(collection: str, doc_id: str) -> str:
     return f"{PREFIX}{collection}/{doc_id}/"
+
+
+def has(collection: str, doc_id: str) -> bool:
+    """Whether ``collection`` holds the document ``doc_id``."""
+    return bool(get_store().items(prefix=_doc_prefix(_name(collection, "collection"), _name(doc_id, "id"))))
 
 
 def add(

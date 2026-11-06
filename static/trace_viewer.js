@@ -62,8 +62,21 @@
   };
 
   var el = window.LogosCoreAPI.ui.element;
-  var finite = window.LogosTraceSummary.finite;
-  var toolFailed = window.LogosTraceSummary.toolFailed;
+
+  // Number(null) is 0, so a missing value is rejected before the conversion.
+  function finite(value) {
+    if (value === null || value === undefined || value === "") return null;
+    var number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function toolFailed(call) {
+    var result = call.result;
+    return (
+      Boolean(call.error) ||
+      Boolean(result && typeof result === "object" && (result.error || result.success === false))
+    );
+  }
 
   function button(className, text, onClick, title) {
     var node = el("button", "logos-btn " + className, text);

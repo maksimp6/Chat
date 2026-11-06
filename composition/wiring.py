@@ -18,11 +18,13 @@ def _agent_memory():
     from kristall import Kristall as kristall_Kristall
     from storage.records import memory_file_path
     from vector_db.store import add as vector_add
+    from vector_db.store import has as vector_has
 
     return host.Host(
         kristall_Kristall=kristall_Kristall,
         memory_file_path=memory_file_path,
         vector_add=vector_add,
+        vector_has=vector_has,
     )
 
 

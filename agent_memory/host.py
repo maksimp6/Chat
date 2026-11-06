@@ -18,6 +18,7 @@ class Host:
     kristall_Kristall: Any  # kristall.Kristall
     memory_file_path: Any  # storage.records.memory_file_path
     vector_add: Any  # vector_db.store.add
+    vector_has: Any  # vector_db.store.has
 
 
 _binding: Binding[Host] = Binding("agent_memory")
@@ -35,6 +36,7 @@ __all__ = [
     "memory_file_path",
     "provide",
     "vector_add",
+    "vector_has",
 ]
 
 
@@ -44,3 +46,7 @@ def memory_file_path(*args: Any, **kwargs: Any) -> Any:
 
 def vector_add(*args: Any, **kwargs: Any) -> Any:
     return current().vector_add(*args, **kwargs)
+
+
+def vector_has(*args: Any, **kwargs: Any) -> Any:
+    return current().vector_has(*args, **kwargs)
