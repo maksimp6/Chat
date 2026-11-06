@@ -440,7 +440,7 @@ function addMessage({
     const editBtn = document.createElement("button");
     editBtn.type = "button";
     // It shares the retry class, so it leaves together with «Повторить» when a newer question is sent.
-    editBtn.className = "logos-btn msg-retry-btn msg-edit-btn";
+    editBtn.className = "logos-btn msg-retry-btn";
     editBtn.textContent = "Изменить";
     editBtn.addEventListener("click", function () {
       const field = document.getElementById("msg-input");

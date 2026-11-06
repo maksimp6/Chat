@@ -186,7 +186,7 @@
                 : '<button class="logos-btn" data-op="restart" data-id="' +
                   esc(env.environment_id) +
                   '">Перезапуск</button>',
-              '<button class="logos-btn environment-delete" data-op="delete" data-id="',
+              '<button class="logos-btn btn-danger" data-op="delete" data-id="',
               esc(env.environment_id),
               '">Удалить</button>',
               "</div></article>",

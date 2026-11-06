@@ -178,7 +178,7 @@
       var acceptButton = document.createElement("button");
       acceptButton.type = "submit";
       acceptButton.className =
-        "logos-btn logos-dialog-accept " + (settings.danger ? "settings-btn-danger" : "settings-btn-accent");
+        "logos-btn logos-dialog-accept " + (settings.danger ? "btn-danger" : "btn-primary");
       acceptButton.textContent =
         settings.confirmText || (kind === "prompt" ? "Сохранить" : "Подтвердить");
       actions.append(cancelButton, acceptButton);

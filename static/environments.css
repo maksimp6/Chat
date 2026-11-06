@@ -24,48 +24,9 @@
   flex: 1;
   min-width: 0;
 }
-/* Sizes only: the colours come from the shared buttons (secondary .logos-btn, gold .btn-primary). */
-.logos-pro-app .environments-create button,
-.logos-pro-app .environments-refresh,
-.logos-pro-app .environment-card-actions button,
-.logos-pro-app .environment-card-actions a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 10px;
-  font-size: 13px;
-  text-decoration: none;
-  white-space: nowrap;
-  cursor: pointer;
-}
-@media (pointer: coarse) {
-  .logos-pro-app .environments-create button,
-  .logos-pro-app .environments-refresh,
-  .logos-pro-app .environment-card-actions button,
-  .logos-pro-app .environment-card-actions a {
-    min-height: 44px;
-  }
-}
-/* «Удалить» is red text on no fill. */
-.logos-pro-app .environment-card-actions .environment-delete {
-  border-color: transparent;
-  background: transparent;
-  color: var(--danger);
-}
-.logos-pro-app .environment-card-actions .environment-delete:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-}
-/* A failure is the shared calm note: a red edge on the left, the text in the body colour. */
+/* A failure is the shared calm note (static/style.css .logos-error-note). */
 .logos-pro-app .environments-status {
   margin-bottom: 12px;
-  padding: 10px 12px;
-  border-left: 3px solid var(--danger);
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--text);
   font-size: 13px;
   line-height: 1.45;
 }

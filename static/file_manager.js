@@ -238,7 +238,7 @@
 
         var deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
-        deleteBtn.className = "logos-btn vs-delete-btn file-manager-danger-btn";
+        deleteBtn.className = "logos-btn btn-danger vs-delete-btn file-manager-danger-btn";
         deleteBtn.dataset.id = vs.id || "";
         deleteBtn.textContent = "Удалить";
 
@@ -382,7 +382,7 @@
       var confirm = document.createElement("button");
       confirm.type = "button";
       confirm.id = "vs-add-confirm";
-      confirm.className = "logos-btn file-manager-primary-btn";
+      confirm.className = "logos-btn btn-primary file-manager-primary-btn";
       confirm.textContent = "Добавить выбранные файлы";
 
       panel.appendChild(fileListEl);
@@ -538,7 +538,7 @@
           "/api/files/" +
           encodeURIComponent(file.id) +
           '/content" download>Скачать</a>',
-        '<button type="button" class="logos-btn fm-delete-btn file-manager-danger-btn" data-id="' +
+        '<button type="button" class="logos-btn btn-danger fm-delete-btn file-manager-danger-btn" data-id="' +
           UI.escapeHtml(file.id) +
           '">Удалить</button>',
       ].join("");

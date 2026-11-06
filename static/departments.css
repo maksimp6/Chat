@@ -34,30 +34,6 @@ button.logos-dept-row:focus-visible {
   font-size: 12px;
 }
 
-/* Buttons in these windows: the shared colours come from .logos-btn / .btn-primary, the size from here. The window's ×
-   keeps its own square. */
-.logos-dept-card :is(.logos-btn, .btn-primary):not(.modal-close) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 14px;
-  font-size: 13px;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.logos-dept-card :is(.logos-btn, .btn-primary):not(.modal-close):disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-@media (pointer: coarse) {
-  .logos-dept-card :is(.logos-btn, .btn-primary):not(.modal-close) {
-    min-height: 44px;
-  }
-}
-
 /* Group chat (static/group_chat.js): the checkbox sits left of the participant's name, the description under the
    name; a ticked row is marked in gold. */
 .group-chat-intro {

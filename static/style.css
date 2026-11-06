@@ -122,11 +122,8 @@
   --bg-input: var(--surface-2);
   --bg-hover: var(--surface-3);
   --btn-bg: var(--surface-2);
-  --bg-bubble-user: var(--msg-user-bg);
   --bg-bubble-bot: var(--surface-1);
   --text-main: var(--text);
-  --text-bubble-user: var(--text);
-  --text-bubble-bot: var(--text);
   --text-secondary: var(--text-muted);
   --border-color: var(--border);
   --accent-text: var(--accent);
@@ -753,11 +750,8 @@ body {
 .logos-pro-app #chatbox {
   flex: 1;
   overflow-y: auto;
-  padding: 15px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background: var(--bg-app);
 }
 
 /* Empty state: one look for every place (chat, a failed load). */
@@ -797,63 +791,10 @@ body {
 }
 
 /* Messages */
-.logos-pro-app .msg {
-  width: auto;
-  max-width: 85%;
-  /* A long unbroken word or link wraps inside the bubble instead of pushing it past the screen edge (#1718). */
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 12px 16px;
-  border-radius: 18px;
-  line-height: 1.5;
-  word-wrap: break-word;
-  overflow-wrap: anywhere;
-  font-size: 16px;
-  position: relative;
-}
-.logos-pro-app .user {
-  align-self: flex-end;
-  background: var(--bg-bubble-user);
-  color: var(--text-bubble-user);
-  border-bottom-right-radius: 4px;
-}
-.logos-pro-app .bot {
-  align-self: flex-start;
-  background: var(--bg-bubble-bot);
-  color: var(--text-bubble-bot);
-  border-bottom-left-radius: 4px;
-  border: 1px solid var(--border-color);
-}
-.logos-pro-app .msg.error {
-  align-self: flex-start;
-  background: color-mix(in srgb, var(--danger) 10%, var(--bg-bubble-bot));
-  color: var(--danger-text);
-  border: 1px solid var(--danger);
-  border-bottom-left-radius: 4px;
-}
-
-/* Copy sits outside the bubble, by its last line, on the free side of the chat: always visible (a phone has no
-   hover), it covers no text and takes no row of its own. A bubble is at most 85% wide, so the side has room. */
-.logos-pro-app .msg-actions {
-  position: absolute;
-  bottom: 0;
-  left: 100%;
-  margin-left: 2px;
-}
-.logos-pro-app .msg.user .msg-actions {
-  left: auto;
-  right: 100%;
-  margin-left: 0;
-  margin-right: 2px;
-}
 .logos-pro-app .msg-retry-btn {
-  margin-top: 6px;
   font-size: 13px;
   min-height: 44px;
   padding: 0 12px;
-}
-.logos-pro-app .msg-retry-btn + .msg-edit-btn {
-  margin-left: 8px;
 }
 .logos-pro-app .msg-details {
   margin-top: 6px;
@@ -947,12 +888,8 @@ body {
   font-size: 16px;
   line-height: 22px;
 }
-.logos-pro-app #text-ui #msg-input::placeholder {
-  color: var(--text-faint);
-  opacity: 1;
-}
 
-.logos-pro-app #attach-btn {
+.logos-pro-app :is(#attach-btn, #send-btn) {
   width: 40px;
   height: 40px;
   min-width: 40px;
@@ -963,9 +900,11 @@ body {
   justify-content: center;
   border: 0;
   border-radius: 50%;
+  cursor: pointer;
+}
+.logos-pro-app #attach-btn {
   background: transparent;
   color: var(--text-muted);
-  cursor: pointer;
   transition:
     background-color 0.15s ease,
     color 0.15s ease;
@@ -977,19 +916,8 @@ body {
 
 /* Send: the primary action, a flat gold circle with a dark arrow. */
 .logos-pro-app #send-btn {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  padding: 0;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 50%;
   background: var(--accent);
   color: var(--accent-ink);
-  cursor: pointer;
   transition:
     background-color 0.15s ease,
     opacity 0.15s ease;
@@ -1002,8 +930,7 @@ body {
   opacity: 0.45;
 }
 @media (pointer: coarse) {
-  .logos-pro-app #attach-btn,
-  .logos-pro-app #send-btn {
+  .logos-pro-app :is(#attach-btn, #send-btn) {
     width: 44px;
     height: 44px;
     min-width: 44px;
@@ -1131,77 +1058,17 @@ body {
   font-size: 14px;
   line-height: 1.4;
 }
-.logos-pro-app .msg code {
-  background: var(--code-bg);
-  border: 1px solid var(--code-border);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
-  font-size: 14px;
-  color: var(--code-text);
-}
-.logos-pro-app .msg pre code {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--text-main);
-}
-
-/* Стили для Markdown */
-.logos-pro-app .bubble h1,
-.logos-pro-app .bubble h2,
-.logos-pro-app .bubble h3 {
-  margin-top: 10px;
-  margin-bottom: 5px;
-  font-weight: bold;
-}
-.logos-pro-app .bubble ul,
-.logos-pro-app .bubble ol {
-  margin-left: 20px;
-  margin-bottom: 5px;
-}
-.logos-pro-app .bubble p {
-  margin-bottom: 8px;
-}
-.logos-pro-app .bubble pre {
-  background: var(--code-bg);
-  padding: 10px;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin: 10px 0;
-  white-space: pre;
-  word-break: normal;
-  border: 1px solid var(--border-color);
-}
-.logos-pro-app .bubble code {
-  background: var(--code-bg);
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 0.9em;
-}
-.logos-pro-app .bubble pre code {
-  background: none;
-  padding: 0;
-  border: none;
-}
 
 /* Стили для Markdown элементов */
-.logos-pro-app .bubble h1,
-.logos-pro-app .bubble h2,
-.logos-pro-app .bubble h3,
 .logos-pro-app .bubble h4 {
-  margin-top: 10px;
-  margin-bottom: 5px;
-  font-weight: bold;
-}
-.logos-pro-app .bubble h4 {
+  margin: 10px 0 5px;
   font-size: 1em;
 }
 .logos-pro-app .bubble p {
   margin-bottom: 8px;
 }
-.logos-pro-app .bubble ul {
+.logos-pro-app .bubble ul,
+.logos-pro-app .bubble ol {
   margin-left: 20px;
   margin-bottom: 8px;
 }
@@ -1214,15 +1081,9 @@ body {
   margin: 10px 0;
 }
 .logos-pro-app .bubble pre {
-  background: var(--code-bg);
-  border: 1px solid var(--code-border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin: 8px 0;
-  overflow-x: auto;
-  max-width: 100%;
+  white-space: pre;
+  word-break: normal;
   font-size: 13px;
-  line-height: 1.4;
 }
 .logos-pro-app .bubble code {
   background: var(--code-bg);
@@ -1362,15 +1223,6 @@ body {
   margin-top: 8px;
 }
 
-/* A failure is the shared calm note (see .logos-error-note). */
-.logos-pro-app .treasury-status.is-error {
-  padding: 10px 12px;
-  border-left: 3px solid var(--danger);
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--text);
-}
-
 @media (max-width: 520px) {
   .logos-pro-app .treasury-top-up-row {
     flex-direction: column;
@@ -1471,11 +1323,6 @@ body {
 /* A failure is the shared calm note (see .logos-error-note); an empty status takes no room. */
 .logos-pro-app .memory-status:not(:empty) {
   margin: 0 0 12px;
-  padding: 10px 12px;
-  border-left: 3px solid var(--danger);
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--text);
   line-height: 1.45;
 }
 
@@ -1489,15 +1336,12 @@ body {
   cursor: default;
   opacity: 0.7;
 }
-.logos-pro-app .model-option-price {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
 .logos-pro-app .model-option-unavailable {
   opacity: 0.55;
   cursor: not-allowed;
 }
 /* «Отключение: <date>» is one more meta line of the card, sized and coloured like the price and Ultra lines. */
+.logos-pro-app .model-option-price,
 .logos-pro-app .model-option-lifecycle,
 .logos-pro-app .model-option-ultra {
   font-size: 12px;
@@ -1522,17 +1366,6 @@ body {
 /* Voice models whose catalog entry accepts text keep the text field (voice.js sets this class). */
 .logos-pro-app.logos-model-voice.logos-voice-text-input #text-ui {
   display: flex;
-}
-
-.logos-pro-app .copy-btn {
-  min-width: 44px;
-  min-height: 44px;
-  margin: 0;
-  padding: 0;
-  font-size: 18px;
-  cursor: pointer;
-  background: none;
-  border: 0;
 }
 
 .logos-pro-app .msg-meta {
@@ -1708,7 +1541,7 @@ body {
   line-height: 1.45;
 }
 
-/* Chat markdown and reasoning presentation. */
+/* Chat markdown presentation. */
 .logos-pro-app .md-code-block {
   margin: 8px 0;
 }
@@ -1765,27 +1598,6 @@ body {
   margin: 8px 0;
   border-radius: 8px;
 }
-.logos-pro-app .reasoning-details {
-  margin-bottom: 10px;
-  font-size: 13px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 8px;
-  padding: 8px 12px;
-  border: 1px dashed var(--border-color);
-}
-.logos-pro-app .reasoning-summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--accent-text);
-}
-.logos-pro-app .reasoning-content {
-  margin-top: 8px;
-  white-space: normal;
-  font-family: inherit;
-  font-size: 12px;
-  color: var(--text-main);
-  opacity: 0.85;
-}
 
 /* A failure is a calm note, not a red block: a red edge on the left, the text in the body colour, and its retry as a
    secondary button under the text. */
@@ -1800,6 +1612,19 @@ body {
   line-height: 1.45;
   text-align: left;
   overflow-wrap: anywhere;
+}
+/* The same note on elements whose own rules would beat the zero-specificity one above. */
+.logos-pro-app :is(
+    .treasury-status.is-error,
+    .memory-status:not(:empty),
+    .environments-status,
+    .file-manager-file-row.is-failed
+  ) {
+  padding: 10px 12px;
+  border-left: 3px solid var(--danger);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
 }
 :where(.logos-error-note-title) {
   margin-bottom: 4px;
@@ -1957,11 +1782,7 @@ body {
 }
 .logos-pro-app .file-manager-file-row.is-failed {
   margin: 6px 0;
-  padding: 10px 12px;
   border-bottom: 0;
-  border-left: 3px solid var(--danger);
-  border-radius: 8px;
-  background: var(--surface-2);
 }
 .logos-pro-app .file-manager-error-tag {
   color: var(--danger);
@@ -1969,9 +1790,7 @@ body {
   font-weight: 600;
 }
 .logos-pro-app .file-manager-secondary-btn,
-.logos-pro-app .file-manager-danger-btn,
-.logos-pro-app .file-manager-vs-create-btn,
-.logos-pro-app .file-manager-vs-refresh-btn {
+.logos-pro-app .file-manager-danger-btn {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -1987,25 +1806,9 @@ body {
 .logos-pro-app .file-manager-secondary-btn[hidden] {
   display: none;
 }
-/* Beside the 40px name field, the store controls are as tall as it. */
-.logos-pro-app .file-manager-vs-create-btn,
-.logos-pro-app .file-manager-vs-refresh-btn {
-  min-height: 40px;
-  padding: 0 14px;
-}
-.logos-pro-app .file-manager-danger-btn {
-  border-color: transparent;
-  background: transparent;
-  color: var(--danger);
-}
-.logos-pro-app .file-manager-danger-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-}
 @media (pointer: coarse) {
   .logos-pro-app .file-manager-secondary-btn,
-  .logos-pro-app .file-manager-danger-btn,
-  .logos-pro-app .file-manager-vs-create-btn,
-  .logos-pro-app .file-manager-vs-refresh-btn {
+  .logos-pro-app .file-manager-danger-btn {
     min-height: 44px;
   }
 }
@@ -2044,18 +1847,7 @@ body {
 /* The picker's one primary action: flat gold across the window. */
 .logos-pro-app .file-manager-primary-btn {
   width: 100%;
-  min-height: 44px;
-  padding: 0 16px;
-  border-color: transparent;
-  border-radius: 10px;
-  background: var(--accent);
-  color: var(--accent-ink);
   font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.logos-pro-app .file-manager-primary-btn:hover:not(:disabled) {
-  background: var(--accent-hover);
 }
 
 /* MCP servers window (settings/settings_mcp.js): one row per server, its connect button on the right. */
@@ -2096,20 +1888,6 @@ body {
   flex: none;
   gap: 6px;
 }
-.logos-pro-app .mcp-oauth-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 14px;
-  font-size: 13px;
-  white-space: nowrap;
-}
-@media (pointer: coarse) {
-  .logos-pro-app .mcp-oauth-btn {
-    min-height: 44px;
-  }
-}
 .logos-pro-app .mcp-manager-empty {
   padding: 20px;
   text-align: center;
@@ -2147,7 +1925,7 @@ body {
 
 /* === UNIFIED BUTTON CONTRACT === */
 /* Общие цвета кнопок, в том числе вне .logos-pro-app (окна, добавленные в body). :where() даёт нулевую
-   специфичность, поэтому любое более конкретное правило (.header-btn, .settings-btn-accent) по-прежнему выигрывает.
+   специфичность, поэтому любое более конкретное правило (.header-btn, .btn-primary) по-прежнему выигрывает.
    Default = secondary: a raised surface with a hairline; primary = flat gold; danger = red text on no fill. */
 :where(.logos-btn) {
   background: var(--surface-2);
@@ -2158,23 +1936,21 @@ body {
 :where(.logos-btn:hover:not(:disabled, [aria-disabled="true"])) {
   background: var(--surface-3);
 }
-.settings-btn-accent,
 .btn-primary {
   background: var(--accent);
   color: var(--accent-ink);
   border-color: transparent;
   font-weight: 600;
 }
-.settings-btn-accent:hover:not(:disabled),
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
-.settings-btn-danger {
+.btn-danger {
   background: transparent;
   color: var(--danger);
   border-color: transparent;
 }
-.settings-btn-danger:hover:not(:disabled) {
+.btn-danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 .logos-pro-app .logos-btn {
@@ -2197,6 +1973,37 @@ body {
 }
 .logos-pro-app .logos-btn:active:not(:disabled) {
   transform: translateY(1px);
+}
+/* One size for buttons that stand beside a field or in a row of actions; the window's × keeps its own square. */
+.logos-pro-app .environments-create button,
+.logos-pro-app .environments-refresh,
+.logos-pro-app .environment-card-actions button,
+.logos-pro-app .environment-card-actions a,
+.logos-pro-app .mcp-oauth-btn,
+.logos-pro-app .file-manager-vs-create-btn,
+.logos-pro-app .file-manager-vs-refresh-btn,
+.logos-dept-card :is(.logos-btn, .btn-primary):not(.modal-close) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .logos-pro-app .environments-create button,
+  .logos-pro-app .environments-refresh,
+  .logos-pro-app .environment-card-actions button,
+  .logos-pro-app .environment-card-actions a,
+  .logos-pro-app .mcp-oauth-btn,
+  .logos-pro-app .file-manager-vs-create-btn,
+  .logos-pro-app .file-manager-vs-refresh-btn,
+  .logos-dept-card :is(.logos-btn, .btn-primary):not(.modal-close) {
+    min-height: 44px;
+  }
 }
 
 /* === SYSTEM STATUS MODULE === */
@@ -2405,21 +2212,12 @@ body {
 .logos-pro-app summary::-webkit-details-marker {
   display: none;
 }
-.logos-pro-app .msg.user {
-  max-width: 80%;
-  margin-left: auto;
-}
 .logos-pro-app .msg pre code {
   font-size: inherit;
 }
 .logos-pro-app .execution-surface {
   flex-basis: 100%;
   width: 100%;
-}
-
-/* Размеры подписей кнопок, которые перебивались общим правилом (пункт 54) */
-.logos-pro-app .logos-trace-open-viewer {
-  font-size: 12px;
 }
 
 /* Индикатор набора ответа (пункт 16) */
@@ -2436,14 +2234,9 @@ body {
   background: var(--text-secondary);
 }
 
-/* Live answer: the reply as it streams in. It stays hidden until the first text arrives;
-   a stream that stopped before the stored reply came is dimmed. */
-.logos-pro-app .msg.live-reply[hidden] {
-  display: none;
-}
+/* A live reply whose stream stopped before the stored reply came is dimmed. */
 .logos-pro-app .msg.live-stopped {
   opacity: 0.75;
-  border-style: dashed;
 }
 
 /* Модели: список и повтор загрузки (пункты 68, 69) */
@@ -2457,24 +2250,8 @@ body {
   align-self: flex-start;
   min-height: 44px;
   padding: 0 16px;
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--text);
   font-size: 14px;
 }
-.logos-pro-app .model-option-retry:hover:not(:disabled) {
-  background: var(--surface-3);
-}
-/* Пустое состояние (пункт 17): one look for every place, defined once next to #chatbox. */
-/* Наведение на кнопки окружений (пункт 76) */
-.logos-pro-app .environments-create button:not(.btn-primary):hover,
-.logos-pro-app .environments-refresh:hover,
-.logos-pro-app .environment-card-actions button:not(.environment-delete):hover,
-.logos-pro-app .environment-card-actions a:hover {
-  background: var(--surface-3);
-}
-/* Нет движения для тех, кто его отключил в системе (пункт 98) */
 
 /* Support version stays outside the crowded mobile toolbar. */
 .logos-pro-app .app-version {
@@ -2796,15 +2573,14 @@ body {
   --court-rainbow-text: linear-gradient(90deg, #ff6b6b, #ffa64d, #ffe04d, #4dd96b, #4da6ff, #b38cff, #ff6bb5);
 }
 .logos-pro-app .msg.msg-court {
+  padding: 12px 16px;
   border: 2px solid transparent;
+  border-radius: 18px 18px 18px 4px;
   background:
     linear-gradient(var(--bg-bubble-bot), var(--bg-bubble-bot)) padding-box,
     var(--court-rainbow-frame) border-box;
 }
-/* The #chatbox selector outranks the plain answer's "background: none" in the Messages section below, which
-   otherwise removed the gradient and left the transparent glyphs invisible. */
-.logos-pro-app .msg.msg-court .bubble,
-.logos-pro-app #chatbox > .msg.bot.msg-court > .bubble {
+.logos-pro-app .msg.msg-court .bubble {
   background: var(--court-rainbow-text);
   -webkit-background-clip: text;
   background-clip: text;
@@ -2817,10 +2593,6 @@ body {
 .logos-pro-app .msg.msg-court .bubble math,
 .logos-pro-app .msg.msg-court .bubble .msg-proof {
   -webkit-text-fill-color: currentColor;
-}
-.logos-pro-app .msg.user .bubble {
-  border-left: 3px solid var(--border-strong);
-  padding-left: 8px;
 }
 .logos-pro-app .msg-proof {
   background: rgba(63, 178, 127, 0.25);
@@ -2904,19 +2676,15 @@ body {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   column-gap: 2px;
+  /* A long unbroken word or link wraps inside the bubble instead of pushing it past the screen edge (#1718). */
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 16px;
   line-height: 1.6;
 }
 /* A live reply waits hidden until its first text (the grid above must not show it). */
 .logos-pro-app #chatbox > .msg[hidden] {
   display: none;
-}
-.logos-pro-app #chatbox > .msg:not(.msg-court) {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
 }
 .logos-pro-app #chatbox > .msg > * {
   grid-column: 1 / -1;
@@ -2940,13 +2708,6 @@ body {
   max-width: 100%;
   color: var(--text-main);
 }
-.logos-pro-app #chatbox > .msg.bot > .bubble,
-.logos-pro-app #chatbox > .msg.error > .bubble {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-}
 
 /* The question: a soft bubble on the right, its row under it. */
 .logos-pro-app #chatbox > .msg.user {
@@ -2957,7 +2718,6 @@ body {
 }
 .logos-pro-app #chatbox > .msg.user > .bubble {
   padding: 10px 15px;
-  border: 0;
   border-radius: 20px 20px 6px 20px;
   background: var(--msg-user-bg);
   color: var(--msg-user-text);
@@ -3125,16 +2885,10 @@ body {
   margin-bottom: 8px;
 }
 .logos-pro-app .logs-search {
-  box-sizing: border-box;
   flex: 1 1 100%;
   min-width: 0;
   min-height: 44px;
-  padding: 0 12px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--text);
-  font: inherit;
 }
 .logos-pro-app .logs-filter {
   min-height: 44px;
