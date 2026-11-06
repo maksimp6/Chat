@@ -20,6 +20,11 @@
     return Number.isFinite(number) ? number : null;
   }
 
+  function toolFailed(call) {
+    var result = call && call.result;
+    return Boolean(call && call.error) || Boolean(result && typeof result === "object" && (result.error || result.success === false));
+  }
+
   function durationMs(trace) {
     var timings = trace.timings || {};
     var total = finite(timings.total_duration_ms);
@@ -264,5 +269,7 @@
 
   window.LogosTraceSummary = Object.freeze({
     build: build,
+    finite: finite,
+    toolFailed: toolFailed,
   });
 })();

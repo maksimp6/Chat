@@ -34,7 +34,7 @@ Dispatcher
 Network
 ```
 
-`LogosDispatcher.request(input, init, options)` applies the time limit and publishes live network status under the name `network`. `LogosDispatcher.adopt(pending, abort, options)` takes over a request the page started before its scripts ran. `LogosDispatcher.hold()` keeps the page busy for work that outlives its request, and `LogosDispatcher.isBusy()` tells the update check to wait.
+`LogosDispatcher.request(input, init, options)` applies the time limit and publishes live network status under the name `network`. `LogosDispatcher.adopt(pending, abort, options)` takes over a request the page started before its scripts ran. `LogosDispatcher.hold()` keeps the page busy for work that outlives its request, and `LogosDispatcher.isBusy()` tells the update check to wait. `LogosDispatcher.retryDelayMs(attempt)` is the pause before an automatic repeat.
 
 Three requests use `fetch` directly: the first history read in `templates/index.html`, which starts ahead of the scripts, the version check in `static/boot.js`, and the `keepalive` delete in `static/file_manager.js`, which runs while the page goes away.
 

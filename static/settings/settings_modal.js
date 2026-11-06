@@ -137,22 +137,8 @@
     };
 
     // fetch resolves for HTTP errors too, so a non-OK status must be turned into a failure here.
-    // The failure keeps the HTTP status and the server's error code, so the message names the real cause.
     function readOk(r) {
-      if (!r.ok) {
-        return r
-          .json()
-          .catch(function () {
-            return {};
-          })
-          .then(function (body) {
-            var error = new Error("HTTP " + r.status);
-            error.status = r.status;
-            error.code = body && typeof body.error === "string" ? body.error : "";
-            throw error;
-          });
-      }
-      return r.json();
+      return r.ok ? r.json() : window.LogosHttpError(r);
     }
     // Why the list did not load: the server's answer (with its HTTP status) or no answer at all.
     function categoriesErrorText(error) {
@@ -183,10 +169,7 @@
         // One tool, one function: the function picks the action; these are its actions.
         var actionsOf = catData.actions || {};
         function countOf(n, one, few, many) {
-          var mod10 = n % 10;
-          var mod100 = n % 100;
-          var word = mod10 === 1 && mod100 !== 11 ? one : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? few : many;
-          return n + " " + word;
+          return n + " " + russianPlural(n, one, few, many);
         }
         listEl.innerHTML = Object.keys(categories)
           .map(function (cat) {
@@ -389,7 +372,7 @@
     if (!box) return;
     window.LogosDispatcher.request("/api/ollama/settings", null, { timeoutMs: 30000 })
       .then(function (r) {
-        if (!r.ok) return window.LogosHttpError(r).then(function (e) { throw e; });
+        if (!r.ok) return window.LogosHttpError(r);
         return r.json();
       })
       .then(function (data) {

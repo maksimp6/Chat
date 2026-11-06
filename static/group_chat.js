@@ -6,14 +6,7 @@
   var STORE_KEY = "group_chat_models";
   var modal = null;
 
-  function el(tag, attrs, text) {
-    var node = document.createElement(tag);
-    Object.keys(attrs || {}).forEach(function (key) {
-      node.setAttribute(key, attrs[key]);
-    });
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
+  var el = window.LogosCoreAPI.ui.element;
 
   function readStored() {
     try {
@@ -37,10 +30,8 @@
   var memoryOnly = readStored();
 
   // One model answers everything in Logos: the group chat has the chat model and never another.
-  var CHAT_MODEL = "ollama-qwen3-4b";
-
   function dialogModels() {
-    return window.isDialogModel(CHAT_MODEL) ? [CHAT_MODEL] : [];
+    return window.isDialogModel(CHAT_MODEL_KEY) ? [CHAT_MODEL_KEY] : [];
   }
 
   // The Court of Logos sits in the group chat as a participant: after the models it judges the
@@ -136,7 +127,7 @@
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ conversation_id: conversationId }),
     }).then(function (r) {
-      if (!r.ok) return window.LogosHttpError(r).then(function (e) { throw e; });
+      if (!r.ok) return window.LogosHttpError(r);
       return r.json();
     });
   }

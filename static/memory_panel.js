@@ -19,7 +19,7 @@
     if (pending) pending.textContent = "Загрузка…";
     try {
       var response = await window.LogosDispatcher.request("/api/memory/manage");
-      if (!response.ok) throw await window.LogosHttpError(response);
+      if (!response.ok) await window.LogosHttpError(response);
       var data = await response.json();
       var enabled = byId("memEnabled");
       var limit = byId("memLimit");

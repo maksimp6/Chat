@@ -178,13 +178,6 @@
   var pageScriptsRan = document.readyState === "complete";
   var heldTap = null;
 
-  function markTapPending(button, pending) {
-    if (!button || !button.classList) return;
-    button.classList.toggle("logos-action-pending", pending);
-    if (pending) button.setAttribute("aria-busy", "true");
-    else button.removeAttribute("aria-busy");
-  }
-
   function runTap(button, event) {
     try {
       dispatchAction(button.dataset.action, actionPayload(button, event), event);
@@ -195,9 +188,9 @@
 
   function takeTap(button, event) {
     if (!pageScriptsRan) {
-      if (heldTap && heldTap.button !== button) markTapPending(heldTap.button, false);
+      if (heldTap && heldTap.button !== button) window.LogosBoot.markTapPending(heldTap.button, false);
       heldTap = { button: button, event: event };
-      markTapPending(button, true);
+      window.LogosBoot.markTapPending(button, true);
       return;
     }
     runTap(button, event);
@@ -209,7 +202,7 @@
     var tap = heldTap;
     heldTap = null;
     if (!tap) return;
-    markTapPending(tap.button, false);
+    window.LogosBoot.markTapPending(tap.button, false);
     if (tap.button.isConnected === false || tap.button.disabled) return;
     runTap(tap.button, tap.event);
   }
@@ -253,10 +246,24 @@
         ? window.LogosBoot.takeEarlyTap()
         : null;
     if (early) {
-      markTapPending(early.button, false);
+      window.LogosBoot.markTapPending(early.button, false);
       if (findActionButton(early.button, root) && !early.button.disabled) takeTap(early.button, early.event);
     }
     return uiClickUnmount;
+  }
+
+  // attrs is an object of attributes or a string of class names.
+  function createElement(tag, attrs, text) {
+    var node = document.createElement(tag);
+    if (typeof attrs === "string") {
+      if (attrs) node.className = attrs;
+    } else {
+      Object.keys(attrs || {}).forEach(function (key) {
+        node.setAttribute(key, attrs[key]);
+      });
+    }
+    if (text !== undefined) node.textContent = text;
+    return node;
   }
 
   function createButton(options) {
@@ -499,6 +506,7 @@
       redact: safeData,
     }),
     ui: Object.freeze({
+      element: createElement,
       button: createButton,
       actions: Object.freeze({ register: registerAction }),
       events: Object.freeze({ mountClicks: mountClickDispatcher }),

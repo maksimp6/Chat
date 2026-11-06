@@ -1,17 +1,24 @@
 // The server's own reason for a failed response, so the user sees why it failed
-// instead of a bare "HTTP 400" or "try again" (#1668). Resolves to an Error.
+// instead of a bare "HTTP 400" or "try again" (#1668). Rejects with an Error that keeps the HTTP status and the
+// server's error code, so a caller can tell the server's answer from a missing connection.
 window.LogosHttpError = function (response) {
   var fallback = "HTTP " + response.status;
+  function failure(text, code) {
+    var failed = new Error(text);
+    failed.status = response.status;
+    failed.code = code;
+    return failed;
+  }
   return response.json().then(
     function (body) {
       var error = body && body.error;
       var text =
         (body && (body.message || body.detail || body.title)) ||
         (error && typeof error === "object" ? error.message || error.code : error);
-      return new Error(typeof text === "string" && text ? text : fallback);
+      throw failure(typeof text === "string" && text ? text : fallback, typeof error === "string" ? error : "");
     },
     function () {
-      return new Error(fallback);
+      throw failure(fallback, "");
     },
   );
 };
@@ -154,7 +161,7 @@ async function loadModels() {
     if (!response.ok) {
       reportModelLoad("http_error", { status: response.status });
       failureClassified = true;
-      throw await window.LogosHttpError(response);
+      await window.LogosHttpError(response);
     }
     var payload;
     try {

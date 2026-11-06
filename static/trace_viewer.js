@@ -61,12 +61,9 @@
     media: null,
   };
 
-  function el(tag, className, text) {
-    var node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined && text !== null) node.textContent = String(text);
-    return node;
-  }
+  var el = window.LogosCoreAPI.ui.element;
+  var finite = window.LogosTraceSummary.finite;
+  var toolFailed = window.LogosTraceSummary.toolFailed;
 
   function button(className, text, onClick, title) {
     var node = el("button", "logos-btn " + className, text);
@@ -74,13 +71,6 @@
     if (title) node.title = title;
     if (onClick) node.addEventListener("click", onClick);
     return node;
-  }
-
-  // Number(null) is 0, so a missing value is rejected before the conversion.
-  function finite(value) {
-    if (value === null || value === undefined || value === "") return null;
-    var number = Number(value);
-    return Number.isFinite(number) ? number : null;
   }
 
   function objectsOf(list) {
@@ -95,21 +85,13 @@
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
   }
 
-  function plural(n, one, few, many) {
-    var mod10 = n % 10;
-    var mod100 = n % 100;
-    if (mod10 === 1 && mod100 !== 11) return one;
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-    return many;
-  }
-
   function fmtNumber(value) {
     var n = finite(value);
     return n === null ? "—" : n.toLocaleString("ru-RU");
   }
 
   function count(n, one, few, many) {
-    return fmtNumber(n) + " " + plural(Math.abs(Math.round(n)), one, few, many);
+    return fmtNumber(n) + " " + russianPlural(Math.abs(Math.round(n)), one, few, many);
   }
 
   function fmtMs(value) {
@@ -242,14 +224,6 @@
     }
     if (end === null) end = finite(response.timestamp);
     return start !== null && end !== null && end >= start ? { start: start, end: end } : null;
-  }
-
-  function toolFailed(call) {
-    var result = call.result;
-    return (
-      Boolean(call.error) ||
-      Boolean(result && typeof result === "object" && (result.error || result.success === false))
-    );
   }
 
   function buildModel(trace) {

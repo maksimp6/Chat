@@ -85,6 +85,7 @@
   window.LogosBoot = Object.freeze({
     markShellReady: markShellReady,
     takeEarlyTap: takeEarlyTap,
+    markTapPending: markTapPending,
   });
 
   function emitDiagnostic(level, event, error, extra) {

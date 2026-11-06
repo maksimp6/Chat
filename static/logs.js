@@ -14,12 +14,7 @@
     ["ERROR", "Ошибки"],
   ];
 
-  function el(tag, className, text) {
-    var node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
+  var el = window.LogosCoreAPI.ui.element;
 
   function when(timestamp) {
     var date = new Date(timestamp);
@@ -107,7 +102,7 @@
       return window.LogosDispatcher.request("/api/logs?" + params.toString(), {
         headers: { Accept: "application/json" },
       }).then(function (response) {
-        if (!response.ok) return window.LogosHttpError(response).then(function (e) { throw e; });
+        if (!response.ok) return window.LogosHttpError(response);
         return response.json();
       });
     }

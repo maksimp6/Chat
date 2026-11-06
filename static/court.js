@@ -13,18 +13,11 @@
     "ТЯЖКОЕ": "grave",
   };
 
-  function h(tag, attrs, text) {
-    var node = document.createElement(tag);
-    Object.keys(attrs || {}).forEach(function (key) {
-      node.setAttribute(key, attrs[key]);
-    });
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
+  var h = window.LogosCoreAPI.ui.element;
 
   function api(path) {
     return window.LogosDispatcher.request(path, { headers: { Accept: "application/json" } }).then(function (r) {
-      if (!r.ok) return window.LogosHttpError(r).then(function (e) { throw e; });
+      if (!r.ok) return window.LogosHttpError(r);
       return r.json();
     });
   }

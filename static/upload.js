@@ -18,17 +18,10 @@
   // The largest piece that still goes out within the longest wait on the slowest link: after the link drops, one
   // timed-out piece costs at most this much.
   const MAX_PIECE_BYTES = Math.floor((MAX_WAIT_MS - BASE_WAIT_MS) * WORST_LINK_BYTES_PER_MS);
-  // Pauses between attempts after a failure: random within a window that doubles from the base to the cap, as the
-  // chat's re-sends do.
-  const RETRY_BASE_MS = 1000;
-  const RETRY_CAP_MS = 15000;
   // Answers that a repeat can get past: a gateway or the server busy for a moment. Any other answer is final.
   const PASSING_STATUSES = [408, 429, 502, 503, 504];
 
-  function retryDelayMs(attempt) {
-    const span = Math.min(RETRY_CAP_MS, RETRY_BASE_MS * Math.pow(2, Math.max(attempt, 1) - 1));
-    return Math.random() * span;
-  }
+  const retryDelayMs = window.LogosDispatcher.retryDelayMs;
 
   function stopped() {
     const error = new Error("The upload was stopped");

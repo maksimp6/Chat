@@ -12,12 +12,7 @@
     return number(value).toLocaleString("ru-RU");
   }
 
-  function el(tag, className, text) {
-    var node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined && text !== null) node.textContent = String(text);
-    return node;
-  }
+  var el = window.LogosCoreAPI.ui.element;
 
   function joined(parts) {
     return Array.isArray(parts) ? parts.join("") : "";

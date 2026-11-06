@@ -100,7 +100,7 @@
   function fetchRecord() {
     return window.LogosDispatcher.request("/api/settings", null, { timeoutMs: 5000 })
       .then(function (r) {
-        if (!r.ok) return window.LogosHttpError(r).then(function (e) { throw e; });
+        if (!r.ok) return window.LogosHttpError(r);
         return r.json();
       })
       .then(recordFrom);

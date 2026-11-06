@@ -5,14 +5,7 @@
   // The stored names are English; the interface language is Russian (docs/development/naming.md).
   var TITLES = { "partner-relations": "Партнёры", government: "Государственные дела" };
 
-  function el(tag, attrs, text) {
-    var node = document.createElement(tag);
-    Object.keys(attrs || {}).forEach(function (key) {
-      node.setAttribute(key, attrs[key]);
-    });
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
+  var el = window.LogosCoreAPI.ui.element;
 
   function close() {
     if (!modal) return;
@@ -38,7 +31,7 @@
 
     window.LogosDispatcher.request("/api/departments", { headers: { Accept: "application/json" } })
       .then(function (response) {
-        if (!response.ok) return window.LogosHttpError(response).then(function (e) { throw e; });
+        if (!response.ok) return window.LogosHttpError(response);
         return response.json();
       })
       .then(function (data) {

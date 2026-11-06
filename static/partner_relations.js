@@ -1,14 +1,7 @@
 (function () {
   "use strict";
 
-  function h(tag, attrs, text) {
-    var node = document.createElement(tag);
-    Object.keys(attrs || {}).forEach(function (key) {
-      node.setAttribute(key, attrs[key]);
-    });
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
+  var h = window.LogosCoreAPI.ui.element;
 
   var STATUS_LABELS = {
     lead: "Лид",
@@ -88,6 +81,17 @@
     });
     UI.modal.open(modal);
 
+    function fetchPartner(id) {
+      return window.LogosDispatcher.request("/api/partners/" + encodeURIComponent(id), {
+        headers: { Accept: "application/json" },
+      }).then(function (r) {
+        return r.json().then(function (data) {
+          if (!r.ok) throw new Error(data.error || "HTTP " + r.status);
+          return data.partner;
+        });
+      });
+    }
+
     function load() {
       return window.LogosDispatcher.request("/api/partners", {
         headers: { Accept: "application/json" },
@@ -120,15 +124,7 @@
               ),
             );
             row.onclick = function () {
-              window.LogosDispatcher.request("/api/partners/" + encodeURIComponent(partner.id), {
-                headers: { Accept: "application/json" },
-              })
-                .then(function (r) {
-                  return r.json().then(function (data) {
-                    if (!r.ok) throw new Error(data.error || "HTTP " + r.status);
-                    return data.partner;
-                  });
-                })
+              fetchPartner(partner.id)
                 .then(showDetails)
                 .catch(function (err) {
                   LogosToast.error(window.LogosErrorText("Не удалось открыть партнёра", err));
@@ -141,19 +137,10 @@
 
     // Details must show the server's current state, not the copy taken before the change.
     function reloadPartner(id) {
-      return window.LogosDispatcher.request("/api/partners/" + encodeURIComponent(id), {
-        headers: { Accept: "application/json" },
-      })
-        .then(function (r) {
-          return r.json().then(function (data) {
-            if (!r.ok) throw new Error(data.error || "HTTP " + r.status);
-            return data.partner;
-          });
-        })
-        .then(function (fresh) {
-          load();
-          showDetails(fresh);
-        });
+      return fetchPartner(id).then(function (fresh) {
+        load();
+        showDetails(fresh);
+      });
     }
 
     function showDetails(partner) {

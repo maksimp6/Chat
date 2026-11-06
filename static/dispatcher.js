@@ -179,10 +179,20 @@
     };
   }
 
+  // The pause before an automatic repeat: random within a window that doubles from the base up to the cap (full jitter).
+  const RETRY_BASE_MS = 1000;
+  const RETRY_WINDOW_CAP_MS = 15000;
+
+  function retryDelayMs(attempt) {
+    const span = Math.min(RETRY_WINDOW_CAP_MS, RETRY_BASE_MS * Math.pow(2, Math.max(attempt, 1) - 1));
+    return Math.random() * span;
+  }
+
   window.LogosDispatcher = Object.freeze({
     request,
     adopt,
     hold,
+    retryDelayMs,
     isBusy: () => activeRequests + holds > 0,
   });
 })();

@@ -283,7 +283,7 @@
               method: "DELETE",
             })
               .then(function (response) {
-                if (!response.ok) return window.LogosHttpError(response).then(function (e) { throw e; });
+                if (!response.ok) return window.LogosHttpError(response);
                 return response.json().catch(function () {
                   return {};
                 });
@@ -345,7 +345,7 @@
         body: JSON.stringify({ name: name }),
       })
         .then(function (r) {
-          if (!r.ok) return window.LogosHttpError(r).then(function (e) { throw e; });
+          if (!r.ok) return window.LogosHttpError(r);
         })
         .then(function () {
           document.getElementById("vs-name-input").value = "";

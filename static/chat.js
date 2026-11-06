@@ -128,14 +128,14 @@ function loadRendererScript(name) {
 loadRendererScript("markdown");
 loadRendererScript("texmath");
 
-function escapeAttribute(text) {
-  return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 // A message drawn before its renderer arrived keeps its source on its own element, so nothing outlives the element
 // (a live answer is drawn again every 250 ms).
 function pendingMarkdownHtml(source, html) {
-  return '<div class="md-pending" data-md-source="' + escapeAttribute(source) + '">' + html + "</div>";
+  return '<div class="md-pending" data-md-source="' + window.SettingsUI.escapeHtml(source) + '">' + html + "</div>";
+}
+
+function isPinned(chatbox) {
+  return chatbox.scrollHeight - chatbox.scrollTop - chatbox.clientHeight <= CHAT_PINNED_PX;
 }
 
 // Draws again every message shown before markdown-it or KaTeX arrived; one that still lacks its renderer stays
@@ -144,7 +144,7 @@ function renderPendingMarkdown() {
   var pending = document.querySelectorAll(".md-pending[data-md-source]");
   if (!pending.length) return;
   var chatbox = document.getElementById("chatbox");
-  var pinned = Boolean(chatbox) && chatbox.scrollHeight - chatbox.scrollTop - chatbox.clientHeight <= CHAT_PINNED_PX;
+  var pinned = Boolean(chatbox) && isPinned(chatbox);
   pending.forEach(function (el) {
     var holder = document.createElement("div");
     holder.innerHTML = parseMarkdown(el.getAttribute("data-md-source"));
@@ -1319,11 +1319,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const turnStarts = new Map();
   function markTurnStart(convId) { turnStarts.set(convId, (turnStarts.get(convId) || 0) + 1); }
 
-  // Every server code is named in Russian (chatErrorReason); the code and English server text go to the console.
-  function errorReasonText(data, status) {
-    return chatErrorReason(data, status);
-  }
-
   // «Стоп» ends only this tab's stream. Once the server has the question ('turn' event) it goes on with the answer; before
   // that the server may not have the question at all, so the text goes back to the field (see sendTurn).
   function stopNotice(accepted) {
@@ -2161,15 +2156,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const LIVE_UPLOAD_BYTES_PER_MS = 32;
   // The live bubble is redrawn at most this often; a slow redraw (a long Markdown reply on a phone) spaces them further.
   const LIVE_RENDER_MS = 250;
-  // Automatic re-sends and re-attachments pause for a random time within a window that doubles from the base up to the
-  // cap (full jitter). They go on until the answer comes or the send is stopped.
-  const RESEND_BASE_MS = 1000;
-  const RESEND_WINDOW_CAP_MS = 15000;
-
-  function retryDelayMs(attempt) {
-    const span = Math.min(RESEND_WINDOW_CAP_MS, RESEND_BASE_MS * Math.pow(2, Math.max(attempt, 1) - 1));
-    return Math.random() * span;
-  }
+  // Automatic re-sends and re-attachments go on until the answer comes or the send is stopped.
+  const retryDelayMs = window.LogosDispatcher.retryDelayMs;
 
   // Seconds with a decimal comma, as the status line reads them.
   function formatSeconds(ms) {
@@ -2207,10 +2195,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function setTurnLabel(turn, text) {
     if (turn.status && typeof text === "string" && text) turn.status.setLabel(text);
-  }
-
-  function isPinned(chatbox) {
-    return chatbox.scrollHeight - chatbox.scrollTop - chatbox.clientHeight <= CHAT_PINNED_PX;
   }
 
   function responseType(response) {
@@ -3073,7 +3057,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
           }
           const errorNode = addMessage({
-            text: data.reply || "⚠️ Ошибка: " + errorReasonText(data, httpStatus),
+            text: data.reply || "⚠️ Ошибка: " + chatErrorReason(data, httpStatus),
             role: "error",
             // A stored error keeps its id, as a loaded one has: a refresh then knows it is stored.
             id: Number.isInteger(data.message_id) && data.message_id > 0 ? data.message_id : undefined,

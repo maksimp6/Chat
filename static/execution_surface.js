@@ -37,11 +37,9 @@
     return Array.isArray(value) ? value : [];
   }
 
-  function finite(value) {
-    if (value === null || value === undefined || value === "") return null;
-    var number = Number(value);
-    return Number.isFinite(number) ? number : null;
-  }
+  var finite = window.LogosTraceSummary.finite;
+  // A stage with a failed call is not shown as done: the marks must agree with the reason line.
+  var toolFailed = window.LogosTraceSummary.toolFailed;
 
   function text(value, limit) {
     if (typeof value !== "string") return "";
@@ -167,12 +165,6 @@
     };
   }
 
-  // A stage with a failed call is not shown as done: the marks must agree with the reason line.
-  function toolFailed(call) {
-    var result = call && call.result;
-    return Boolean(call && call.error) || Boolean(result && typeof result === "object" && (result.error || result.success === false));
-  }
-
   function finishStatus(state) {
     if (state === "partial") return "partial";
     if (state === "error" || state === "timeout" || state === "cancelled") return "error";
@@ -225,10 +217,7 @@
 
   // A count with its Russian word form, digits grouped: 1 вызов, 4 инструмента, 1 960 065 токенов.
   function countText(n, one, few, many) {
-    var mod10 = n % 10;
-    var mod100 = n % 100;
-    var word = mod10 === 1 && mod100 !== 11 ? one : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? few : many;
-    return n.toLocaleString("ru-RU") + " " + word;
+    return n.toLocaleString("ru-RU") + " " + russianPlural(n, one, few, many);
   }
 
   function summaryParts(surface) {

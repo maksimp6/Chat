@@ -1,20 +1,6 @@
 (() => {
   const state = { environments: [] };
 
-  function esc(value) {
-    return String(value ?? "").replace(
-      /[&<>"']/g,
-      (ch) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;",
-        })[ch],
-    );
-  }
-
   // Web addresses and same-origin paths such as "/environments/<id>/" become links; other schemes in
   // server data would run as script. "//host" and backslashes would leave the origin, so they are refused.
   const SAME_ORIGIN_PATH_RE = /^\/(?![\/\\])[^\\\x00-\x20\x7f]*$/;
@@ -50,10 +36,6 @@
     ["git ref is not available:", "Ветка или коммит не найдены в репозитории. Проверьте имя и повторите."],
     ["invalid environment transition:", ERROR_TEXT.environment_state_conflict],
   ];
-
-  function isRussianText(value) {
-    return typeof value === "string" && /[А-Яа-яЁё]/.test(value);
-  }
 
   // A timed-out request may still finish on the server, so the message says that instead of the browser text.
   // A server answer is named by its code or HTTP status; only a request without an answer is a connection problem.
@@ -154,6 +136,7 @@
   }
 
   function render() {
+    const esc = window.SettingsUI.escapeHtml;
     const list = modal().querySelector(".environments-list");
     list.innerHTML = state.environments.length
       ? state.environments

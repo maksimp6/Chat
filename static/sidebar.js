@@ -85,22 +85,6 @@ function hideSidebarPanel(focusMenu) {
   }
 }
 
-// A refused request carries the HTTP status and the server's error code, so the message can tell
-// the server's answer from a missing connection.
-function sidebarHttpError(response) {
-  return response
-    .json()
-    .catch(function () {
-      return {};
-    })
-    .then(function (body) {
-      var error = new Error("HTTP " + response.status);
-      error.status = response.status;
-      error.code = body && typeof body.error === "string" ? body.error : "";
-      throw error;
-    });
-}
-
 // What happened and what to do, in Russian: the server's answer is named with its HTTP status and is not
 // called a network error; only a request that got no answer is.
 function sidebarFailureText(err, notDone) {
@@ -275,7 +259,7 @@ function renderSidebarRow(conv) {
       body: JSON.stringify({ title: name }),
     })
       .then((r) => {
-        if (!r.ok) return sidebarHttpError(r);
+        if (!r.ok) return window.LogosHttpError(r);
         return r.json();
       })
       .then((data) => {
@@ -366,7 +350,7 @@ function renderSidebarRow(conv) {
         if (!confirmed) return;
         window.LogosDispatcher.request("/api/conversations/" + conv.id, { method: "DELETE" })
           .then((r) => {
-            if (!r.ok) return sidebarHttpError(r);
+            if (!r.ok) return window.LogosHttpError(r);
             deleteConv(conv.id);
           })
           .catch((err) => {
