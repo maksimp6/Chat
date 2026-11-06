@@ -118,7 +118,11 @@ struc MatvecJob
   .xsum16:  resq 1   ; -> f32[ cols/16 ] or 0
   .rows:    resq 1
   .cols:    resq 1
+  .next:    resq 1   ; next unclaimed row (threads take .chunk rows at a time with lock xadd); reset to 0 per matvec
+  .chunk:   resq 1   ; rows per claim: rows / (nthreads * MATVEC_CHUNKS_PER_THREAD), at least MATVEC_CHUNK_MIN
 endstruc
+MATVEC_CHUNKS_PER_THREAD equ 8   ; claims per thread per matvec: the tail imbalance is at most 1/8 of a thread's share
+MATVEC_CHUNK_MIN         equ 8
 
 ; One attention step for the current position. Each thread handles a slice of
 ; the query heads. `scores` is a scratch base; thread t uses scores + t*n_ctx.

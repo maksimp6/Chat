@@ -35,6 +35,10 @@ $prompts = @(
 
 function Median($xs) { $s = @($xs | Sort-Object); return $s[[int]([math]::Floor($s.Count / 2))] }
 
+# Unload the model from Ollama. Through cmd so its progress spinner on stderr never
+# reaches PowerShell 5.1, which would turn it into a terminating NativeCommandError.
+function Stop-Ollama { cmd /c "ollama stop $Model >nul 2>&1" | Out-Null }
+
 function Run-Ollama($prompt, $n) {
     $body = @{ model = $Model; prompt = $prompt; raw = $true; stream = $false
         options = @{ temperature = 0; seed = 1; num_predict = $n; num_ctx = 1024 } } | ConvertTo-Json -Depth 4
@@ -48,31 +52,36 @@ function Run-Ollama($prompt, $n) {
 }
 
 function Run-Asmrun($prompt, $n) {
-    $pf = New-TemporaryFile
+    $pf = (New-TemporaryFile).FullName
     [IO.File]::WriteAllText($pf, $prompt, (New-Object Text.UTF8Encoding $false))
-    $errf = New-TemporaryFile
-    $sw = [Diagnostics.Stopwatch]::StartNew()
-    $out = & $exe $blob "-p" $pf "-n" $n "-c" 1024 "-t" $Threads 2> $errf
-    $sw.Stop()
-    $stats = Get-Content $errf -Raw
-    Remove-Item $pf, $errf -ErrorAction SilentlyContinue
+    $outf = (New-TemporaryFile).FullName
+    $errf = (New-TemporaryFile).FullName
+    # Start-Process keeps asmrun's statistics (stderr) out of PowerShell's error
+    # stream; PowerShell 5.1 would otherwise raise a terminating NativeCommandError.
+    $p = Start-Process -FilePath $exe -ArgumentList @($blob, "-p", $pf, "-n", $n, "-c", 1024, "-t", $Threads) `
+        -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outf -RedirectStandardError $errf
+    $stats = [IO.File]::ReadAllText($errf)
+    $text = [IO.File]::ReadAllText($outf, [Text.Encoding]::UTF8)
+    Remove-Item $pf, $outf, $errf -ErrorAction SilentlyContinue
+    if ($p.ExitCode -ne 0) { throw "asmrun exited with code $($p.ExitCode): $stats" }
     $gen = if ($stats -match "gen_tok_s=([0-9.]+)") { [double]$Matches[1] } else { 0 }
     $pe = if ($stats -match "prompt_tok_s=([0-9.]+)") { [double]$Matches[1] } else { 0 }
     $eff = if ($stats -match "effective_gb_s=([0-9.]+)") { [double]$Matches[1] } else { 0 }
-    [pscustomobject]@{ gen_tok_s = $gen; prompt_tok_s = $pe; effective_gb_s = $eff; text = ($out -join "`n") }
+    $gbtok = if ($stats -match "weights_gb_per_token=([0-9.]+)") { [double]$Matches[1] } else { 0 }
+    [pscustomobject]@{ gen_tok_s = $gen; prompt_tok_s = $pe; effective_gb_s = $eff; gb_per_token = $gbtok; text = $text }
 }
 
 $rows = @()
 for ($p = 0; $p -lt $prompts.Count; $p++) {
     Write-Host "`n=== prompt $p ==="
 
-    & ollama stop $Model 2>$null | Out-Null
+    Stop-Ollama
     $aRuns = 1..$Runs | ForEach-Object { Run-Asmrun $prompts[$p] 64 }
     $a = $aRuns[-1]
 
     $warm = Run-Ollama $prompts[$p] 8
     $oRuns = 1..$Runs | ForEach-Object { Run-Ollama $prompts[$p] 64 }
-    & ollama stop $Model 2>$null | Out-Null
+    Stop-Ollama
 
     $rows += [pscustomobject]@{
         prompt            = $p
@@ -80,12 +89,13 @@ for ($p = 0; $p -lt $prompts.Count; $p++) {
         asmrun_gen_tok_s  = [math]::Round((Median ($aRuns.gen_tok_s)), 2)
         ollama_prompt_tok_s = [math]::Round((Median ($oRuns.prompt_tok_s)), 2)
         asmrun_prompt_tok_s = [math]::Round((Median ($aRuns.prompt_tok_s)), 2)
-        asmrun_effective_gb_s = [math]::Round($a.effective_gb_s, 2)
+        asmrun_effective_gb_s = [math]::Round((Median ($aRuns.effective_gb_s)), 2)
     }
     Write-Host ("ollama : " + ($oRuns[-1].text -replace "\s+", " ").Substring(0, [math]::Min(160, $oRuns[-1].text.Length)))
     Write-Host ("asmrun : " + ($a.text -replace "\s+", " ").Substring(0, [math]::Min(160, $a.text.Length)))
 }
 
 Write-Host "`n=== summary (median of $Runs runs, 64 new tokens, greedy) ==="
-Write-Host ("model weights = {0:N0} bytes = {1:N3} GB/token" -f $weightBytes, ($weightBytes / 1e9))
+Write-Host ("model blob = {0:N0} bytes; a token reads {1:N3} GB of it (everything but the embedding table)" -f $weightBytes, $a.gb_per_token)
+Write-Host "Ollama evaluates the prompt as one batch (and caches it between runs); asmrun one token at a time."
 $rows | Format-Table -AutoSize

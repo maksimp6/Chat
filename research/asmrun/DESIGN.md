@@ -228,10 +228,12 @@ struc MatvecJob
   .w        resq 1   ; Tensor address
   .x        resq 1   ; f32[cols]
   .out      resq 1   ; f32[rows]
-  .xsum32   resq 1   ; f32[cols/32], sums of x per 32 values (Q4_K mins)
-  .xsum16   resq 1   ; f32[cols/16], sums of x per 16 values (Q6_K offsets)
+  .xsum32   resq 1   ; (unused since the int8 path; kept for layout)
+  .xsum16   resq 1   ; (unused)
   .rows     resq 1
   .cols     resq 1
+  .next     resq 1   ; next unclaimed row; threads take .chunk rows at a time with lock xadd
+  .chunk    resq 1   ; rows / (nthreads · 8), at least 8
 endstruc
 ```
 
@@ -279,34 +281,39 @@ scalar metadata, the per-type counts and the first tensors, as the PowerShell du
 | --- | --- |
 | `k_rmsnorm(rcx=out, rdx=x, r8=w, r9=n, xmm0=eps)` | out = x · (1/sqrt(mean(x²)+eps)) · w (ymm FMA) |
 | `k_add(rcx=dst, rdx=src, r8=n)` | dst += src (ymm) |
-| `k_silu_mul(rcx=g, rdx=u, r8=n)` | g = silu(g) · u, silu(z)=z/(1+e^−z) via `k_exp` |
+| `k_silu_mul(rcx=g, rdx=u, r8=n)` | g = silu(g) · u, silu(z)=z/(1+e^−z); eight lanes per step with the `EXP8` macro |
 | `k_softmax(rcx=x, rdx=n)` | in place, max-subtracted, `k_exp` per element |
-| `k_exp(xmm0=x f32) -> xmm0` | e^x via x87 (`fldl2e`/`frndint`/`f2xm1`/`fscale`); clamped to ±88. Hardware-accurate, not a polynomial; it is never the bottleneck (see efficiency notes) |
+| `k_exp(xmm0=x f32) -> xmm0`, `EXP8` (ymm0) | e^x by the cephes expf scheme: n = round(x·log2e), r = x − n·ln2 (two-part ln2), degree-6 polynomial for e^r, times 2^n built in the exponent field; clamped to [−87, 88]; ~1 ulp. (The x87 version this replaced cost ~150 cycles per element, 8 ms per token in SiLU alone.) |
 | `k_dot_f32_row(rcx=row, rdx=x, r8=cols) -> xmm0` | one F32 row (ymm FMA) |
 | `k_dot_f16_row(rcx=row, rdx=x, r8=cols) -> xmm0` | one F16 row (`vcvtph2ps` 8 at a time) |
 | `k_argmax(rcx=x, rdx=n) -> rax` | first index of the maximum |
-| `k_sum32(rcx=out, rdx=x, r8=n)`, `k_sum16` | sums per 32 / 16 values of x (feed the quant dots) |
-| `k_dot_q4k_row(rcx=row, rdx=x, r8=cols, r9=xsum32) -> xmm0` | one Q4_K row |
-| `k_dot_q6k_row(rcx=row, rdx=x, r8=cols, r9=xsum16) -> xmm0` | one Q6_K row |
-| `k_matvec_job(rcx=MatvecJob*, rdx=tid, r8=nthreads)` | `pool_run` body: contiguous row slice [tid·rows/nthreads, (tid+1)·rows/nthreads), dispatch by type to the row dots. (The per-row-range work `k_matvec_rows` is folded directly into this loop.) |
+| `k_quant_x(rcx=x, rdx=n)` | activation quantisation, once per matvec input: per 256-block `g_d8[b]` = amax/127, `g_q8` = round(x/d8) as i8, `g_bsums` (i16 per 16) and `g_bsums32` (i16 per 32) sums of the rounded values. AVX2, ~1 instruction per value |
+| `k_sum32`, `k_sum16` | (unused since the int8 path) |
+| `k_dot_q4k_row(rcx=row, r8=cols) -> xmm0` | one Q4_K row against `g_q8` (see below) |
+| `k_dot_q6k_row(rcx=row, r8=cols) -> xmm0` | one Q6_K row against `g_q8` |
+| `k_matvec_job(rcx=MatvecJob*, rdx=tid, r8=nthreads)` | `pool_run` body: claims `job.chunk` rows at a time from `job.next` (lock xadd) until the rows run out, dispatching by type to the row dots; saves xmm6-15 once (the quantised dots use all sixteen ymm registers) |
 | `k_rope_table(rcx=out, rdx=n_ctx, r8=head_dim, xmm0=theta)` | out[pos][0..half) = cos, [half..d) = sin, via x87 `fsincos`; publishes head_dim/half for `k_rope` |
 | `k_rope(rcx=head f32*, rdx=table_row)` | NeoX rotation in place (half from the published global) |
 | `k_attn_job(rcx=AttnJob*, rdx=tid, r8=nthreads)` | `pool_run` body: splits the query heads by tid; scores (÷√head_dim), softmax, weighted V sum per head. Per-thread score row at `scores + tid·g_n_ctx` |
-| `kernels_cli(rcx=Model*)` (`--kernels`) | micro-benchmark: times `KERNELS_BENCH_ITERS` matvecs of the output projection (largest weight) through the real `model_matvec` path and prints rows, cols, iters, ms and effective GB/s (= weight bytes read ÷ time) |
+| `kernels_cli(rcx=Model*)` (`--kernels`) | micro-benchmark through the real `model_matvec` path: the Q6_K output projection and the Q4_K token-embedding table (both 2048×151936, streaming from DRAM) and one 1.2 MB Q4_K tensor that stays in L2 (the kernel's compute rate); each prints rows, cols, type, iters, ms, effective GB/s and three check rows (kernel vs an f32 dot of the dequantised row); then the cost of an empty `pool_run` |
 
-Quant dots fuse dequant and the dot: for each 256-value block they reproduce the
-exact bit-extraction of `model_dequant_row` and accumulate q·x per sub-block
-instead of storing. Q4_K: each 32-byte `qs` chunk splits into a low sub-block
-(nibble `& 0x0F`) over x[64c..+32) and a high sub-block (nibble `>> 4`) over
-x[64c+32..+64); per block, dot += d·Σ sc[s]·(Σ q·x) − dmin·Σ m[s]·xsum32[blk·8+s].
-Q6_K: the four 32-value groups per half are built from `ql`/`qh` with shifts/masks;
-dot += d·(Σ sc[S]·(Σ q·x) − 32·Σ sc[S]·xsum16[blk·16+S]). The `xsum32`/`xsum16`
-buffers (filled by `k_sum32`/`k_sum16` once per x) hoist the constant min/offset
-terms out of the inner loop. The f16 `d`/`dmin` convert with `vcvtph2ps` from a
-scalar load. The q·x accumulation is scalar (the nibble/6-bit unpack is inherently
-scalar and the kernel is memory-bandwidth bound); F16/F32 rows and the attention
-q·K / p·V use 8-wide ymm FMA. An int8 x path (`vpmaddubsw`/`vpdpbusd`) is a possible
-second version if the dot ever proves compute-bound rather than bandwidth-bound.
+Quant dots work on the int8 activation. `k_quant_x` rounds x to i8 per 256-value
+block (`d8` = amax/127) and keeps the exact sums of the rounded values per 16 and
+per 32. Each dot then reproduces `model_dequant_row`'s bit extraction in SIMD and
+does the q·q8 arithmetic in integers: `vpmaddubsw` (u8 code × s8 q8 → i16 pair
+sums; |·| ≤ 2·63·127 fits) then `vpmaddwd` by the sub-block scale (i16, broadcast
+with `vpshufb` from a register holding the block's scales) into eight i32 lanes
+that accumulate over the block; one `vcvtdq2ps` + FMA by d·d8 per block, one
+horizontal sum per row. Q4_K: `qs` chunk c gives sub-block 2c (low nibbles) and
+2c+1 (high nibbles); dot += d8·(d·Σ sc[s]·Σ q·q8 − dmin·Σ m[s]·bsums32[s]), the
+mins term one `vpmaddwd` of the 8 mins with the 8 per-32 sums. Q6_K: the four
+32-value groups per half come from `ql`/`qh` with shifts and masks (`0x0F`,
+`0x30`), each group vector holding two 16-value sub-blocks, one per 128-bit lane;
+dot += d8·d·(Σ sc·q·q8 − 32·Σ sc[S]·bsums[S]), the offset term one `vpmaddwd` of
+the 16 scales with the 16 per-16 sums. Nothing in the loops touches the stack: on
+Gracemont a store followed by narrower loads from it stalled each block (~25%).
+`vpmulld` is avoided (slow on this core), as are horizontal sums inside a block.
+F16/F32 rows and the attention q·K / p·V use 8-wide ymm FMA.
 
 ### tokenizer (`src/tokenizer.asm`)
 

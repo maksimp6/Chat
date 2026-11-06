@@ -393,6 +393,16 @@ model_matvec:
   mov  [r9 + MatvecJob.rows], rax
   mov  rax, [rcx + Tensor.ne0]  ; cols
   mov  [r9 + MatvecJob.cols], rax
+  mov  qword [r9 + MatvecJob.next], 0 ; row counter the threads claim chunks from
+  mov  rcx, [rel g_nthreads]
+  imul rcx, rcx, MATVEC_CHUNKS_PER_THREAD
+  xor  rdx, rdx
+  div  rcx                      ; rax = rows / (nthreads * chunks per thread)
+  cmp  rax, MATVEC_CHUNK_MIN
+  jae  .chunk_ok
+  mov  rax, MATVEC_CHUNK_MIN
+.chunk_ok:
+  mov  [r9 + MatvecJob.chunk], rax
   lea  rcx, [rel k_matvec_job]
   lea  rdx, [rel g_mvjob]
   call pool_run
@@ -566,7 +576,8 @@ model_load:
   call rt_alloc
   mov  [rel g_xsum16], rax
   ; int8 activation buffers (maxcols is a multiple of 256): q8[maxcols],
-  ; d8[maxcols/256] f32, bsums[maxcols/16] i32.
+  ; d8[maxcols/256] f32, bsums[maxcols/16] i16, bsums32[maxcols/32] i16 (each sum
+  ; buffer gets a spare 32 bytes: the dot kernels read a whole block's sums at once).
   mov  rcx, rbx
   call rt_alloc
   mov  [rel g_q8], rax
@@ -578,10 +589,16 @@ model_load:
   mov  [rel g_d8], rax
   mov  rcx, rbx
   shr  rcx, 4
-  add  rcx, 1
-  shl  rcx, 2
+  shl  rcx, 1
+  add  rcx, 32
   call rt_alloc
   mov  [rel g_bsums], rax
+  mov  rcx, rbx
+  shr  rcx, 5
+  shl  rcx, 1
+  add  rcx, 32
+  call rt_alloc
+  mov  [rel g_bsums32], rax
 
   ; attention scores: f32[n_threads][n_ctx].
   mov  rax, [r15 + Model.n_threads]
@@ -592,7 +609,8 @@ model_load:
   mov  [rel g_scores], rax
 
   ; Pre-fault every weight page (one byte per 4 KiB) so page-in is counted in
-  ; load time, and total all tensor bytes for weights_gb_per_token / effective_gb_s.
+  ; load time, and total the tensor bytes a token reads (every tensor except the
+  ; token embedding table) for weights_gb_per_token / effective_gb_s.
   xor  rbx, rbx                 ; tensor index
   xor  rsi, rsi                 ; total weight bytes
 .touch_loop:
@@ -619,6 +637,8 @@ model_load:
   inc  rbx
   jmp  .touch_loop
 .touch_done:
+  mov  rax, [r15 + Model.tok_embd]
+  sub  rsi, [rax + Tensor.nbytes] ; a token reads one embedding row, not the table
   mov  [rel g_weight_bytes], rsi
 
   mov  rax, r15                 ; return Model*
@@ -631,6 +651,31 @@ model_load:
   pop  rsi
   pop  rbx
   ret
+
+; ===========================================================================
+; Phase profile: PROF_BEGIN / PROF_END slot bracket a step of the forward pass
+; and accumulate its nanoseconds in g_prof[slot]; model_generate prints the
+; totals. rt_now_ns clobbers the volatile registers, so the brackets sit outside
+; each step's argument setup. Slots: 0 quant (model_fill_sums), 1 Q/K/V matvecs,
+; 2 attention (q/k norms, rope, cache store, k_attn_job), 3 attn_output matvec,
+; 4 gate+up matvecs, 5 silu, 6 ffn_down matvec, 7 output matvec, 8 rmsnorm and
+; residual adds, 9 argmax.
+; ===========================================================================
+%macro PROF_BEGIN 0
+  call rt_now_ns
+  mov  [rel g_prof_t0], rax
+%endmacro
+%macro PROF_END 1
+  call rt_now_ns
+  sub  rax, [rel g_prof_t0]
+  add  [rel g_prof + 8*%1], rax
+%endmacro
+%macro PROF_PRINT 2           ; %1 label string, %2 slot
+  lea  rcx, [rel %1]
+  call rt_err_str
+  mov  rdx, [rel g_prof + 8*%2]
+  call model_emit_ms
+%endmacro
 
 ; ===========================================================================
 ; model_forward
@@ -676,6 +721,7 @@ model_forward:
   add  r14, rax                 ; Layer*
 
   ; xn = rmsnorm(x) * attn_norm
+  PROF_BEGIN
   mov  rcx, [rel g_xn]
   mov  rdx, [rel g_x]
   mov  r8, [r14 + Layer.attn_norm]
@@ -683,11 +729,15 @@ model_forward:
   mov  r9, [rbx + Model.n_embd]
   movss xmm0, [rbx + Model.rms_eps]
   call k_rmsnorm
-  ; sums of xn for the Q/K/V matvecs
+  PROF_END 8
+  ; quantise xn for the Q/K/V matvecs
+  PROF_BEGIN
   mov  rcx, [rel g_xn]
   mov  rdx, [rbx + Model.n_embd]
   call model_fill_sums
+  PROF_END 0
   ; q = Wq.xn ; k = Wk.xn ; v = Wv.xn
+  PROF_BEGIN
   mov  rcx, [r14 + Layer.attn_q]
   mov  rdx, [rel g_xn]
   mov  r8, [rel g_q]
@@ -700,6 +750,8 @@ model_forward:
   mov  rdx, [rel g_xn]
   mov  r8, [rel g_v]
   call model_matvec
+  PROF_END 1
+  PROF_BEGIN
 
   ; per-head q_norm (over head_dim), in place on each of n_head heads
   xor  r15, r15
@@ -826,16 +878,22 @@ model_forward:
   lea  rcx, [rel k_attn_job]
   lea  rdx, [rel g_attnjob]
   call pool_run
+  PROF_END 2
 
   ; x += Wo.att_out
+  PROF_BEGIN
   mov  rcx, [rel g_att_out]
   mov  rdx, [rbx + Model.n_head]
   imul rdx, [rbx + Model.head_dim]
   call model_fill_sums
+  PROF_END 0
+  PROF_BEGIN
   mov  rcx, [r14 + Layer.attn_output]
   mov  rdx, [rel g_att_out]
   mov  r8, [rel g_xn]
   call model_matvec
+  PROF_END 3
+  PROF_BEGIN
   mov  rcx, [rel g_x]
   mov  rdx, [rel g_xn]
   mov  r8, [rbx + Model.n_embd]
@@ -849,10 +907,14 @@ model_forward:
   mov  r9, [rbx + Model.n_embd]
   movss xmm0, [rbx + Model.rms_eps]
   call k_rmsnorm
+  PROF_END 8
+  PROF_BEGIN
   mov  rcx, [rel g_xn]
   mov  rdx, [rbx + Model.n_embd]
   call model_fill_sums
+  PROF_END 0
   ; g = Wgate.xn ; u = Wup.xn ; g = silu(g)*u
+  PROF_BEGIN
   mov  rcx, [r14 + Layer.ffn_gate]
   mov  rdx, [rel g_xn]
   mov  r8, [rel g_g]
@@ -861,27 +923,37 @@ model_forward:
   mov  rdx, [rel g_xn]
   mov  r8, [rel g_u]
   call model_matvec
+  PROF_END 4
+  PROF_BEGIN
   mov  rcx, [rel g_g]
   mov  rdx, [rel g_u]
   mov  r8, [rbx + Model.n_ff]
   call k_silu_mul
+  PROF_END 5
   ; x += Wdown.g
+  PROF_BEGIN
   mov  rcx, [rel g_g]
   mov  rdx, [rbx + Model.n_ff]
   call model_fill_sums
+  PROF_END 0
+  PROF_BEGIN
   mov  rcx, [r14 + Layer.ffn_down]
   mov  rdx, [rel g_g]
   mov  r8, [rel g_xn]
   call model_matvec
+  PROF_END 6
+  PROF_BEGIN
   mov  rcx, [rel g_x]
   mov  rdx, [rel g_xn]
   mov  r8, [rbx + Model.n_embd]
   call k_add
+  PROF_END 8
 
   inc  r13
   jmp  .layer
 .layers_done:
   ; xf = rmsnorm(x) * output_norm ; logits = Wout.xf
+  PROF_BEGIN
   mov  rcx, [rel g_xn]
   mov  rdx, [rel g_x]
   mov  r8, [rbx + Model.output_norm]
@@ -889,13 +961,18 @@ model_forward:
   mov  r9, [rbx + Model.n_embd]
   movss xmm0, [rbx + Model.rms_eps]
   call k_rmsnorm
+  PROF_END 8
+  PROF_BEGIN
   mov  rcx, [rel g_xn]
   mov  rdx, [rbx + Model.n_embd]
   call model_fill_sums
+  PROF_END 0
+  PROF_BEGIN
   mov  rcx, [rbx + Model.output]
   mov  rdx, [rel g_xn]
   mov  r8, [rel g_logits]
   call model_matvec
+  PROF_END 7
 
   mov  rax, [rel g_logits]
   WINEPILOGUE
@@ -1002,10 +1079,12 @@ model_generate:
   mov  rax, r14
   cmp  rax, [rbx + Model.n_ctx]
   jae  .gdone                   ; context full
+  PROF_BEGIN
   mov  rcx, rdi
   mov  rdx, [rbx + Model.n_vocab]
   call k_argmax
   mov  [rsp+56], rax            ; next token
+  PROF_END 9
   mov  rcx, rax
   call tok_is_stop
   test rax, rax
@@ -1094,6 +1173,21 @@ model_generate:
   cvtsi2ss xmm1, rdx
   divss xmm0, xmm1             ; bytes*tokens / ns == GB/s (GB=1e9)
   call rt_err_f32
+  lea  rcx, [rel s_nl]
+  mov  rdx, 1
+  call rt_err
+
+  ; phase profile (totals over the prompt and generation forwards)
+  PROF_PRINT s_prof0, 0
+  PROF_PRINT s_prof1, 1
+  PROF_PRINT s_prof2, 2
+  PROF_PRINT s_prof3, 3
+  PROF_PRINT s_prof4, 4
+  PROF_PRINT s_prof5, 5
+  PROF_PRINT s_prof6, 6
+  PROF_PRINT s_prof7, 7
+  PROF_PRINT s_prof8, 8
+  PROF_PRINT s_prof9, 9
   lea  rcx, [rel s_nl]
   mov  rdx, 1
   call rt_err
@@ -1292,10 +1386,12 @@ main:
   jmp  .argloop
 .argdone:
 
-  ; --bw: ISA gate then the bandwidth probe (no model needed)
+  ; --bw: ISA gate, start the pool with -t threads, then the bandwidth probe (no model needed)
   cmp  r14d, MODE_BW
   jne  .not_bw
   call rt_cpuid_check
+  mov  rcx, [rsp+48]
+  call pool_start
   call rt_bench_bandwidth
   jmp  .ret0
 .not_bw:
@@ -1443,12 +1539,15 @@ g_u:            dq 0           ; f32[n_ff]  ffn up
 g_logits:       dq 0           ; f32[n_vocab]
 g_xsum32:       dq 0           ; f32[maxcols/32]  per-32 sums of the current x (unused since int8 Q4_K)
 g_xsum16:       dq 0           ; f32[maxcols/16]  per-16 sums of the current x (Q6_K fold-sc)
-g_q8:           dq 0           ; int8[maxcols]      activations quantized for the int8 Q4_K matvec
+g_q8:           dq 0           ; int8[maxcols]      activations quantized for the int8 Q4_K/Q6_K matvecs
 g_d8:           dq 0           ; f32[maxcols/256]   per-256-block activation scale
-g_bsums:        dq 0           ; i32[maxcols/16]    per-16 sums of g_q8
+g_bsums:        dq 0           ; i16[maxcols/16]    per-16 sums of g_q8 (Q6_K -32 offset term)
+g_bsums32:      dq 0           ; i16[maxcols/32]    per-32 sums of g_q8 (Q4_K mins term)
 g_scores:       dq 0           ; f32[n_threads*n_ctx]  attention score scratch
 g_n_ctx:        dq 0           ; per-thread score-row stride read by k_attn_job
-g_weight_bytes: dq 0           ; total tensor bytes, for the bandwidth statistic
+g_weight_bytes: dq 0           ; tensor bytes read per token, for the bandwidth statistic
+g_prof_t0:      dq 0           ; PROF_BEGIN timestamp
+g_prof:         times 10 dq 0  ; PROF_END accumulators (ns per phase slot)
 
   align 8
 g_mvjob:        times (MatvecJob_size / 8) dq 0
@@ -1487,5 +1586,15 @@ s_gen2:        db " gen_ms=", 0
 s_gen3:        db " gen_tok_s=", 0
 s_gen4:        db " weights_gb_per_token=", 0
 s_gen5:        db " effective_gb_s=", 0
+s_prof0:       db "asmrun: prof_ms quant=", 0
+s_prof1:       db " qkv=", 0
+s_prof2:       db " attn=", 0
+s_prof3:       db " wo=", 0
+s_prof4:       db " gateup=", 0
+s_prof5:       db " silu=", 0
+s_prof6:       db " down=", 0
+s_prof7:       db " out=", 0
+s_prof8:       db " norm_add=", 0
+s_prof9:       db " argmax=", 0
 
 s_nl:          db 10

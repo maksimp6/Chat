@@ -16,8 +16,8 @@
 ;   k_add(rcx=dst f32*, rdx=src f32*, r8=n)                    dst[i]+=src[i]
 ;   k_silu_mul(rcx=g f32*, rdx=u f32*, r8=n)                   g[i]=silu(g[i])*u[i]
 ;   k_argmax(rcx=x f32*, rdx=n) -> rax index of max
-;   k_sum32(rcx=out f32*, rdx=x f32*, r8=n)                    out[b]=sum x[32b..+32)
-;   k_sum16(rcx=out f32*, rdx=x f32*, r8=n)                    out[b]=sum x[16b..+16)
+;   k_quant_x(rcx=x f32*, rdx=n)                               int8 activation + sums
+;   k_sum32 / k_sum16                                          (unused since the int8 path)
 ;   k_rope_table(rcx=tbl f32*, rdx=n_ctx, r8=head_dim, xmm0=theta)
 ;   k_rope(rcx=head f32*, rdx=tbl_row f32*)                    NeoX rotate in place
 ;   k_matvec_job(rcx=MatvecJob*, rdx=tid, r8=nthreads)         pool body
@@ -27,10 +27,9 @@
 ;           k_dot_q6k_row.
 ;
 ; ISA: AVX2 + FMA + F16C (gated once by rt_cpuid_check in main before any use).
-; Transcendentals (exp for silu/softmax, sincos for the rope table) use the x87
-; unit: hardware-accurate and one small routine, and not the bottleneck — the
-; weights the matvec streams per token dwarf the O(n_ff)/O(seqlen) exp work. x87
-; blocks are kept self-contained and stack-balanced, with vzeroupper before them.
+; exp (silu/softmax) is a polynomial in SSE/AVX (k_exp / EXP8); only the rope
+; table's sincos uses the x87 unit (once at load). x87 blocks are kept
+; self-contained and stack-balanced, with vzeroupper before them.
 
 KERNELS_BENCH_ITERS equ 24      ; matvecs timed by --kernels
 
@@ -38,15 +37,44 @@ KERNELS_BENCH_ITERS equ 24      ; matvecs timed by --kernels
 ; f32 constants (initialised bytes in the .flat section; read with [rel ..]).
   align 4
 kc_one:     dd 1.0
-kc_exp_hi:  dd 88.0
-kc_exp_lo:  dd -88.0
   align 32
+kc8_one:      times 8 dd 1.0
+kc8_exp_hi:   times 8 dd 88.0             ; exp clamp: 2^127 scale, result finite
+kc8_exp_lo:   times 8 dd -87.0            ; exp clamp: result stays a normal f32
+kc8_log2e:    times 8 dd 1.44269504088896341
+kc8_ln2_hi:   times 8 dd 0.693359375      ; ln 2 split (cephes expf): hi + lo
+kc8_ln2_lo:   times 8 dd -2.12194440e-4
+kc8_p0:       times 8 dd 1.9875691500E-4  ; cephes expf polynomial, highest degree first
+kc8_p1:       times 8 dd 1.3981999507E-3
+kc8_p2:       times 8 dd 8.3334519073E-3
+kc8_p3:       times 8 dd 4.1665795894E-2
+kc8_p4:       times 8 dd 1.6666665459E-1
+kc8_p5:       times 8 dd 5.0000001201E-1
+kc8_127i:     times 8 dd 127              ; f32 exponent bias
+kc8_signmask: times 8 dd 0x80000000
+kc8_absmask:  times 8 dd 0x7FFFFFFF       ; |f32| mask (clear sign bit)
+kc8_127f:     times 8 dd 127.0            ; activation quantisation scale
+kc8_ones16:   times 16 dw 1               ; i16 ones: vpmaddwd row sums
+kc8_perm_q8:  dd 0, 4, 1, 5, 2, 6, 3, 7   ; vpermd order undoing the vpackssdw/vpacksswb lane interleave
+kc_63w:       times 8 dw 63              ; Q4_K scale extraction masks (i16 lanes)
+kc_15w:       times 8 dw 15
+  align 32
+kc_q4_scmask:                            ; vpshufb masks: broadcast i16 lane s of [sc0..7 | sc0..7] to all 16 lanes
+%assign s 0
+%rep 8
+  times 16 db 2*s, 2*s+1
+%assign s s+1
+%endrep
+kc_q6_scmask:                            ; vpshufb masks: [lane 2g x8 | lane 2g+1 x8] of [sc0..7 | sc0..7]
+%assign g 0
+%rep 4
+  times 8 db 4*g, 4*g+1
+  times 8 db 4*g+2, 4*g+3
+%assign g g+1
+%endrep
 kc_0f32:    times 32 db 0x0F     ; per-byte low-nibble mask for vpand (AVX2 memory operand)
   align 32
-kc_0332:    times 32 db 0x03     ; per-byte 2-bit mask (Q6_K high bits from qh)
-  align 16
-kc_absmask: times 4 dd 0x7FFFFFFF ; |f32| mask (clear sign bit)
-kc_127:     dd 127.0             ; activation quantization scale
+kc_3032:    times 32 db 0x30     ; per-byte bits 4-5 mask (Q6_K high bits, already shifted into place)
 
 ; Published by k_rope_table for k_rope (which gets no size argument).
   align 8
@@ -56,35 +84,65 @@ kg_rope_half: dq 0              ; head_dim/2
 ; --kernels bench strings.
 kc_s_head:  db "asmrun: kernels matvec rows=", 0
 kc_s_cols:  db " cols=", 0
+kc_s_type:  db " type=", 0
 kc_s_iters: db " iters=", 0
 kc_s_ms:    db " ms=", 0
 kc_s_gbs:   db " gb_s=", 0
+kc_s_chk:   db "asmrun: kernels check row=", 0
+kc_s_kern:  db " kernel=", 0
+kc_s_ref:   db " ref_f32=", 0
+kc_s_pool:  db "asmrun: pool_run empty job ns=", 0
 kc_s_nl:    db 10
 
 ; ===========================================================================
-; k_exp — scalar e^x via x87.  xmm0 (f32) in/out. Clamps x to [-88,88].
-; Leaf: uses the caller-provided 32-byte shadow ([rsp+8]) for one temp and the
-; x87 stack (left empty). Clobbers xmm0 only; no GPR touched.
+; k_exp — scalar e^x: xmm0 (f32) in/out. Clamps x to [-87,88]. The cephes expf
+; scheme: n = round(x*log2e), r = x - n*ln2 (ln2 in two parts), e^r by a degree-6
+; polynomial, times 2^n built in the exponent field. ~1 ulp. Leaf; clobbers
+; xmm1-xmm3, no GPR. EXP8 below is the same computation on eight lanes.
 ; ===========================================================================
 k_exp:
-  maxss xmm0, [rel kc_exp_lo]
-  minss xmm0, [rel kc_exp_hi]
-  movss [rsp+8], xmm0
-  fld   dword [rsp+8]           ; x
-  fldl2e                        ; log2e, x
-  fmulp st1, st0                ; y = x*log2e
-  fld   st0                     ; y, y
-  frndint                       ; n, y
-  fsub  st1, st0                ; n, f=y-n
-  fxch  st1                     ; f, n
-  f2xm1                         ; 2^f-1, n
-  fld1                          ; 1, 2^f-1, n
-  faddp st1, st0                ; 2^f, n
-  fscale                        ; 2^f*2^n = e^x, n
-  fstp  st1                     ; e^x
-  fstp  dword [rsp+8]
-  movss xmm0, [rsp+8]
+  vmaxss xmm0, xmm0, [rel kc8_exp_lo]
+  vminss xmm0, xmm0, [rel kc8_exp_hi]
+  vmulss xmm1, xmm0, [rel kc8_log2e]
+  vroundss xmm1, xmm1, xmm1, 8          ; n = nearest integer
+  vfnmadd231ss xmm0, xmm1, [rel kc8_ln2_hi]   ; r = x - n*ln2
+  vfnmadd231ss xmm0, xmm1, [rel kc8_ln2_lo]
+  vmovss xmm2, [rel kc8_p0]
+  vfmadd213ss xmm2, xmm0, [rel kc8_p1]  ; p = p*r + c
+  vfmadd213ss xmm2, xmm0, [rel kc8_p2]
+  vfmadd213ss xmm2, xmm0, [rel kc8_p3]
+  vfmadd213ss xmm2, xmm0, [rel kc8_p4]
+  vfmadd213ss xmm2, xmm0, [rel kc8_p5]
+  vmulss xmm3, xmm0, xmm0               ; r^2
+  vfmadd213ss xmm2, xmm3, xmm0          ; p*r^2 + r
+  vaddss xmm2, xmm2, [rel kc8_one]      ; e^r
+  vcvtps2dq xmm1, xmm1                  ; n (lane 0)
+  vpaddd xmm1, xmm1, [rel kc8_127i]
+  vpslld xmm1, xmm1, 23                 ; 2^n
+  vmulss xmm0, xmm2, xmm1
   ret
+
+%macro EXP8 0                 ; ymm0 = e^ymm0 on 8 lanes; clobbers ymm1-ymm3
+  vmaxps  ymm0, ymm0, [rel kc8_exp_lo]
+  vminps  ymm0, ymm0, [rel kc8_exp_hi]
+  vmulps  ymm1, ymm0, [rel kc8_log2e]
+  vroundps ymm1, ymm1, 8
+  vfnmadd231ps ymm0, ymm1, [rel kc8_ln2_hi]
+  vfnmadd231ps ymm0, ymm1, [rel kc8_ln2_lo]
+  vmovaps ymm2, [rel kc8_p0]
+  vfmadd213ps ymm2, ymm0, [rel kc8_p1]
+  vfmadd213ps ymm2, ymm0, [rel kc8_p2]
+  vfmadd213ps ymm2, ymm0, [rel kc8_p3]
+  vfmadd213ps ymm2, ymm0, [rel kc8_p4]
+  vfmadd213ps ymm2, ymm0, [rel kc8_p5]
+  vmulps  ymm3, ymm0, ymm0
+  vfmadd213ps ymm2, ymm3, ymm0
+  vaddps  ymm2, ymm2, [rel kc8_one]
+  vcvtps2dq ymm1, ymm1
+  vpaddd  ymm1, ymm1, [rel kc8_127i]
+  vpslld  ymm1, ymm1, 23
+  vmulps  ymm0, ymm2, ymm1
+%endmacro
 
 ; ===========================================================================
 ; k_sum32 / k_sum16 — per sub-block sums of x (used by the Q4_K/Q6_K dots).
@@ -201,44 +259,24 @@ k_add:
 
 ; ===========================================================================
 ; k_silu_mul(rcx=g, rdx=u, r8=n): g[i] = (g[i]/(1+e^-g[i])) * u[i], in place.
-; Calls k_exp per element, so it is non-leaf: pushes g/u/n in nonvolatiles and
-; keeps a 32-byte shadow for k_exp.
+; Eight lanes per step with EXP8 (n is a multiple of 8: n_ff). Leaf; ymm0-4.
 ; ===========================================================================
 k_silu_mul:
-  push rbx
-  push rsi
-  push rdi
-  push r12                      ; entry rsp%16==8; +4 pushes -> %16==8
-  sub  rsp, 40                  ; 32 shadow + 8 pad -> %16==0 (8+32? see note)
-  mov  rbx, rcx                 ; g
-  mov  rsi, rdx                 ; u
-  mov  rdi, r8                  ; n
-  xor  r12, r12                 ; i
+  xor  r10, r10
 .l:
-  cmp  r12, rdi
+  cmp  r10, r8
   jae  .done
-  movss xmm0, [rbx + r12*4]     ; z
-  movss [rsp+36], xmm0          ; save z
-  xorps xmm1, xmm1
-  subss xmm1, xmm0              ; -z
-  movaps xmm0, xmm1
-  call k_exp                    ; xmm0 = e^-z
-  movss xmm1, [rel kc_one]
-  addss xmm0, xmm1              ; 1+e^-z
-  movss xmm2, [rel kc_one]
-  divss xmm2, xmm0             ; sigmoid = 1/(1+e^-z)
-  movss xmm0, [rsp+36]          ; z
-  mulss xmm0, xmm2              ; silu = z*sigmoid
-  mulss xmm0, [rsi + r12*4]     ; * u[i]
-  movss [rbx + r12*4], xmm0
-  inc  r12
+  vmovups ymm4, [rcx + r10*4]            ; z
+  vxorps  ymm0, ymm4, [rel kc8_signmask] ; -z
+  EXP8                                   ; e^-z
+  vaddps  ymm0, ymm0, [rel kc8_one]      ; 1+e^-z
+  vdivps  ymm0, ymm4, ymm0               ; z/(1+e^-z) = silu(z)
+  vmulps  ymm0, ymm0, [rdx + r10*4]      ; * u
+  vmovups [rcx + r10*4], ymm0
+  add  r10, 8
   jmp  .l
 .done:
-  add  rsp, 40
-  pop  r12
-  pop  rdi
-  pop  rsi
-  pop  rbx
+  vzeroupper
   ret
 
 ; ===========================================================================
@@ -505,441 +543,309 @@ k_dot_f16_row:
   ret
 
 ; ---------------------------------------------------------------------------
-; k_quant_x(rcx=x f32*, rdx=n). Quantize x into the int8 activation buffers for
-; the int8 Q4_K matvec: per 256-block, g_d8[b]=amax/127, g_q8[256b+i]=round(x/d8)
-; clamped to [-127,127], g_bsums[16b+j]=sum of 16 consecutive g_q8. n % 256 == 0.
-; Leaf (no calls); scalar (runs once per matvec over n<=n_ff values, cheap).
+; k_quant_x(rcx=x f32*, rdx=n). Quantize x into the int8 activation buffers the
+; Q4_K/Q6_K matvecs read: per 256-block b, g_d8[b]=amax/127 (f32), g_q8[256b+i]=
+; round(x/d8) in [-127,127] (i8), g_bsums[16b+j]=sum of 16 consecutive g_q8 (i16,
+; |sum|<=2032), g_bsums32[8b+k]=g_bsums[16b+2k]+g_bsums[16b+2k+1] (i16). n%256==0.
+; Leaf (no calls); AVX2 throughout (~1 instruction per value): the block max with
+; two accumulators, then per 32 values four vmulps/vcvtps2dq, two vpackssdw to
+; i16 (which also feed the sums: vpmaddwd by ones + vphaddd), one vpacksswb to i8
+; and one vpermd undoing the packs' lane interleave. Rounding is the MXCSR
+; default (nearest even) in both this and the scalar version it replaced, so the
+; q8 bytes are identical. Uses rax, rcx, rdx, r8-r11 and ymm0-5 only.
 ; ---------------------------------------------------------------------------
 k_quant_x:
-  push rbx
-  push rsi
-  push rdi
-  push rbp
-  push r12
-  push r13
-  push r14
-  push r15
-  mov  rsi, rcx                 ; x
-  mov  r13, rdx
-  shr  r13, 8                   ; nblocks = n/256
-  mov  r12, [rel g_q8]
-  mov  r14, [rel g_d8]
-  mov  r15, [rel g_bsums]
-  xor  rbx, rbx                 ; block b
-.qblk:
-  cmp  rbx, r13
-  jae  .qdone
-  mov  rax, rbx
-  shl  rax, 8                   ; 256b
-  lea  rdi, [rsi + rax*4]       ; &x[256b]
-  vxorps xmm2, xmm2, xmm2       ; amax
-  xor  rbp, rbp
-.qamax:
-  cmp  rbp, 256
-  jae  .qamax_done
-  vmovss xmm0, [rdi + rbp*4]
-  vandps xmm0, xmm0, [rel kc_absmask]
-  vmaxss xmm2, xmm2, xmm0
-  inc  rbp
-  jmp  .qamax
-.qamax_done:
-  vmovss xmm1, [rel kc_127]
-  vdivss xmm3, xmm2, xmm1       ; d8 = amax/127
-  vmovss [r14 + rbx*4], xmm3
-  vxorps xmm4, xmm4, xmm4       ; inv = 0
-  vucomiss xmm2, xmm4
-  je   .qzero
-  vdivss xmm4, xmm1, xmm2       ; inv = 127/amax
-.qzero:
-  mov  rax, rbx
-  shl  rax, 8
-  lea  r8, [r12 + rax]          ; &g_q8[256b]
-  mov  rax, rbx
-  shl  rax, 4                   ; 16b
-  lea  r9, [r15 + rax*4]        ; &g_bsums[16b]
-  xor  rbp, rbp                 ; j
-.qsub:
-  cmp  rbp, 16
-  jae  .qblk_next
-  xor  r10d, r10d               ; per-16 sum
-  mov  rax, rbp
-  shl  rax, 4                   ; 16j
-  xor  r11, r11                 ; i
-.qval:
-  cmp  r11, 16
-  jae  .qsub_done
-  mov  rdx, rax
-  add  rdx, r11                 ; 16j+i
-  vmovss xmm0, [rdi + rdx*4]
-  vmulss xmm0, xmm0, xmm4       ; x*inv
-  vcvtss2si ecx, xmm0           ; round to nearest
-  cmp  ecx, 127
-  jle  .qhi
-  mov  ecx, 127
-.qhi:
-  cmp  ecx, -127
-  jge  .qlo
-  mov  ecx, -127
-.qlo:
-  mov  [r8 + rdx], cl           ; g_q8[256b+16j+i] (int8)
-  add  r10d, ecx
-  inc  r11
-  jmp  .qval
-.qsub_done:
-  mov  [r9 + rbp*4], r10d       ; g_bsums[16b+j]
-  inc  rbp
-  jmp  .qsub
-.qblk_next:
-  inc  rbx
-  jmp  .qblk
-.qdone:
-  pop  r15
-  pop  r14
-  pop  r13
-  pop  r12
-  pop  rbp
-  pop  rdi
-  pop  rsi
-  pop  rbx
+  mov  r9, rdx
+  shr  r9, 8                    ; nblocks = n/256 (>= 1)
+  mov  r8, [rel g_q8]           ; q8 cursor
+  mov  r10, [rel g_d8]          ; d8 cursor
+  mov  r11, [rel g_bsums]       ; bsums cursor (i16 per 16)
+  mov  rax, [rel g_bsums32]     ; bsums32 cursor (i16 per 32)
+  vmovdqa ymm4, [rel kc8_perm_q8]
+.blk:
+  ; amax = max |x| over the block (two accumulators, 64 bytes per step)
+  vmovaps ymm5, [rel kc8_absmask]
+  vxorps ymm0, ymm0, ymm0
+  vxorps ymm1, ymm1, ymm1
+  xor  rdx, rdx
+.amax:
+  vandps ymm2, ymm5, [rcx + rdx]
+  vmaxps ymm0, ymm0, ymm2
+  vandps ymm3, ymm5, [rcx + rdx + 32]
+  vmaxps ymm1, ymm1, ymm3
+  add  rdx, 64
+  cmp  rdx, 1024
+  jb   .amax
+  vmaxps ymm0, ymm0, ymm1
+  vextractf128 xmm1, ymm0, 1
+  vmaxps xmm0, xmm0, xmm1
+  vpermilps xmm1, xmm0, 0x4E
+  vmaxps xmm0, xmm0, xmm1
+  vpermilps xmm1, xmm0, 0xB1
+  vmaxps xmm0, xmm0, xmm1       ; amax in every lane
+  vdivss xmm1, xmm0, [rel kc8_127f]
+  vmovss [r10], xmm1            ; d8 = amax/127
+  vxorps xmm5, xmm5, xmm5       ; inv = 0 when amax == 0 (all-zero block)
+  vucomiss xmm0, xmm5
+  je   .inv_done
+  vmovss xmm5, [rel kc8_127f]
+  vdivss xmm5, xmm5, xmm0       ; inv = 127/amax
+.inv_done:
+  vbroadcastss ymm5, xmm5
+  xor  rdx, rdx                 ; byte offset into the block: 128 per 32 values
+.q32:
+  vmulps ymm0, ymm5, [rcx + rdx]
+  vmulps ymm1, ymm5, [rcx + rdx + 32]
+  vcvtps2dq ymm0, ymm0
+  vcvtps2dq ymm1, ymm1
+  vpackssdw ymm0, ymm0, ymm1    ; P: values 0..15 as i16 (lanes interleaved: A0-3 B0-3 | A4-7 B4-7)
+  vmulps ymm1, ymm5, [rcx + rdx + 64]
+  vmulps ymm2, ymm5, [rcx + rdx + 96]
+  vcvtps2dq ymm1, ymm1
+  vcvtps2dq ymm2, ymm2
+  vpackssdw ymm1, ymm1, ymm2    ; Q: values 16..31 as i16
+  ; sums: bsums[2k] = sum P, bsums[2k+1] = sum Q, bsums32[k] = both
+  vpmaddwd ymm2, ymm0, [rel kc8_ones16]
+  vpmaddwd ymm3, ymm1, [rel kc8_ones16]
+  vphaddd ymm2, ymm2, ymm3
+  vextracti128 xmm3, ymm2, 1
+  vpaddd  xmm2, xmm2, xmm3      ; [sum A, sum B, sum C, sum D]
+  vphaddd xmm2, xmm2, xmm2      ; [sum P, sum Q, sum P, sum Q]
+  vpackssdw xmm3, xmm2, xmm2    ; as i16
+  vmovd   [r11], xmm3           ; bsums[2k], bsums[2k+1]
+  vphaddd xmm2, xmm2, xmm2      ; [sum P + sum Q, ...]
+  vpackssdw xmm2, xmm2, xmm2
+  vpextrw word [rax], xmm2, 0   ; bsums32[k]
+  ; q8 bytes, in value order
+  vpacksswb ymm0, ymm0, ymm1    ; dwords: A0-3 B0-3 C0-3 D0-3 | A4-7 B4-7 C4-7 D4-7
+  vpermd  ymm0, ymm4, ymm0      ; -> A0-3 A4-7 B0-3 B4-7 C0-3 C4-7 D0-3 D4-7
+  vmovdqu [r8], ymm0
+  add  r8, 32
+  add  r11, 4
+  add  rax, 2
+  add  rdx, 128
+  cmp  rdx, 1024
+  jb   .q32
+  add  rcx, 1024
+  add  r10, 4
+  dec  r9
+  jnz  .blk
+  vzeroupper
   ret
 
 ; ---------------------------------------------------------------------------
-; k_dot_q4k_row(rcx=w, r8=cols) -> xmm0.  int8 path: reads g_q8/g_d8/g_bsums (the
-; current activation quantized by k_quant_x). dot = d8*(d4*sum_s sc[s]*isum_s -
-; dmin*sum_s m[s]*(bsums[2s]+bsums[2s+1])), isum_s = sum_32 q4*q8 via vpdpbusd.
-; Q4_K: 144-byte blocks of 256. Per 32-value sub-block s (0..7): dequant value =
-; q*d*sc[s] - dmin*m[s]. So dot = d*sum_s sc[s]*(sum_b q*x) - dmin*sum_s m[s]*
-; xsum32[blk*8+s]. Scale extraction and nibble layout copied from
-; model_dequant_row. sub-block s covers x[32s..32s+32) within the block.
-; Saves nonvolatiles; scales/mins kept in a 64-byte stack scratch.
+; k_dot_q4k_row(rcx=w row, r8=cols) -> xmm0 = dot(row, x) over the int8 activation
+; (g_q8/g_d8/g_bsums32 filled by k_quant_x). Clobbers xmm0-15, rax, rcx, rdx,
+; r8-r11 — k_matvec_job saves xmm6-15 once per call, for every row it dots.
+;
+; Q4_K block (144 B = 256 values): f16 d, f16 dmin, u8 scales[12] (8 six-bit sc
+; and 8 six-bit m), u8 qs[128]. Sub-block s (32 values) dequantises to
+; d*sc[s]*q - dmin*m[s]; chunk c of qs (32 bytes) holds sub-block 2c in the low
+; nibbles and 2c+1 in the high nibbles. With x ~ d8*q8 per block,
+;   dot = sum_blk d8 * ( d * sum_s sc[s]*sum_{i in s} q*q8 - dmin * sum_s m[s]*bsums32[s] ).
+; The inner sum is exact integer work: vpmaddubsw (u8 q x s8 q8 -> i16 pair
+; sums, |.| <= 2*15*127) then vpmaddwd by the sub-block scale (i16 broadcast) into
+; eight i32 lanes, summed over the block and converted once; the mins term is one
+; vpmaddwd of the eight mins with the eight per-32 activation sums. Float work per
+; block: two FMAs. No horizontal reduction until the row ends, no vpmulld, and no
+; stack traffic: the 6-bit scales are unpacked in xmm registers (i16 lanes, so
+; the shifts cannot leak between bytes) and broadcast per sub-block by vpshufb.
 ; ---------------------------------------------------------------------------
+%macro Q4K_CHUNK 1            ; %1 = chunk c (0..3): qs[32c..32c+32), q8[64c..64c+64), sc[2c], sc[2c+1]
+  vmovdqu ymm1, [rbx + 16 + 32*%1]             ; 32 packed nibble bytes (VEX shifts take no memory source)
+  vpand   ymm0, ymm1, ymm15                    ; low nibbles  = sub-block 2c   (u8 0..15)
+  vpsrlw  ymm1, ymm1, 4
+  vpand   ymm1, ymm1, ymm15                    ; high nibbles = sub-block 2c+1
+  vpmaddubsw ymm0, ymm0, [r8 + 64*%1]          ; i16 pair sums of q*q8
+  vpmaddubsw ymm1, ymm1, [r8 + 64*%1 + 32]
+  vpshufb ymm2, ymm9, [rel kc_q4_scmask + 64*%1]      ; sc[2c]   as i16 in every lane
+  vpshufb ymm3, ymm9, [rel kc_q4_scmask + 64*%1 + 32] ; sc[2c+1]
+  vpmaddwd ymm0, ymm0, ymm2                    ; i32: sc * (pair sums), pairs summed
+  vpmaddwd ymm1, ymm1, ymm3
+  vpaddd  ymm0, ymm0, ymm1
+  vpaddd  ymm8, ymm8, ymm0
+%endmacro
+
 k_dot_q4k_row:
   push rbx
   push rsi
-  push rdi
   push rbp
-  push r12
-  push r13
-  push r14
-  push r15                      ; 8 pushes (leaf; no stack-align requirement)
-  sub  rsp, 80                  ; [0..32) sc, [32..64) m, [64]d4, [68]dmin4, [72]d8, [76]dot
-  mov  rbx, rcx                 ; block ptr (advances)
+  push r13                      ; leaf: no calls, no locals
+  mov  rbx, rcx                 ; block cursor
   mov  r13, r8
-  shr  r13, 8                   ; nblocks = cols/256
-  mov  r14, [rel g_q8]          ; int8 activations (this x)
-  mov  rsi, [rel g_bsums]       ; i32 per-16 sums of g_q8
-  mov  rbp, [rel g_d8]          ; f32 per-256 activation scale
-  vxorps xmm0, xmm0, xmm0
-  vmovss [rsp+76], xmm0         ; dot = 0
-  xor  r12, r12                 ; block index
+  shr  r13, 8                   ; nblocks = cols/256 (>= 1)
+  mov  r8, [rel g_q8]           ; q8 cursor (+256 per block)
+  mov  rsi, [rel g_bsums32]     ; i16 per-32 sums cursor (+16 bytes per block)
+  mov  rbp, [rel g_d8]          ; f32 activation scale cursor (+4 per block)
+  vmovdqa ymm15, [rel kc_0f32]
+  vxorps ymm13, ymm13, ymm13    ; f32 accumulator, 8 lanes (scale terms)
+  vxorps xmm12, xmm12, xmm12    ; f32 accumulator, 4 lanes (min terms, subtracted)
 .blk:
-  cmp  r12, r13
-  jae  .done
-  movzx eax, word [rbx]
-  vmovd xmm0, eax
+  ; scales[12] -> sc[0..7] (i16) in both lanes of ymm9, m[0..7] (i16) in xmm11.
+  ; ggml get_scale_min_k4: j<4: sc=b[j]&63, m=b[j+4]&63; j>=4: sc=(b[j+4]&15)|
+  ; ((b[j-4]>>6)<<4), m=(b[j+4]>>4)|((b[j]>>6)<<4).
+  vpmovzxbw xmm0, [rbx+4]       ; b0..b7 as u16
+  vpmovzxbw xmm1, [rbx+12]      ; b8..b11 as u16 (lanes 4-7: qs bytes, unused)
+  vpand   xmm2, xmm0, [rel kc_63w]   ; [sc0..3, m0..3]
+  vpsrlw  xmm0, xmm0, 6
+  vpsllw  xmm0, xmm0, 4              ; (b>>6)<<4: the high two bits of [sc4..7, m4..7]
+  vpand   xmm3, xmm1, [rel kc_15w]   ; b8..11 & 15: low four bits of sc4..7
+  vpsrlw  xmm1, xmm1, 4              ; b8..11 >> 4: low four bits of m4..7
+  vpunpcklqdq xmm3, xmm3, xmm1       ; [sc4..7 low, m4..7 low]
+  vpor    xmm3, xmm3, xmm0           ; [sc4..7, m4..7]
+  vpunpcklqdq xmm9, xmm2, xmm3       ; sc[0..7]
+  vpunpckhqdq xmm11, xmm2, xmm3      ; m[0..7]
+  vinserti128 ymm9, ymm9, xmm9, 1    ; sc in both lanes for the vpshufb broadcasts
+  ; mins: acc4 -= (dmin*d8) * sum_s m[s]*bsums32[s]
+  vpmaddwd xmm11, xmm11, [rsi]  ; 4 x i32 pair sums of m*bsums32
+  vcvtdq2ps xmm11, xmm11
+  vbroadcastss ymm10, [rbp]     ; d8 (this block's activation scale) in 8 lanes
+  vpbroadcastw xmm0, [rbx+2]    ; dmin (f16)   (xmm0: ymm9 holds the scales)
   vcvtph2ps xmm0, xmm0
-  vmovss [rsp+64], xmm0         ; d4
-  movzx eax, word [rbx+2]
-  vmovd xmm0, eax
-  vcvtph2ps xmm0, xmm0
-  vmovss [rsp+68], xmm0         ; dmin4
-  vmovss xmm0, [rbp + r12*4]
-  vmovss [rsp+72], xmm0         ; d8 = g_d8[blk]
-  ; scales[12] at block+4 -> sc[0..7] (int) at [rsp+0..32), m[0..7] at [rsp+32..64)
-  lea  r8, [rbx+4]
-  xor  rcx, rcx
-.sc:
-  cmp  rcx, 8
-  jae  .sc_done
-  cmp  rcx, 4
-  jae  .schi
-  movzx eax, byte [r8+rcx]       ; j<4: sc=scales[j]&63
-  and  eax, 63
-  mov  [rsp + rcx*4], eax
-  movzx edx, byte [r8+rcx+4]     ;       m=scales[j+4]&63
-  and  edx, 63
-  mov  [rsp+32 + rcx*4], edx
-  jmp  .scn
-.schi:
-  movzx eax, byte [r8+rcx+4]     ; j>=4: sc=(scales[j+4]&15)|((scales[j-4]>>6)<<4)
-  and  eax, 15
-  movzx edx, byte [r8+rcx-4]
-  shr  edx, 6
-  shl  edx, 4
-  or   eax, edx
-  mov  [rsp + rcx*4], eax
-  movzx eax, byte [r8+rcx+4]     ;       m=(scales[j+4]>>4)|((scales[j]>>6)<<4)
-  shr  eax, 4
-  movzx edx, byte [r8+rcx]
-  shr  edx, 6
-  shl  edx, 4
-  or   eax, edx
-  mov  [rsp+32 + rcx*4], eax
-.scn:
-  inc  rcx
-  jmp  .sc
-.sc_done:
-  lea  r15, [rbx+16]            ; qs (4-bit weights)
-  mov  rax, r12
-  shl  rax, 8
-  lea  r8, [r14 + rax]          ; &g_q8[256*blk]  (this block's int8 activations)
-  vpxor  ymm2, ymm2, ymm2       ; acc_int (8 i32) = sum_s sc[s]*isum_s
-  xor  rdi, rdi                 ; chunk c
-.chunk:
-  cmp  rdi, 4
-  jae  .chunk_done
-  mov  r9, rdi
-  shl  r9, 5
-  add  r9, r15                  ; &qs[32c]
-  mov  r10, rdi
-  shl  r10, 6                   ; 64c (q8 offset within this block)
-  vmovdqu ymm0, [r9]            ; 32 packed nibble bytes
-  vpand  ymm1, ymm0, [rel kc_0f32]   ; low nibbles  (u8 q4, sub-block 2c)
-  vpsrlw ymm0, ymm0, 4
-  vpand  ymm0, ymm0, [rel kc_0f32]   ; high nibbles (sub-block 2c+1)
-  mov  rax, rdi
-  shl  rax, 1                   ; 2c
-  ; sub-block 2c: isum = sum_32 q4_lo * q8[64c..] ; acc += sc[2c]*isum
-  vpxor  ymm3, ymm3, ymm3
-  {vex} vpdpbusd ymm3, ymm1, [r8 + r10]
-  vpbroadcastd ymm4, [rsp + rax*4]       ; sc[2c]
-  vpmulld ymm3, ymm3, ymm4
-  vpaddd  ymm2, ymm2, ymm3
-  ; sub-block 2c+1: q8[64c+32..] ; acc += sc[2c+1]*isum
-  vpxor  ymm3, ymm3, ymm3
-  {vex} vpdpbusd ymm3, ymm0, [r8 + r10 + 32]
-  vpbroadcastd ymm4, [rsp + rax*4 + 4]   ; sc[2c+1]
-  vpmulld ymm3, ymm3, ymm4
-  vpaddd  ymm2, ymm2, ymm3
-  inc  rdi
-  jmp  .chunk
-.chunk_done:
-  ; term1_int = hsum(acc_int) (8 i32 -> scalar)
-  vextracti128 xmm3, ymm2, 1
-  vpaddd  xmm2, xmm2, xmm3
-  vpshufd xmm3, xmm2, 0x0E
-  vpaddd  xmm2, xmm2, xmm3
-  vpshufd xmm3, xmm2, 0x01
-  vpaddd  xmm2, xmm2, xmm3                ; xmm2[0] = term1_int
-  ; term2_int = sum_{s=0..7} m[s]*(bsums[16blk+2s] + bsums[16blk+2s+1])
-  xor  r11d, r11d
-  mov  r10, r12
-  shl  r10, 4                   ; 16*blk
-  xor  rax, rax                 ; s
-.t2:
-  cmp  rax, 8
-  jae  .t2_done
-  mov  r9, rax
-  shl  r9, 1                    ; 2s
-  add  r9, r10                  ; 16blk + 2s
-  mov  ecx, [rsi + r9*4]
-  add  ecx, [rsi + r9*4 + 4]    ; bsums[..2s] + bsums[..2s+1]
-  imul ecx, [rsp+32 + rax*4]    ; * m[s]
-  add  r11d, ecx
-  inc  rax
-  jmp  .t2
-.t2_done:
-  ; dot += d8*(d4*term1_int - dmin4*term2_int)
-  vcvtdq2ps xmm2, xmm2          ; (float)term1_int in lane 0
-  vcvtsi2ss xmm3, xmm3, r11d    ; (float)term2_int
-  vmulss  xmm2, xmm2, [rsp+64]  ; d4*term1
-  vmulss  xmm3, xmm3, [rsp+68]  ; dmin4*term2
-  vsubss  xmm2, xmm2, xmm3
-  vmulss  xmm2, xmm2, [rsp+72]  ; * d8
-  vmovss  xmm0, [rsp+76]
-  vaddss  xmm0, xmm0, xmm2
-  vmovss  [rsp+76], xmm0
+  vmulps  xmm0, xmm0, xmm10     ; dmin*d8
+  vfnmadd231ps xmm12, xmm11, xmm0
+  ; scales: acc8 = sum_s sc[s] * sum_{i in s} q*q8   (integer, exact)
+  vpxor   ymm8, ymm8, ymm8
+  Q4K_CHUNK 0
+  Q4K_CHUNK 1
+  Q4K_CHUNK 2
+  Q4K_CHUNK 3
+  vcvtdq2ps ymm8, ymm8
+  vpbroadcastw xmm0, [rbx]      ; d (f16)
+  vcvtph2ps ymm0, xmm0
+  vmulps  ymm0, ymm0, ymm10     ; d*d8
+  vfmadd231ps ymm13, ymm8, ymm0
   add  rbx, Q4K_BYTES
-  inc  r12
-  jmp  .blk
-.done:
-  vmovss xmm0, [rsp+76]
+  add  r8, 256
+  add  rsi, 16
+  add  rbp, 4
+  dec  r13
+  jnz  .blk
+  ; dot = hsum(acc8) + hsum(acc4)
+  vextractf128 xmm1, ymm13, 1
+  vaddps  xmm0, xmm13, xmm1
+  vaddps  xmm0, xmm0, xmm12
+  vhaddps xmm0, xmm0, xmm0
+  vhaddps xmm0, xmm0, xmm0
   vzeroupper
-  add  rsp, 80
-  pop  r15
-  pop  r14
   pop  r13
-  pop  r12
   pop  rbp
-  pop  rdi
   pop  rsi
   pop  rbx
   ret
 
 ; ---------------------------------------------------------------------------
-; k_dot_q6k_row(rcx=w, rdx=x, r8=cols, r9=xsum16 f32*) -> xmm0
-; Q6_K: 210-byte blocks of 256; sub-block S (0..15) of 16 values, scale sc[S]
-; (i8), value = d*sc[S]*(q-32), q the 6-bit code. So dot = d*(sum_S sc[S]*
-; (sum q*x) - 32*sum_S sc[S]*xsum16[blk*16+S]). q extraction and the (half,l,4
-; group) layout copied from model_dequant_row; sub-block S covers x[16S..16S+16).
+; k_dot_q6k_row(rcx=w row, r8=cols) -> xmm0. Same contract as k_dot_q4k_row
+; (reads g_q8/g_d8/g_bsums; clobbers xmm0-15 and the volatile GPRs).
+;
+; Q6_K block (210 B = 256 values): u8 ql[128] (low 4 bits), u8 qh[64] (high 2
+; bits), i8 scales[16], f16 d. Sub-block s (16 values) dequantises to
+; d*sc[s]*(q-32). Each 128-value half h uses ql[64h..64h+64), qh[32h..32h+32),
+; sc[8h..8h+8): group g (values 32g.. of the half) = (ql slice & 0xF, or >> 4)
+; | (two bits of qh << 4), so each 32-byte group vector holds sub-block 8h+2g in
+; its low 128 bits and 8h+2g+1 in its high 128 bits. With x ~ d8*q8:
+;   dot = sum_blk d8*d * ( sum_s sc[s]*sum_{i in s} q*q8 - 32*sum_s sc[s]*bsums[s] ).
+; vpmaddubsw (|.| <= 2*63*127) then vpmaddwd by [sc[2g] x8 | sc[2g+1] x8] into
+; eight i32 lanes; the -32 term is one vpmaddwd of the 16 scales with the 16
+; per-16 activation sums. The per-group scale pairs are vpshufb broadcasts from
+; a register holding the half's eight scales in both lanes (no stack traffic).
 ; ---------------------------------------------------------------------------
+%macro Q6K_HALF 4             ; %1 ql offset, %2 qh offset, %3 q8 offset, %4 ymm with [sc8h..8h+7 | same]
+  vmovdqu ymm0, [rbx + %2]                     ; qh
+  vpsllw  ymm1, ymm0, 4
+  vpand   ymm1, ymm1, ymm14                    ; h0 = (qh & 3) << 4
+  vpsllw  ymm2, ymm0, 2
+  vpand   ymm2, ymm2, ymm14                    ; h1 = ((qh >> 2) & 3) << 4
+  vpand   ymm3, ymm0, ymm14                    ; h2 = ((qh >> 4) & 3) << 4
+  vpsrlw  ymm0, ymm0, 2
+  vpand   ymm0, ymm0, ymm14                    ; h3 = ((qh >> 6) & 3) << 4
+  vmovdqu ymm6, [rbx + %1]                     ; ql[0..31]  (VEX shifts take no memory source)
+  vmovdqu ymm7, [rbx + %1 + 32]                ; ql[32..63]
+  vpand   ymm4, ymm6, ymm15
+  vpor    ymm4, ymm4, ymm1                     ; g0 = (ql[0..31] & 0xF) | h0
+  vpand   ymm5, ymm7, ymm15
+  vpor    ymm5, ymm5, ymm2                     ; g1 = (ql[32..63] & 0xF) | h1
+  vpsrlw  ymm6, ymm6, 4
+  vpand   ymm6, ymm6, ymm15
+  vpor    ymm6, ymm6, ymm3                     ; g2 = (ql[0..31] >> 4) | h2
+  vpsrlw  ymm7, ymm7, 4
+  vpand   ymm7, ymm7, ymm15
+  vpor    ymm7, ymm7, ymm0                     ; g3 = (ql[32..63] >> 4) | h3
+  vpmaddubsw ymm4, ymm4, [r8 + %3]             ; i16 pair sums of q*q8
+  vpmaddubsw ymm5, ymm5, [r8 + %3 + 32]
+  vpmaddubsw ymm6, ymm6, [r8 + %3 + 64]
+  vpmaddubsw ymm7, ymm7, [r8 + %3 + 96]
+  vpshufb ymm0, %4, [rel kc_q6_scmask]         ; [sc[8h+0] x8 | sc[8h+1] x8]
+  vpshufb ymm1, %4, [rel kc_q6_scmask + 32]    ; [sc2 | sc3]
+  vpshufb ymm2, %4, [rel kc_q6_scmask + 64]    ; [sc4 | sc5]
+  vpshufb ymm3, %4, [rel kc_q6_scmask + 96]    ; [sc6 | sc7]
+  vpmaddwd ymm4, ymm4, ymm0
+  vpmaddwd ymm5, ymm5, ymm1
+  vpmaddwd ymm6, ymm6, ymm2
+  vpmaddwd ymm7, ymm7, ymm3
+  vpaddd  ymm4, ymm4, ymm5
+  vpaddd  ymm6, ymm6, ymm7
+  vpaddd  ymm8, ymm8, ymm4
+  vpaddd  ymm8, ymm8, ymm6
+%endmacro
+
 k_dot_q6k_row:
   push rbx
   push rsi
-  push rdi
   push rbp
-  push r12
-  push r13
-  push r14
-  push r15                      ; 8 pushes; entry %16==8 -> %16==8
-  sub  rsp, 40                  ; [0]dot [8]d6 [16]d8 [24]term1 [28]term2 [32]g_d8 base
-  mov  rbx, rcx                 ; block ptr
+  push r13                      ; leaf: no calls, no locals
+  mov  rbx, rcx                 ; block cursor
   mov  r13, r8
-  shr  r13, 8                   ; nblocks
-  mov  r14, [rel g_q8]          ; int8 activations (this x)
-  mov  rsi, [rel g_bsums]       ; i32 per-16 sums of g_q8
-  mov  rax, [rel g_d8]
-  mov  [rsp+32], rax            ; g_d8 base
-  vxorps xmm0, xmm0, xmm0
-  vmovss [rsp+0], xmm0          ; dot = 0
-  xor  r12, r12                 ; block index
+  shr  r13, 8                   ; nblocks (>= 1)
+  mov  r8, [rel g_q8]           ; q8 cursor (+256 per block)
+  mov  rsi, [rel g_bsums]       ; i16 per-16 sums cursor (+32 bytes per block)
+  mov  rbp, [rel g_d8]          ; f32 activation scale cursor
+  vmovdqa ymm15, [rel kc_0f32]
+  vmovdqa ymm14, [rel kc_3032]
+  vxorps ymm13, ymm13, ymm13    ; f32 accumulator
 .blk:
-  cmp  r12, r13
-  jae  .done
-  movzx eax, word [rbx+208]     ; d6 (f16)
-  vmovd xmm0, eax
-  vcvtph2ps xmm0, xmm0
-  vmovss [rsp+8], xmm0          ; d6
-  mov  rax, [rsp+32]
-  vmovss xmm0, [rax + r12*4]
-  vmovss [rsp+16], xmm0         ; d8 = g_d8[blk]
-  mov  dword [rsp+24], 0        ; term1 = 0
-  mov  dword [rsp+28], 0        ; term2 = 0
-  xor  rbp, rbp                 ; half h in 0..1
-.half:
-  cmp  rbp, 2
-  jae  .half_done
-  mov  rax, rbp
-  shl  rax, 3
-  lea  r15, [rbx + 192 + rax]      ; &sc[h*8] (i8)
-  xor  rdi, rdi                    ; group g in 0..3
-.grp:
-  cmp  rdi, 4
-  jae  .grp_done
-  ; build 32 six-bit codes (0..63) into ymm0 (reload ql/qh per group so ymm2-5
-  ; stay as the block accumulators):  g0:(ql0&0xF)|((qh&3)<<4)
-  ; g1:(ql1&0xF)|(((qh>>2)&3)<<4)  g2:(ql0>>4)|(((qh>>4)&3)<<4)  g3:(ql1>>4)|(((qh>>6)&3)<<4)
-  mov  rax, rbp
-  shl  rax, 6                      ; h*64
-  test rdi, 1
-  jz   .ql_even
-  add  rax, 32                     ; groups 1,3 use ql[h*64+32 ..]
-.ql_even:
-  vmovdqu ymm0, [rbx + rax]        ; ql slice
-  cmp  rdi, 2
-  jb   .ql_lo
-  vpsrlw  ymm0, ymm0, 4            ; groups 2,3: high nibble
-.ql_lo:
-  vpand   ymm0, ymm0, [rel kc_0f32]
-  mov  rax, rbp
-  shl  rax, 5
-  vmovdqu ymm1, [rbx + 128 + rax]  ; qh
-  cmp  rdi, 1
-  je   .qh_s2
-  cmp  rdi, 2
-  je   .qh_s4
-  cmp  rdi, 3
-  je   .qh_s6
-  jmp  .qh_mask                    ; g0: no shift
-.qh_s2:
-  vpsrlw  ymm1, ymm1, 2
-  jmp  .qh_mask
-.qh_s4:
-  vpsrlw  ymm1, ymm1, 4
-  jmp  .qh_mask
-.qh_s6:
-  vpsrlw  ymm1, ymm1, 6
-.qh_mask:
-  vpand   ymm1, ymm1, [rel kc_0332]
-  vpsllw  ymm1, ymm1, 4
-  vpor    ymm2, ymm0, ymm1         ; 32 six-bit codes (0..63), kept in ymm2
-  ; value base = 256*blk + h*128 + 32g -> r9 ; q8 ptr = g_q8 + value base
-  mov  r9, r12
-  shl  r9, 8
-  mov  rax, rbp
-  shl  rax, 7
-  add  r9, rax
-  mov  rax, rdi
-  shl  rax, 5
-  add  r9, rax
-  ; bsums dword index of S0 = 16*blk + h*8 + 2g -> r10
-  mov  r10, r12
-  shl  r10, 4
-  mov  rax, rbp
-  shl  rax, 3
-  add  r10, rax
-  mov  rax, rdi
-  shl  rax, 1
-  add  r10, rax
-  mov  rdx, rdi
-  shl  rdx, 1                       ; 2g (offset into &sc[h*8])
-  ; S0 (codes 0..15): isum0 = sum_16 q6*q8[vbase..] via vpdpbusd (u8 codes, s8 q8)
-  vpxor  xmm3, xmm3, xmm3
-  {vex} vpdpbusd xmm3, xmm2, [r14 + r9]
-  vpshufd xmm1, xmm3, 0x0E
-  vpaddd  xmm3, xmm3, xmm1
-  vpshufd xmm1, xmm3, 0x01
-  vpaddd  xmm3, xmm3, xmm1
-  vmovd   eax, xmm3                 ; isum0
-  movsx   r8d, byte [r15 + rdx]     ; sc[S0]
-  imul    eax, r8d
-  add     [rsp+24], eax             ; term1 += sc0*isum0
-  mov     eax, [rsi + r10*4]        ; bsums[S0]
-  imul    eax, r8d
-  add     [rsp+28], eax             ; term2 += sc0*bsums0
-  ; S1 (codes 16..31 = high 128 of ymm2): q8[vbase+16..]
-  vextracti128 xmm4, ymm2, 1
-  vpxor  xmm3, xmm3, xmm3
-  {vex} vpdpbusd xmm3, xmm4, [r14 + r9 + 16]
-  vpshufd xmm1, xmm3, 0x0E
-  vpaddd  xmm3, xmm3, xmm1
-  vpshufd xmm1, xmm3, 0x01
-  vpaddd  xmm3, xmm3, xmm1
-  vmovd   eax, xmm3                 ; isum1
-  movsx   r8d, byte [r15 + rdx + 1] ; sc[S1]
-  imul    eax, r8d
-  add     [rsp+24], eax
-  mov     eax, [rsi + r10*4 + 4]    ; bsums[S1]
-  imul    eax, r8d
-  add     [rsp+28], eax
-  inc  rdi
-  jmp  .grp
-.grp_done:
-  inc  rbp
-  jmp  .half
-.half_done:
-  ; dot += d6*d8*(term1 - 32*term2)  (term1 = Σ sc*isum, term2 = Σ sc*bsums; ints)
-  mov  eax, [rsp+24]                 ; term1
-  mov  ecx, [rsp+28]                 ; term2
-  shl  ecx, 5                        ; 32*term2
-  sub  eax, ecx                      ; term1 - 32*term2
-  vcvtsi2ss xmm0, xmm0, eax
-  vmulss  xmm0, xmm0, [rsp+8]        ; * d6
-  vmulss  xmm0, xmm0, [rsp+16]       ; * d8
-  vaddss  xmm0, xmm0, [rsp+0]
-  vmovss  [rsp+0], xmm0
+  vpmovsxbw ymm11, [rbx + 192]  ; sc[0..15] as i16
+  vinserti128 ymm10, ymm11, xmm11, 1 ; [sc0..7 | sc0..7]   (half 0's vpshufb source)
+  vpermq  ymm9, ymm11, 0xEE     ; [sc8..15 | sc8..15] (half 1's)
+  vpmaddwd ymm12, ymm11, [rsi]  ; 8 x i32 pair sums of sc*bsums
+  vpslld  ymm12, ymm12, 5       ; * 32
+  vpxor   ymm8, ymm8, ymm8      ; i32 accumulator
+  Q6K_HALF 0, 128, 0, ymm10
+  Q6K_HALF 64, 160, 128, ymm9
+  vpsubd  ymm8, ymm8, ymm12     ; sum sc*q*q8 - 32*sum sc*bsums
+  vcvtdq2ps ymm8, ymm8
+  vpbroadcastw xmm0, [rbx + 208] ; d (f16)
+  vcvtph2ps ymm0, xmm0
+  vbroadcastss ymm1, [rbp]      ; d8
+  vmulps  ymm0, ymm0, ymm1
+  vfmadd231ps ymm13, ymm8, ymm0
   add  rbx, Q6K_BYTES
-  inc  r12
-  jmp  .blk
-.done:
-  vmovss xmm0, [rsp+0]
+  add  r8, 256
+  add  rsi, 32
+  add  rbp, 4
+  dec  r13
+  jnz  .blk
+  vextractf128 xmm1, ymm13, 1
+  vaddps  xmm0, xmm13, xmm1
+  vhaddps xmm0, xmm0, xmm0
+  vhaddps xmm0, xmm0, xmm0
   vzeroupper
-  add  rsp, 40
-  pop  r15
-  pop  r14
   pop  r13
-  pop  r12
   pop  rbp
-  pop  rdi
   pop  rsi
   pop  rbx
   ret
 
 ; ===========================================================================
 ; k_matvec_job(rcx=MatvecJob*, rdx=tid, r8=nthreads) — pool body.
-; out[r] = dot(row r of w, x) for the thread's contiguous row slice
-; [tid*rows/nthreads, (tid+1)*rows/nthreads). Dispatches on w.type and passes the
-; whole-x xsum32/xsum16 (indexed per sub-block inside each dot).
+; out[r] = dot(row r of w, x). Rows are handed out dynamically: each thread claims
+; job.chunk consecutive rows at a time from job.next (lock xadd) until the rows
+; run out, so a thread slowed by an interrupt or a lower clock takes fewer rows
+; and the matvec ends when the work does, not when the slowest static slice does.
+; Chunks are large (a thread's share / 8) so each stays one long sequential stream
+; for the L2 prefetcher.
+; Dispatches on w.type; the quantised dots read the int8 activation that
+; k_quant_x prepared for this x.
 ; ===========================================================================
 k_matvec_job:
   push rbx
@@ -950,26 +856,24 @@ k_matvec_job:
   push r13
   push r14
   push r15                      ; 8 pushes; entry %16==8 -> %16==8
-  sub  rsp, 56                  ; 32 shadow + 24 locals; %16: 8-8=0
+  sub  rsp, 216                 ; 32 shadow + 24 locals + 160 xmm6-15 save; %16: 8-8=0
   mov  r14, rcx                 ; job
+  vmovdqu [rsp+56], xmm6        ; the quantised dot kernels use ymm0-15 freely; the
+  vmovdqu [rsp+72], xmm7        ; low halves of xmm6-15 are callee-saved, so keep
+  vmovdqu [rsp+88], xmm8        ; them here once per job instead of once per row
+  vmovdqu [rsp+104], xmm9
+  vmovdqu [rsp+120], xmm10
+  vmovdqu [rsp+136], xmm11
+  vmovdqu [rsp+152], xmm12
+  vmovdqu [rsp+168], xmm13
+  vmovdqu [rsp+184], xmm14
+  vmovdqu [rsp+200], xmm15
   mov  [rsp+32], rdx            ; tid
   mov  [rsp+40], r8             ; nthreads
   mov  r12, [r14 + MatvecJob.x]
   mov  r13, [r14 + MatvecJob.out]
   mov  rbx, [r14 + MatvecJob.w] ; Tensor*
   mov  r15, [r14 + MatvecJob.cols]
-  ; contiguous row slice [r0, r1): r0=tid*rows/nthreads, r1=(tid+1)*rows/nthreads
-  mov  rax, rdx
-  imul rax, [r14 + MatvecJob.rows]
-  xor  rdx, rdx
-  div  r8                       ; r0
-  mov  rsi, rax                 ; r (current row)
-  mov  rax, [rsp+32]
-  inc  rax
-  imul rax, [r14 + MatvecJob.rows]
-  xor  rdx, rdx
-  div  qword [rsp+40]
-  mov  rdi, rax                 ; r1 (slice end)
   ; --- row stride in bytes by type, into rbp ---
   mov  eax, [rbx + Tensor.type]
   cmp  eax, GGML_Q4_K
@@ -996,11 +900,23 @@ k_matvec_job:
   shr  rbp, 8
   imul rbp, rbp, Q6K_BYTES
 .run:
+  ; claim the next chunk of rows: [rsi, rdi) = [old next, min(old next + CHUNK, rows))
+.grab:
+  mov  rax, [r14 + MatvecJob.chunk]
+  lock xadd [r14 + MatvecJob.next], rax
+  mov  rsi, rax
+  cmp  rsi, [r14 + MatvecJob.rows]
+  jae  .done                    ; no rows left
+  mov  rdi, rsi
+  add  rdi, [r14 + MatvecJob.chunk]
+  cmp  rdi, [r14 + MatvecJob.rows]
+  jbe  .rowloop
+  mov  rdi, [r14 + MatvecJob.rows]
   ; loop r in [rsi, rdi): rowptr = w.data + r*rbp (data base reloaded each row
   ; because the dot helpers clobber the volatile regs).
 .rowloop:
   cmp  rsi, rdi
-  jae  .done
+  jae  .grab
   mov  rax, rsi
   imul rax, rbp
   add  rax, [rbx + Tensor.data]
@@ -1020,19 +936,27 @@ k_matvec_job:
   call k_dot_f16_row
   jmp  .store
 .d_q4:
-  mov  r9, [r14 + MatvecJob.xsum32]
   call k_dot_q4k_row
   jmp  .store
 .d_q6:
-  mov  r9, [r14 + MatvecJob.xsum16]
   call k_dot_q6k_row
 .store:
   movss [r13 + rsi*4], xmm0
-  ; rowptr base r11, cols r15, stride rbp, w rbx, x r12, out r13, end rdi survive
+  ; cols r15, stride rbp, w rbx, x r12, out r13, chunk end rdi survive the dot calls
   inc  rsi
   jmp  .rowloop
 .done:
-  add  rsp, 56
+  vmovdqu xmm6, [rsp+56]
+  vmovdqu xmm7, [rsp+72]
+  vmovdqu xmm8, [rsp+88]
+  vmovdqu xmm9, [rsp+104]
+  vmovdqu xmm10, [rsp+120]
+  vmovdqu xmm11, [rsp+136]
+  vmovdqu xmm12, [rsp+152]
+  vmovdqu xmm13, [rsp+168]
+  vmovdqu xmm14, [rsp+184]
+  vmovdqu xmm15, [rsp+200]
+  add  rsp, 216
   pop  r15
   pop  r14
   pop  r13
@@ -1218,10 +1142,12 @@ k_attn_job:
 
 ; ===========================================================================
 ; kernels_cli(rcx=Model*) -> eax=0. --kernels micro-benchmark: time
-; KERNELS_BENCH_ITERS matvecs of the output projection (the largest weight) and
-; report rows, cols, ms and effective GB/s (= weight bytes read / time). Reuses
-; the real model_matvec path (thread pool, sums, dequant+dot). The model is
-; already loaded, so g_xsum32/g_xsum16/g_mvjob and the pool are ready.
+; KERNELS_BENCH_ITERS matvecs of the two largest weights — the Q6_K output
+; projection and the Q4_K token embedding (same shape; used here only as a big
+; Q4_K matrix) — and report rows, cols, type, ms and effective GB/s (= weight
+; bytes read / time) for each. Reuses the real model_matvec path (thread pool,
+; activation quantisation, dot kernels). The model is already loaded, so the
+; activation buffers, g_mvjob and the pool are ready.
 ; ===========================================================================
 k_dot_bench_x_fill:                ; local: fill r14[0..r12) with 1.0
   xorps xmm0, xmm0
@@ -1236,7 +1162,12 @@ k_dot_bench_x_fill:                ; local: fill r14[0..r12) with 1.0
 .done:
   ret
 
-kernels_cli:
+; kernels_bench(rcx=Tensor*, rdx=iters): one warm matvec, then `iters` timed ones,
+; then one report line, then three check lines comparing the kernel's result for
+; rows 0, rows/2 and rows-1 with a plain f32 dot of the dequantised row (the
+; activation x[*]=1.0 is exactly representable in int8, so they should agree to
+; float rounding).
+kernels_bench:
   push rbx
   push rsi
   push rdi
@@ -1245,9 +1176,9 @@ kernels_cli:
   push r13
   push r14
   push r15                      ; 8 pushes; entry %16==8 -> %16==8
-  sub  rsp, 56                  ; 32 shadow + 24 locals; %16: 8-8=0 (56 mod16=8)
-  mov  rbx, rcx                 ; Model*
-  mov  rsi, [rbx + Model.output]   ; Tensor* (lm head, largest matrix)
+  sub  rsp, 72                  ; 32 shadow + [32]=iters [40]=t0/ns [48]=bytes [56]=dequant buf [64]=ref; %16==0
+  mov  rsi, rcx                 ; Tensor*
+  mov  [rsp+32], rdx            ; iters
   mov  r12, [rsi + Tensor.ne0]  ; cols
   mov  r13, [rsi + Tensor.ne1]  ; rows
   ; x = rt_alloc(cols*4); out = rt_alloc(rows*4)
@@ -1260,10 +1191,9 @@ kernels_cli:
   call rt_alloc
   mov  r15, rax                 ; out
   call k_dot_bench_x_fill       ; x[*]=1.0  (uses r14,r12)
-  ; sums for x
   mov  rcx, r14
   mov  rdx, r12
-  call model_fill_sums
+  call model_fill_sums          ; quantise x
   ; warm
   mov  rcx, rsi
   mov  rdx, r14
@@ -1271,8 +1201,8 @@ kernels_cli:
   call model_matvec
   ; timed
   call rt_now_ns
-  mov  [rsp+32], rax            ; t0
-  mov  rbp, KERNELS_BENCH_ITERS
+  mov  [rsp+40], rax            ; t0
+  mov  rbp, [rsp+32]
 .loop:
   test rbp, rbp
   jz   .loop_done
@@ -1284,13 +1214,12 @@ kernels_cli:
   jmp  .loop
 .loop_done:
   call rt_now_ns
-  sub  rax, [rsp+32]            ; elapsed ns
+  sub  rax, [rsp+40]            ; elapsed ns
   mov  [rsp+40], rax            ; ns
-  ; bytes = nbytes * iters
   mov  rax, [rsi + Tensor.nbytes]
-  imul rax, KERNELS_BENCH_ITERS
-  mov  [rsp+48], rax            ; bytes
-  ; print: head rows cols iters ms gb_s
+  imul rax, [rsp+32]
+  mov  [rsp+48], rax            ; bytes read = nbytes * iters
+  ; print: head rows cols type iters ms gb_s
   lea  rcx, [rel kc_s_head]
   call rt_err_str
   mov  rcx, r13
@@ -1299,9 +1228,13 @@ kernels_cli:
   call rt_err_str
   mov  rcx, r12
   call rt_err_u64
+  lea  rcx, [rel kc_s_type]
+  call rt_err_str
+  mov  ecx, [rsi + Tensor.type]
+  call rt_err_u64
   lea  rcx, [rel kc_s_iters]
   call rt_err_str
-  mov  rcx, KERNELS_BENCH_ITERS
+  mov  rcx, [rsp+32]
   call rt_err_u64
   lea  rcx, [rel kc_s_ms]
   call rt_err_str
@@ -1321,8 +1254,55 @@ kernels_cli:
   lea  rcx, [rel kc_s_nl]
   mov  rdx, 1
   call rt_err
-  xor  eax, eax
-  add  rsp, 56
+  ; check rows 0, rows/2, rows-1 against the f32 dequantised dot
+  mov  rcx, r12
+  shl  rcx, 2
+  call rt_alloc
+  mov  [rsp+56], rax            ; f32[cols] dequant scratch
+  xor  rdi, rdi                 ; check index 0..2
+.chk:
+  cmp  rdi, 3
+  jae  .chk_done
+  xor  rbp, rbp                 ; row 0
+  cmp  rdi, 1
+  jne  .chk_r2
+  mov  rbp, r13
+  shr  rbp, 1                   ; rows/2
+  jmp  .chk_go
+.chk_r2:
+  cmp  rdi, 2
+  jne  .chk_go
+  mov  rbp, r13
+  dec  rbp                      ; rows-1
+.chk_go:
+  mov  rcx, rsi
+  mov  rdx, rbp
+  mov  r8, [rsp+56]
+  call model_dequant_row
+  mov  rcx, [rsp+56]
+  mov  rdx, r14
+  mov  r8, r12
+  call k_dot_f32_row            ; xmm0 = reference dot
+  movss [rsp+64], xmm0
+  lea  rcx, [rel kc_s_chk]
+  call rt_err_str
+  mov  rcx, rbp
+  call rt_err_u64
+  lea  rcx, [rel kc_s_kern]
+  call rt_err_str
+  movss xmm0, [r15 + rbp*4]
+  call rt_err_f32
+  lea  rcx, [rel kc_s_ref]
+  call rt_err_str
+  movss xmm0, [rsp+64]
+  call rt_err_f32
+  lea  rcx, [rel kc_s_nl]
+  mov  rdx, 1
+  call rt_err
+  inc  rdi
+  jmp  .chk
+.chk_done:
+  add  rsp, 72
   pop  r15
   pop  r14
   pop  r13
@@ -1330,5 +1310,50 @@ kernels_cli:
   pop  rbp
   pop  rdi
   pop  rsi
+  pop  rbx
+  ret
+
+k_pool_noop:                       ; empty pool body for the dispatch-cost measurement
+  ret
+
+kernels_cli:
+  push rbx                      ; entry %16==8 -> 0
+  sub  rsp, 48                  ; shadow + [32]=t0; %16==0
+  mov  rbx, rcx                 ; Model*
+  mov  rcx, [rbx + Model.output]   ; Q6_K lm head (255 MB: streams from DRAM)
+  mov  rdx, KERNELS_BENCH_ITERS
+  call kernels_bench
+  mov  rcx, [rbx + Model.tok_embd] ; Q4_K, same shape (175 MB: DRAM)
+  mov  rdx, KERNELS_BENCH_ITERS
+  call kernels_bench
+  mov  rcx, [rbx + Model.layers]
+  mov  rcx, [rcx + Layer.attn_k]   ; Q4_K 1024x2048 = 1.2 MB: stays in L2, so this is the kernel's compute rate
+  mov  rdx, KERNELS_BENCH_ITERS*100
+  call kernels_bench
+  ; pool dispatch cost: time empty jobs
+  call rt_now_ns
+  mov  [rsp+32], rax
+  mov  ebx, KERNELS_BENCH_ITERS*100
+.pool:
+  lea  rcx, [rel k_pool_noop]
+  xor  edx, edx
+  call pool_run
+  dec  ebx
+  jnz  .pool
+  call rt_now_ns
+  sub  rax, [rsp+32]
+  mov  [rsp+32], rax
+  lea  rcx, [rel kc_s_pool]
+  call rt_err_str
+  cvtsi2ss xmm0, qword [rsp+32]
+  mov  eax, KERNELS_BENCH_ITERS*100
+  cvtsi2ss xmm1, eax
+  divss xmm0, xmm1              ; ns per pool_run
+  call rt_err_f32
+  lea  rcx, [rel kc_s_nl]
+  mov  rdx, 1
+  call rt_err
+  xor  eax, eax
+  add  rsp, 48
   pop  rbx
   ret
