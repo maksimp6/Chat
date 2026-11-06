@@ -25,7 +25,7 @@ import urllib.request
 from pathlib import Path
 
 DIRECTORY = "https://acme-v02.api.letsencrypt.org/directory"
-NAMES = ("chat.maxxxpavlov.ru", "maxxxpavlov.ru", "www.maxxxpavlov.ru")
+NAMES = ("chat.maxxxpavlov.ru", "maxxxpavlov.ru", "www.maxxxpavlov.ru", "tunnel.maxxxpavlov.ru")
 ROOT = Path.home() / ".config/acme"
 CHALLENGES = ROOT / "challenges"
 ACCOUNT_KEY = ROOT / "account.key"

@@ -27,7 +27,7 @@ import urllib.request
 from pathlib import Path
 
 DOMAIN = "maxxxpavlov.ru"
-SUBDOMAINS = ("@", "www", "chat")
+SUBDOMAINS = ("@", "www", "chat", "tunnel")
 API = "https://api.reg.ru/api/regru2/"
 IP_URL = "https://api.ipify.org"
 INTERVAL_SECONDS = 300

@@ -228,11 +228,16 @@ restart_home() {
   # The home page (port 80, the LAN-only chat.maxxxpavlov.ru proxy) and the DDNS loop
   # run from this checkout, so a deploy restarts them on its code.
   local script log
-  for script in home_server.py ddns_regru.py; do
+  for script in home_server.py ddns_regru.py tunnel.py; do
     [[ -f $app/scripts/home/$script ]] || continue
     if [[ $script == ddns_regru.py ]]; then
       [[ -f $HOME/.config/regru/ddns.json ]] || continue
       log=$HOME/.ddns-regru.log
+    elif [[ $script == tunnel.py ]]; then
+      # The owner's server depends on the tunnel, so a deploy leaves it running; it restarts
+      # by itself when its own code changes. Here it is only started when it is down.
+      pgrep -f "scripts/home/$script" >/dev/null && continue
+      log=$HOME/.tunnel.log
     else
       log=$HOME/.home-page.log
     fi
