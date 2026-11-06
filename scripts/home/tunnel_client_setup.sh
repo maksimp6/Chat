@@ -40,6 +40,7 @@ connect)
   openssl pkeyutl -derive -inkey "$ROOT/key.pem" -peerkey "$ROOT/redmi.pem" -out "$work/shared"
   password=$(sha256sum "$work/shared" | cut -d' ' -f1)
 
+  # dns_mode: its default for a route like this one would take over the server's own DNS.
   cat >"$ROOT/config.json" <<EOF
 {
   "log": {"level": "warn", "timestamp": true},
@@ -51,7 +52,8 @@ connect)
       "interface_name": "tunnel0",
       "address": ["172.19.0.1/30"],
       "auto_route": true,
-      "route_address": ["192.168.10.0/24"]
+      "route_address": ["192.168.10.0/24"],
+      "dns_mode": "disabled"
     },
     {"type": "socks", "tag": "socks", "listen": "127.0.0.1", "listen_port": 1081}
   ],
