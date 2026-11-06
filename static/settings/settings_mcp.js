@@ -60,7 +60,7 @@
 
 
   // The RDC window: whether Logos is connected to RDC, and the button that connects it (owner, 05.11.2026: a link to the
-  // RDC site did not connect Logos). The state is read again when the sign-in tab hands the page back.
+  // RDC site did not connect Logos). The state is read again when the sign-in tab or popup hands the page back.
   window.openRdcModal = function () {
     var CoreUI = window.LogosCoreAPI.ui;
     var existing = document.getElementById("rdc-modal");
@@ -115,12 +115,14 @@
       });
     });
 
-    function onVisible() {
+    function onReturn() {
       if (!document.hidden) load();
     }
-    document.addEventListener("visibilitychange", onVisible);
+    document.addEventListener("visibilitychange", onReturn);
+    window.addEventListener("focus", onReturn);
     modal.addEventListener("close", function () {
-      document.removeEventListener("visibilitychange", onVisible);
+      document.removeEventListener("visibilitychange", onReturn);
+      window.removeEventListener("focus", onReturn);
     });
 
     load();

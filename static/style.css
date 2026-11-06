@@ -1075,7 +1075,7 @@ body {
 .logos-pro-app .modal.visible {
   display: flex;
 }
-@media (min-width: 769px) {
+@media (min-width: 769px) and (min-height: 600px) {
   .logos-pro-app .modal {
     padding-top: 48px;
     padding-bottom: 48px;
@@ -1109,6 +1109,8 @@ body {
   max-height: 100%;
   overflow-y: auto;
   overflow-wrap: break-word;
+  /* A scrollbar that takes room, as on a PC, must not move the × when the content grows past the window. */
+  scrollbar-gutter: stable;
   position: relative;
 }
 /* Кнопка закрытия: липкая справа сверху, поэтому остаётся видимой при прокрутке .modal-content (пункты 23, 30).
@@ -1132,6 +1134,12 @@ body {
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
+}
+@media (hover: hover) {
+  .logos-pro-app .modal-close:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
 }
 .logos-pro-app .modal-content h3 {
   margin-top: 0;
@@ -2466,10 +2474,10 @@ body {
   padding: 0 16px;
 }
 
-/* Window titles: plain text in the UI font, 17px/600, with one 12px gap under them (the emoji are gone from the
-   titles). :where() keeps this at zero specificity and reaches windows appended to <body> as well. */
+/* Window titles: plain text in the UI font, 17px/600. The 14px under them takes the content past the bottom of the
+   floated ×: a flex box that started higher would lose the width of the × (the logs search field did). */
 :where(.modal-content > .modal-title, .settings-modal-heading > .modal-title) {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   color: var(--text);
   font-size: 17px;
   font-weight: 600;
@@ -2518,12 +2526,17 @@ body {
   font-weight: 600;
 }
 /* The settings header and tabs stay visible while the panel body scrolls. The panel is a column flex box, so the block must not shrink: a shrunk tab row clips the 44px labels. */
+/* The heading is a flex row, so the sticky offset that holds the × down in other windows does not apply here. */
+.logos-pro-app #set-close-btn {
+  margin-top: 0;
+}
 .logos-pro-app .settings-modal-top {
   flex: 0 0 auto;
   position: sticky;
-  top: 0;
+  top: -20px;
   z-index: 1;
-  padding-bottom: 14px;
+  margin-top: -20px;
+  padding: 20px 0 14px;
   background: var(--surface-1);
 }
 
@@ -2596,11 +2609,6 @@ body {
   width: 100%;
 }
 
-/* Шапка, сайдбар и безопасные зоны (пункты 54, 55, 57, 59, 60). The header's own safe-area padding is in the
-   header section; this is its two-row height (10 + 44 + 6 + 44 + 10 + 1), where the status popover starts. */
-:root {
-  --header-h: 115px;
-}
 /* Размеры подписей кнопок, которые перебивались общим правилом (пункт 54) */
 .logos-pro-app .logos-trace-open-viewer {
   font-size: 12px;
@@ -2697,7 +2705,7 @@ body {
 /* Settings dialog: one height for every tab, so switching tabs does not move the dialog.
    The status line and the buttons stay at the bottom (margin-top:auto in settings_modal.js). */
 .logos-pro-app .settings-modal-panel {
-  height: calc(100% - 24px);
+  height: 100%;
 }
 /* Dialog footer buttons get the same 44px touch target as the other buttons. */
 .logos-pro-app .settings-modal-footer .logos-btn {

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sys
 import threading
 from datetime import UTC, datetime
@@ -30,8 +31,9 @@ _MAX_BYTES = 5 * 1024 * 1024
 _BACKUPS = 3
 _READ_BLOCK = 256 * 1024
 _LEVELS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
-# The log window asks for new records every few seconds; these lines would bury what it shows.
-_OWN_REQUEST = '"GET /api/logs'
+# The log window asks for new records every few seconds. Its answered requests stay out of the
+# plain list, which they would bury; a search finds them, and one that failed stays in the list.
+_OWN_POLL = re.compile(r'"GET /api/logs[^"]*" 200 ')
 _lock = threading.Lock()
 _mirroring = threading.local()
 
@@ -141,26 +143,26 @@ def configure(
     return root
 
 
-def _log_spans() -> list[tuple[Path, int, int]]:
-    """The log files, oldest first, each with its byte range in the whole history."""
+def _log_spans() -> list[tuple[Path, str, int, int]]:
+    """The log files, oldest first: path, inode and byte range in the whole history."""
     current = log_dir() / DEFAULT_LOG_FILE
     rotated = [current.with_name(f"{current.name}.{n}") for n in range(_BACKUPS, 0, -1)]
-    spans: list[tuple[Path, int, int]] = []
+    spans: list[tuple[Path, str, int, int]] = []
     position = 0
     for path in (*rotated, current):
         try:
-            size = path.stat().st_size
+            stat = path.stat()
         except OSError:
             continue
-        spans.append((path, position, position + size))
-        position += size
+        spans.append((path, str(stat.st_ino), position, position + stat.st_size))
+        position += stat.st_size
     return spans
 
 
-def _read_span(spans: list[tuple[Path, int, int]], start: int, end: int) -> bytes:
+def _read_span(spans: list[tuple[Path, str, int, int]], start: int, end: int) -> bytes:
     """Bytes ``start`` to ``end`` of the whole history."""
     parts = []
-    for path, first, last in spans:
+    for path, _inode, first, last in spans:
         low, high = max(start, first), min(end, last)
         if low < high:
             with path.open("rb") as stream:
@@ -181,17 +183,29 @@ def _entry(line: bytes, floor: int, needle: str) -> dict[str, Any] | None:
     if not isinstance(entry, dict):
         entry = {"message": redact_text(raw)}
     message = str(entry.get("message") or "")
-    if _OWN_REQUEST in message or _LEVELS.get(str(entry.get("level")), 0) < floor:
+    if _LEVELS.get(str(entry.get("level")), 0) < floor:
         return None
-    if needle:
-        searched = " ".join((str(entry.get("logger") or ""), message, str(entry.get("exception") or "")))
-        if needle not in searched.casefold():
-            return None
-    return entry
+    if not needle:
+        return None if _OWN_POLL.search(message) else entry
+    logger = str(entry.get("logger") or "").removeprefix(f"{ROOT_LOGGER_NAME}.")
+    held = (
+        entry.get("level"),
+        logger,
+        message,
+        entry.get("exception"),
+        entry.get("trace_id"),
+        entry.get("invocation_id"),
+    )
+    return entry if needle in " ".join(str(value) for value in held if value).casefold() else None
 
 
 def read_entries(
-    *, before: int | None = None, after: int | None = None, level: str = "", text: str = ""
+    *,
+    log: str = "",
+    before: int | None = None,
+    after: int | None = None,
+    level: str = "",
+    text: str = "",
 ) -> dict[str, Any]:
     """Records of the system log, newest first, with the positions to read on from.
 
@@ -200,11 +214,17 @@ def read_entries(
     the answer ends the next older page and is None at the start of the log. ``level`` keeps that
     severity and above, ``text`` keeps records that hold it, in any case.
 
-    Positions count bytes through the rotated files and the current one, so they hold while
-    the log grows; only a rotation that drops the oldest file moves them.
+    Positions count bytes through the rotated files and the current one, oldest first. They hold
+    while the log grows, and a rotation that drops the oldest file renumbers them. So every
+    answer names its history in ``log`` (the oldest file's inode, as text: a browser would round
+    a large number), and a position sent with another ``log`` gets ``{"reset": True}``: the
+    reader starts again from the newest records.
     """
     spans = _log_spans()
-    total = spans[-1][2] if spans else 0
+    total = spans[-1][3] if spans else 0
+    history = spans[0][1] if spans else ""
+    if (before is not None or after is not None) and log != history:
+        return {"reset": True}
     floor = _LEVELS.get(level.upper(), 0)
     needle = text.casefold()
 
@@ -214,7 +234,11 @@ def read_entries(
         # A line still being written is read by the next call.
         data = data[: data.rfind(b"\n") + 1]
         found = (_entry(line, floor, needle) for line in reversed(data.splitlines()))
-        return {"entries": [entry for entry in found if entry], "after": start + len(data)}
+        return {
+            "entries": [entry for entry in found if entry],
+            "log": history,
+            "after": start + len(data),
+        }
 
     tail = _read_span(spans, max(0, total - _READ_BLOCK), total)
     newest = total - len(tail) + tail.rfind(b"\n") + 1
@@ -239,9 +263,14 @@ def read_entries(
             if entry:
                 entries.append(entry)
                 if len(entries) == PAGE_ENTRIES:
-                    return {"entries": entries, "before": position or None, "after": newest}
+                    return {
+                        "entries": entries,
+                        "log": history,
+                        "before": position or None,
+                        "after": newest,
+                    }
         end = start
-    return {"entries": entries, "before": None, "after": newest}
+    return {"entries": entries, "log": history, "before": None, "after": newest}
 
 
 def get_logger(name: str = "") -> logging.Logger:

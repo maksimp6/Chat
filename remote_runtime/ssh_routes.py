@@ -14,7 +14,7 @@ logger = logging.getLogger("logos.remote_runtime.ssh_routes")
 # What the SSH window says when the settings cannot be read; the cause goes to the log.
 _DETAILS = {
     "ssh_settings_unreadable": (
-        "Не удалось прочитать настройки SSH Runtime. Проверьте сохранённые цели "
+        "Не удалось прочитать настройки среды SSH. Проверьте сохранённые цели "
         "и known_hosts в настройках на сервере: в окне они только для чтения."
     ),
 }

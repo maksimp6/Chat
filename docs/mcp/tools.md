@@ -42,7 +42,7 @@
 `GET`/`PUT /api/conversations/<conv_id>/tools`, `POST /api/mcp-servers`,
 `PUT`/`DELETE /api/mcp-servers/<server_id>`, `PUT /api/memory/config`,
 `POST /api/memory/clear`, `PUT /api/ssh-runtime/settings` и `POST /api/ssh-runtime/test`
-нет. Окна «Инструменты», «Параметры», «SSH Runtime», «MCP Серверы» и память только
+нет. Окна «Инструменты», «Настройки», «Среда SSH», «MCP серверы» и память только
 показывают значения: полей для ввода и кнопок действий нет. Цветовая схема хранится на
 устройстве и остаётся выбираемой.
 

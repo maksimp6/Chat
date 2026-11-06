@@ -127,7 +127,7 @@
     window.LogosDispatcher.request("/api/ssh-runtime/settings")
       .then(function (r) {
         return r.json().then(function (data) {
-          if (!r.ok) throw new Error(data.detail || data.error || "Не удалось загрузить SSH settings");
+          if (!r.ok) throw new Error(data.detail || data.error || "Не удалось загрузить настройки среды SSH");
           return data;
         });
       })

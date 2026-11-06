@@ -7,13 +7,26 @@
   var REMOVE_AFTER_MS = 300;
   var stack = null;
 
+  // A window is a showModal() dialog, in the browser's top layer above any z-index, and the page behind it is inert. So
+  // the stack lives in the top-most open window: on <body> a failure inside a window would show behind it.
+  function placeStack() {
+    if (!stack) return;
+    var open = document.querySelectorAll("dialog[open]");
+    var host = open.length ? open[open.length - 1] : document.body;
+    if (stack.parentNode !== host) host.appendChild(stack);
+  }
+
   function ensureStack() {
-    if (stack && stack.isConnected) return stack;
-    stack = document.createElement("div");
-    stack.className = "logos-toast-stack";
-    document.body.appendChild(stack);
+    if (!stack) {
+      stack = document.createElement("div");
+      stack.className = "logos-toast-stack";
+    }
+    placeStack();
     return stack;
   }
+
+  // A window that closes hands its messages on. The close event does not bubble, so it is caught on the way down.
+  document.addEventListener("close", placeStack, true);
 
   // Shows a short, non-blocking message. Text is set with textContent, so server
   // error text is never parsed as HTML.

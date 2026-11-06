@@ -177,7 +177,7 @@
   }
 
   async function loadTreasuryAccount() {
-    return requestTreasury("/api/treasury/account", null, "Не удалось загрузить казначейство");
+    return requestTreasury("/api/treasury/account", null, "Не удалось загрузить казну");
   }
 
   let topUpInFlight = false;

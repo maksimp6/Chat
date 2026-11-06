@@ -91,10 +91,13 @@
 
     var level = "";
     var text = "";
+    // Which log the two positions below belong to; a rotation can renumber them (read_entries).
+    var history = null;
     var older = null;
     var newer = null;
     // A filter changed or the window closed: answers to the earlier requests are dropped.
     var generation = 0;
+    var loading = false;
     var refreshing = false;
     var searchTimer = null;
 
@@ -122,18 +125,13 @@
       status.textContent = "Не удалось загрузить логи: " + ((error && error.message) || error);
     }
 
-    function reload() {
-      generation += 1;
+    function load() {
       var mine = generation;
-      older = null;
-      newer = null;
-      list.replaceChildren();
-      more.hidden = true;
-      status.classList.remove("logos-error-note");
-      status.textContent = "Загрузка…";
+      loading = true;
       query({})
         .then(function (data) {
           if (mine !== generation) return;
+          history = data.log;
           older = data.before;
           newer = data.after;
           list.append.apply(list, data.entries.map(row));
@@ -141,16 +139,39 @@
         })
         .catch(function (error) {
           if (mine === generation) showFailure(error);
+        })
+        .then(function () {
+          if (mine === generation) loading = false;
         });
     }
 
+    function reload() {
+      generation += 1;
+      older = null;
+      newer = null;
+      list.replaceChildren();
+      more.hidden = true;
+      status.classList.remove("logos-error-note");
+      status.textContent = "Загрузка…";
+      load();
+    }
+
     function refresh() {
-      if (refreshing || newer === null || document.hidden) return;
+      if (refreshing || loading || document.hidden) return;
+      // The first read failed, say during a restart: it is tried again, and its failure stays up until it works.
+      if (newer === null) {
+        load();
+        return;
+      }
       var mine = generation;
       refreshing = true;
-      query({ after: newer })
+      query({ after: newer, log: history })
         .then(function (data) {
           if (mine !== generation) return;
+          if (data.reset) {
+            reload();
+            return;
+          }
           newer = data.after;
           list.prepend.apply(list, data.entries.map(row));
           showCount();
@@ -166,9 +187,13 @@
     more.addEventListener("click", function () {
       var mine = generation;
       more.disabled = true;
-      query({ before: older })
+      query({ before: older, log: history })
         .then(function (data) {
           if (mine !== generation) return;
+          if (data.reset) {
+            reload();
+            return;
+          }
           older = data.before;
           list.append.apply(list, data.entries.map(row));
           showCount();

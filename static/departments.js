@@ -2,6 +2,8 @@
   "use strict";
 
   var modal = null;
+  // The stored names are English; the interface language is Russian (docs/development/naming.md).
+  var TITLES = { "partner-relations": "Партнёры", government: "Государственные дела" };
 
   function el(tag, attrs, text) {
     var node = document.createElement(tag);
@@ -45,7 +47,7 @@
         list.textContent = "";
         (data.departments || []).forEach(function (department) {
           var row = el("button", { class: "logos-dept-row" });
-          row.appendChild(el("strong", {}, department.name));
+          row.appendChild(el("strong", {}, TITLES[department.id] || department.name));
           row.appendChild(
             el("span", {}, (department.description || department.type || "").slice(0, 120)),
           );
@@ -81,7 +83,7 @@
           list.appendChild(row);
         });
         if (!list.children.length) {
-          list.appendChild(el("div", {}, "Пока нет активных departments."));
+          list.appendChild(el("div", {}, "Пока нет активных отделов."));
         }
       })
       .catch(function (error) {

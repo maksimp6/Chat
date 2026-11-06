@@ -782,7 +782,6 @@
       actions: Object.freeze({ register: registerAction, dispatch: dispatchAction }),
       events: Object.freeze({ mountClicks: mountClickDispatcher }),
       modal: Object.freeze({ create: createModal, open: openModal, close: closeModal }),
-      // A non-modal panel reports itself shown (with its close function) and hidden.
     }),
   });
 

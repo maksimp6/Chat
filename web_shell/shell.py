@@ -161,6 +161,7 @@ def system_log():
     args = request.args
     return jsonify(
         read_log_entries(
+            log=args.get("log", ""),
             before=args.get("before", type=int),
             after=args.get("after", type=int),
             level=args.get("level", ""),

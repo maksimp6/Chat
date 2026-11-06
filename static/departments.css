@@ -29,7 +29,7 @@ button.logos-dept-row:focus-visible {
   outline: 2px solid transparent;
   box-shadow: var(--focus-ring);
 }
-.logos-dept-row span {
+.logos-dept-row > span {
   color: var(--text-muted);
   font-size: 12px;
 }

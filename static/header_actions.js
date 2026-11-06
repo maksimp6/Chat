@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  // Every opener shows its window at once with its loading line and fills it when the data arrives. A tap whose window
+  // Every opener shows its window at once and fills it when the data arrives. A tap whose window
   // script did not load is named in the console instead of doing nothing silently.
   function call(name) {
     return function () {
