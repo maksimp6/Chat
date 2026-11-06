@@ -1294,6 +1294,7 @@ main:
   mov  qword [rsp+32], 64       ; -n default
   mov  qword [rsp+40], 1024     ; -c default
   mov  qword [rsp+112], 0       ; -i off
+  mov  qword [rsp+120], 0       ; --chat off (wrap each prompt as a Qwen3 chat turn)
   call rt_cpu_count
   mov  [rsp+48], rax            ; -t default
   xor  esi, esi                 ; gguf path
@@ -1354,6 +1355,11 @@ main:
   call rt_wcmp_ascii
   test rax, rax
   jz   .opt_i
+  mov  rcx, r15
+  lea  rdx, [rel f_chat]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_chat
   ; positional argument: the first one is the GGUF path
   test rsi, rsi
   jnz  .arg_next
@@ -1407,6 +1413,9 @@ main:
 .opt_i:
   mov  qword [rsp+112], 1
   mov  qword [rel g_stdin_line], 1 ; rt_read_stdin returns at the end of a line
+  jmp  .arg_next
+.opt_chat:
+  mov  qword [rsp+120], 1
   jmp  .arg_next
 .arg_next:
   inc  r13
@@ -1532,9 +1541,9 @@ main:
   cmp  qword [rsp+112], 0
   jne  .ret0                    ; -i: an empty line (or Esc) ends the session
 .nonempty:
-  ; ids buffer = (len+1) u32 (token count never exceeds byte length)
+  ; ids buffer = (len+64) u32 (text tokens <= byte length; chat adds a few control ids)
   mov  rcx, [rsp+72]
-  inc  rcx
+  add  rcx, 64
   shl  rcx, 2
   call rt_alloc
   mov  [rsp+80], rax
@@ -1542,8 +1551,14 @@ main:
   mov  rdx, [rsp+72]
   mov  r8, [rsp+80]
   mov  r9, [rsp+72]
-  inc  r9
+  add  r9, 64
+  cmp  qword [rsp+120], 0
+  je   .enc_raw
+  call tok_encode_chat          ; --chat: wrap as a Qwen3 chat turn
+  jmp  .enc_done
+.enc_raw:
   call tok_encode
+.enc_done:
   mov  [rsp+88], rax
   ; -i from the console: a prompt longer than the context is refused with a
   ; message and the loop goes on (model_generate would stop the program)
@@ -1631,8 +1646,9 @@ f_gguf:     db "--gguf", 0
 f_tok:      db "--tokenize", 0
 f_kern:     db "--kernels", 0
 f_i:        db "-i", 0
+f_chat:     db "--chat", 0
 
-m_usage:    db "usage: asmrun <model.gguf> [-n N] [-c CTX] [-t T] [-p FILE] [-i] [--bw|--cpuid|--gguf|--tokenize|--kernels]", 0
+m_usage:    db "usage: asmrun <model.gguf> [-n N] [-c CTX] [-t T] [-p FILE] [-i] [--chat] [--bw|--cpuid|--gguf|--tokenize|--kernels]", 0
 s_prompt_mark: db 10, "> ", 0
 s_err_ctx:     db "the prompt has more tokens than the context (-c); it would not fit the KV cache", 0
 s_too_long1:   db "asmrun: the prompt has ", 0

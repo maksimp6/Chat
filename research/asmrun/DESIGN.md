@@ -351,6 +351,12 @@ open, and `--bw` on bare metal plus the `cpu clock:` line will decide it.
   load) are dropped once, after that typing ahead works. `-i` (the default without an
   `asmrun.cfg`) loops: prompt, generation, statistics, next prompt; an empty line or Esc
   ends the session; a prompt longer than the context is refused with a message.
+- **Chat.** `--chat` (on for the stick) wraps each line as a Qwen3 chat turn through
+  `tok_encode_chat`: it emits the `<|im_start|>`/`<|im_end|>` control ids directly (151644/151645,
+  model-specific like `TOK_SPECIAL_MIN`) around BPE-encoded `user\n`, the text, ` /no_think`, and
+  `assistant\n`, so the model replies as an assistant and stops at `<|im_end|>`, which is this GGUF's
+  eos, through the ordinary `tok_is_stop`. Without `--chat`, `-i` and `-p` feed the prompt raw (what
+  the benchmarks measure), so the chat path changes no measured number.
 - **Time.** `rdtsc` scaled by the TSC frequency measured over a 100 ms `Stall`
   (CPUID.15H's figure is printed beside it when the leaf reports a crystal, and replaces
   a measurement outside 100 MHz..20 GHz; with neither the run stops with a message rather

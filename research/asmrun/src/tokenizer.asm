@@ -9,6 +9,8 @@
 ; Public surface (Windows x64 everywhere, also between modules):
 ;   tok_init(rcx=Model*)                         byte maps, vocab + merge tables
 ;   tok_encode(rcx=text,rdx=len,r8=ids,r9=max)   pre-tokenize + BPE -> rax count
+;   tok_encode_chat(rcx=text,rdx=len,r8=ids,r9=max) the same text wrapped as a
+;                                                Qwen3 chat turn (--chat) -> rax count
 ;   tok_decode(rcx=id, rdx=out_buf) -> rax       token bytes (0 for control ids)
 ;   tok_is_stop(rcx=id) -> rax                   1 if eos / bos / pad, else 0
 ;   tok_cli(rcx=Model*)                          --tokenize: stdin -> ids + text
@@ -34,6 +36,12 @@ FNV_PRIME       equ 0x100000001b3
 ; a token id >= this emits no bytes. This equals n_vocab minus the number of
 ; added/special tokens and is a model-specific constant (see risks).
 TOK_SPECIAL_MIN equ 151643
+
+; Qwen3 chat control ids, emitted directly by tok_encode_chat (model-specific,
+; like TOK_SPECIAL_MIN above). <|im_end|> is also this GGUF's eos, so a chat turn
+; stops on it through tok_is_stop with no extra case.
+TOK_IM_START    equ 151644   ; <|im_start|>
+TOK_IM_END      equ 151645   ; <|im_end|>
 
 ; Byte classes returned by tok_class.
 CLASS_WS        equ 0   ; space / tab / VT / FF  (whitespace that is not CR or LF)
@@ -985,6 +993,76 @@ tok_encode:
   pop  rbp
   ret
 
+; tok_encode_chat(rcx=content, rdx=len, r8=ids, r9=max) -> rax = id count.
+; Wraps the user text as one Qwen3 chat turn and appends "/no_think", so the
+; model answers directly and stops at <|im_end|> (this GGUF's eos):
+;   <|im_start|>user\n{content} /no_think<|im_end|>\n<|im_start|>assistant\n
+; The <|im_*|> ids are stored directly (u32); every text span goes through
+; tok_encode, which preserves rbx/rsi/rdi/r12-r15, so the cursor survives each
+; call. The caller sizes ids for the content plus a few control ids (len+64).
+%macro TC_ID 1                 ; append the u32 id %1, respecting the capacity
+  cmp  rsi, r13
+  jae  %%skip
+  mov  dword [rbx + rsi*4], %1
+%%skip:
+  inc  rsi
+  cmp  rsi, r13
+  jbe  %%ok
+  mov  rsi, r13
+%%ok:
+%endmacro
+%macro TC_ENCODE 2             ; encode text at %1 (reg), length %2 (reg/imm) at the cursor
+  mov  rcx, %1
+  mov  rdx, %2
+  lea  r8, [rbx + rsi*4]
+  mov  r9, r13
+  sub  r9, rsi
+  call tok_encode
+  add  rsi, rax
+  cmp  rsi, r13
+  jbe  %%ok
+  mov  rsi, r13
+%%ok:
+%endmacro
+tok_encode_chat:
+  push rbp
+  mov  rbp, rsp
+  push rbx
+  push rsi
+  push rdi
+  push r12
+  push r13
+  and  rsp, -16
+  sub  rsp, 32
+  mov  rbx, r8                 ; ids base
+  mov  r13, r9                 ; capacity (ids)
+  mov  rdi, rcx                ; content
+  mov  r12, rdx                ; content len
+  xor  esi, esi                ; ids so far
+  TC_ID TOK_IM_START
+  lea  rax, [rel tc_user]
+  TC_ENCODE rax, TC_USER_LEN
+  TC_ENCODE rdi, r12           ; the user's text
+  lea  rax, [rel tc_nothink]
+  TC_ENCODE rax, TC_NOTHINK_LEN
+  TC_ID TOK_IM_END
+  lea  rax, [rel tc_nl]
+  TC_ENCODE rax, 1
+  TC_ID TOK_IM_START
+  lea  rax, [rel tc_asst]
+  TC_ENCODE rax, TC_ASST_LEN
+  mov  rax, rsi                ; count
+  lea  rsp, [rbp - 40]
+  pop  r13
+  pop  r12
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  pop  rbp
+  ret
+%undef TC_ID
+%undef TC_ENCODE
+
 ; ===========================================================================
 ; tok_decode / tok_is_stop
 ; ===========================================================================
@@ -1222,3 +1300,12 @@ k_tok_text:      db "asmrun: text=", 0
 k_tok_err_piece: db "tokenizer: piece not in vocabulary", 0
 k_sp:            db ' '
 k_nl:            db 10
+
+; tok_encode_chat spans (ASCII; BPE-encoded around the <|im_*|> control ids)
+tc_user:        db "user", 10
+TC_USER_LEN     equ $ - tc_user
+tc_nothink:     db " /no_think"
+TC_NOTHINK_LEN  equ $ - tc_nothink
+tc_nl:          db 10
+tc_asst:        db "assistant", 10
+TC_ASST_LEN     equ $ - tc_asst

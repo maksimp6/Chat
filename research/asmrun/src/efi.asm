@@ -319,13 +319,16 @@ efi_calibrate_tsc:
 ; 800 MHz against a 3.4 GHz burst). Since Skylake and Goldmont Plus the
 ; processor picks its own frequency once Hardware P-states (HWP, "Speed Shift")
 ; are on, inside the window software requests. Per logical processor,
-; efi_cpu_perf enables HWP if the firmware has not and requests minimum =
-; maximum = the highest level the hardware reports (desired 0: autonomous inside
-; that window; EPP 0: performance), and sets the energy/performance bias to
-; performance. The hardware still enforces its power and thermal limits; this
-; only removes the software limit. Every MSR is touched only when CPUID says the
-; feature exists: a wrong MSR is a #GP, and the firmware's handler would stop
-; the machine with a register dump.
+; efi_cpu_perf enables HWP if the firmware has not and requests the full range,
+; minimum = the hardware's lowest level and maximum = its highest (desired 0:
+; autonomous inside that window; EPP 0: performance), the way an operating system
+; leaves it, so the processor boosts to the maximum it can sustain under its
+; power limit rather than a rigid min = max pin that can trip the limit and sit
+; lower; it also sets the energy/performance bias to performance. The hardware
+; still enforces its power and thermal limits; this only removes the software
+; limit. Every MSR is touched only when CPUID says the feature exists: a wrong
+; MSR is a #GP, and the firmware's handler would stop the machine with a
+; register dump.
 
 ; efi_cpu_setup — on the boot processor: measure the clock, apply efi_cpu_perf,
 ; measure again, print both and the HWP levels. The application processors
@@ -401,7 +404,7 @@ efi_cpu_setup:
 ; efi_cpu_perf — this processor at its highest performance level (see above).
 ; Returns eax = the highest HWP level (0: no HWP, nothing requested), edx =
 ; IA32_HWP_CAPABILITIES[31:0], r8d = 1 when this call enabled HWP. Clobbers
-; rax, rcx, rdx, r8-r10; preserves rbx. Runs on every processor.
+; rax, rcx, rdx, r8-r11; preserves rbx. Runs on every processor.
 efi_cpu_perf:
   push rbx
   xor  r8d, r8d
@@ -431,8 +434,12 @@ efi_cpu_perf:
   mov  ecx, MSR_IA32_HWP_CAPABILITIES
   rdmsr                        ; [7:0] highest [15:8] guaranteed [23:16] most efficient [31:24] lowest
   mov  r9d, eax
-  movzx r10d, al
-  mov  eax, r10d               ; minimum = highest
+  movzx r10d, al               ; highest (the ceiling and the return value)
+  mov  r11d, r9d
+  shr  r11d, 24                ; lowest (the floor)
+  mov  eax, r11d               ; minimum = lowest: the full range, as an OS leaves it, so the
+                               ; hardware boosts to its sustainable maximum under the power limit
+                               ; instead of a rigid pin that can trip the limit and sit lower
   mov  edx, r10d
   shl  edx, 8
   or   eax, edx                ; maximum = highest; desired 0 (autonomous in [min,max]);
@@ -1728,7 +1735,7 @@ e_s_hwp_on:     db "asmrun: hwp was already on", 0
 e_s_hwp1:       db "; performance levels lowest ", 0
 e_s_hwp2:       db ", guaranteed ", 0
 e_s_hwp3:       db ", highest ", 0
-e_s_hwp4:       db "; every processor asks for the highest (EPP 0)", 10, 0
+e_s_hwp4:       db "; every processor asks for the full range, floor to highest, EPP 0", 10, 0
 e_s_nohwp:      db "asmrun: no hardware P-states (HWP) on this CPU: the clock stays as the firmware set it", 10, 0
 e_s_volume:     db "asmrun: boot volume opened", 10, 0
 e_s_nocfg:      db "asmrun: no asmrun.cfg on the boot volume: using \model.gguf -i", 10, 0

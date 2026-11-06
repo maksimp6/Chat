@@ -144,7 +144,13 @@ asmrun.exe <model.gguf> -p prompt.txt -n 64 -c 1024 -t 4
 - `-i` interactive: a prompt per line (on a Windows console each Enter submits
   the line), generation and statistics after each, until an empty line (or end
   of input). A prompt longer than the context is refused with a message and the
-  loop goes on. This is what the USB stick runs.
+  loop goes on.
+- `--chat` wraps each line as a Qwen3 chat turn
+  (`<|im_start|>user\n…<|im_end|>\n<|im_start|>assistant\n`) with `/no_think`
+  appended, so the model answers as an assistant and stops at `<|im_end|>`
+  (this GGUF's eos) instead of continuing raw text to the `-n` cap. Without it,
+  `-i` and `-p` do raw completion (what the benchmarks use). The USB stick runs
+  `-i --chat -n 512`.
 
 ## Boot it from a USB stick (no operating system)
 

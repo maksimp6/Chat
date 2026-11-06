@@ -4,18 +4,18 @@
 # The stick ends up with:
 #   \EFI\BOOT\BOOTX64.EFI   the runner (build\BOOTX64.EFI from .\build.ps1)
 #   \model.gguf             the Ollama model blob (qwen3:1.7b by default, 1.36 GB)
-#   \asmrun.cfg             the arguments, one line, e.g. "model.gguf -i"
+#   \asmrun.cfg             the arguments, one line, e.g. "model.gguf -i --chat -n 512"
 #
 # The firmware needs FAT32 (not exFAT or NTFS) and Secure Boot off: the image
 # is not signed. Formatting is only done when -Format is given, after a
 # confirmation; otherwise the files are copied onto what is there.
 #
-# Usage:  .\make-usb.ps1 -Drive E: [-Model qwen3:1.7b] [-Args "model.gguf -i"] [-Format]
+# Usage:  .\make-usb.ps1 -Drive E: [-Model qwen3:1.7b] [-Args "model.gguf -i --chat -n 512"] [-Format]
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Drive,
     [string]$Model = "qwen3:1.7b",
-    [string]$Args = "model.gguf -i",
+    [string]$Args = "model.gguf -i --chat -n 512",
     [switch]$Format
 )
 
