@@ -19,7 +19,8 @@
     archived: "В архиве",
   };
 
-  var DIRECTION_LABELS = { outbound: "исходящее", inbound: "входящее" };
+  var DIRECTION_LABELS = { outgoing: "исходящее", incoming: "входящее" };
+  var FOLLOWUP_LABELS = { open: "открыто", completed: "завершено", cancelled: "отменено" };
 
   function statusLabel(status) {
     return STATUS_LABELS[status] || status || "";
@@ -231,7 +232,7 @@
       if (!(partner.followups || []).length) detail.appendChild(emptyLine("Пока пусто."));
       (partner.followups || []).forEach(function (followup) {
         var line = h("div", { class: "logos-partner-line" });
-        line.appendChild(h("span", {}, followup.title + " · " + followup.status));
+        line.appendChild(h("span", {}, followup.title + " · " + (FOLLOWUP_LABELS[followup.status] || followup.status)));
         if (followup.status === "open") {
           var done = h("button", { type: "button", class: "logos-btn" }, "Готово");
           done.onclick = function () {

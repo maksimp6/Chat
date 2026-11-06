@@ -177,18 +177,14 @@ window.fetchVectorStores = function () {
 
     // Resolves with whether the copy worked, so the caller can say so.
     function copyToClipboard(text) {
-      return Promise.resolve()
-        .then(function () {
-          return navigator.clipboard.writeText(text);
-        })
-        .then(
-          function () {
-            return true;
-          },
-          function () {
-            return false;
-          },
-        );
+      return window.LogosClipboard.copy(text).then(
+        function () {
+          return true;
+        },
+        function () {
+          return false;
+        },
+      );
     }
 
     // === Рендер списка Vector Stores ===
@@ -550,7 +546,9 @@ window.fetchVectorStores = function () {
           UI.escapeHtml(file.id.substring(0, 12)) +
           "...</code></div>",
         "</div>",
-        '<a class="logos-btn file-manager-secondary-btn" href="/api/files/' +
+        '<a class="logos-btn file-manager-secondary-btn" href="' +
+          UI.escapeHtml(window.__LOGOS_BASE_PATH || "") +
+          "/api/files/" +
           encodeURIComponent(file.id) +
           '/content" download>Скачать</a>',
         '<button type="button" class="logos-btn fm-delete-btn file-manager-danger-btn" data-id="' +

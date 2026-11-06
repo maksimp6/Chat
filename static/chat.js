@@ -63,6 +63,7 @@ function getChatMarkdownRenderer() {
     if (!allowed) {
       return md.utils.escapeHtml(renderer.renderInlineAsText(token.children || [], options, env));
     }
+    if (src.charAt(0) === "/") token.attrSet("src", (window.__LOGOS_BASE_PATH || "") + src);
     token.attrJoin("class", "md-image");
     token.attrSet("loading", "lazy");
     token.attrSet("decoding", "async");

@@ -157,6 +157,14 @@
         );
         return;
       }
+      // In the capture phase window also gets the load failures of scripts, styles and images. Those
+      // events carry no message: the element is what names the failure.
+      var target = event.target;
+      if (target && target !== window && target.tagName) {
+        var address = String(target.currentSrc || target.src || target.href || "").slice(0, 300);
+        emitDiagnostic("error", "resource_load_failed", target.tagName.toLowerCase() + " " + address);
+        return;
+      }
       emitDiagnostic("error", "uncaught_error", event.error || event.message, {
         filename: event.filename || "",
         line: event.lineno || 0,
