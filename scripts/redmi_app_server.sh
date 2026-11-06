@@ -200,7 +200,7 @@ start_app() {
     printf '{"bind_host":"0.0.0.0","require_wifi":true}\n' >"$state/server-network.json.next" || return 1
     mv "$state/server-network.json.next" "$state/server-network.json" || return 1
   fi
-  # The existing launcher supplies native dependencies and legacy ALICE_* names.
+  # The existing launcher supplies native dependencies.
   # Bridge the same private files to LOGOS_* before entering that launcher.
   # Secrets stay out of command-line arguments and workflow environment.
   env -i HOME="$HOME" PATH="$PATH" PREFIX="${PREFIX:-}" TMPDIR="${TMPDIR:-/tmp}" \
