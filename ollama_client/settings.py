@@ -15,11 +15,46 @@ from __future__ import annotations
 
 from typing import Any
 
-# asmrun on the owner's PC (Intel N100, 8 GB RAM): `asmrun.exe <model> --chat --no-tools
-# --http 11434 ...` under Windows, or the same runner booted from the USB stick with no
-# operating system (then the address is the one its screen prints). The port is Ollama's,
-# so nothing else had to move.
-URL = "http://192.168.10.6:11434"
+import requests
+
+# asmrun on the owner's PC (Intel N100, 8 GB RAM). Two ways to reach it, same port
+# (Ollama's, so nothing else had to move):
+#   - booted from the USB stick with no operating system, the PC's network card is the
+#     phone's USB tethering, and the runner is 192.168.42.50 on that link (its screen
+#     prints the address; --ip in asmrun.cfg changes it);
+#   - under Windows (`asmrun.exe <model> --chat --no-tools --http 11434 ...`) the PC is
+#     192.168.10.6 on the phone's hotspot.
+# The no-OS runner is the product (owner, 08.11.2026: "focus on our no os"), so it comes
+# first: url() asks each address for /api/version and keeps the first that answers, until
+# a request finds it gone (forget()).
+URLS = (
+    "http://192.168.42.50:11434",
+    "http://192.168.10.6:11434",
+)
+URL = URLS[0]
+_url: str | None = None
+
+
+def url() -> str:
+    """The server address: the first of URLS that answers /api/version, probed once."""
+    global _url
+    if _url is None:
+        for candidate in URLS:
+            try:
+                requests.get(candidate.rstrip("/") + "/api/version", timeout=2).raise_for_status()
+            except requests.RequestException:
+                continue
+            _url = candidate
+            break
+        else:
+            _url = URLS[0]
+    return _url
+
+
+def forget() -> None:
+    """The remembered address is dropped: the next url() probes again (after an unreachable server)."""
+    global _url
+    _url = None
 
 # The models Logos serves through asmrun: the key Logos uses -> its catalog entry. The
 # runner serves the one model it was started with and answers under any name; the
@@ -94,7 +129,8 @@ def options() -> dict[str, Any]:
 def describe() -> dict[str, Any]:
     """The settings as ⚙️ shows them."""
     return {
-        "url": URL,
+        "url": url(),
+        "urls": list(URLS),
         "models": {key: info["upstream"] for key, info in MODELS.items()},
         "options": options(),
         "think": {key: bool(info.get("think", THINK)) for key, info in MODELS.items()},

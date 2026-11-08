@@ -12,7 +12,7 @@ __all__ = ["status"]
 
 
 def _get(path: str, *, json: Any = None) -> tuple[Any, str | None]:
-    url = settings.URL.rstrip("/") + path
+    url = settings.url().rstrip("/") + path
     try:
         resp = (
             requests.post(url, json=json, timeout=5) if json is not None else requests.get(url, timeout=5)

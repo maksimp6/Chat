@@ -34,4 +34,4 @@ def embed(url: str, model: str, texts: list[str], *, timeout: float | None = 300
 
 def embed_texts(texts: list[str], *, model: str, trace: Any = None) -> dict[str, Any]:
     """The vector database's embedding port: ``embed`` on the configured Ollama; ``trace`` stays unwritten."""
-    return embed(settings.URL, model, texts)
+    return embed(settings.url(), model, texts)

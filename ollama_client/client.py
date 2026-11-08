@@ -85,7 +85,7 @@ class OllamaClient:
         step = trace_step
         if trace is not None and step is None:
             step = len(trace.trace.get("api_requests", [])) + 1
-        url = settings.URL
+        url = settings.url()
         started = time.time()
         perf = time.perf_counter()
         if trace is not None:
