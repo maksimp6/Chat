@@ -467,8 +467,36 @@ Logos's client keeps its code; its settings name `asmrun-qwen35-9b` (commit on
 
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 =======
 =======
+>>>>>>> theirs
+=======
+**The runner owns no tools (owner, 2026-11-08: "remove all tool from asm
+leave them to logos").** `src/tools.asm` and its file tools (list, read,
+write, append on the stick), the built-in tools block, the `--no-tools` flag
+and the console tool loop are gone. The runner never executes a tool: in the
+API it renders the tools a request carries into the `<tools>` block, lets the
+model write its `<tool_call>`, and returns the call as JSON (`api_call_json`)
+for the caller to run; in the console a `<tool_call>` is just text. All tools,
+and running them, belong to the caller (Logos). Verified: a plain chat injects
+no tools block (31 prompt tokens, not 700), and a turn carrying one tool
+returns `{"function":{"name":…,"arguments":{…}}}` without the runner touching it.
+
+**The tool schemas that never arrived (court case #1843).** The first turns
+with Logos's filesystem and git tools went wrong twice: a call without the
+`tool` field, then a claimed read of AGENTS.md with invented contents. The
+runner's fault first: the renderers copied each tool's JSON with `rt_memcpy`
+and advanced the cursor by a register that call clobbers, so the text after
+overwrote the schema and 12,750 characters of tools rendered to 491 tokens.
+Fixed in three places; every turn request now logs `render_bytes`, `ids`
+and `tools_sent`. Then the size: the registry's full form is ~21,000 tokens
+for the two categories, 40 minutes of prompt on the 4B and far beyond the
+attention window, so Logos's turn client now sends each category as one
+function with one line per action (`compact_tools`). A model that answers
+"file read" without a tool call is the failure to watch for when the model
+works on the repository: every claim needs a tool result behind it.
+
 >>>>>>> theirs
 **RAM and the batch (owner: "what about ram", "optimazi maximum").** The
 attention kernel now takes its per-thread score stride from the job
@@ -490,6 +518,9 @@ it against all the slots (5 + 4·T instructions per 32 weights instead of
 Q5_K/Q8_0 kernels is the next piece of work.
 
 <<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs

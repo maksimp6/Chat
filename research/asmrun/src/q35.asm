@@ -641,6 +641,10 @@ q35_setup:
   imul rcx, [rel g35_ctx]
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
+=======
+  mov  [rel g_scores_n], rcx
+>>>>>>> theirs
 =======
   mov  [rel g_scores_n], rcx
 >>>>>>> theirs
@@ -654,7 +658,10 @@ q35_setup:
   shl  rcx, 10
   call rt_alloc
   mov  [rel g35_scratch], rax
+<<<<<<< ours
   call tl_setup                ; the file tools' buffers
+=======
+>>>>>>> theirs
   ; the rope table for the rotary part of a head
   mov  rcx, [rel g35_posmax]
   imul rcx, [rel g35_rot]
@@ -765,8 +772,11 @@ q35_generate:
   mov  rsi, rdx
   mov  rdi, r8
   mov  r12, r9
+<<<<<<< ours
   mov  qword [rel g_tl_turnlen], 0
   mov  qword [rel g_tl_rounds], 0
+=======
+>>>>>>> theirs
   mov  qword [rel g35_traced], 0
   mov  qword [rel g35_stop_len], 0
   mov  qword [rel g35_gen_total], 0
@@ -862,9 +872,12 @@ q35_generate:
   lea  rcx, [rel g35_decbuf]
   mov  rdx, rax
   call rt_out                  ; (teed into dialog.txt's buffer by rt_write_h)
+<<<<<<< ours
   lea  rcx, [rel g35_decbuf]
   mov  rdx, r14
   call tl_turn_add             ; the turn's text, for the tool-call search
+=======
+>>>>>>> theirs
   mov  rax, [rel g35_pos]
   cmp  rax, [rel g35_posmax]
   jae  .full
@@ -900,6 +913,7 @@ q35_generate:
 .gdone_len:
   mov  qword [rel g35_stop_len], 1 ; -n reached: the answer is cut (the API's done_reason "length")
 .gdone:
+<<<<<<< ours
   ; a tool call in the turn? run it, show the result, feed the tool turn, go on
   cmp  qword [rel g_tools_off], 0
   jne  .no_tool
@@ -959,6 +973,10 @@ q35_generate:
   call k_sample
   mov  [rsp+56], rax
   jmp  .gen
+=======
+  ; the runner runs no tools: a <tool_call> in the answer is Logos's to run
+  ; (api.asm hands it back as JSON). The turn ends here.
+>>>>>>> theirs
 .no_tool:
   call rt_now_ns
   mov  [rsp+40], rax
@@ -1494,6 +1512,7 @@ q35_encode_chat:
   lea  rcx, [rel s_chat_system]
   mov  edx, S_CHAT_SYSTEM_LEN
   call q35_chat_text
+<<<<<<< ours
   cmp  qword [rel g_tools_off], 0
   jne  .sys_text               ; --no-tools: the system turn is --system's text alone
   lea  rcx, [rel tl_sys_text]
@@ -1504,6 +1523,8 @@ q35_encode_chat:
   lea  rcx, [rel q35_s_lflf]
   mov  edx, 2
   call q35_chat_text
+=======
+>>>>>>> theirs
 .sys_text:
   cmp  qword [rel g_system_len], 0
   je   .sys_end

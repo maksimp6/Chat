@@ -63,7 +63,10 @@ section .text
 %include "q35k.asm"      ; Qwen3.5's extra kernels: gated delta rule, causal conv, gated norm, partial rope
 %include "q35.asm"       ; Qwen3.5: layers, setup, generation, chat
 %include "q35f.asm"      ; Qwen3.5: the forward pass for a batch of tokens and its pool jobs
+<<<<<<< ours
 %include "tools.asm"     ; the model's file tools on the stick: list, read, write, append
+=======
+>>>>>>> theirs
 %include "unet.asm"      ; SD-Turbo's UNet: one denoising step (convolutions, GroupNorm, attention)
 %include "taesd.asm"     ; the Tiny AutoEncoder's decoder: latent -> 512x512 picture
 %include "tokenizer.asm" ; byte-level BPE encode and decode

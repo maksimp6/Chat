@@ -208,7 +208,10 @@ api_route:
   test rax, rax
   jnz  .bad
   mov  qword [rel g_api_mode], 1
+<<<<<<< ours
   mov  qword [rel g_tools_off], 1 ; the caller runs the tools
+=======
+>>>>>>> theirs
   mov  eax, 1
   jmp  .ret
 .turn:
@@ -221,7 +224,10 @@ api_route:
   test rax, rax
   jnz  .bad
   mov  qword [rel g_api_mode], 2
+<<<<<<< ours
   mov  qword [rel g_tools_off], 1
+=======
+>>>>>>> theirs
   mov  eax, 1
   jmp  .ret
 .noq35:
@@ -431,17 +437,23 @@ api_chat_prepare:
   mov  r8, rax
   sub  r8, r14
 <<<<<<< ours
+<<<<<<< ours
   mov  rcx, rdi
   mov  rdx, r14
   call rt_memcpy               ; the element verbatim
   mov  rdi, rax
   add  rdi, r8
 =======
+=======
+>>>>>>> theirs
   mov  [rsp+72], r8            ; the element's length (rt_memcpy clobbers r8)
   mov  rcx, rdi
   mov  rdx, r14
   call rt_memcpy               ; the element verbatim
   add  rdi, [rsp+72]
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
   mov  byte [rdi], 10
   inc  rdi
@@ -750,10 +762,13 @@ api_cat_call:
   mov  r8, rax
   sub  r8, r14
 <<<<<<< ours
+<<<<<<< ours
   mov  rcx, rdi
   mov  rdx, r14
   call rt_memcpy
 =======
+=======
+>>>>>>> theirs
   push r8
   push r8                      ; the value's length (rt_memcpy clobbers r8)
   mov  rcx, rdi
@@ -761,6 +776,9 @@ api_cat_call:
   call rt_memcpy
   pop  r8
   pop  r8
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
   add  rdi, r8
 .arg_end:
@@ -1341,6 +1359,7 @@ api_turn_prepare:
   mov  rdx, r12
   call js_skip
 <<<<<<< ours
+<<<<<<< ours
   mov  r8, rax
   sub  r8, r14
   mov  rcx, rdi
@@ -1349,6 +1368,8 @@ api_turn_prepare:
   mov  rdi, rax
   add  rdi, r8
 =======
+=======
+>>>>>>> theirs
   mov  r13, rax
   sub  r13, r14                ; the element's length (rt_memcpy clobbers r8)
   mov  rcx, rdi
@@ -1356,6 +1377,9 @@ api_turn_prepare:
   mov  r8, r13
   call rt_memcpy
   add  rdi, r13
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
   mov  byte [rdi], 10
   inc  rdi
@@ -1456,7 +1480,10 @@ api_turn_prepare:
   call api_encode
   mov  [rel g_api_nids], rax
 <<<<<<< ours
+<<<<<<< ours
 =======
+=======
+>>>>>>> theirs
   ; one line per turn request: what was rendered and fed (into dialog.txt too)
   lea  rcx, [rel api_s_log1]
   call rt_err_str
@@ -1472,6 +1499,9 @@ api_turn_prepare:
   call rt_err_u64
   lea  rcx, [rel api_s_log4]
   call rt_err_str
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
   xor  eax, eax
   jmp  .ret
@@ -1636,6 +1666,7 @@ api_embed_one:
   xor  r14d, r14d              ; the last state
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
 .tok:
   cmp  r13, r12
   jae  .fed
@@ -1648,6 +1679,8 @@ api_embed_one:
   inc  r13
   jmp  .tok
 =======
+=======
+>>>>>>> theirs
 =======
 >>>>>>> theirs
 .slice:
@@ -1669,6 +1702,9 @@ api_embed_one:
   add  r13, [rsp+40]
   jmp  .slice
 <<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 =======
 >>>>>>> theirs
@@ -2793,11 +2829,17 @@ api_k_message:    db "message", 0
 api_k_tool_results: db "tool_results", 0
 api_s_ct_ndjson:  db "application/x-ndjson", 0
 <<<<<<< ours
+<<<<<<< ours
 =======
+=======
+>>>>>>> theirs
 api_s_log1:       db "asmrun: turn: render_bytes=", 0
 api_s_log2:       db " ids=", 0
 api_s_log3:       db " tools_sent=", 0
 api_s_log4:       db 10, 0
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 api_k_input:      db "input", 0
 api_j_noinput:    db `{"error":"input missing: a string or an array of strings"}`

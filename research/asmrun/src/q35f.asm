@@ -326,6 +326,11 @@ q35_forward_batch:
   mov  [r9 + AttnJob.scores], rax
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
+=======
+  mov  rax, [rel g35_ctx]
+  mov  [r9 + AttnJob.stride], rax
+>>>>>>> theirs
 =======
   mov  rax, [rel g35_ctx]
   mov  [r9 + AttnJob.stride], rax

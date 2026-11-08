@@ -1337,7 +1337,11 @@ model_embed_load:
   mov  rcx, rbx
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
   mov  rdx, rsi
+=======
+  mov  edx, EMBED_CTX           ; its own short context: a text to embed is one chunk, not a dialog
+>>>>>>> theirs
 =======
   mov  edx, EMBED_CTX           ; its own short context: a text to embed is one chunk, not a dialog
 >>>>>>> theirs
@@ -1881,11 +1885,14 @@ main:
   test rax, rax
   jz   .opt_system
   mov  rcx, r15
+<<<<<<< ours
   lea  rdx, [rel f_no_tools]
   call rt_wcmp_ascii
   test rax, rax
   jz   .opt_no_tools
   mov  rcx, r15
+=======
+>>>>>>> theirs
   lea  rdx, [rel f_http]
   call rt_wcmp_ascii
   test rax, rax
@@ -2040,9 +2047,12 @@ main:
 .opt_trace:
   mov  qword [rel g35_trace], 1
   jmp  .arg_next
+<<<<<<< ours
 .opt_no_tools:
   mov  qword [rel g_tools_off], 1
   jmp  .arg_next
+=======
+>>>>>>> theirs
 .opt_http:                     ; --http PORT: prompts from the network; the loop goes on like -i
   inc  r13
   cmp  r13, r12
@@ -2551,7 +2561,11 @@ main:
   ; ids buffer = (len + system len + 64) u32 (text tokens <= byte length; chat adds a few control ids)
   mov  rcx, [rsp+72]
   add  rcx, [rel g_system_len]
+<<<<<<< ours
   add  rcx, TL_SYS_LEN + 64     ; (the tools block opens a Qwen3.5 conversation)
+=======
+  add  rcx, 64
+>>>>>>> theirs
   shl  rcx, 2
   call rt_alloc
   mov  [rsp+80], rax
@@ -2560,7 +2574,11 @@ main:
   mov  r8, [rsp+80]
   mov  r9, [rsp+72]
   add  r9, [rel g_system_len]
+<<<<<<< ours
   add  r9, TL_SYS_LEN + 64      ; the capacity: the same as the allocation
+=======
+  add  r9, 64                   ; the capacity: the same as the allocation
+>>>>>>> theirs
   cmp  qword [rsp+120], 0
   je   .enc_raw
   mov  rax, [rsp+56]
@@ -2687,7 +2705,10 @@ f_temp:     db "--temp", 0
 f_top_p:    db "--top-p", 0
 f_top_k:    db "--top-k", 0
 f_system:   db "--system", 0
+<<<<<<< ours
 f_no_tools: db "--no-tools", 0
+=======
+>>>>>>> theirs
 f_http:     db "--http", 0
 f_ip:       db "--ip", 0
 f_mask:     db "--mask", 0
@@ -2700,6 +2721,10 @@ s_embed_no:  db "asmrun: embeddings: --embed needs a Qwen3.5 chat model beside i
 TOK_STATE_BYTES equ 80         ; g_tok_ready .. g_merge_slots in tokenizer.asm: ten qwords
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
+=======
+EMBED_CTX equ 1024             ; the embedder's positions: Logos's 2000-character chunks are under this; 28 layers x 224 KB per position
+>>>>>>> theirs
 =======
 EMBED_CTX equ 1024             ; the embedder's positions: Logos's 2000-character chunks are under this; 28 layers x 224 KB per position
 >>>>>>> theirs
@@ -2714,7 +2739,10 @@ g_embed_only:   dq 0           ; 1 while model_forward returns the normed state 
 g_tok_main:     times 80 db 0  ; the chat model's tokenizer tables (a copy of the globals)
 g_tok_embed:    times 80 db 0  ; the embedder's
   align 8
+<<<<<<< ours
 g_tools_off:   dq 0           ; --no-tools: no tools block in the system turn, no tool calls run
+=======
+>>>>>>> theirs
 g_system_text: dq 0           ; --system FILE: the text (UTF-8), or 0
 g_system_len:  dq 0
 s_chat_system: db "system", 10 ; the ChatML role line of the system turn
