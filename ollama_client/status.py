@@ -1,4 +1,4 @@
-"""What ⚙️ shows on the Ollama tab: the settings and what Ollama reports right now."""
+"""What ⚙️ shows on the asmrun tab: the settings and what the runner reports right now."""
 
 from __future__ import annotations
 

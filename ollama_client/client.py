@@ -1,8 +1,8 @@
-"""The chat client of Ollama: the turn requests of a dialog served by a local model.
+"""The chat client of the local model (asmrun, answering Ollama's API): the turn requests of a dialog.
 
 The chat's tool loop (chat/mcp_routes.py, LogosClient) sits on top of this class as it
 sits on top of the Yandex client: it calls ``ask_with_mcp``, ``ask`` and the
-``extract_*`` readers. Nothing here comes from the Yandex client: Ollama has its own
+``extract_*`` readers. Nothing here comes from the Yandex client: the local model has its own
 settings (ollama_client.settings), instructions and tool list.
 """
 

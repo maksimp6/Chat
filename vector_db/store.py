@@ -1,7 +1,7 @@
 """Collections of texts with their embeddings, kept in the Kristall store and searched by cosine similarity.
 
-One model embeds stored chunks and queries alike: Ollama's ``qwen3-embedding:0.6b`` on
-the owner's PC (Logos has no Yandex API since 04.11.2026), at the model's own size.
+One model embeds stored chunks and queries alike: ``qwen3-embedding:0.6b`` through the local
+server's /api/embed on the owner's PC (asmrun since 08.11.2026; until it serves an embedding model, embedding fails and search finds only what was embedded before).
 DOC_MODEL and QUERY_MODEL both name it. A text is split into chunks (paragraphs joined
 up to CHUNK_CHARS characters, a longer paragraph cut at that size) kept as
 ``vector_db/<collection>/<doc id>/<chunk>`` with text, metadata, model, dimensions and

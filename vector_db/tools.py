@@ -124,7 +124,7 @@ def vectors(args, cfg=None):
 VECTOR_TOOLS = {
     "vectors": {
         "title": "Vector database",
-        "description": "Векторная база приложения (эмбеддинги Ollama на ПК, поиск по смыслу на сервере) одной "
+        "description": "Векторная база приложения (эмбеддинги локального сервера asmrun на ПК, поиск по смыслу на сервере) одной "
         "функцией: поле action выбирает действие. "
         + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items()),
         "parameters": {

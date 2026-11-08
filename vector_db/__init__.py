@@ -1,4 +1,4 @@
-"""Vector database of the app: texts embedded by Ollama, searched by meaning on the server, their sense as text."""
+"""Vector database of the app: texts embedded by the local model server (asmrun), searched by meaning on the server, their sense as text."""
 
 from __future__ import annotations
 

@@ -32,7 +32,7 @@ window.LogosErrorText = function (prefix, error) {
 let currentConvId = null;
 let conversations = [];
 // The one model of Logos: every dialog answers with it, whatever a dialog stored.
-const CHAT_MODEL_KEY = "ollama-qwen3-4b";
+const CHAT_MODEL_KEY = "asmrun-qwen35-9b";
 let currentModel = CHAT_MODEL_KEY;
 let modelsData = { text: {}, voice: {}, image: {} };
 let coreEnhancementStarted = false;

@@ -1,6 +1,6 @@
-"""One chat request to Ollama's /api/chat, with Responses API input and output.
+"""One chat request to the local model's /api/chat (asmrun, Ollama's API), with Responses API input and output.
 
-Ollama keeps no conversation: the caller sends the whole dialog every time.
+The server keeps one conversation: the caller sends the whole dialog every time, and the runner reads only its new tail.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ class OllamaError(Exception):
         super().__init__(message)
         self.status_code = status_code
         # An embedding failure reaches the chat as this error: the pinned embeddings dialog says why.
-        self.user_text = f"Ollama ответила ошибкой: {message}" if reached else settings.USER_TEXT_UNREACHABLE
+        self.user_text = f"asmrun ответил ошибкой: {message}" if reached else settings.USER_TEXT_UNREACHABLE
 
 
 def _text(content: Any) -> str:
@@ -222,11 +222,11 @@ def ask(
         resp = requests.post(endpoint, json=body, timeout=timeout, stream=True)
     except requests.RequestException as exc:
         raise OllamaError(
-            f"Ollama {endpoint} unreachable: {type(exc).__name__}: {exc}", reached=False
+            f"asmrun {endpoint} unreachable: {type(exc).__name__}: {exc}", reached=False
         ) from exc
     if resp.status_code != 200:
         raise OllamaError(
-            f"Ollama HTTP {resp.status_code}: {resp.text[:500]}", status_code=resp.status_code
+            f"asmrun HTTP {resp.status_code}: {resp.text[:500]}", status_code=resp.status_code
         )
     data = _read_stream(resp, on_event if on_event is not None else (lambda _event: None))
     return body, _response(data if isinstance(data, dict) else {}, model_key, started)
@@ -246,11 +246,11 @@ def _read_stream(resp: requests.Response, on_event: Callable[[dict[str, Any]], N
             try:
                 chunk = json.loads(line)
             except ValueError as exc:
-                raise OllamaError("Ollama streamed a line that is not valid JSON", status_code=200) from exc
+                raise OllamaError("asmrun streamed a line that is not valid JSON", status_code=200) from exc
             if not isinstance(chunk, dict):
                 continue
             if chunk.get("error"):
-                raise OllamaError(f"Ollama: {chunk['error']}", status_code=200)
+                raise OllamaError(f"asmrun: {chunk["error"]}", status_code=200)
             message = chunk.get("message") if isinstance(chunk.get("message"), dict) else {}
             if message.get("thinking"):
                 thinking.append(message["thinking"])
@@ -273,7 +273,7 @@ def _read_stream(resp: requests.Response, on_event: Callable[[dict[str, Any]], N
             if chunk.get("done"):
                 last = chunk
     except requests.RequestException as exc:
-        raise OllamaError(f"Ollama stream broke: {type(exc).__name__}: {exc}", status_code=200) from exc
+        raise OllamaError(f"asmrun stream broke: {type(exc).__name__}: {exc}", status_code=200) from exc
     finally:
         resp.close()
     return {

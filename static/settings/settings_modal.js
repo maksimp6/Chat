@@ -374,7 +374,7 @@
     );
   }
 
-  // GET /api/ollama/settings: the settings and the server's live state, all read-only.
+  // GET /api/ollama/settings: the settings and the runner's live state, all read-only.
   function loadOllamaSettings(box, UI) {
     if (!box) return;
     window.LogosDispatcher.request("/api/ollama/settings", null, { timeoutMs: 30000 })
@@ -389,7 +389,7 @@
         var html = ollamaRows(
           [
             ["Сервер", s.url],
-            ["Версия Ollama", data.version],
+            ["Версия asmrun", data.version],
             [
               "Модели",
               Object.keys(models)
@@ -457,7 +457,7 @@
         var errorKeys = Object.keys(errors);
         if (errorKeys.length) {
           html +=
-            '<div class="ollama-error">Ollama не ответила: ' +
+            '<div class="ollama-error">asmrun не ответил: ' +
             UI.escapeHtml(
               errorKeys.map(function (k) { return k + ": " + errors[k]; }).join("; "),
             ) +
@@ -467,7 +467,7 @@
       })
       .catch(function (error) {
         box.textContent =
-          "Настройки Ollama не загружены: " + (error && error.message ? error.message : error);
+          "Настройки asmrun не загружены: " + (error && error.message ? error.message : error);
       });
   }
 
@@ -534,7 +534,7 @@
       '<div class="settings-modal-top">',
       '<div class="settings-modal-heading"></div>',
       '<div class="llm-tabs">',
-      '    <button class="logos-btn llm-tab-btn active" data-tab="tab-ollama">Ollama</button>',
+      '    <button class="logos-btn llm-tab-btn active" data-tab="tab-ollama">asmrun</button>',
       '    <button class="logos-btn llm-tab-btn" data-tab="tab-gen">Сэмплинг</button>',
       '    <button class="logos-btn llm-tab-btn" data-tab="tab-output">Формат вывода</button>',
       '    <button class="logos-btn llm-tab-btn" data-tab="tab-routing">Маршрутизация вызовов</button>',
@@ -544,11 +544,11 @@
       "</div>",
     ].join("");
 
-    // Ollama's own settings (ollama_client.settings) and what Ollama reports now: the
+    // asmrun's own settings (ollama_client.settings) and what the runner reports now: the
     // chat model runs there, and nothing of the Yandex tabs below reaches it.
     var tabOllama = [
       '<div id="tab-ollama" class="llm-tab-content">',
-      UI.section("Ollama на ПК владельца"),
+      UI.section("asmrun на ПК владельца"),
       '<div id="ollama-settings-body">Загружаю…</div>',
       "</div>",
     ].join("");

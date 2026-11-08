@@ -8,7 +8,7 @@ from typing import Any
 import requests
 
 DEFAULT_BASE_URL = "http://127.0.0.1:5000"
-DEFAULT_MODEL = "ollama-qwen3-4b"
+DEFAULT_MODEL = "asmrun-qwen35-9b"
 DEFAULT_TIMEOUT = 60.0
 
 

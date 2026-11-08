@@ -128,14 +128,14 @@ TEXT_MODELS: dict[str, dict[str, Any]] = {
         "tool": 0.05,
         "output": 0.30,
     },
-    # The models served by Ollama on the owner's PC come from Ollama's own settings
-    # (owner, 04.11.2026: no Yandex API; 05.11.2026: Ollama independent of Yandex).
+    # The models served by asmrun on the owner's PC come from its client's own settings
+    # (owner, 04.11.2026: no Yandex API; 08.11.2026: no Ollama any more, asmrun replaces it).
     **ollama_settings.MODELS,
 }
 
 # The one text model of every Logos dialog.
 # A dialog has no text model of its own; image and voice dialogs keep their model.
-CHAT_MODEL = "ollama-qwen3-4b"
+CHAT_MODEL = "asmrun-qwen35-9b"
 
 VOICE_MODELS = {
     "speech-realtime-deepseek-v4-flash": {

@@ -1,7 +1,7 @@
-"""Ollama on the owner's PC: chat and embeddings of the models Logos serves locally.
+"""The local model on the owner's PC: chat and embeddings through Ollama's API, served by asmrun since 08.11.2026.
 
-Logos has no Yandex API since 04.11.2026 (owner). This module knows only Ollama and is
-independent of the Yandex client: its own settings (``settings``), its chat client
+Logos has no Yandex API since 04.11.2026 (owner) and no Ollama since 08.11.2026: asmrun, the
+owner's runner in assembly, answers the same API. This module has its own settings (``settings``), its chat client
 (``OllamaClient``), embeddings and status. Answers come back in the Responses API
 shape, so the chat tool loop, parsers and traces read them like any provider answer.
 """
