@@ -44,12 +44,31 @@ section .text
 %include "runtime.asm"   ; shared: console formatting, cpuid gate, thread pool, bandwidth probe, helpers
 %ifdef ASMRUN_EFI
   %include "efi.asm"     ; UEFI: entry, console, files, pages, TSC clock, EFI_MP_SERVICES workers
+  %include "usb.asm"     ; UEFI: the USB interfaces and network protocols the firmware enumerated (a link to the phone)
+  %include "tcp4.asm"    ; UEFI: the network transport, EFI_TCP4_PROTOCOL (the BIOS network stack), and the net_* dispatcher
+  %include "usbnet.asm"  ; UEFI: the phone's USB tethering as the network card: RNDIS, ARP, IP, ICMP, a one-connection TCP
 %else
   %include "win.asm"     ; Windows: entry, console, files, VirtualAlloc, QPC, CreateThread workers
+  %include "wsock.asm"   ; Windows: the network transport, Winsock (the HTTP test bench)
 %endif
+%include "http.asm"      ; the model behind HTTP (--http PORT): the phone's page and POST /api/chat
+%include "api.asm"       ; Ollama's API on the same port: JSON /api/chat with tools, /api/tags, /api/version (Logos's client)
 %include "gguf.asm"      ; GGUF parsing into Model
+%include "sd.asm"        ; the SD-Turbo GGUF indexed by tensor name (--sdinfo lists it)
+%include "cliptok.asm"   ; the CLIP BPE tokenizer of SD-Turbo's text encoder (--cliptok)
 %include "kernels.asm"   ; matvec / rmsnorm / softmax / silu / exp / rope / attention
+%include "sample.asm"    ; the next token: temperature, top-k, top-p, a seeded random draw
+%include "sdk.asm"       ; the image generator's kernels: cache-blocked matmul, LayerNorm, GELU, attention
+%include "clipenc.asm"   ; SD-Turbo's text encoder (OpenCLIP ViT-H text tower, 23 layers)
+%include "q35k.asm"      ; Qwen3.5's extra kernels: gated delta rule, causal conv, gated norm, partial rope
+%include "q35.asm"       ; Qwen3.5: layers, setup, generation, chat
+%include "q35f.asm"      ; Qwen3.5: the forward pass for a batch of tokens and its pool jobs
+%include "tools.asm"     ; the model's file tools on the stick: list, read, write, append
+%include "unet.asm"      ; SD-Turbo's UNet: one denoising step (convolutions, GroupNorm, attention)
+%include "taesd.asm"     ; the Tiny AutoEncoder's decoder: latent -> 512x512 picture
 %include "tokenizer.asm" ; byte-level BPE encode and decode
+%include "view.asm"      ; pictures: BMP loading, test card, fit-and-centre scaling (rt_view_show shows them)
+%include "image.asm"     ; text to image (--image): the prompt, img_generate, the console prompt loop
 %include "model.asm"     ; forward pass, generation loop, main() and CLI dispatch
 
 ; End of the code: pe.inc sizes .text from here. The bytes up to data_start are

@@ -39,6 +39,7 @@
 ;   rt_now_ns      rdtsc scaled by the measured TSC frequency
 ;   rt_cpu_count   enabled processors from EFI_MP_SERVICES_PROTOCOL (1 without it)
 ;   pool_start     run pool_worker on nthreads-1 application processors
+;   rt_view_show   a picture on the whole screen (GOP Blt) until a key
 ;
 ; Internal: efi_warn_status, efi_fatal_status, rt_enable_avx, efi_calibrate_tsc,
 ; efi_cpu_setup, efi_cpu_perf, efi_measure_clock, efi_open_root, efi_open,
@@ -59,6 +60,8 @@ EFI_FINFO_BYTES  equ 1024                ; EFI_FILE_INFO buffer (80 bytes + the 
 EFI_OUT_CHARS    equ 1024                ; ConOut chunk (CHAR16s) per OutputString
 EFI_LINE_BYTES   equ 4096                ; one typed line, UTF-8
 EFI_READ_CHUNK   equ 8*1024*1024         ; bytes per EFI_FILE_PROTOCOL.Read
+EFI_HEADER_MAX   equ 32*1024*1024        ; the GGUF header (metadata, vocabulary, tensor table) must fit this
+EFI_PARTS_MAX    equ 8                   ; model files: "<path>" and "<path>.1" .. "<path>.7"
 EFI_PROGRESS_MIN equ 64*1024*1024        ; files at least this big show progress
 AP_STACK_BYTES   equ 1024*1024           ; stack of each worker processor
 
@@ -148,6 +151,7 @@ _entry:
   call efi_calibrate_tsc       ; g_tsc_hz; prints tsc_mhz
   call efi_cpu_setup           ; this processor at its highest clock; prints what it found
   call efi_open_root           ; g_root: the volume we were loaded from
+  call efi_probe_links         ; usb.asm: the USB interfaces and network protocols the firmware offers
   call efi_build_cmdline       ; rax = argc, g_argv filled
 
   mov  rcx, rax
@@ -346,6 +350,8 @@ efi_cpu_setup:
   mov  r13d, eax               ; highest level (0 = no HWP)
   mov  ebx, edx                ; IA32_HWP_CAPABILITIES[31:0]
   mov  r14d, r8d               ; 1 = HWP enabled by us
+  call efi_pmu_enable          ; the fixed counters on the boot processor
+  mov  [rel g_pmu_on], rax
   mov  rax, [rel g_bs]
   mov  ecx, 10000              ; let the clock settle before measuring again
   call [rax + BS_Stall]
@@ -519,6 +525,134 @@ efi_measure_clock:
 ; Leaving
 ; ===========================================================================
 
+; rt_temp_read() — the cores' and the package's temperatures from the digital
+; thermal sensors: g_temp_c[tid] (°C, -1 when no valid reading) for every pool
+; thread, g_temp_pkg for the package, g_temp_tjmax. Only after CPUID.06H
+; reports the sensors (eax[0] DTS, eax[6] package); without them g_temp_n stays
+; 0. Each core reads its own IA32_THERM_STATUS inside a pool job. Clobbers the
+; volatile registers.
+rt_temp_read:
+  push rbx
+  WINPROLOGUE
+  mov  qword [rel g_temp_n], 0
+  mov  eax, 6
+  xor  ecx, ecx
+  cpuid
+  test eax, 1
+  jz   .done
+  mov  ebx, eax                ; eax[6]: package sensor
+  mov  ecx, MSR_IA32_TEMPERATURE_TARGET
+  rdmsr
+  shr  eax, 16
+  and  eax, 0xFF
+  mov  [rel g_temp_tjmax], rax
+  lea  rcx, [rel rt_temp_job]
+  xor  edx, edx
+  call pool_run
+  mov  rax, [rel g_nthreads]
+  mov  [rel g_temp_n], rax
+  mov  qword [rel g_temp_pkg], -1
+  test ebx, 1 << 6
+  jz   .done
+  mov  ecx, MSR_IA32_PACKAGE_THERM_STATUS
+  rdmsr
+  test eax, 1 << 31
+  jz   .done
+  shr  eax, 16
+  and  eax, 0x7F
+  mov  rcx, [rel g_temp_tjmax]
+  sub  rcx, rax
+  mov  [rel g_temp_pkg], rcx
+.done:
+  WINEPILOGUE
+  pop  rbx
+  ret
+
+; rt_temp_job(rcx=arg, rdx=tid, r8=nthreads) — pool body: this core's readout.
+rt_temp_job:
+  cmp  rdx, 8
+  jae  .ret
+  mov  r9, rdx
+  mov  ecx, MSR_IA32_THERM_STATUS
+  rdmsr
+  mov  rcx, -1
+  test eax, 1 << 31
+  jz   .store
+  shr  eax, 16
+  and  eax, 0x7F
+  mov  rcx, [rel g_temp_tjmax]
+  sub  rcx, rax
+.store:
+  lea  rax, [rel g_temp_c]
+  mov  [rax + r9*8], rcx
+.ret:
+  ret
+
+; efi_pmu_enable() -> eax = 1 when this core's fixed performance counters now
+; count: instructions retired (fixed 0) and unhalted core cycles (fixed 1), in
+; ring 0 and ring 3, for the waste metric's rdpmc reads. Only after CPUID.0AH
+; reports an architectural PMU of version 2 or later with at least two fixed
+; counters (a wrmsr to an absent MSR would be a #GP). Clobbers rax, rcx, rdx,
+; r8; preserves rbx.
+efi_pmu_enable:
+  push rbx
+  xor  eax, eax
+  cpuid
+  cmp  eax, 0x0A
+  jb   .no
+  mov  eax, 0x0A
+  xor  ecx, ecx
+  cpuid
+  movzx r8d, al                ; version
+  cmp  r8d, 2
+  jb   .no
+  and  edx, 0x1F               ; fixed counters
+  cmp  edx, 2
+  jb   .no
+  mov  r8d, eax
+  shr  r8d, 8
+  and  r8d, 0xFF               ; general-purpose counters per core
+  mov  ecx, MSR_IA32_FIXED_CTR_CTRL
+  mov  eax, 0x33               ; fixed 0 and 1: count in ring 0 and ring 3
+  xor  edx, edx
+  wrmsr
+  cmp  r8d, 2
+  jb   .fixed_only
+  ; general counters 0 and 1: memory-stall cycles (any level) and DRAM-stall cycles
+  mov  ecx, MSR_IA32_PMC0
+  xor  eax, eax
+  xor  edx, edx
+  wrmsr
+  mov  ecx, MSR_IA32_PMC0 + 1
+  wrmsr
+  mov  ecx, MSR_IA32_PERFEVTSEL0
+  mov  eax, PMU_EVSEL_MEM_STALL
+  wrmsr
+  mov  ecx, MSR_IA32_PERFEVTSEL0 + 1
+  mov  eax, PMU_EVSEL_DRAM_STALL
+  wrmsr
+  mov  ecx, MSR_IA32_PERF_GLOBAL_CTRL
+  rdmsr
+  or   eax, 3                  ; bits 0, 1: enable general 0 and 1
+  or   edx, 3                  ; bits 32, 33: enable fixed 0 and 1
+  wrmsr
+  mov  qword [rel g_pmu_stalls], 1
+  mov  eax, 1
+  pop  rbx
+  ret
+.fixed_only:
+  mov  ecx, MSR_IA32_PERF_GLOBAL_CTRL
+  rdmsr
+  or   edx, 3                  ; bits 32, 33: enable fixed 0 and 1
+  wrmsr
+  mov  eax, 1
+  pop  rbx
+  ret
+.no:
+  xor  eax, eax
+  pop  rbx
+  ret
+
 ; efi_warn_status(rcx=zstr, rdx=status) — "asmrun: <msg> (EFI status 0x..)\n".
 efi_warn_status:
   WINPROLOGUE
@@ -675,6 +809,36 @@ efi_wait_key:
 ; in the middle of a character; code points outside the BMP and malformed
 ; sequences print as '?'. Only tid 0 prints, so one output buffer suffices.
 rt_write_h:
+  cmp  qword [rel g_http_cap_on], 0
+  je   .nocap
+  cmp  rcx, [rel g_stdout]
+  jne  .nocap
+  push rcx                     ; stdout also goes to the HTTP answer (http.asm)
+  push rdx
+  push r8
+  sub  rsp, 32
+  mov  rcx, rdx
+  mov  rdx, r8
+  call http_capture
+  add  rsp, 32
+  pop  r8
+  pop  rdx
+  pop  rcx
+.nocap:
+  cmp  qword [rel g_log_tee], 0
+  je   .body
+  push rcx                     ; the screen output also goes to the dialog buffer
+  push rdx
+  push r8
+  sub  rsp, 32
+  mov  rcx, rdx
+  mov  rdx, r8
+  call rt_log_add
+  add  rsp, 32
+  pop  r8
+  pop  rdx
+  pop  rcx
+.body:
   push rbx
   push rsi
   push rdi
@@ -1073,6 +1237,10 @@ efi_read_all:
   mov  rdi, r8                 ; cursor
   mov  r12, rdx                ; total
   xor  r13d, r13d              ; read so far
+  cmp  qword [rel g_read_quiet], 0
+  je   .loud
+  xor  r12d, r12d              ; quiet: no progress line (the caller prints its own)
+.loud:
   cmp  r12, EFI_PROGRESS_MIN
   jb   .nohead
   lea  rcx, [rel e_s_reading]
@@ -1212,6 +1380,263 @@ rt_map_file:
 ; rt_read_file(rcx=path utf16, rdx=&len) -> rax = ptr. Same as rt_map_file.
 rt_read_file:
   jmp  rt_map_file
+
+; rt_model_open(rcx=path utf16, rdx=&size) -> rax = the first EFI_HEADER_MAX
+; bytes of the model file (its GGUF header) in pages. The file stays open:
+; gguf_open then asks rt_tensor_data for every tensor, each read at its file
+; offset into pages of its own, so the model need not fit one free region of
+; memory (the largest on an 8 GB machine is the ~4 GB above the PCI hole).
+; Prints the "reading N MB" line; the dots follow per tensor.
+; A model larger than a FAT32 file (4 GiB) comes in parts: the path as given
+; holds the first bytes and "<path>.1", "<path>.2", ... the rest, in order
+; (make-usb.ps1 writes them). The parts are opened here and read as one file:
+; g_part_file / g_part_start / g_part_size describe them, g_model_size is the
+; total.
+rt_model_open:
+  push rbx
+  push rsi
+  push rdi
+  push r12
+  WINPROLOGUE
+  sub  rsp, 16                 ; [rsp+32] = header bytes, [rsp+40] = buffer
+  mov  rsi, rdx
+  mov  rbx, rcx
+  call efi_open
+  test rax, rax
+  jz   rt_map_file.nofile      ; the same message as a missing prompt file (rbx = path)
+  mov  [rel g_model_file], rax
+  mov  [rel g_part_file], rax
+  mov  rcx, rax
+  call efi_file_size
+  mov  [rel g_part_size], rax
+  mov  qword [rel g_part_start], 0
+  mov  qword [rel g_part_n], 1
+  mov  r12, rax                ; total so far
+  ; the further parts: "<path>.N" while such a file exists
+  mov  edi, 1
+.part:
+  cmp  rdi, EFI_PARTS_MAX
+  jae  .parts_done
+  ; g_part_path = path, '.', digit, 0
+  lea  rdx, [rel g_part_path]
+  xor  r8d, r8d
+.pp:
+  movzx eax, word [rbx + r8*2]
+  mov  [rdx + r8*2], ax
+  test eax, eax
+  jz   .ppd
+  inc  r8
+  cmp  r8, EFI_PATH_CHARS - 4
+  jb   .pp
+.ppd:
+  mov  word [rdx + r8*2], '.'
+  lea  eax, [rdi + '0']
+  mov  [rdx + r8*2 + 2], ax
+  mov  word [rdx + r8*2 + 4], 0
+  mov  rcx, rdx
+  call efi_open
+  test rax, rax
+  jz   .parts_done
+  lea  rdx, [rel g_part_file]  ; (an indexed address cannot be RIP-relative: base in a register)
+  mov  [rdx + rdi*8], rax
+  lea  rdx, [rel g_part_start]
+  mov  [rdx + rdi*8], r12
+  mov  rcx, rax
+  call efi_file_size
+  lea  rdx, [rel g_part_size]
+  mov  [rdx + rdi*8], rax
+  add  r12, rax
+  inc  rdi
+  mov  [rel g_part_n], rdi
+  jmp  .part
+.parts_done:
+  cmp  rdi, 1
+  je   .one_part
+  lea  rcx, [rel e_s_parts1]
+  call rt_err_str
+  mov  rcx, rdi
+  call rt_err_u64
+  lea  rcx, [rel e_s_parts2]
+  call rt_err_str
+.one_part:
+  mov  rbx, [rel g_model_file]
+  mov  rax, r12
+  mov  [rsi], rax
+  mov  [rel g_model_size], rax
+  cmp  rax, EFI_HEADER_MAX
+  jbe  .hdr
+  mov  rax, EFI_HEADER_MAX
+.hdr:
+  mov  [rsp+32], rax
+  mov  rcx, rax
+  call efi_pages
+  mov  [rsp+40], rax
+  mov  qword [rel g_read_quiet], 1
+  mov  rcx, rbx
+  mov  rdx, [rsp+32]
+  mov  r8, rax
+  call efi_read_all
+  mov  qword [rel g_read_quiet], 0
+  lea  rcx, [rel e_s_reading]
+  call rt_err_str
+  mov  rcx, [rel g_model_size]
+  shr  rcx, 20
+  call rt_err_u64
+  mov  qword [rel g_model_read], 0
+  lea  rcx, [rel e_s_mb_tensors]
+  call rt_err_str
+  call rt_now_ns
+  mov  [rel g_model_t0], rax
+  mov  rax, [rsp+40]
+  WINEPILOGUE
+  pop  r12
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+
+; rt_tensor_data(rcx=file offset, rdx=bytes) -> rax = the bytes, read from the
+; open model file into new pages. A tensor whose end is past the header buffer
+; is the normal case; one that lies inside it is still read afresh (simpler,
+; and only the small early tensors). A dot per 32 MB read in total. A read
+; that crosses a part boundary is done part by part.
+rt_tensor_data:
+  push rbx
+  push rsi
+  push rdi
+  push r12
+  push r13
+  push r14
+  WINPROLOGUE
+  mov  rsi, rcx                ; offset
+  mov  rdi, rdx                ; bytes
+  cmp  rsi, [rel g_model_size]
+  ja   .bad
+  mov  rax, rsi
+  add  rax, rdi
+  cmp  rax, [rel g_model_size]
+  ja   .bad
+  mov  rcx, rdi
+  call efi_pages
+  mov  rbx, rax
+  mov  r12, rax                ; write cursor
+  mov  r13, rsi                ; file cursor
+  mov  r14, rdi                ; remaining
+  mov  qword [rel g_read_quiet], 1
+.span:
+  test r14, r14
+  jz   .read_done
+  ; the part holding r13
+  xor  ecx, ecx
+  lea  r8, [rel g_part_start]
+  lea  r9, [rel g_part_size]
+.find:
+  mov  rax, [r8 + rcx*8]
+  add  rax, [r9 + rcx*8]
+  cmp  r13, rax
+  jb   .found
+  inc  rcx
+  cmp  rcx, [rel g_part_n]
+  jb   .find
+  jmp  .bad
+.found:
+  ; this piece: min(remaining, part end - r13)
+  sub  rax, r13
+  cmp  rax, r14
+  jbe  .piece
+  mov  rax, r14
+.piece:
+  mov  rsi, rax                ; piece bytes
+  mov  rdx, r13
+  sub  rdx, [r8 + rcx*8]       ; position inside the part
+  lea  rax, [rel g_part_file]
+  mov  rcx, [rax + rcx*8]
+  mov  [rel g_part_cur], rcx
+  call [rcx + FP_SetPosition]
+  EFI_CHECK e_err_seek
+  mov  rcx, [rel g_part_cur]
+  mov  rdx, rsi
+  mov  r8, r12
+  call efi_read_all
+  add  r12, rsi
+  add  r13, rsi
+  sub  r14, rsi
+  jmp  .span
+.read_done:
+  mov  qword [rel g_read_quiet], 0
+  mov  rax, [rel g_model_read]
+  shr  rax, 25
+  mov  rsi, rax                ; 32 MB units before
+  add  [rel g_model_read], rdi
+  mov  rax, [rel g_model_read]
+  shr  rax, 25
+  sub  rax, rsi                ; dots to print
+  mov  rdi, rax
+.dots:
+  test rdi, rdi
+  jz   .done
+  lea  rcx, [rel e_s_dot]
+  mov  edx, 1
+  call rt_err
+  dec  rdi
+  jmp  .dots
+.done:
+  mov  rax, rbx
+  WINEPILOGUE
+  pop  r14
+  pop  r13
+  pop  r12
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+.bad:
+  lea  rcx, [rel e_err_tensor_range]
+  call rt_fatal
+
+; rt_model_done() — the read rate for the whole model, then the file is closed.
+rt_model_done:
+  push rbx
+  WINPROLOGUE
+  call rt_now_ns
+  sub  rax, [rel g_model_t0]   ; ns
+  xor  edx, edx
+  mov  ecx, 1000000
+  div  rcx                     ; ms
+  test rax, rax
+  jnz  .msok
+  mov  eax, 1
+.msok:
+  mov  rcx, rax
+  mov  rax, [rel g_model_read]
+  shr  rax, 20                 ; MB
+  imul rax, rax, 1000
+  xor  edx, edx
+  div  rcx                     ; MB/s
+  mov  rbx, rax
+  lea  rcx, [rel e_s_done]
+  call rt_err_str
+  mov  rcx, rbx
+  call rt_err_u64
+  lea  rcx, [rel e_s_mbs_nl]
+  call rt_err_str
+  xor  ebx, ebx
+.close:
+  cmp  rbx, [rel g_part_n]
+  jae  .closed
+  lea  rcx, [rel g_part_file]
+  mov  rcx, [rcx + rbx*8]
+  call [rcx + FP_Close]
+  lea  rcx, [rel g_part_file]
+  mov  qword [rcx + rbx*8], 0
+  inc  rbx
+  jmp  .close
+.closed:
+  mov  qword [rel g_model_file], 0
+  mov  qword [rel g_part_n], 0
+  WINEPILOGUE
+  pop  rbx
+  ret
 
 ; efi_read_optional(rcx=path utf16, rdx=&len) -> rax = ptr (zero-terminated
 ; copy) or 0 when the file does not exist.
@@ -1355,6 +1780,612 @@ rt_now_ns:
   mov  rcx, [rel g_tsc_hz]
   div  rcx
   ret
+
+; rt_view_show(rcx=pixels BGRX top-down, rdx=w, r8=h) — the picture on the
+; whole screen: EFI_GRAPHICS_OUTPUT_PROTOCOL's current mode, the picture fitted
+; and centred on black by view_blit (a whole-number enlargement when it fits,
+; so a 512x512 picture is 1024x1024 on a 1080-line screen), one Blt
+; (EfiBltBufferToVideo takes BGRX pixels whatever the framebuffer's format, so
+; the picture is never converted here). A key press clears the screen back to
+; the text console and returns. Without a graphics output the reason is printed
+; and it returns at once. Preserves the nonvolatile registers.
+rt_view_show:
+  push rbx
+  push rsi
+  push rdi
+  push r12
+  push r13
+  WINPROLOGUE
+  sub  rsp, 96                 ; [rsp+32..80) Blt's stack arguments
+  mov  rsi, rcx
+  mov  r12, rdx
+  mov  r13, r8
+  mov  rax, [rel g_bs]
+  lea  rcx, [rel e_guid_gop]
+  xor  edx, edx
+  lea  r8, [rel g_gop]
+  call [rax + BS_LocateProtocol]
+  test rax, rax
+  jz   .have
+  mov  rdx, rax
+  lea  rcx, [rel e_err_gop]
+  call efi_warn_status
+  jmp  .ret
+.have:
+  mov  rax, [rel g_gop]
+  mov  rax, [rax + GOP_Mode]
+  mov  rax, [rax + GOPM_Info]
+  mov  ebx, [rax + GOPI_HRes]  ; screen width
+  mov  edi, [rax + GOPI_VRes]  ; screen height
+  mov  rax, rbx
+  imul rax, rdi
+  cmp  rax, [rel g_view_scr_px] ; one screen buffer, reused while the mode stays
+  je   .buf
+  mov  [rel g_view_scr_px], rax
+  lea  rcx, [rax*4]
+  call rt_alloc
+  mov  [rel g_view_scr], rax
+.buf:
+  mov  rcx, rsi
+  mov  rdx, r12
+  mov  r8, r13
+  mov  r9, [rel g_view_scr]
+  mov  [rsp+32], rbx
+  mov  [rsp+40], rdi
+  call view_blit
+  ; Blt(This, buffer, EfiBltBufferToVideo, 0, 0, 0, 0, width, height, 0 = 4*width per row)
+  mov  rcx, [rel g_gop]
+  mov  rdx, [rel g_view_scr]
+  mov  r8d, EfiBltBufferToVideo
+  xor  r9d, r9d                ; SourceX
+  mov  qword [rsp+32], 0       ; SourceY
+  mov  qword [rsp+40], 0       ; DestinationX
+  mov  qword [rsp+48], 0       ; DestinationY
+  mov  [rsp+56], rbx           ; Width
+  mov  [rsp+64], rdi           ; Height
+  mov  qword [rsp+72], 0       ; Delta
+  call [rcx + GOP_Blt]
+  test rax, rax
+  jz   .shown
+  mov  rdx, rax
+  lea  rcx, [rel e_err_blt]
+  call efi_warn_status
+  jmp  .ret
+.shown:
+  call efi_wait_key
+  mov  rcx, [rel g_conout]
+  call [rcx + TXT_ClearScreen]
+.ret:
+  WINEPILOGUE
+  pop  r13
+  pop  r12
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+
+; efi_set_path(rcx=path utf16) — the path into g_path with '/' as '\'. Leaf;
+; clobbers rax, rdx, r8.
+efi_set_path:
+  lea  rdx, [rel g_path]
+  xor  r8d, r8d
+.cp:
+  movzx eax, word [rcx + r8*2]
+  cmp  eax, '/'
+  jne  .nosl
+  mov  eax, '\'
+.nosl:
+  mov  [rdx + r8*2], ax
+  test eax, eax
+  jz   .done
+  inc  r8
+  cmp  r8, EFI_PATH_CHARS - 1
+  jb   .cp
+  mov  word [rdx + r8*2], 0
+.done:
+  ret
+
+; rt_write_file(rcx=path utf16, rdx=ptr, r8=len) -> rax = 1 when the file on
+; the boot volume now holds exactly these bytes (an existing file is deleted
+; first, then created and written), else 0.
+rt_write_file:
+  push rbx
+  push rsi
+  push rdi
+  WINPROLOGUE
+  sub  rsp, 32                 ; [rsp+32] Attributes (arg 5), [rsp+40] handle (out), [rsp+48] size (in/out)
+  mov  rsi, rdx
+  mov  rdi, r8
+  call efi_set_path
+  ; an existing file goes first
+  mov  qword [rsp+40], 0
+  mov  rcx, [rel g_root]
+  lea  rdx, [rsp+40]
+  lea  r8, [rel g_path]
+  mov  r9d, EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE
+  mov  qword [rsp+32], 0
+  call [rcx + FP_Open]
+  test rax, rax
+  jnz  .create
+  mov  rcx, [rsp+40]
+  call [rcx + FP_Delete]       ; (closes the handle too)
+.create:
+  mov  qword [rsp+40], 0
+  mov  rcx, [rel g_root]
+  lea  rdx, [rsp+40]
+  lea  r8, [rel g_path]
+  mov  r9, EFI_FILE_MODE_CREATE | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_READ
+  mov  qword [rsp+32], 0
+  call [rcx + FP_Open]
+  test rax, rax
+  jnz  .fail
+  mov  rbx, [rsp+40]
+  mov  [rsp+48], rdi
+  mov  rcx, rbx
+  lea  rdx, [rsp+48]
+  mov  r8, rsi
+  call [rbx + FP_Write]
+  test rax, rax
+  jnz  .fail_close
+  mov  rcx, rbx
+  call [rbx + FP_Flush]
+  mov  rcx, rbx
+  call [rbx + FP_Close]
+  mov  eax, 1
+  WINEPILOGUE
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+.fail_close:
+  mov  rcx, rbx
+  call [rbx + FP_Close]
+.fail:
+  xor  eax, eax
+  WINEPILOGUE
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+
+; rt_read_optional(rcx=path utf16, rdx=&len) -> rax = the file's bytes (a
+; zero-terminated copy) or 0 when it does not exist: efi_read_optional.
+rt_read_optional:
+  jmp  efi_read_optional
+
+; rt_list_root(rcx=buf, rdx=cap) -> rax = bytes written: every file in the
+; boot volume's root as "name  size\n" (directories left out), as far as the
+; buffer holds. Preserves the nonvolatile registers.
+rt_list_root:
+  push rbx
+  push rsi
+  push rdi
+  push r12
+  WINPROLOGUE
+  sub  rsp, 32                 ; [rsp+32] size (in/out), [rsp+40..64) digits
+  mov  rbx, rcx                ; buf
+  mov  rsi, rdx                ; cap
+  xor  r12d, r12d              ; written
+  mov  rcx, [rel g_root]
+  xor  edx, edx
+  call [rcx + FP_SetPosition]
+.entry:
+  mov  qword [rsp+32], EFI_FINFO_BYTES
+  mov  rcx, [rel g_root]
+  lea  rdx, [rsp+32]
+  lea  r8, [rel g_finfo]
+  call [rcx + FP_Read]
+  test rax, rax
+  jnz  .done
+  cmp  qword [rsp+32], 0
+  je   .done
+  test byte [rel g_finfo + 72], 0x10
+  jnz  .entry
+  ; name
+  mov  rax, rsi
+  sub  rax, r12
+  cmp  rax, 300
+  jb   .done                   ; no room for another line
+  lea  rcx, [rel g_finfo + 80]
+  lea  rdx, [rbx + r12]
+  mov  r8d, 255
+  call rt_utf16_to_utf8
+  add  r12, rax
+  mov  word [rbx + r12], 0x2020 ; two spaces
+  add  r12, 2
+  mov  rcx, [rel g_finfo + FI_FileSize]
+  lea  rdx, [rsp+64]
+  call rt_u64_digits           ; rax = first digit (digits end at [rsp+64])
+  mov  rdi, rax
+.dg:
+  lea  rcx, [rsp+64]
+  cmp  rdi, rcx
+  jae  .dgd
+  mov  al, [rdi]
+  mov  [rbx + r12], al
+  inc  r12
+  inc  rdi
+  jmp  .dg
+.dgd:
+  mov  byte [rbx + r12], 10
+  inc  r12
+  jmp  .entry
+.done:
+  mov  rax, r12
+  WINEPILOGUE
+  pop  r12
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+
+; rt_pick_model() -> rax = the UTF-16 name of the model chosen from a numbered
+; list of the boot volume's *.gguf files (a model split into *.gguf.N parts is
+; listed once, with the parts' sizes added), or 0 when there is none. The root
+; directory is read entry by entry (EFI_FILE_INFO), the number is typed on the
+; console; an empty or wrong answer asks again. Preserves the nonvolatile
+; registers; the name lives in g_menu_name.
+EFI_MENU_MAX  equ 64                     ; directory entries kept (models and parts)
+EFI_MENU_NAME equ 128                    ; CHAR16s per kept name
+rt_pick_model:
+  push rbx
+  push rsi
+  push rdi
+  push r12
+  push r13
+  WINPROLOGUE
+  sub  rsp, 32                 ; [rsp+32] size (in/out), [rsp+40] line length
+  mov  rcx, [rel g_root]
+  xor  edx, edx
+  call [rcx + FP_SetPosition]  ; the directory from its first entry
+  xor  r12d, r12d              ; entries kept
+.entry:
+  cmp  r12, EFI_MENU_MAX
+  jae  .listed
+  mov  qword [rsp+32], EFI_FINFO_BYTES
+  mov  rcx, [rel g_root]
+  lea  rdx, [rsp+32]
+  lea  r8, [rel g_finfo]
+  call [rcx + FP_Read]
+  test rax, rax
+  jnz  .listed
+  cmp  qword [rsp+32], 0
+  je   .listed                 ; the end of the directory
+  test byte [rel g_finfo + 72], 0x10 ; EFI_FILE_DIRECTORY
+  jnz  .entry
+  lea  rsi, [rel g_finfo + 80] ; the name
+  xor  ecx, ecx
+.nlen:
+  cmp  word [rsi + rcx*2], 0
+  je   .nlend
+  inc  ecx
+  cmp  ecx, EFI_MENU_NAME - 1
+  jb   .nlen
+.nlend:
+  mov  rbx, rcx                ; the name's length
+  xor  r13d, r13d              ; kind: 0 a model, 1 a part
+  cmp  rbx, 6
+  jb   .entry
+  lea  rdx, [rbx - 5]          ; "<base>.gguf"?
+  mov  rcx, rsi
+  call efi_is_gguf_at
+  test rax, rax
+  jnz  .take
+  cmp  rbx, 8                  ; "<base>.gguf.N"?
+  jb   .entry
+  movzx eax, word [rsi + rbx*2 - 2]
+  sub  eax, '0'
+  cmp  eax, 9
+  ja   .entry
+  cmp  word [rsi + rbx*2 - 4], '.'
+  jne  .entry
+  lea  rdx, [rbx - 7]
+  mov  rcx, rsi
+  call efi_is_gguf_at
+  test rax, rax
+  jz   .entry
+  mov  r13d, 1
+  sub  rbx, 2                  ; kept under the base name
+.take:
+  mov  rax, r12
+  shl  rax, 8                  ; 256 bytes per name
+  lea  rdi, [rel g_menu_name]
+  add  rdi, rax
+  xor  ecx, ecx
+.cp:
+  cmp  rcx, rbx
+  jae  .cpd
+  movzx eax, word [rsi + rcx*2]
+  mov  [rdi + rcx*2], ax
+  inc  rcx
+  jmp  .cp
+.cpd:
+  mov  word [rdi + rcx*2], 0
+  mov  rax, [rel g_finfo + FI_FileSize]
+  lea  rcx, [rel g_menu_size]
+  mov  [rcx + r12*8], rax
+  lea  rcx, [rel g_menu_kind]
+  mov  [rcx + r12*8], r13
+  inc  r12
+  jmp  .entry
+.listed:
+  ; the parts' sizes into their models
+  xor  ebx, ebx
+.sum:
+  cmp  rbx, r12
+  jae  .summed
+  lea  rax, [rel g_menu_kind]
+  cmp  qword [rax + rbx*8], 0
+  jne  .sum_next
+  xor  esi, esi
+.sump:
+  cmp  rsi, r12
+  jae  .sum_next
+  lea  rax, [rel g_menu_kind]
+  cmp  qword [rax + rsi*8], 1
+  jne  .sump_next
+  lea  rax, [rel g_menu_name]
+  mov  rcx, rbx
+  shl  rcx, 8
+  add  rcx, rax
+  mov  rdx, rsi
+  shl  rdx, 8
+  add  rdx, rax
+  call efi_wstr_ieq
+  test rax, rax
+  jz   .sump_next
+  lea  rax, [rel g_menu_size]
+  mov  rcx, [rax + rsi*8]
+  add  [rax + rbx*8], rcx
+.sump_next:
+  inc  rsi
+  jmp  .sump
+.sum_next:
+  inc  rbx
+  jmp  .sum
+.summed:
+  ; the list: "  N) name  (G.G GB)"
+  xor  r13d, r13d              ; models listed
+  lea  rcx, [rel e_s_menu]
+  call rt_err_str
+  xor  ebx, ebx
+.print:
+  cmp  rbx, r12
+  jae  .printed
+  lea  rax, [rel g_menu_kind]
+  cmp  qword [rax + rbx*8], 0
+  jne  .print_next
+  inc  r13
+  lea  rcx, [rel e_s_menu_sp]
+  call rt_err_str
+  mov  rcx, r13
+  call rt_err_u64
+  lea  rcx, [rel e_s_menu_paren]
+  call rt_err_str
+  mov  rcx, rbx
+  shl  rcx, 8
+  lea  rax, [rel g_menu_name]
+  add  rcx, rax
+  lea  rdx, [rel g_menu_utf8]
+  mov  r8d, 255
+  call rt_utf16_to_utf8
+  lea  rcx, [rel g_menu_utf8]
+  mov  byte [rcx + rax], 0
+  call rt_err_str
+  lea  rcx, [rel e_s_menu_gb1]
+  call rt_err_str
+  lea  rax, [rel g_menu_size]
+  mov  rax, [rax + rbx*8]
+  xor  edx, edx
+  mov  ecx, 100000000
+  div  rcx                     ; tenths of a GB
+  xor  edx, edx
+  mov  ecx, 10
+  div  rcx
+  mov  rdi, rdx                ; the tenth
+  mov  rcx, rax
+  call rt_err_u64
+  lea  rcx, [rel e_s_dot_c]
+  call rt_err_str
+  mov  rcx, rdi
+  call rt_err_u64
+  lea  rcx, [rel e_s_menu_gb2]
+  call rt_err_str
+.print_next:
+  inc  rbx
+  jmp  .print
+.printed:
+  test r13, r13
+  jz   .none
+.ask:
+  lea  rcx, [rel e_s_menu_ask]
+  call rt_err_str
+  lea  rcx, [rsp+40]
+  call rt_read_stdin
+  xor  ecx, ecx                ; the number typed
+  xor  edx, edx
+.dig:
+  cmp  rcx, [rsp+40]
+  jae  .digd
+  movzx r8d, byte [rax + rcx]
+  sub  r8d, '0'
+  cmp  r8d, 9
+  ja   .digd
+  imul rdx, rdx, 10
+  add  rdx, r8
+  inc  rcx
+  jmp  .dig
+.digd:
+  test rdx, rdx
+  jz   .ask
+  cmp  rdx, r13
+  ja   .ask
+  xor  ebx, ebx                ; the rdx-th model
+  xor  esi, esi
+.find:
+  lea  rax, [rel g_menu_kind]
+  cmp  qword [rax + rbx*8], 0
+  jne  .find_next
+  inc  rsi
+  cmp  rsi, rdx
+  je   .found
+.find_next:
+  inc  rbx
+  jmp  .find
+.found:
+  mov  rax, rbx
+  shl  rax, 8
+  lea  rcx, [rel g_menu_name]
+  add  rax, rcx
+  jmp  .ret
+.none:
+  lea  rcx, [rel e_s_menu_none]
+  call rt_err_str
+  xor  eax, eax
+.ret:
+  WINEPILOGUE
+  pop  r13
+  pop  r12
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+
+; efi_is_gguf_at(rcx=CHAR16 string, rdx=index) -> rax = 1 when the five
+; characters at the index are ".gguf" in any case. Leaf; clobbers rax, r8-r10.
+efi_is_gguf_at:
+  lea  r8, [rcx + rdx*2]
+  lea  r9, [rel e_w_gguf]
+  xor  r10d, r10d
+.c:
+  cmp  r10d, 5
+  jae  .yes
+  movzx eax, word [r8 + r10*2]
+  cmp  eax, 'A'
+  jb   .lc
+  cmp  eax, 'Z'
+  ja   .lc
+  add  eax, 32
+.lc:
+  cmp  ax, [r9 + r10*2]
+  jne  .no
+  inc  r10d
+  jmp  .c
+.yes:
+  mov  eax, 1
+  ret
+.no:
+  xor  eax, eax
+  ret
+
+; efi_wstr_ieq(rcx, rdx: CHAR16 strings) -> rax = 1 when equal ignoring ASCII
+; case. Leaf; clobbers rax, r8, r9.
+efi_wstr_ieq:
+  xor  r8d, r8d
+.l:
+  movzx eax, word [rcx + r8*2]
+  movzx r9d, word [rdx + r8*2]
+  cmp  eax, 'A'
+  jb   .a
+  cmp  eax, 'Z'
+  ja   .a
+  add  eax, 32
+.a:
+  cmp  r9d, 'A'
+  jb   .b
+  cmp  r9d, 'Z'
+  ja   .b
+  add  r9d, 32
+.b:
+  cmp  eax, r9d
+  jne  .no
+  test eax, eax
+  jz   .yes
+  inc  r8d
+  jmp  .l
+.yes:
+  mov  eax, 1
+  ret
+.no:
+  xor  eax, eax
+  ret
+
+; rt_append_file(rcx=path utf16, rdx=ptr, r8=len) -> rax = 1 when the bytes were
+; appended to the file on the boot volume (created when absent), else 0. The
+; firmware's FAT driver does the write: open read+write+create, seek to the
+; end, write, flush, close.
+rt_append_file:
+  push rbx
+  push rsi
+  push rdi
+  WINPROLOGUE
+  sub  rsp, 32                 ; [rsp+32] Attributes (arg 5), [rsp+40] handle (out), [rsp+48] size (in/out)
+  mov  rsi, rdx
+  mov  rdi, r8
+  lea  rdx, [rel g_path]       ; the path, '/' as '\'
+  xor  r8d, r8d
+.cp:
+  movzx eax, word [rcx + r8*2]
+  cmp  eax, '/'
+  jne  .nosl
+  mov  eax, '\'
+.nosl:
+  mov  [rdx + r8*2], ax
+  test eax, eax
+  jz   .cpd
+  inc  r8
+  cmp  r8, EFI_PATH_CHARS - 1
+  jb   .cp
+  mov  word [rdx + r8*2], 0
+.cpd:
+  mov  qword [rsp+40], 0
+  mov  rcx, [rel g_root]
+  lea  rdx, [rsp+40]
+  lea  r8, [rel g_path]
+  mov  r9, EFI_FILE_MODE_CREATE | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_READ
+  mov  qword [rsp+32], 0
+  call [rcx + FP_Open]
+  test rax, rax
+  jnz  .fail
+  mov  rbx, [rsp+40]
+  mov  rcx, rbx
+  mov  rdx, -1                 ; the end of the file
+  call [rbx + FP_SetPosition]
+  test rax, rax
+  jnz  .fail_close
+  mov  [rsp+48], rdi
+  mov  rcx, rbx
+  lea  rdx, [rsp+48]
+  mov  r8, rsi
+  call [rbx + FP_Write]
+  test rax, rax
+  jnz  .fail_close
+  mov  rcx, rbx
+  call [rbx + FP_Flush]
+  mov  rcx, rbx
+  call [rbx + FP_Close]
+  mov  eax, 1
+  WINEPILOGUE
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+.fail_close:
+  mov  rcx, rbx
+  call [rbx + FP_Close]
+.fail:
+  xor  eax, eax
+  WINEPILOGUE
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+
+; rt_image_ui() — asmrun --image with no operating system: the "image> "
+; prompt line on the screen (image.asm's img_console); each picture fills the
+; screen until a key.
+rt_image_ui:
+  jmp  img_console
 
 ; efi_mp() -> rax = EFI_MP_SERVICES_PROTOCOL* or 0 (looked up once).
 efi_mp:
@@ -1597,6 +2628,7 @@ pool_ap_entry:
   mov  [rax + r12*8], r8
   ldmxcsr [rel k_mxcsr_init]
   call efi_cpu_perf            ; this core at its highest performance level
+  call efi_pmu_enable          ; and its fixed counters
   lea  rax, [rel g_ap_stack_top]
   mov  rsp, [rax + r12*8]      ; own stack (16-byte aligned top)
   lock inc qword [rel g_ap_ready]
@@ -1654,8 +2686,25 @@ g_rs:           dq 0           ; EFI_RUNTIME_SERVICES*
 g_conout:       dq 0           ; EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*
 g_conin:        dq 0           ; EFI_SIMPLE_TEXT_INPUT_PROTOCOL*
 g_root:         dq 0           ; EFI_FILE_PROTOCOL* of the boot volume's root
+g_temp_n:       dq 0           ; cores with a temperature reading (0: no sensors)
+g_temp_tjmax:   dq 0
+g_temp_pkg:     dq -1
+g_temp_c:       dq -1, -1, -1, -1, -1, -1, -1, -1
 g_mp:           dq 0           ; EFI_MP_SERVICES_PROTOCOL* or 0
 g_mp_tried:     dq 0           ; 1 once LocateProtocol has been asked
+g_gop:          dq 0           ; EFI_GRAPHICS_OUTPUT_PROTOCOL* (rt_view_show)
+g_model_file:   dq 0           ; the model file while its tensors are read (rt_model_open .. rt_model_done)
+g_model_size:   dq 0           ; all parts together
+g_model_read:   dq 0           ; tensor bytes read so far (the dots)
+g_model_t0:     dq 0
+g_part_n:       dq 0           ; the model's parts (rt_model_open .. rt_model_done)
+g_part_cur:     dq 0           ; the part a piece is being read from
+g_part_file:    times EFI_PARTS_MAX dq 0 ; EFI_FILE_PROTOCOL* per part
+g_part_start:   times EFI_PARTS_MAX dq 0 ; the part's first byte in the whole model
+g_part_size:    times EFI_PARTS_MAX dq 0
+g_read_quiet:   dq 0           ; 1: efi_read_all prints no progress of its own
+g_view_scr:     dq 0           ; the screen-sized BGRX buffer rt_view_show blits
+g_view_scr_px:  dq 0           ; its size in pixels
 g_tsc_hz:       dq 1           ; TSC ticks per second (measured at start)
 g_last_status:  dq 0           ; status of the last efi_open
 g_exit_code:    dq 0
@@ -1694,6 +2743,11 @@ g_ap_fw_cr4:    times MAX_THREADS dq 0  ; per tid: the firmware's CR4 on that pr
 g_ap_fw_xcr0:   times MAX_THREADS dq 0  ; per tid: its XCR0
 
 g_path:         times EFI_PATH_CHARS dw 0
+g_part_path:    times EFI_PATH_CHARS dw 0  ; "<model path>.N" while the parts are opened
+g_menu_name:    times (EFI_MENU_MAX * EFI_MENU_NAME) dw 0 ; rt_pick_model: the names (256 bytes each)
+g_menu_size:    times EFI_MENU_MAX dq 0    ; per entry: bytes (a model's parts added in)
+g_menu_kind:    times EFI_MENU_MAX dq 0    ; per entry: 0 a model, 1 a part
+g_menu_utf8:    times 256 db 0             ; a name for printing
 g_finfo:        times EFI_FINFO_BYTES db 0
 g_outbuf:       times (EFI_OUT_CHARS + 2) dw 0
 g_line_buf:     times EFI_LINE_BYTES db 0  ; rt_read_stdin's line
@@ -1715,6 +2769,10 @@ e_guid_mp:                     ; EFI_MP_SERVICES_PROTOCOL 3FDDA605-A76E-4F46-AD2
   dd 0x3FDDA605
   dw 0xA76E, 0x4F46
   db 0xAD, 0x29, 0x12, 0xF4, 0x53, 0x1B, 0x3D, 0x08
+e_guid_gop:                    ; EFI_GRAPHICS_OUTPUT_PROTOCOL 9042A9DE-23DC-4A38-96FB-7ADED080516A
+  dd 0x9042A9DE
+  dw 0x23DC, 0x4A38
+  db 0x96, 0xFB, 0x7A, 0xDE, 0xD0, 0x80, 0x51, 0x6A
 
 e_w_cfg:        dw __utf16__("asmrun.cfg"), 0
 e_w_prog:       dw __utf16__("asmrun "), 0
@@ -1742,6 +2800,18 @@ e_s_nocfg:      db "asmrun: no asmrun.cfg on the boot volume: using \model.gguf 
 e_s_args:       db "asmrun: args: ", 0
 e_s_reading:    db "asmrun: reading ", 0
 e_s_mb:         db " MB from the boot volume ", 0
+e_s_mb_tensors: db " MB from the boot volume, a tensor at a time ", 0
+e_w_gguf:       dw __utf16__(".gguf"), 0
+e_s_menu:       db "asmrun: models on the boot volume:", 10, 0
+e_s_menu_sp:    db "  ", 0
+e_s_menu_paren: db ") ", 0
+e_s_menu_gb1:   db "  (", 0
+e_s_dot_c:      db ".", 0
+e_s_menu_gb2:   db " GB)", 10, 0
+e_s_menu_ask:   db "asmrun: model number: ", 0
+e_s_menu_none:  db "asmrun: no .gguf file on the boot volume", 10, 0
+e_s_parts1:     db "asmrun: the model is in ", 0
+e_s_parts2:     db " files (FAT32 holds 4 GiB per file)", 10, 0
 e_s_dot:        db "."
 e_s_done:       db " done, ", 0
 e_s_mbs_nl:     db " MB/s", 10, 0
@@ -1766,11 +2836,16 @@ e_err_openvol:      db "OpenVolume failed", 0
 e_err_getinfo:      db "GetInfo(EFI_FILE_INFO) failed", 0
 e_err_alloc:        db "AllocatePages failed (out of memory)", 0
 e_err_read:         db "file read failed", 0
+e_err_seek:         db "file seek (SetPosition) failed", 0
+e_err_tensor_range: db "a tensor lies beyond the end of the model file", 0
 e_err_short:        db "file read ended before the end of the file", 0
 e_err_mpcount:      db "GetNumberOfProcessors failed", 0
 e_err_whoami:       db "WhoAmI failed", 0
 e_s_apfail:         db "the firmware would not start an application processor; running with the processors started so far", 0
 e_err_apstart:      db "the application processors did not start running the pool", 0
 e_err_apnoavx:      db "an application processor could not enable AVX state (XSAVE/AVX missing on that core)", 0
+e_err_gop:          db "no EFI_GRAPHICS_OUTPUT_PROTOCOL: the picture cannot be shown", 0
+e_s_nowrite:        db "asmrun: the USB build does not write files (-o): the picture is shown on the screen", 10, 0
+e_err_blt:          db "drawing the picture (GOP Blt) failed", 0
 
 section .text

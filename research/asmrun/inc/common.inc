@@ -11,8 +11,11 @@
 ; GGML tensor types this runner understands. Any other type is fatal at load.
 GGML_F32   equ 0
 GGML_F16   equ 1
+GGML_Q8_0  equ 8
 GGML_Q4_K  equ 12
+GGML_Q5_K  equ 13
 GGML_Q6_K  equ 14
+Q80_BYTES  equ 34          ; f16 d; i8 qs[32]
 
 ; GGUF scalar value types (used by the parser).
 GGUF_U8 equ 0
@@ -29,9 +32,14 @@ GGUF_U64 equ 10
 GGUF_I64 equ 11
 GGUF_F64 equ 12
 
+; general.architecture values gguf_open accepts
+ARCH_QWEN3  equ 0
+ARCH_QWEN35 equ 1
+
 ; Quantized block geometry (llama.cpp ggml-common.h).
 QK_K        equ 256        ; values per super-block (Q4_K, Q6_K)
 Q4K_BYTES   equ 144        ; f16 d; f16 dmin; u8 scales[12]; u8 qs[128]
+Q5K_BYTES   equ 176        ; f16 d; f16 dmin; u8 scales[12]; u8 qh[32]; u8 qs[128]
 Q6K_BYTES   equ 210        ; u8 ql[128]; u8 qh[64]; i8 scales[16]; f16 d
 
 ; ---------------------------------------------------------------------------
@@ -102,6 +110,7 @@ struc Model
   .kv_dim:        resq 1   ; n_head_kv * head_dim
   .kcache:        resq 1   ; -> f32[ n_layer ][ n_ctx ][ kv_dim ]
   .vcache:        resq 1   ; -> f32[ n_layer ][ n_ctx ][ kv_dim ]
+  .arch:          resq 1   ; ARCH_QWEN3 (the Layer records above) or ARCH_QWEN35 (q35.asm resolves its own)
 endstruc
 
 ; One matrix-vector multiply, split across threads by row range.
@@ -110,17 +119,39 @@ endstruc
 ; xsum16 holds sum(x) over each 16-value sub-block (needed by Q6_K offsets).
 ; A caller fills xsum32/xsum16 once per x with k_sum32 / k_sum16 (or 0 if the
 ; weight type does not need them).
+; One job may hold up to MATVEC_SEGS matrices that share x (q, k, v of a layer;
+; gate and up): their rows form one row space the threads claim from, so the
+; pool synchronises once instead of once per matrix. Segment s holds rows
+; [cum[s-1], cum[s]) of that space (cum[-1] = 0), its output at out[s].
+MATVEC_SEGS equ 4
 struc MatvecJob
-  .w:       resq 1   ; -> Tensor
+  .w:       resq 1   ; -> Tensor (segment 0)
   .x:       resq 1   ; -> f32[ cols ]
-  .out:     resq 1   ; -> f32[ rows ]
+  .out:     resq 1   ; -> f32[ rows ] (segment 0)
   .xsum32:  resq 1   ; -> f32[ cols/32 ] or 0
   .xsum16:  resq 1   ; -> f32[ cols/16 ] or 0
-  .rows:    resq 1
+  .rows:    resq 1   ; all segments
   .cols:    resq 1
   .next:    resq 1   ; next unclaimed row (threads take .chunk rows at a time with lock xadd); reset to 0 per matvec
   .chunk:   resq 1   ; rows per claim: rows / (nthreads * MATVEC_CHUNKS_PER_THREAD), at least MATVEC_CHUNK_MIN
+  .nx:      resq 1   ; activation vectors (prompt batch): slot t of g_act_slots, out + t*rows*4 per segment
+  .nseg:    resq 1   ; segments in use (1..MATVEC_SEGS)
+  .ws:      resq MATVEC_SEGS   ; -> Tensor per segment (ws[0] = w)
+  .outs:    resq MATVEC_SEGS   ; -> f32 output per segment
+  .cum:     resq MATVEC_SEGS   ; the row space's end of each segment
 endstruc
+; One activation vector for the dot kernels: its f32 values and its int8 form
+; (k_quant_slot). g_act_slots holds ACT_SLOTS of them: a prompt batch quantises
+; token t into slot t and the matvec job dots every row with every slot.
+struc ActSlot
+  .q8:      resq 1   ; -> i8[ cols ]
+  .d8:      resq 1   ; -> f32[ cols/256 ]
+  .bsums:   resq 1   ; -> i16[ cols/16 ]
+  .bsums32: resq 1   ; -> i16[ cols/32 ]
+  .x:       resq 1   ; -> f32[ cols ] (the f32/f16 kernels read this)
+endstruc
+ACT_SLOTS equ 32     ; the largest prompt batch
+
 MATVEC_CHUNKS_PER_THREAD equ 8   ; claims per thread per matvec: the tail imbalance is at most 1/8 of a thread's share
 MATVEC_CHUNK_MIN         equ 8
 

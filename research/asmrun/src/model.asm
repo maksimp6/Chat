@@ -37,6 +37,15 @@ MODE_CPUID    equ 2
 MODE_GGUF     equ 3
 MODE_TOKENIZE equ 4
 MODE_KERNELS  equ 5
+MODE_VIEW     equ 6             ; --view FILE.bmp: show the picture (view.asm, rt_view_show)
+MODE_TESTCARD equ 7             ; --testcard: show view.asm's test card
+MODE_IMAGE    equ 8             ; --image: type a prompt, get a picture (image.asm, rt_image_ui)
+MODE_SDINFO   equ 9             ; --sdinfo FILE.gguf: list an SD-Turbo GGUF's tensors (sd.asm)
+MODE_CLIPTOK  equ 10            ; --cliptok --vocab V --merges M: the prompt's CLIP token ids (cliptok.asm)
+MODE_CLIPENC  equ 11            ; --clipenc SD.gguf --vocab V --merges M: run the text encoder (clipenc.asm)
+MODE_GEN      equ 12            ; --gen --sd S --taesd T --vocab V --merges M -p FILE -o out.bmp: one picture to a file
+MODE_KV       equ 13            ; --kv FILE.gguf: every metadata key and value (sd.asm)
+MODE_TENSOR   equ 14            ; --tensor NAME FILE.gguf: a tensor's shape and first values (sd.asm)
 
 ; f32 bit patterns used when formatting rates (no .rodata float loads needed).
 F32_1E6 equ 0x49742400          ; 1000000.0f  (nanoseconds -> milliseconds)
@@ -52,6 +61,20 @@ F32_1E9 equ 0x4E6E6B28          ; 1000000000.0f (seconds <-> nanoseconds, GB=1e9
 ; paths exist for completeness. Leaf (no external calls); saves every nonvolatile
 ; it uses and a 128-byte stack scratch for the Q4_K/Q6_K sub-block scales.
 model_dequant_row:
+  cmp  dword [rcx + Tensor.type], GGML_Q8_0
+  jne  .not_q8
+  mov  rax, [rcx + Tensor.ne0]
+  mov  r9, rax
+  shr  rax, 5
+  imul rax, rax, Q80_BYTES
+  imul rax, rdx
+  add  rax, [rcx + Tensor.data]
+  mov  rdx, rax                ; the row
+  mov  rcx, r8                 ; out
+  mov  r8, r9                  ; values
+  mov  r9d, GGML_Q8_0
+  jmp  sg_deq_row
+.not_q8:
   push rbx
   push rsi
   push rdi
@@ -75,9 +98,140 @@ model_dequant_row:
   je   .f16
   cmp  r10d, GGML_Q4_K
   je   .q4k
+  cmp  r10d, GGML_Q5_K
+  je   .q5k
   cmp  r10d, GGML_Q6_K
   je   .q6k
   jmp  .done                    ; unknown type: leave out as-is (gguf already refused it)
+
+.q5k:
+  ; Q5_K: Q4_K's block with qh[32] between the scales and qs; the value gains
+  ; 16 when its qh bit is set (chunk c: bit 2c for the low nibbles, 2c+1 for the high)
+  mov  rax, r11
+  shr  rax, 8                   ; blocks = cols / QK_K
+  mov  r13, rax
+  mov  rax, r9
+  imul rax, r13
+  imul rax, rax, Q5K_BYTES
+  add  rax, r12
+  mov  rsi, rax                 ; the block
+  xor  r14, r14
+  xor  r15, r15
+.q5blk:
+  cmp  r14, r13
+  jae  .done
+  movzx eax, word [rsi]         ; d
+  movd xmm0, eax
+  vcvtph2ps xmm0, xmm0
+  movss [rsp+64], xmm0
+  movzx eax, word [rsi+2]       ; dmin
+  movd xmm0, eax
+  vcvtph2ps xmm0, xmm0
+  movss [rsp+68], xmm0
+  lea  r8, [rsi+4]              ; scales[12]: as Q4_K
+  xor  rcx, rcx
+.q5scloop:
+  cmp  rcx, 8
+  jae  .q5scdone
+  cmp  rcx, 4
+  jae  .q5schi
+  movzx eax, byte [r8+rcx]
+  and  eax, 63
+  mov  [rsp + rcx*4], eax
+  movzx edx, byte [r8+rcx+4]
+  and  edx, 63
+  mov  [rsp+32 + rcx*4], edx
+  jmp  .q5scnext
+.q5schi:
+  movzx eax, byte [r8+rcx+4]
+  and  eax, 15
+  movzx edx, byte [r8+rcx-4]
+  shr  edx, 6
+  shl  edx, 4
+  or   eax, edx
+  mov  [rsp + rcx*4], eax
+  movzx eax, byte [r8+rcx+4]
+  shr  eax, 4
+  movzx edx, byte [r8+rcx]
+  shr  edx, 6
+  shl  edx, 4
+  or   eax, edx
+  mov  [rsp+32 + rcx*4], eax
+.q5scnext:
+  inc  rcx
+  jmp  .q5scloop
+.q5scdone:
+  lea  r9, [rsi+48]             ; qs[128]
+  xor  rcx, rcx                 ; chunk c
+.q5chunk:
+  cmp  rcx, 4
+  jae  .q5blk_next
+  mov  rax, rcx
+  shl  rax, 1
+  mov  edx, [rsp + rax*4]
+  cvtsi2ss xmm0, edx
+  mulss xmm0, [rsp+64]          ; d*sc[2c]
+  mov  edx, [rsp+32 + rax*4]
+  cvtsi2ss xmm1, edx
+  mulss xmm1, [rsp+68]          ; dmin*m[2c]
+  mov  edx, [rsp + rax*4 + 4]
+  cvtsi2ss xmm2, edx
+  mulss xmm2, [rsp+64]          ; d*sc[2c+1]
+  mov  edx, [rsp+32 + rax*4 + 4]
+  cvtsi2ss xmm3, edx
+  mulss xmm3, [rsp+68]          ; dmin*m[2c+1]
+  mov  eax, 1
+  shl  eax, cl
+  shl  eax, cl
+  mov  [rsp+72], eax            ; u1 = 1 << 2c
+  add  eax, eax
+  mov  [rsp+76], eax            ; u2 = 2 << 2c
+  mov  r8, rcx
+  shl  r8, 5
+  add  r8, r9                   ; &qs[32c]
+  mov  r11, rcx
+  shl  r11, 6
+  add  r11, r15                 ; out base = block base + 64c
+  xor  rbx, rbx
+.q5b:
+  cmp  rbx, 32
+  jae  .q5chunk_next
+  movzx eax, byte [r8+rbx]
+  movzx r10d, byte [rsi+16+rbx] ; qh[b]
+  mov  edx, eax
+  and  edx, 15
+  test r10d, dword [rsp+72]
+  jz   .q5lo
+  add  edx, 16
+.q5lo:
+  shr  eax, 4
+  test r10d, dword [rsp+76]
+  jz   .q5hi
+  add  eax, 16
+.q5hi:
+  cvtsi2ss xmm4, edx
+  mulss xmm4, xmm0
+  subss xmm4, xmm1
+  mov  r10, r11
+  add  r10, rbx
+  movss [rdi + r10*4], xmm4
+  cvtsi2ss xmm5, eax
+  mulss xmm5, xmm2
+  subss xmm5, xmm3
+  mov  r10, r11
+  add  r10, rbx
+  add  r10, 32
+  movss [rdi + r10*4], xmm5
+  inc  rbx
+  jmp  .q5b
+.q5chunk_next:
+  inc  rcx
+  jmp  .q5chunk
+.q5blk_next:
+  add  rsi, Q5K_BYTES
+  add  r15, 256
+  inc  r14
+  jmp  .q5blk
 
 .f32:
   mov  rax, r9
@@ -387,6 +541,11 @@ model_matvec:
   mov  [r9 + MatvecJob.w], rcx
   mov  [r9 + MatvecJob.x], rdx
   mov  [r9 + MatvecJob.out], r8
+  mov  qword [r9 + MatvecJob.nseg], 1
+  mov  [r9 + MatvecJob.ws], rcx
+  mov  [r9 + MatvecJob.outs], r8
+  mov  rax, [rcx + Tensor.ne1]
+  mov  [r9 + MatvecJob.cum], rax
   mov  rax, [rel g_xsum32]
   mov  [r9 + MatvecJob.xsum32], rax
   mov  rax, [rel g_xsum16]
@@ -395,7 +554,59 @@ model_matvec:
   mov  [r9 + MatvecJob.rows], rax
   mov  rax, [rcx + Tensor.ne0]  ; cols
   mov  [r9 + MatvecJob.cols], rax
+  jmp  model_matvec_run
+
+; model_matvec_multi(rcx=&Tensor*[n], rdx=&f32*[n], r8=n, r9=x) — up to
+; MATVEC_SEGS matrices with the same number of columns and the same x, as one
+; pool job: the threads claim rows from the concatenated row space, so the
+; pool synchronises once. Clobbers volatiles only.
+model_matvec_multi:
+  push rbx
+  push rsi
+  push rdi
+  WINPROLOGUE
+  lea  rbx, [rel g_mvjob]
+  mov  [rbx + MatvecJob.x], r9
+  mov  [rbx + MatvecJob.nseg], r8
+  xor  esi, esi                 ; segment
+  xor  edi, edi                 ; rows so far
+.s:
+  cmp  rsi, r8
+  jae  .filled
+  mov  rax, [rcx + rsi*8]
+  mov  [rbx + MatvecJob.ws + rsi*8], rax
+  add  rdi, [rax + Tensor.ne1]
+  mov  [rbx + MatvecJob.cum + rsi*8], rdi
+  mov  rax, [rdx + rsi*8]
+  mov  [rbx + MatvecJob.outs + rsi*8], rax
+  inc  rsi
+  jmp  .s
+.filled:
+  mov  rax, [rbx + MatvecJob.ws]
+  mov  [rbx + MatvecJob.w], rax
+  mov  rax, [rbx + MatvecJob.outs]
+  mov  [rbx + MatvecJob.out], rax
+  mov  [rbx + MatvecJob.rows], rdi
+  mov  rax, [rbx + MatvecJob.ws]
+  mov  rax, [rax + Tensor.ne0]
+  mov  [rbx + MatvecJob.cols], rax
+  mov  rax, [rel g_xsum32]
+  mov  [rbx + MatvecJob.xsum32], rax
+  mov  rax, [rel g_xsum16]
+  mov  [rbx + MatvecJob.xsum16], rax
+  WINEPILOGUE
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  WINPROLOGUE
+  lea  r9, [rel g_mvjob]
+  jmp  model_matvec_run
+
+; model_matvec_run — r9 = g_mvjob filled but for .next and .chunk; inside a
+; WINPROLOGUE frame. Sizes the chunks and runs the job on the pool.
+model_matvec_run:
   mov  qword [r9 + MatvecJob.next], 0 ; row counter the threads claim chunks from
+  mov  rax, [r9 + MatvecJob.rows]
   mov  rcx, [rel g_nthreads]
   imul rcx, rcx, MATVEC_CHUNKS_PER_THREAD
   xor  rdx, rdx
@@ -405,10 +616,85 @@ model_matvec:
   mov  rax, MATVEC_CHUNK_MIN
 .chunk_ok:
   mov  [r9 + MatvecJob.chunk], rax
+  ; the activation vectors: g_mv_nx slots; slot t's f32 values are x + t*cols*4
+  mov  rax, [rel g_mv_nx]
+  mov  [r9 + MatvecJob.nx], rax
+  mov  r8, [r9 + MatvecJob.x]
+  mov  r10, [r9 + MatvecJob.cols]
+  shl  r10, 2
+  lea  r11, [rel g_act_slots]
+  xor  ecx, ecx
+.sx:
+  cmp  rcx, rax
+  jae  .sx_done
+  mov  [r11 + ActSlot.x], r8
+  add  r8, r10
+  add  r11, ActSlot_size
+  inc  rcx
+  jmp  .sx
+.sx_done:
   lea  rcx, [rel k_matvec_job]
   lea  rdx, [rel g_mvjob]
   call pool_run
   WINEPILOGUE
+  ret
+
+; act_slots_init(rcx=maxcols, a multiple of 256) — ACT_SLOTS activation slots:
+; per slot q8[maxcols] i8, d8[maxcols/256] f32, bsums[maxcols/16] i16 and
+; bsums32[maxcols/32] i16 (each sum buffer with a spare 32 bytes: the dot
+; kernels read a whole block's sums at once). Slot 0's buffers are also
+; g_q8/g_d8/g_bsums/g_bsums32. Clobbers the volatile registers.
+act_slots_init:
+  push rbx
+  push rsi
+  push rdi
+  WINPROLOGUE
+  mov  rbx, rcx                 ; maxcols
+  xor  esi, esi                 ; slot
+.s:
+  cmp  rsi, ACT_SLOTS
+  jae  .done
+  mov  rdi, rsi
+  imul rdi, rdi, ActSlot_size
+  lea  rax, [rel g_act_slots]
+  add  rdi, rax                 ; the slot
+  mov  rcx, rbx
+  call rt_alloc
+  mov  [rdi + ActSlot.q8], rax
+  mov  rcx, rbx
+  shr  rcx, 8
+  add  rcx, 1
+  shl  rcx, 2
+  call rt_alloc
+  mov  [rdi + ActSlot.d8], rax
+  mov  rcx, rbx
+  shr  rcx, 4
+  shl  rcx, 1
+  add  rcx, 32
+  call rt_alloc
+  mov  [rdi + ActSlot.bsums], rax
+  mov  rcx, rbx
+  shr  rcx, 5
+  shl  rcx, 1
+  add  rcx, 32
+  call rt_alloc
+  mov  [rdi + ActSlot.bsums32], rax
+  inc  rsi
+  jmp  .s
+.done:
+  lea  rdi, [rel g_act_slots]
+  mov  rax, [rdi + ActSlot.q8]
+  mov  [rel g_q8], rax
+  mov  rax, [rdi + ActSlot.d8]
+  mov  [rel g_d8], rax
+  mov  rax, [rdi + ActSlot.bsums]
+  mov  [rel g_bsums], rax
+  mov  rax, [rdi + ActSlot.bsums32]
+  mov  [rel g_bsums32], rax
+  WINEPILOGUE
+  pop  rdi
+  pop  rsi
+  pop  rbx
   ret
 
 ; model_fill_sums(rcx=x f32*, rdx=n). Fills g_xsum32 (sums per 32 values) and
@@ -455,13 +741,31 @@ model_load:
 
   mov  rcx, r12
   lea  rdx, [rsp+32]
-  call rt_map_file              ; rax = view base, [rsp+32] = size
+  call rt_model_open            ; rax = the header's bytes (Windows: the whole file mapped), [rsp+32] = size
   mov  [r15 + Model.file_base], rax
   mov  rcx, [rsp+32]
   mov  [r15 + Model.file_size], rcx
 
   mov  rcx, r15
-  call gguf_open                ; fills the Model from the mapped header
+  call gguf_open                ; fills the Model from the header; rt_tensor_data gives every tensor's bytes
+  call rt_model_done            ; (no OS: the read rate; the file is closed)
+  cmp  qword [r15 + Model.arch], ARCH_QWEN35
+  jne  .qwen3
+  mov  rcx, r15                 ; Qwen3.5: its own layers, states and buffers
+  mov  rdx, r13
+  mov  r8, r14
+  call q35_setup
+  mov  rax, r15
+  WINEPILOGUE
+  pop  r15
+  pop  r14
+  pop  r13
+  pop  r12
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+.qwen3:
 
   mov  rcx, r15
   call tok_init                 ; vocab + merge tables, byte maps
@@ -479,8 +783,11 @@ model_load:
   mov  [r15 + Model.n_ctx], rax
   mov  [rel g_n_ctx], rax       ; published for k_attn_job's per-thread score stride
 
+  cmp  qword [rel g_nthreads], 0
+  jne  .pool_up                 ; a second model (the embedder) shares the pool the first one started
   mov  rcx, r14
   call pool_start               ; may lower g_nthreads (UEFI: enabled processors, a processor the firmware would not start, no MP protocol)
+.pool_up:
   mov  rax, [rel g_nthreads]    ; the pool that exists, for the summary line and the score scratch
   mov  [r15 + Model.n_threads], rax
 
@@ -578,30 +885,13 @@ model_load:
   shl  rcx, 2
   call rt_alloc
   mov  [rel g_xsum16], rax
-  ; int8 activation buffers (maxcols is a multiple of 256): q8[maxcols],
-  ; d8[maxcols/256] f32, bsums[maxcols/16] i16, bsums32[maxcols/32] i16 (each sum
-  ; buffer gets a spare 32 bytes: the dot kernels read a whole block's sums at once).
+  ; the int8 activation slots (ACT_SLOTS of them, for a prompt batch); a second
+  ; model (the embedder) uses the first one's, sized for the larger model
+  cmp  qword [rel g_act_slots], 0
+  jne  .slots_up
   mov  rcx, rbx
-  call rt_alloc
-  mov  [rel g_q8], rax
-  mov  rcx, rbx
-  shr  rcx, 8
-  add  rcx, 1
-  shl  rcx, 2
-  call rt_alloc
-  mov  [rel g_d8], rax
-  mov  rcx, rbx
-  shr  rcx, 4
-  shl  rcx, 1
-  add  rcx, 32
-  call rt_alloc
-  mov  [rel g_bsums], rax
-  mov  rcx, rbx
-  shr  rcx, 5
-  shl  rcx, 1
-  add  rcx, 32
-  call rt_alloc
-  mov  [rel g_bsums32], rax
+  call act_slots_init
+.slots_up:
 
   ; attention scores: f32[n_threads][n_ctx].
   mov  rax, [r15 + Model.n_threads]
@@ -739,20 +1029,25 @@ model_forward:
   mov  rdx, [rbx + Model.n_embd]
   call model_fill_sums
   PROF_END 0
-  ; q = Wq.xn ; k = Wk.xn ; v = Wv.xn
+  ; q = Wq.xn ; k = Wk.xn ; v = Wv.xn, as one pool job
   PROF_BEGIN
-  mov  rcx, [r14 + Layer.attn_q]
-  mov  rdx, [rel g_xn]
-  mov  r8, [rel g_q]
-  call model_matvec
-  mov  rcx, [r14 + Layer.attn_k]
-  mov  rdx, [rel g_xn]
-  mov  r8, [rel g_k]
-  call model_matvec
-  mov  rcx, [r14 + Layer.attn_v]
-  mov  rdx, [rel g_xn]
-  mov  r8, [rel g_v]
-  call model_matvec
+  lea  rcx, [rel g_mv_ws]
+  mov  rax, [r14 + Layer.attn_q]
+  mov  [rcx], rax
+  mov  rax, [r14 + Layer.attn_k]
+  mov  [rcx+8], rax
+  mov  rax, [r14 + Layer.attn_v]
+  mov  [rcx+16], rax
+  lea  rdx, [rel g_mv_outs]
+  mov  rax, [rel g_q]
+  mov  [rdx], rax
+  mov  rax, [rel g_k]
+  mov  [rdx+8], rax
+  mov  rax, [rel g_v]
+  mov  [rdx+16], rax
+  mov  r8d, 3
+  mov  r9, [rel g_xn]
+  call model_matvec_multi
   PROF_END 1
   PROF_BEGIN
 
@@ -916,16 +1211,21 @@ model_forward:
   mov  rdx, [rbx + Model.n_embd]
   call model_fill_sums
   PROF_END 0
-  ; g = Wgate.xn ; u = Wup.xn ; g = silu(g)*u
+  ; g = Wgate.xn ; u = Wup.xn (one pool job) ; g = silu(g)*u
   PROF_BEGIN
-  mov  rcx, [r14 + Layer.ffn_gate]
-  mov  rdx, [rel g_xn]
-  mov  r8, [rel g_g]
-  call model_matvec
-  mov  rcx, [r14 + Layer.ffn_up]
-  mov  rdx, [rel g_xn]
-  mov  r8, [rel g_u]
-  call model_matvec
+  lea  rcx, [rel g_mv_ws]
+  mov  rax, [r14 + Layer.ffn_gate]
+  mov  [rcx], rax
+  mov  rax, [r14 + Layer.ffn_up]
+  mov  [rcx+8], rax
+  lea  rdx, [rel g_mv_outs]
+  mov  rax, [rel g_g]
+  mov  [rdx], rax
+  mov  rax, [rel g_u]
+  mov  [rdx+8], rax
+  mov  r8d, 2
+  mov  r9, [rel g_xn]
+  call model_matvec_multi
   PROF_END 4
   PROF_BEGIN
   mov  rcx, [rel g_g]
@@ -965,6 +1265,11 @@ model_forward:
   movss xmm0, [rbx + Model.rms_eps]
   call k_rmsnorm
   PROF_END 8
+  cmp  qword [rel g_embed_only], 0
+  je   .lm_head
+  mov  rax, [rel g_xn]          ; an embedding: the normed state of this token, no word scores
+  jmp  .fwd_ret
+.lm_head:
   PROF_BEGIN
   mov  rcx, [rel g_xn]
   mov  rdx, [rbx + Model.n_embd]
@@ -978,11 +1283,75 @@ model_forward:
   PROF_END 7
 
   mov  rax, [rel g_logits]
+.fwd_ret:
   WINEPILOGUE
   pop  r15
   pop  r14
   pop  r13
   pop  r12
+  pop  rsi
+  pop  rbx
+  ret
+
+; ===========================================================================
+; model_embed_load(rcx=path utf16, rdx=n_ctx, r8=chat Model*) — the embedding
+; model (--embed FILE: Qwen3-Embedding, a Qwen3-family GGUF) as a second model
+; beside a Qwen3.5 chat model. It takes the Qwen3 path's scratch buffers for
+; itself, shares the pool and the activation slots, keeps its own tokenizer
+; tables (swapped in around every embedding by api.asm), and leaves the chat
+; model's weight-bytes statistic alone. g_embed_model = 0 when it cannot be
+; loaded beside this chat model.
+; ===========================================================================
+model_embed_load:
+  push rbx
+  push rsi
+  push rdi
+  WINPROLOGUE
+  mov  rbx, rcx
+  mov  rsi, rdx
+  cmp  qword [r8 + Model.arch], ARCH_QWEN35
+  jne  .not_beside              ; a Qwen3-family chat model owns the Qwen3 path's buffers
+  lea  rcx, [rel g_tok_main]    ; the chat model's tokenizer tables
+  lea  rdx, [rel g_tok_ready]
+  mov  r8d, TOK_STATE_BYTES
+  call rt_memcpy
+  mov  rdi, [rel g_weight_bytes]
+  mov  qword [rel g_tok_ready], 0 ; tok_init builds the embedder's own tables (it returns early on built ones)
+  mov  rcx, rbx
+  mov  rdx, rsi
+  mov  r8, [rel g_nthreads]
+  call model_load
+  mov  [rel g_embed_model], rax
+  mov  rcx, [rel g_weight_bytes]
+  mov  [rel g_embed_bytes], rcx
+  mov  [rel g_weight_bytes], rdi
+  lea  rcx, [rel g_tok_embed]   ; the embedder's tokenizer tables
+  lea  rdx, [rel g_tok_ready]
+  mov  r8d, TOK_STATE_BYTES
+  call rt_memcpy
+  lea  rcx, [rel g_tok_ready]   ; and the chat model's back
+  lea  rdx, [rel g_tok_main]
+  mov  r8d, TOK_STATE_BYTES
+  call rt_memcpy
+  lea  rcx, [rel s_embed_ok1]
+  call rt_err_str
+  mov  rax, [rel g_embed_model]
+  mov  rcx, [rax + Model.n_embd]
+  call rt_err_u64
+  lea  rcx, [rel s_embed_ok2]
+  call rt_err_str
+  mov  rcx, [rel g_embed_bytes]
+  shr  rcx, 20
+  call rt_err_u64
+  lea  rcx, [rel s_embed_ok3]
+  call rt_err_str
+  jmp  .ret
+.not_beside:
+  lea  rcx, [rel s_embed_no]
+  call rt_err_str
+.ret:
+  WINEPILOGUE
+  pop  rdi
   pop  rsi
   pop  rbx
   ret
@@ -1036,6 +1405,10 @@ model_emit_rate:
 ; statistics to stderr. Registers: rbx=Model*, rsi=ids, r12=n, r13=max_new,
 ; r14=pos, r15=gen count, rdi=current logits.
 model_generate:
+  cmp  qword [rcx + Model.arch], ARCH_QWEN35
+  jne  .qwen3
+  jmp  q35_generate             ; the same arguments; the conversation continues across calls
+.qwen3:
   push rbx
   push rsi
   push rdi
@@ -1044,8 +1417,9 @@ model_generate:
   push r14
   push r15
   WINPROLOGUE
-  sub  rsp, 80                  ; [rsp+32]=decode scratch, [+40]=t0/prompt_ns,
-                                ; [+48]=t1/gen_ns, [+56]=next, [+64]=tend
+  sub  rsp, 96                  ; [rsp+32]=decode scratch, [+40]=t0/prompt_ns,
+                                ; [+48]=t1/gen_ns, [+56]=next, [+64]=tend,
+                                ; [+72..96) the pool counters at the start of generation
   mov  rbx, rcx
   mov  rsi, rdx
   mov  r12, r8                  ; n
@@ -1082,6 +1456,7 @@ model_generate:
 .pdone:
   call rt_now_ns
   mov  [rsp+48], rax            ; t1
+  call pool_counters_reset      ; the waste metric counts from here
 
   xor  r15, r15                 ; generated count
   test r12, r12
@@ -1095,7 +1470,7 @@ model_generate:
   PROF_BEGIN
   mov  rcx, rdi
   mov  rdx, [rbx + Model.n_vocab]
-  call k_argmax
+  call k_sample
   mov  [rsp+56], rax            ; next token
   PROF_END 9                    ; (clobbers rax: the token is reloaded)
   mov  rcx, [rsp+56]
@@ -1208,6 +1583,12 @@ model_generate:
   mov  rdx, 1
   call rt_err
 
+  ; the waste metric for the generation phase
+  mov  rcx, r15
+  mov  rdx, [rsp+48]
+  call rt_waste_line
+  call rt_log_flush             ; this turn (prompt, answer, statistics) to dialog.txt
+
   WINEPILOGUE
   pop  r15
   pop  r14
@@ -1228,6 +1609,10 @@ main_print_summary:
   WINPROLOGUE
   mov  rbx, rcx
   lea  rcx, [rel s_sum1]
+  cmp  qword [rbx + Model.arch], ARCH_QWEN35
+  jne  .sum_arch
+  lea  rcx, [rel s_sum1_35]
+.sum_arch:
   call rt_err_str
   mov  rcx, [rbx + Model.n_layer]
   call rt_err_u64
@@ -1360,7 +1745,147 @@ main:
   call rt_wcmp_ascii
   test rax, rax
   jz   .opt_chat
-  ; positional argument: the first one is the GGUF path
+  mov  rcx, r15
+  lea  rdx, [rel f_view]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_view
+  mov  rcx, r15
+  lea  rdx, [rel f_testcard]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_testcard
+  mov  rcx, r15
+  lea  rdx, [rel f_image]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_image
+  mov  rcx, r15
+  lea  rdx, [rel f_sdinfo]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_sdinfo
+  mov  rcx, r15
+  lea  rdx, [rel f_cliptok]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_cliptok
+  mov  rcx, r15
+  lea  rdx, [rel f_clipenc]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_clipenc
+  mov  rcx, r15
+  lea  rdx, [rel f_vocab]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_vocab
+  mov  rcx, r15
+  lea  rdx, [rel f_merges]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_merges
+  mov  rcx, r15
+  lea  rdx, [rel f_sd]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_sd
+  mov  rcx, r15
+  lea  rdx, [rel f_taesd]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_taesd
+  mov  rcx, r15
+  lea  rdx, [rel f_seed]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_seed
+  mov  rcx, r15
+  lea  rdx, [rel f_vpred]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_vpred
+  mov  rcx, r15
+  lea  rdx, [rel f_o]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_o
+  mov  rcx, r15
+  lea  rdx, [rel f_gen]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_gen
+  mov  rcx, r15
+  lea  rdx, [rel f_kv]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_kv
+  mov  rcx, r15
+  lea  rdx, [rel f_tensor]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_tensor
+  mov  rcx, r15
+  lea  rdx, [rel f_bus]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_bus
+  mov  rcx, r15
+  lea  rdx, [rel f_trace]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_trace
+  mov  rcx, r15
+  lea  rdx, [rel f_temp]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_temp
+  mov  rcx, r15
+  lea  rdx, [rel f_top_p]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_top_p
+  mov  rcx, r15
+  lea  rdx, [rel f_top_k]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_top_k
+  mov  rcx, r15
+  lea  rdx, [rel f_system]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_system
+  mov  rcx, r15
+  lea  rdx, [rel f_no_tools]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_no_tools
+  mov  rcx, r15
+  lea  rdx, [rel f_http]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_http
+  mov  rcx, r15
+  lea  rdx, [rel f_ip]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_ip
+  mov  rcx, r15
+  lea  rdx, [rel f_mask]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_mask
+  mov  rcx, r15
+  lea  rdx, [rel f_gw]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_gw
+  mov  rcx, r15
+  lea  rdx, [rel f_embed]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_embed
+  ; positional argument: the first one is the GGUF path (with --view, the picture)
   test rsi, rsi
   jnz  .arg_next
   mov  rsi, r15
@@ -1417,6 +1942,183 @@ main:
 .opt_chat:
   mov  qword [rsp+120], 1
   jmp  .arg_next
+.opt_view:
+  mov  r14d, MODE_VIEW
+  jmp  .arg_next
+.opt_testcard:
+  mov  r14d, MODE_TESTCARD
+  jmp  .arg_next
+.opt_image:
+  mov  r14d, MODE_IMAGE
+  jmp  .arg_next
+.opt_sdinfo:
+  mov  r14d, MODE_SDINFO
+  jmp  .arg_next
+.opt_cliptok:
+  mov  r14d, MODE_CLIPTOK
+  jmp  .arg_next
+.opt_clipenc:
+  mov  r14d, MODE_CLIPENC
+  jmp  .arg_next
+.opt_vocab:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rax, [rbx + r13*8]
+  mov  [rel g_ct_vocab_path], rax
+  jmp  .arg_next
+.opt_merges:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rax, [rbx + r13*8]
+  mov  [rel g_ct_merges_path], rax
+  jmp  .arg_next
+.opt_sd:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rax, [rbx + r13*8]
+  mov  [rel g_img_sd_path], rax
+  jmp  .arg_next
+.opt_taesd:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rax, [rbx + r13*8]
+  mov  [rel g_img_taesd_path], rax
+  jmp  .arg_next
+.opt_seed:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  call rt_watoi
+  mov  [rel g_img_seed], rax
+  jmp  .arg_next
+.opt_vpred:
+  mov  qword [rel g_img_vpred], 1
+  jmp  .arg_next
+.opt_o:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rax, [rbx + r13*8]
+  mov  [rel g_img_out_path], rax
+  jmp  .arg_next
+.opt_gen:
+  mov  r14d, MODE_GEN
+  jmp  .arg_next
+.opt_kv:
+  mov  r14d, MODE_KV
+  jmp  .arg_next
+.opt_trace:
+  mov  qword [rel g35_trace], 1
+  jmp  .arg_next
+.opt_no_tools:
+  mov  qword [rel g_tools_off], 1
+  jmp  .arg_next
+.opt_http:                     ; --http PORT: prompts from the network; the loop goes on like -i
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  call rt_watoi
+  mov  [rel g_http_port], rax
+  mov  qword [rsp+112], 1
+  jmp  .arg_next
+.opt_ip:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  call http_wparse_ip
+  mov  [rel g_http_ip], eax
+  jmp  .arg_next
+.opt_mask:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  call http_wparse_ip
+  mov  [rel g_http_mask], eax
+  jmp  .arg_next
+.opt_gw:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  call http_wparse_ip
+  mov  [rel g_http_gw], eax
+  jmp  .arg_next
+.opt_embed:                    ; --embed FILE: the embedding model, loaded after the chat model
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  mov  [rel g_embed_path], rcx
+  jmp  .arg_next
+.opt_temp:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  call q35_parse_f32w
+  vmovss [rel g_temp], xmm0
+  jmp  .arg_next
+.opt_top_p:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  call q35_parse_f32w
+  vmovss [rel g_top_p], xmm0
+  jmp  .arg_next
+.opt_top_k:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  call rt_watoi
+  mov  [rel g_top_k], rax
+  jmp  .arg_next
+.opt_system:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  lea  rdx, [rel g_system_len]
+  call rt_read_file            ; the system prompt's text (UTF-8); a missing file is fatal
+  mov  [rel g_system_text], rax
+  ; without its trailing line ends
+.sys_trim:
+  mov  rcx, [rel g_system_len]
+  test rcx, rcx
+  jz   .arg_next
+  mov  dl, [rax + rcx - 1]
+  cmp  dl, 10
+  je   .sys_cut
+  cmp  dl, 13
+  jne  .arg_next
+.sys_cut:
+  dec  qword [rel g_system_len]
+  jmp  .sys_trim
+.opt_bus:
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rcx, [rbx + r13*8]
+  call q35_parse_f32w
+  vmovss [rel g_bus_gbps], xmm0
+  jmp  .arg_next
+.opt_tensor:
+  mov  r14d, MODE_TENSOR
+  inc  r13
+  cmp  r13, r12
+  jae  .argdone
+  mov  rax, [rbx + r13*8]
+  mov  [rel g_tensor_name_w], rax ; the name, UTF-16; made UTF-8 at dispatch
+  jmp  .arg_next
 .arg_next:
   inc  r13
   jmp  .argloop
@@ -1449,7 +2151,247 @@ main:
   call rt_err
   jmp  .ret0
 .not_cpuid:
-  ; every remaining mode needs the GGUF path
+  ; --image: the prompt box (Windows) or prompt line (no OS), a picture per prompt
+  cmp  r14d, MODE_IMAGE
+  jne  .not_image
+  call rt_cpuid_check
+  mov  rcx, [rsp+48]
+  call pool_start
+  call rt_image_ui
+  jmp  .ret0
+.not_image:
+  ; --gen: one picture of the prompt (-p FILE or stdin) into -o FILE (BMP)
+  cmp  r14d, MODE_GEN
+  jne  .not_gen
+  cmp  qword [rel g_img_out_path], 0
+  je   .gen_usage
+  call rt_cpuid_check
+  mov  rcx, [rsp+48]
+  call pool_start
+  test rdi, rdi
+  jz   .gen_stdin
+  mov  rcx, rdi
+  lea  rdx, [rsp+72]
+  call rt_read_file
+  jmp  .gen_text
+.gen_stdin:
+  lea  rcx, [rsp+72]
+  call rt_read_stdin
+.gen_text:
+  mov  rcx, rax
+  mov  rdx, [rsp+72]
+  call img_generate
+  test rax, rax
+  jz   .gen_none
+  mov  rcx, [rel g_img_out_path]
+  mov  rdx, rax
+  mov  r8d, IMG_SIDE
+  mov  r9d, IMG_SIDE
+  call img_write               ; PNG or BMP by the extension
+  test rax, rax
+  jz   .gen_nowrite
+  lea  rcx, [rel s_gen_wrote]
+  call rt_err_str
+  jmp  .ret0
+.gen_none:
+  mov  eax, 1
+  jmp  .retcode
+.gen_nowrite:
+  lea  rcx, [rel s_gen_nowrite]
+  call rt_fatal
+.gen_usage:
+  lea  rcx, [rel m_usage]
+  call rt_fatal
+.not_gen:
+  ; --testcard: the viewer with view.asm's test card (no model, no file)
+  cmp  r14d, MODE_TESTCARD
+  jne  .not_card
+  call view_testcard
+  mov  rcx, rax
+  mov  edx, VIEW_CARD
+  mov  r8d, VIEW_CARD
+  call rt_view_show
+  jmp  .ret0
+.not_card:
+  ; --view FILE.bmp: the viewer with a picture from a file
+  cmp  r14d, MODE_VIEW
+  jne  .not_view
+  test rsi, rsi
+  jnz  .view_file
+  lea  rcx, [rel m_usage]
+  call rt_fatal
+.view_file:
+  mov  rcx, rsi
+  call view_load_bmp           ; rax = pixels, rdx = w, r8 = h
+  mov  rcx, rax
+  call rt_view_show
+  jmp  .ret0
+.not_view:
+  ; --sdinfo FILE.gguf: the SD-Turbo weights' tensor table
+  cmp  r14d, MODE_SDINFO
+  jne  .not_sdinfo
+  test rsi, rsi
+  jnz  .sdinfo_file
+  lea  rcx, [rel m_usage]
+  call rt_fatal
+.sdinfo_file:
+  mov  rcx, rsi
+  call sd_index
+  call sd_list
+  jmp  .ret0
+.not_sdinfo:
+  ; --kv FILE.gguf / --tensor NAME FILE.gguf: the metadata, or one tensor's values
+  cmp  r14d, MODE_KV
+  je   .kvmode
+  cmp  r14d, MODE_TENSOR
+  jne  .not_kvt
+.kvmode:
+  test rsi, rsi
+  jnz  .kvt_file
+  lea  rcx, [rel m_usage]
+  call rt_fatal
+.kvt_file:
+  mov  rcx, rsi
+  call sd_index
+  cmp  r14d, MODE_KV
+  jne  .tensormode
+  call sd_kv
+  jmp  .ret0
+.tensormode:
+  mov  rcx, [rel g_tensor_name_w]
+  test rcx, rcx
+  jz   .kvmode_usage
+  lea  rdx, [rel g_tensor_name]
+  mov  r8d, 255
+  call rt_utf16_to_utf8
+  lea  rcx, [rel g_tensor_name]
+  mov  byte [rcx + rax], 0
+  call sd_tensor_dump
+  jmp  .ret0
+.kvmode_usage:
+  lea  rcx, [rel m_usage]
+  call rt_fatal
+.not_kvt:
+  ; --cliptok --vocab V --merges M [-p FILE]: the prompt (FILE or stdin) as CLIP ids
+  cmp  r14d, MODE_CLIPENC
+  je   .clipenc
+  cmp  r14d, MODE_CLIPTOK
+  jne  .not_cliptok
+  cmp  qword [rel g_ct_vocab_path], 0
+  je   .cliptok_usage
+  cmp  qword [rel g_ct_merges_path], 0
+  je   .cliptok_usage
+  mov  rcx, [rel g_ct_vocab_path]
+  mov  rdx, [rel g_ct_merges_path]
+  call ct_load
+  test rdi, rdi
+  jz   .ct_stdin
+  mov  rcx, rdi
+  lea  rdx, [rsp+72]
+  call rt_read_file
+  jmp  .ct_text
+.ct_stdin:
+  lea  rcx, [rsp+72]
+  call rt_read_stdin
+.ct_text:
+  mov  rcx, rax
+  mov  rdx, [rsp+72]
+  lea  r8, [rel g_ct_ids]
+  call ct_encode
+  mov  [rsp+88], rax           ; ids before the padding
+  lea  rcx, [rel s_ct_count]
+  call rt_out_str
+  mov  rcx, [rsp+88]
+  call rt_out_u64
+  lea  rcx, [rel s_ct_ids]
+  call rt_out_str
+  mov  qword [rsp+80], 0
+.ct_ids:
+  mov  rax, [rsp+80]
+  cmp  rax, [rsp+88]
+  jae  .ct_end
+  lea  rcx, [rel g_ct_ids]
+  mov  ecx, [rcx + rax*4]
+  call rt_out_u64
+  lea  rcx, [rel s_ct_sp]
+  call rt_out_str
+  inc  qword [rsp+80]
+  jmp  .ct_ids
+.ct_end:
+  lea  rcx, [rel s_nl]
+  mov  rdx, 1
+  call rt_out
+  jmp  .ret0
+.cliptok_usage:
+  lea  rcx, [rel m_usage]
+  call rt_fatal
+.clipenc:
+  ; --clipenc SD.gguf --vocab V --merges M [-p FILE]: tokens, then the 23 layers
+  ; on every core; the time and the context's statistics to stderr
+  test rsi, rsi
+  jz   .cliptok_usage
+  cmp  qword [rel g_ct_vocab_path], 0
+  je   .cliptok_usage
+  cmp  qword [rel g_ct_merges_path], 0
+  je   .cliptok_usage
+  call rt_cpuid_check
+  mov  rcx, [rsp+48]
+  call pool_start
+  mov  rcx, rsi
+  call sd_index
+  mov  rcx, [rel g_ct_vocab_path]
+  mov  rdx, [rel g_ct_merges_path]
+  call ct_load
+  test rdi, rdi
+  jz   .ce_stdin
+  mov  rcx, rdi
+  lea  rdx, [rsp+72]
+  call rt_read_file
+  jmp  .ce_text
+.ce_stdin:
+  lea  rcx, [rsp+72]
+  call rt_read_stdin
+.ce_text:
+  mov  rcx, rax
+  mov  rdx, [rsp+72]
+  lea  r8, [rel g_ct_ids]
+  call ct_encode
+  mov  [rsp+88], rax           ; rt_err_str clobbers rax
+  lea  rcx, [rel s_ct_count]
+  call rt_err_str
+  mov  rcx, [rsp+88]
+  call rt_err_u64
+  lea  rcx, [rel s_nl]
+  mov  rdx, 1
+  call rt_err
+  call ce_load
+  lea  rcx, [rel g_ct_ids]
+  call ce_check                ; the matmul kernel against a scalar reference
+  call rt_now_ns
+  mov  [rsp+96], rax
+  lea  rcx, [rel g_ct_ids]
+  call ce_forward
+  mov  [rsp+56], rax
+  call rt_now_ns
+  mov  [rsp+104], rax
+  lea  rcx, [rel s_ce_ms]
+  call rt_err_str
+  mov  rdx, [rsp+104]
+  sub  rdx, [rsp+96]
+  call model_emit_ms
+  lea  rcx, [rel s_nl]
+  mov  rdx, 1
+  call rt_err
+  mov  rcx, [rsp+56]
+  call ce_stats
+  jmp  .ret0
+.not_cliptok:
+  ; every remaining mode needs the GGUF path; without one the USB build offers
+  ; the .gguf files on the boot volume as a numbered list (Windows: usage)
+  test rsi, rsi
+  jnz  .have_path
+  call rt_pick_model
+  mov  rsi, rax
   test rsi, rsi
   jnz  .have_path
   lea  rcx, [rel m_usage]
@@ -1463,6 +2405,13 @@ main:
   mov  r8, [rsp+48]
   call model_load
   mov  [rsp+56], rax
+  mov  rcx, [rel g_embed_path]
+  test rcx, rcx
+  jz   .no_embed
+  mov  rdx, [rsp+40]            ; the same context as the chat model (k_attn_job's score stride is shared)
+  mov  r8, rax
+  call model_embed_load
+.no_embed:
   call rt_now_ns
   mov  [rsp+104], rax
 
@@ -1485,6 +2434,7 @@ main:
   jmp  .ret0
 .not_kern:
   ; default: summary + load time, read the prompt, encode, generate
+  mov  qword [rel g_log_tee], 1 ; from here the screen is copied into dialog.txt (every model)
   mov  rcx, [rsp+56]
   call main_print_summary
   lea  rcx, [rel s_loadms]
@@ -1505,14 +2455,25 @@ main:
   mov  [rsp+64], rax
   jmp  .have_prompt
 .stdin:
+  cmp  qword [rel g_http_port], 0
+  je   .console
+  lea  rcx, [rsp+72]
+  call http_wait_prompt         ; --http: the previous answer goes out, the next POST's body comes in
+  test rax, rax
+  jz   .stdin                   ; the server could not start: g_http_port is 0 now, the console it is
+  mov  [rsp+64], rax
+  jmp  .have_prompt
+.console:
   cmp  qword [rsp+112], 0
   je   .readin
   lea  rcx, [rel s_prompt_mark] ; -i: a prompt marker before reading the line
   call rt_out_str
 .readin:
+  mov  qword [rel g_log_tee], 0 ; the console's echo of the typed line is not teed
   lea  rcx, [rsp+72]
   call rt_read_stdin
   mov  [rsp+64], rax
+  mov  qword [rel g_log_tee], 1
   ; strip one trailing CR/LF pair: "\n", "\r\n" or a lone "\r"
   mov  rax, [rsp+64]
   mov  rdx, [rsp+72]
@@ -1541,9 +2502,31 @@ main:
   cmp  qword [rsp+112], 0
   jne  .ret0                    ; -i: an empty line (or Esc) ends the session
 .nonempty:
-  ; ids buffer = (len+64) u32 (text tokens <= byte length; chat adds a few control ids)
+  ; the prompt's text to dialog.txt (the "> " mark, the answer and the statistics
+  ; reach it from the screen output; the typed line is not teed, see .readin)
+  mov  rcx, [rsp+64]
+  mov  rdx, [rsp+72]
+  call rt_log_add
+  lea  rcx, [rel s_nl]
+  mov  edx, 1
+  call rt_log_add
+  ; an Ollama chat request (api.asm) brings its own ids: the rendered dialog's
+  ; new tail, after a state reset when the dialog is a different one
+  cmp  qword [rel g_api_nids], 0
+  je   .own_ids
+  cmp  qword [rel g_api_reset], 0
+  je   .api_ids
+  call q35_reset
+.api_ids:
+  mov  rax, [rel g_api_ids]
+  mov  [rsp+80], rax
+  mov  rax, [rel g_api_nids]
+  jmp  .enc_done
+.own_ids:
+  ; ids buffer = (len + system len + 64) u32 (text tokens <= byte length; chat adds a few control ids)
   mov  rcx, [rsp+72]
-  add  rcx, 64
+  add  rcx, [rel g_system_len]
+  add  rcx, TL_SYS_LEN + 64     ; (the tools block opens a Qwen3.5 conversation)
   shl  rcx, 2
   call rt_alloc
   mov  [rsp+80], rax
@@ -1551,9 +2534,16 @@ main:
   mov  rdx, [rsp+72]
   mov  r8, [rsp+80]
   mov  r9, [rsp+72]
-  add  r9, 64
+  add  r9, [rel g_system_len]
+  add  r9, TL_SYS_LEN + 64      ; the capacity: the same as the allocation
   cmp  qword [rsp+120], 0
   je   .enc_raw
+  mov  rax, [rsp+56]
+  cmp  qword [rax + Model.arch], ARCH_QWEN35
+  jne  .enc_q3
+  call q35_encode_chat          ; --chat: a ChatML turn with this file's ids, continuing the conversation
+  jmp  .enc_done
+.enc_q3:
   call tok_encode_chat          ; --chat: wrap as a Qwen3 chat turn
   jmp  .enc_done
 .enc_raw:
@@ -1595,6 +2585,7 @@ main:
   jmp  .prompt_again
 .ret0:
   xor  eax, eax
+.retcode:
   WINEPILOGUE
   pop  r15
   pop  r14
@@ -1634,6 +2625,10 @@ g_prof:         times 10 dq 0  ; PROF_END accumulators (ns per phase slot)
 
   align 8
 g_mvjob:        times (MatvecJob_size / 8) dq 0
+g_mv_nx:        dq 1                    ; activation vectors per matvec (a prompt batch sets it; 1 otherwise)
+g_act_slots:    times (ACT_SLOTS * ActSlot_size / 8) dq 0 ; the activation slots (act_slots_init)
+g_mv_ws:        times MATVEC_SEGS dq 0  ; model_matvec_multi's argument arrays
+g_mv_outs:      times MATVEC_SEGS dq 0
 g_attnjob:      times (AttnJob_size / 8) dq 0
 
 f_n:        db "-n", 0
@@ -1647,8 +2642,62 @@ f_tok:      db "--tokenize", 0
 f_kern:     db "--kernels", 0
 f_i:        db "-i", 0
 f_chat:     db "--chat", 0
+f_view:     db "--view", 0
+f_testcard: db "--testcard", 0
+f_image:    db "--image", 0
+f_sdinfo:   db "--sdinfo", 0
+f_cliptok:  db "--cliptok", 0
+f_clipenc:  db "--clipenc", 0
+f_sd:       db "--sd", 0
+f_taesd:    db "--taesd", 0
+f_seed:     db "--seed", 0
+f_vpred:    db "--vpred", 0
+f_o:        db "-o", 0
+f_gen:      db "--gen", 0
+f_kv:       db "--kv", 0
+f_bus:      db "--bus", 0
+f_trace:    db "--trace", 0
+f_temp:     db "--temp", 0
+f_top_p:    db "--top-p", 0
+f_top_k:    db "--top-k", 0
+f_system:   db "--system", 0
+f_no_tools: db "--no-tools", 0
+f_http:     db "--http", 0
+f_ip:       db "--ip", 0
+f_mask:     db "--mask", 0
+f_gw:       db "--gw", 0
+f_embed:    db "--embed", 0
+s_embed_ok1: db "asmrun: embeddings: ", 0
+s_embed_ok2: db " dims, ", 0
+s_embed_ok3: db " MB of weights (POST /api/embed)", 10, 0
+s_embed_no:  db "asmrun: embeddings: --embed needs a Qwen3.5 chat model beside it (a Qwen3-family one owns the same buffers); none loaded", 10, 0
+TOK_STATE_BYTES equ 80         ; g_tok_ready .. g_merge_slots in tokenizer.asm: ten qwords
+  align 8
+g_embed_path:   dq 0           ; --embed FILE (UTF-16), or 0
+g_embed_model:  dq 0           ; the embedding model's Model*, or 0
+g_embed_bytes:  dq 0           ; its weight bytes
+g_embed_only:   dq 0           ; 1 while model_forward returns the normed state instead of word scores
+g_tok_main:     times 80 db 0  ; the chat model's tokenizer tables (a copy of the globals)
+g_tok_embed:    times 80 db 0  ; the embedder's
+  align 8
+g_tools_off:   dq 0           ; --no-tools: no tools block in the system turn, no tool calls run
+g_system_text: dq 0           ; --system FILE: the text (UTF-8), or 0
+g_system_len:  dq 0
+s_chat_system: db "system", 10 ; the ChatML role line of the system turn
+S_CHAT_SYSTEM_LEN equ $ - s_chat_system
+f_tensor:   db "--tensor", 0
+g_tensor_name_w: dq 0
+g_tensor_name:   times 256 db 0
+s_gen_wrote: db "asmrun: the picture was written (-o)", 10, 0
+s_gen_nowrite: db "the picture could not be written to the -o file", 0
+s_ce_ms:    db "asmrun: text encoder 23 layers ms=", 0
+f_vocab:    db "--vocab", 0
+f_merges:   db "--merges", 0
+s_ct_count: db "clip_tokens=", 0
+s_ct_ids:   db " ids: ", 0
+s_ct_sp:    db " ", 0
 
-m_usage:    db "usage: asmrun <model.gguf> [-n N] [-c CTX] [-t T] [-p FILE] [-i] [--chat] [--bw|--cpuid|--gguf|--tokenize|--kernels]", 0
+m_usage:    db "usage: asmrun <model.gguf> [-n N] [-c CTX] [-t T] [-p FILE] [-i] [--chat] [--bw|--cpuid|--gguf|--tokenize|--kernels] | asmrun --image --sd <sd_turbo.gguf> --taesd <taesd.safetensors> --vocab <vocab.json> --merges <merges.txt> [--seed N] [--vpred] | asmrun --gen (the same files) -p prompt.txt -o out.bmp | asmrun --sdinfo <sd.gguf> | asmrun --cliptok --vocab <vocab.json> --merges <merges.txt> [-p FILE] | asmrun --view <picture.bmp> | asmrun --testcard", 0
 s_prompt_mark: db 10, "> ", 0
 s_err_ctx:     db "the prompt has more tokens than the context (-c); it would not fit the KV cache", 0
 s_too_long1:   db "asmrun: the prompt has ", 0
@@ -1659,6 +2708,7 @@ s_feat_cores:  db " cores=", 0
 s_loadms:      db "asmrun: load_ms=", 0
 
 s_sum1:        db "asmrun: model=qwen3 layers=", 0
+s_sum1_35:     db "asmrun: model=qwen3.5 layers=", 0
 s_sum_embd:    db " embd=", 0
 s_sum_ff:      db " ff=", 0
 s_sum_heads:   db " heads=", 0

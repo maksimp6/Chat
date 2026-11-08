@@ -1039,6 +1039,18 @@ tok_encode_chat:
   mov  rdi, rcx                ; content
   mov  r12, rdx                ; content len
   xor  esi, esi                ; ids so far
+  cmp  qword [rel g_system_len], 0 ; --system: the system turn first (this path's context is per call)
+  je   .user
+  TC_ID TOK_IM_START
+  lea  rax, [rel s_chat_system]
+  TC_ENCODE rax, S_CHAT_SYSTEM_LEN
+  mov  rax, [rel g_system_text]
+  mov  rdx, [rel g_system_len]
+  TC_ENCODE rax, rdx           ; (the macro loads rcx first, then rdx)
+  TC_ID TOK_IM_END
+  lea  rax, [rel tc_nl]
+  TC_ENCODE rax, 1
+.user:
   TC_ID TOK_IM_START
   lea  rax, [rel tc_user]
   TC_ENCODE rax, TC_USER_LEN
@@ -1076,8 +1088,17 @@ tok_decode:
   push rbx
   push rsi
   push rdi
+  mov  rax, [rel g_model]
+  mov  rax, [rax + Model.token_type_arr]
+  test rax, rax
+  jz   .by_id                  ; no token types in the file: the Qwen3 id boundary
+  cmp  dword [rax + rcx*4], 3  ; CONTROL: emits nothing
+  je   .zero
+  jmp  .typed
+.by_id:
   cmp  rcx, TOK_SPECIAL_MIN
   jae  .zero
+.typed:
   mov  rsi, [rel g_tok_ptr]
   mov  rsi, [rsi + rcx*8]      ; token byte ptr
   mov  rbx, [rel g_tok_len]

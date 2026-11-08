@@ -74,6 +74,7 @@ kc_q6_scmask:                            ; vpshufb masks: [lane 2g x8 | lane 2g+
 %assign g g+1
 %endrep
 kc_0f32:    times 32 db 0x0F     ; per-byte low-nibble mask for vpand (AVX2 memory operand)
+kc_10b:     times 32 db 0x10     ; per-byte bit-4 mask (Q5_K's qh bit shifted into place)
   align 32
 kc_3032:    times 32 db 0x30     ; per-byte bits 4-5 mask (Q6_K high bits, already shifted into place)
 
@@ -509,6 +510,7 @@ k_softmax:
 
 ; k_dot_f32_row(rcx=w f32*, rdx=x, r8=cols)
 k_dot_f32_row:
+  mov  rdx, [rdx + ActSlot.x]   ; the slot's f32 values
   vxorps ymm0, ymm0, ymm0
   xor  r10, r10
 .l:
@@ -528,6 +530,7 @@ k_dot_f32_row:
 
 ; k_dot_f16_row(rcx=w f16*, rdx=x, r8=cols)
 k_dot_f16_row:
+  mov  rdx, [rdx + ActSlot.x]   ; the slot's f32 values
   vxorps ymm0, ymm0, ymm0
   xor  r10, r10
 .l:
@@ -558,12 +561,20 @@ k_dot_f16_row:
 ; q8 bytes are identical. Uses rax, rcx, rdx, r8-r11 and ymm0-5 only.
 ; ---------------------------------------------------------------------------
 k_quant_x:
-  mov  r9, rdx
+  mov  r8, rdx
+  mov  rdx, rcx
+  lea  rcx, [rel g_act_slots]   ; slot 0: the single-token path
+; k_quant_slot(rcx=ActSlot*, rdx=x f32*, r8=n) — the same into the given slot,
+; whose .x is set to x.
+k_quant_slot:
+  mov  [rcx + ActSlot.x], rdx
+  mov  r9, r8
   shr  r9, 8                    ; nblocks = n/256 (>= 1)
-  mov  r8, [rel g_q8]           ; q8 cursor
-  mov  r10, [rel g_d8]          ; d8 cursor
-  mov  r11, [rel g_bsums]       ; bsums cursor (i16 per 16)
-  mov  rax, [rel g_bsums32]     ; bsums32 cursor (i16 per 32)
+  mov  r8, [rcx + ActSlot.q8]   ; q8 cursor
+  mov  r10, [rcx + ActSlot.d8]  ; d8 cursor
+  mov  r11, [rcx + ActSlot.bsums] ; bsums cursor (i16 per 16)
+  mov  rax, [rcx + ActSlot.bsums32] ; bsums32 cursor (i16 per 32)
+  mov  rcx, rdx                 ; x
   vmovdqa ymm4, [rel kc8_perm_q8]
 .blk:
   ; amax = max |x| over the block (two accumulators, 64 bytes per step)
@@ -677,9 +688,9 @@ k_dot_q4k_row:
   mov  rbx, rcx                 ; block cursor
   mov  r13, r8
   shr  r13, 8                   ; nblocks = cols/256 (>= 1)
-  mov  r8, [rel g_q8]           ; q8 cursor (+256 per block)
-  mov  rsi, [rel g_bsums32]     ; i16 per-32 sums cursor (+16 bytes per block)
-  mov  rbp, [rel g_d8]          ; f32 activation scale cursor (+4 per block)
+  mov  r8, [rdx + ActSlot.q8]   ; q8 cursor (+256 per block)
+  mov  rsi, [rdx + ActSlot.bsums32] ; i16 per-32 sums cursor (+16 bytes per block)
+  mov  rbp, [rdx + ActSlot.d8]  ; f32 activation scale cursor (+4 per block)
   vmovdqa ymm15, [rel kc_0f32]
   vxorps ymm13, ymm13, ymm13    ; f32 accumulator, 8 lanes (scale terms)
   vxorps xmm12, xmm12, xmm12    ; f32 accumulator, 4 lanes (min terms, subtracted)
@@ -725,6 +736,112 @@ k_dot_q4k_row:
   dec  r13
   jnz  .blk
   ; dot = hsum(acc8) + hsum(acc4)
+  vextractf128 xmm1, ymm13, 1
+  vaddps  xmm0, xmm13, xmm1
+  vaddps  xmm0, xmm0, xmm12
+  vhaddps xmm0, xmm0, xmm0
+  vhaddps xmm0, xmm0, xmm0
+  vzeroupper
+  pop  r13
+  pop  rbp
+  pop  rsi
+  pop  rbx
+  ret
+
+; ---------------------------------------------------------------------------
+; k_dot_q5k_row(rcx=w row, r8=cols) -> xmm0. Same contract as k_dot_q4k_row.
+;
+; Q5_K block (176 B = 256 values): f16 d, f16 dmin, u8 scales[12] (as Q4_K),
+; u8 qh[32], u8 qs[128]. The value is the Q4_K nibble plus 16 when its bit of
+; qh is set: chunk c's low nibbles (sub-block 2c) take bit 2c of qh[l], its
+; high nibbles (sub-block 2c+1) bit 2c+1 (ggml's u1/u2 masks). So q is 0..31
+; and the pair sums |.| <= 2*31*127 still fit i16; everything else is Q4_K's.
+; ---------------------------------------------------------------------------
+%macro Q5K_CHUNK 1            ; %1 = chunk c: qs[32c..), q8[64c..), sc[2c], sc[2c+1], qh bits 2c, 2c+1 (ymm14 = qh, ymm7 = 0x10 bytes)
+  vmovdqu ymm1, [rbx + 48 + 32*%1]
+  vpand   ymm0, ymm1, ymm15                    ; low nibbles
+  vpsrlw  ymm1, ymm1, 4
+  vpand   ymm1, ymm1, ymm15                    ; high nibbles
+  ; bit 2c of qh to bit 4 (a word shift never carries into bit 4 of the other byte here), masked
+%if %1 < 2
+  vpsllw  ymm5, ymm14, 4 - 2*%1
+%elif %1 == 2
+  vmovdqa ymm5, ymm14
+%else
+  vpsrlw  ymm5, ymm14, 2
+%endif
+  vpand   ymm5, ymm5, ymm7
+  vpor    ymm0, ymm0, ymm5                     ; + 16 where set
+  ; bit 2c+1 to bit 4
+%if %1 < 2
+  vpsllw  ymm5, ymm14, 3 - 2*%1
+%else
+  vpsrlw  ymm5, ymm14, 2*%1 - 3
+%endif
+  vpand   ymm5, ymm5, ymm7
+  vpor    ymm1, ymm1, ymm5
+  vpmaddubsw ymm0, ymm0, [r8 + 64*%1]
+  vpmaddubsw ymm1, ymm1, [r8 + 64*%1 + 32]
+  vpshufb ymm2, ymm9, [rel kc_q4_scmask + 64*%1]
+  vpshufb ymm3, ymm9, [rel kc_q4_scmask + 64*%1 + 32]
+  vpmaddwd ymm0, ymm0, ymm2
+  vpmaddwd ymm1, ymm1, ymm3
+  vpaddd  ymm0, ymm0, ymm1
+  vpaddd  ymm8, ymm8, ymm0
+%endmacro
+
+k_dot_q5k_row:
+  push rbx
+  push rsi
+  push rbp
+  push r13
+  mov  rbx, rcx
+  mov  r13, r8
+  shr  r13, 8
+  mov  r8, [rdx + ActSlot.q8]
+  mov  rsi, [rdx + ActSlot.bsums32]
+  mov  rbp, [rdx + ActSlot.d8]
+  vmovdqa ymm15, [rel kc_0f32]
+  vmovdqa ymm7, [rel kc_10b]
+  vxorps ymm13, ymm13, ymm13
+  vxorps xmm12, xmm12, xmm12
+.blk:
+  vpmovzxbw xmm0, [rbx+4]
+  vpmovzxbw xmm1, [rbx+12]
+  vpand   xmm2, xmm0, [rel kc_63w]
+  vpsrlw  xmm0, xmm0, 6
+  vpsllw  xmm0, xmm0, 4
+  vpand   xmm3, xmm1, [rel kc_15w]
+  vpsrlw  xmm1, xmm1, 4
+  vpunpcklqdq xmm3, xmm3, xmm1
+  vpor    xmm3, xmm3, xmm0
+  vpunpcklqdq xmm9, xmm2, xmm3
+  vpunpckhqdq xmm11, xmm2, xmm3
+  vinserti128 ymm9, ymm9, xmm9, 1
+  vpmaddwd xmm11, xmm11, [rsi]
+  vcvtdq2ps xmm11, xmm11
+  vbroadcastss ymm10, [rbp]
+  vpbroadcastw xmm0, [rbx+2]
+  vcvtph2ps xmm0, xmm0
+  vmulps  xmm0, xmm0, xmm10
+  vfnmadd231ps xmm12, xmm11, xmm0
+  vmovdqu ymm14, [rbx + 16]     ; qh: the high bits of the block
+  vpxor   ymm8, ymm8, ymm8
+  Q5K_CHUNK 0
+  Q5K_CHUNK 1
+  Q5K_CHUNK 2
+  Q5K_CHUNK 3
+  vcvtdq2ps ymm8, ymm8
+  vpbroadcastw xmm0, [rbx]
+  vcvtph2ps ymm0, xmm0
+  vmulps  ymm0, ymm0, ymm10
+  vfmadd231ps ymm13, ymm8, ymm0
+  add  rbx, Q5K_BYTES
+  add  r8, 256
+  add  rsi, 16
+  add  rbp, 4
+  dec  r13
+  jnz  .blk
   vextractf128 xmm1, ymm13, 1
   vaddps  xmm0, xmm13, xmm1
   vaddps  xmm0, xmm0, xmm12
@@ -800,9 +917,9 @@ k_dot_q6k_row:
   mov  rbx, rcx                 ; block cursor
   mov  r13, r8
   shr  r13, 8                   ; nblocks (>= 1)
-  mov  r8, [rel g_q8]           ; q8 cursor (+256 per block)
-  mov  rsi, [rel g_bsums]       ; i16 per-16 sums cursor (+32 bytes per block)
-  mov  rbp, [rel g_d8]          ; f32 activation scale cursor
+  mov  r8, [rdx + ActSlot.q8]   ; q8 cursor (+256 per block)
+  mov  rsi, [rdx + ActSlot.bsums] ; i16 per-16 sums cursor (+32 bytes per block)
+  mov  rbp, [rdx + ActSlot.d8]  ; f32 activation scale cursor
   vmovdqa ymm15, [rel kc_0f32]
   vmovdqa ymm14, [rel kc_3032]
   vxorps ymm13, ymm13, ymm13    ; f32 accumulator
@@ -840,6 +957,52 @@ k_dot_q6k_row:
   ret
 
 ; ===========================================================================
+; k_dot_q8_0_row(rcx=w row, r8=cols) -> xmm0 = dot(row, x) over the int8
+; activation k_quant_x prepared (g_q8, with a scale per 256 values in g_d8).
+; A Q8_0 block is an f16 scale and 32 int8; cols a multiple of 256. Per block:
+; vpmaddwd of the sign-extended weights and activations (16 i16 pairs twice),
+; the 8 i32 lane sums converted and scaled by the block's d; per 256 the lane
+; sums are reduced and scaled by the activation's d. Leaf; clobbers rax, rcx,
+; rdx, r9-r11, ymm0-ymm5.
+; ===========================================================================
+k_dot_q8_0_row:
+  mov  r9, [rdx + ActSlot.q8]
+  mov  r10, [rdx + ActSlot.d8]
+  vxorps xmm0, xmm0, xmm0
+  mov  r11, r8
+  shr  r11, 8
+.sb:
+  vxorps ymm5, ymm5, ymm5
+  mov  edx, 8
+.blk:
+  movzx eax, word [rcx]
+  vmovd xmm1, eax
+  vcvtph2ps xmm1, xmm1
+  vbroadcastss ymm1, xmm1
+  vpmovsxbw ymm2, [rcx+2]
+  vpmovsxbw ymm3, [r9]
+  vpmaddwd ymm2, ymm2, ymm3
+  vpmovsxbw ymm3, [rcx+18]
+  vpmovsxbw ymm4, [r9+16]
+  vpmaddwd ymm3, ymm3, ymm4
+  vpaddd ymm2, ymm2, ymm3
+  vcvtdq2ps ymm2, ymm2
+  vfmadd231ps ymm5, ymm2, ymm1
+  add  rcx, Q80_BYTES
+  add  r9, 32
+  dec  edx
+  jnz  .blk
+  vextractf128 xmm2, ymm5, 1
+  vaddps xmm5, xmm5, xmm2
+  vhaddps xmm5, xmm5, xmm5
+  vhaddps xmm5, xmm5, xmm5
+  vfmadd231ss xmm0, xmm5, [r10]
+  add  r10, 4
+  dec  r11
+  jnz  .sb
+  ret
+
+; ===========================================================================
 ; k_matvec_job(rcx=MatvecJob*, rdx=tid, r8=nthreads) — pool body.
 ; out[r] = dot(row r of w, x). Rows are handed out dynamically: each thread claims
 ; job.chunk consecutive rows at a time from job.next (lock xadd) until the rows
@@ -859,7 +1022,7 @@ k_matvec_job:
   push r13
   push r14
   push r15                      ; 8 pushes; entry %16==8 -> %16==8
-  sub  rsp, 216                 ; 32 shadow + 24 locals + 160 xmm6-15 save; %16: 8-8=0
+  sub  rsp, 232                 ; 32 shadow + 24 locals + 160 xmm6-15 save + 16 (segment first row); %16 == 0
   mov  r14, rcx                 ; job
   vmovdqu [rsp+56], xmm6        ; the quantised dot kernels use ymm0-15 freely; the
   vmovdqu [rsp+72], xmm7        ; low halves of xmm6-15 are callee-saved, so keep
@@ -874,35 +1037,7 @@ k_matvec_job:
   mov  [rsp+32], rdx            ; tid
   mov  [rsp+40], r8             ; nthreads
   mov  r12, [r14 + MatvecJob.x]
-  mov  r13, [r14 + MatvecJob.out]
-  mov  rbx, [r14 + MatvecJob.w] ; Tensor*
   mov  r15, [r14 + MatvecJob.cols]
-  ; --- row stride in bytes by type, into rbp ---
-  mov  eax, [rbx + Tensor.type]
-  cmp  eax, GGML_Q4_K
-  je   .q4
-  cmp  eax, GGML_Q6_K
-  je   .q6
-  cmp  eax, GGML_F16
-  je   .f16
-  ; F32
-  mov  rbp, r15
-  shl  rbp, 2
-  jmp  .run
-.f16:
-  mov  rbp, r15
-  shl  rbp, 1
-  jmp  .run
-.q4:
-  mov  rbp, r15
-  shr  rbp, 8
-  imul rbp, rbp, Q4K_BYTES
-  jmp  .run
-.q6:
-  mov  rbp, r15
-  shr  rbp, 8
-  imul rbp, rbp, Q6K_BYTES
-.run:
   ; claim the next chunk of rows: [rsi, rdi) = [old next, min(old next + CHUNK, rows))
 .grab:
   mov  rax, [r14 + MatvecJob.chunk]
@@ -913,30 +1048,109 @@ k_matvec_job:
   mov  rdi, rsi
   add  rdi, [r14 + MatvecJob.chunk]
   cmp  rdi, [r14 + MatvecJob.rows]
-  jbe  .rowloop
+  jbe  .seg
   mov  rdi, [r14 + MatvecJob.rows]
-  ; loop r in [rsi, rdi): rowptr = w.data + r*rbp (data base reloaded each row
-  ; because the dot helpers clobber the volatile regs).
+.seg:
+  ; the segment row rsi lies in: rbx = its Tensor*, r13 = its output shifted
+  ; so that out[rsi] is right, rbp = its row stride, [rsp+48] = the chunk's
+  ; end within this segment (the chunk is cut at a segment boundary)
+  xor  ecx, ecx                 ; segment index
+  xor  edx, edx                 ; its first row
+.find:
+  mov  rax, [r14 + MatvecJob.cum + rcx*8]
+  cmp  rsi, rax
+  jb   .found
+  mov  rdx, rax
+  inc  ecx
+  cmp  rcx, [r14 + MatvecJob.nseg]
+  jb   .find
+  jmp  .grab                    ; (not reached: rsi < rows = the last cum)
+.found:
+  mov  rbx, [r14 + MatvecJob.ws + rcx*8]
+  mov  r13, [r14 + MatvecJob.outs + rcx*8]
+  mov  [rsp+216], rdx           ; the segment's first row
+  shl  rdx, 2
+  sub  r13, rdx                 ; out[r] = outs[seg] + (r - first) * 4
+  mov  [rsp+48], rdi
+  cmp  rax, rdi
+  jae  .stride
+  mov  [rsp+48], rax            ; this segment ends before the chunk does
+.stride:
+  mov  eax, [rbx + Tensor.type]
+  cmp  eax, GGML_Q4_K
+  je   .q4
+  cmp  eax, GGML_Q5_K
+  je   .q5
+  cmp  eax, GGML_Q6_K
+  je   .q6
+  cmp  eax, GGML_F16
+  je   .f16
+  cmp  eax, GGML_Q8_0
+  je   .q8
+  mov  rbp, r15                 ; F32
+  shl  rbp, 2
+  jmp  .rowloop
+.q5:
+  mov  rbp, r15
+  shr  rbp, 8
+  imul rbp, rbp, Q5K_BYTES
+  jmp  .rowloop
+.f16:
+  mov  rbp, r15
+  shl  rbp, 1
+  jmp  .rowloop
+.q8:
+  mov  rbp, r15
+  shr  rbp, 5
+  imul rbp, rbp, Q80_BYTES
+  jmp  .rowloop
+.q4:
+  mov  rbp, r15
+  shr  rbp, 8
+  imul rbp, rbp, Q4K_BYTES
+  jmp  .rowloop
+.q6:
+  mov  rbp, r15
+  shr  rbp, 8
+  imul rbp, rbp, Q6K_BYTES
+  ; loop r in [rsi, segment end): rowptr = w.data + (r - first)*rbp (data base
+  ; reloaded each row because the dot helpers clobber the volatile regs).
 .rowloop:
-  cmp  rsi, rdi
-  jae  .grab
+  cmp  rsi, [rsp+48]
+  jae  .segdone
+  mov  qword [rsp+224], 0       ; activation slot t: the row is dotted with every slot
+.slot:
   mov  rax, rsi
+  sub  rax, [rsp+216]           ; the row within its segment
   imul rax, rbp
   add  rax, [rbx + Tensor.data]
   mov  rcx, rax                 ; rowptr
-  mov  rdx, r12                 ; x
+  mov  rdx, [rsp+224]
+  imul rdx, rdx, ActSlot_size
+  lea  rax, [rel g_act_slots]
+  add  rdx, rax                 ; the slot
   mov  r8, r15                  ; cols
   mov  eax, [rbx + Tensor.type]
   cmp  eax, GGML_Q4_K
   je   .d_q4
+  cmp  eax, GGML_Q5_K
+  je   .d_q5
   cmp  eax, GGML_Q6_K
   je   .d_q6
   cmp  eax, GGML_F16
   je   .d_f16
+  cmp  eax, GGML_Q8_0
+  je   .d_q8
   call k_dot_f32_row
+  jmp  .store
+.d_q5:
+  call k_dot_q5k_row
   jmp  .store
 .d_f16:
   call k_dot_f16_row
+  jmp  .store
+.d_q8:
+  call k_dot_q8_0_row
   jmp  .store
 .d_q4:
   call k_dot_q4k_row
@@ -944,10 +1158,21 @@ k_matvec_job:
 .d_q6:
   call k_dot_q6k_row
 .store:
-  movss [r13 + rsi*4], xmm0
+  mov  rax, [rsp+224]
+  imul rax, [rbx + Tensor.ne1]  ; slot t's output: outs[seg] + t * (segment rows) * 4
+  lea  rax, [r13 + rax*4]
+  movss [rax + rsi*4], xmm0
   ; cols r15, stride rbp, w rbx, x r12, out r13, chunk end rdi survive the dot calls
+  inc  qword [rsp+224]
+  mov  rax, [rsp+224]
+  cmp  rax, [r14 + MatvecJob.nx]
+  jb   .slot
   inc  rsi
   jmp  .rowloop
+.segdone:
+  cmp  rsi, rdi
+  jb   .seg                     ; the chunk goes on in the next segment
+  jmp  .grab
 .done:
   vmovdqu xmm6, [rsp+56]
   vmovdqu xmm7, [rsp+72]
@@ -959,7 +1184,7 @@ k_matvec_job:
   vmovdqu xmm13, [rsp+168]
   vmovdqu xmm14, [rsp+184]
   vmovdqu xmm15, [rsp+200]
-  add  rsp, 216
+  add  rsp, 232
   pop  r15
   pop  r14
   pop  r13
@@ -1283,7 +1508,8 @@ kernels_bench:
   mov  r8, [rsp+56]
   call model_dequant_row
   mov  rcx, [rsp+56]
-  mov  rdx, r14
+  lea  rdx, [rel g_act_slots]   ; slot 0 with x as its f32 values
+  mov  [rdx + ActSlot.x], r14
   mov  r8, r12
   call k_dot_f32_row            ; xmm0 = reference dot
   movss [rsp+64], xmm0

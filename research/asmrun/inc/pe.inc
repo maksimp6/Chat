@@ -165,13 +165,17 @@ EFI_RELOC_SIZE equ 12
   align 16
 
 %else
-; --- Import Directory Table (one descriptor for kernel32.dll + a null one) ---
+; --- Import Directory Table: kernel32.dll (console, files, memory, threads),
+; user32.dll and gdi32.dll (the picture viewer's window), then a null one ---
 import_descriptors:
   dd RVA(ilt)            ; OriginalFirstThunk (Import Lookup Table)
   dd 0                   ; TimeDateStamp
   dd 0                   ; ForwarderChain
   dd RVA(kernel32_name)  ; Name
   dd RVA(iat)            ; FirstThunk (Import Address Table)
+  dd RVA(ilt_user32), 0, 0, RVA(user32_name), RVA(iat_user32)
+  dd RVA(ilt_gdi32), 0, 0, RVA(gdi32_name), RVA(iat_gdi32)
+  dd RVA(ilt_ws2), 0, 0, RVA(ws2_name), RVA(iat_ws2)   ; the HTTP test bench (src/wsock.asm)
   dd 0, 0, 0, 0, 0       ; null terminating descriptor
 import_descriptors_size equ $ - import_descriptors
 
@@ -192,6 +196,53 @@ ilt:
   dq RVA(h_GetCommandLineW)
   dq RVA(h_GetSystemInfo)
   dq RVA(h_CreateThread)
+  dq RVA(h_SetThreadAffinityMask)
+  dq RVA(h_SetThreadPriority)
+  dq RVA(h_AddVectoredExceptionHandler)
+  dq RVA(h_RemoveVectoredExceptionHandler)
+  dq 0
+ilt_user32:
+  dq RVA(h_RegisterClassExW)
+  dq RVA(h_CreateWindowExW)
+  dq RVA(h_DefWindowProcW)
+  dq RVA(h_GetMessageW)
+  dq RVA(h_DispatchMessageW)
+  dq RVA(h_PostQuitMessage)
+  dq RVA(h_DestroyWindow)
+  dq RVA(h_BeginPaint)
+  dq RVA(h_EndPaint)
+  dq RVA(h_GetClientRect)
+  dq RVA(h_AdjustWindowRect)
+  dq RVA(h_GetSystemMetrics)
+  dq RVA(h_LoadCursorW)
+  dq RVA(h_TranslateMessage)
+  dq RVA(h_SendMessageW)
+  dq RVA(h_SetFocus)
+  dq RVA(h_MoveWindow)
+  dq RVA(h_GetWindowTextW)
+  dq RVA(h_SetWindowTextW)
+  dq RVA(h_InvalidateRect)
+  dq RVA(h_DrawTextW)
+  dq 0
+ilt_gdi32:
+  dq RVA(h_StretchDIBits)
+  dq RVA(h_SetStretchBltMode)
+  dq RVA(h_GetStockObject)
+  dq RVA(h_CreateFontW)
+  dq RVA(h_CreateSolidBrush)
+  dq RVA(h_SelectObject)
+  dq RVA(h_SetTextColor)
+  dq RVA(h_SetBkMode)
+  dq 0
+ilt_ws2:
+  dq RVA(h_WSAStartup)
+  dq RVA(h_socket)
+  dq RVA(h_bind)
+  dq RVA(h_listen)
+  dq RVA(h_accept)
+  dq RVA(h_recv)
+  dq RVA(h_send)
+  dq RVA(h_closesocket)
   dq 0
 
 ; Import Address Table: the loader overwrites each slot with the function
@@ -214,10 +265,60 @@ __imp_QueryPerformanceFrequency: dq RVA(h_QueryPerformanceFrequency)
 __imp_GetCommandLineW:          dq RVA(h_GetCommandLineW)
 __imp_GetSystemInfo:            dq RVA(h_GetSystemInfo)
 __imp_CreateThread:             dq RVA(h_CreateThread)
+__imp_SetThreadAffinityMask:    dq RVA(h_SetThreadAffinityMask)
+__imp_SetThreadPriority:        dq RVA(h_SetThreadPriority)
+__imp_AddVectoredExceptionHandler: dq RVA(h_AddVectoredExceptionHandler)
+__imp_RemoveVectoredExceptionHandler: dq RVA(h_RemoveVectoredExceptionHandler)
+                                dq 0
+iat_user32:
+__imp_RegisterClassExW:         dq RVA(h_RegisterClassExW)
+__imp_CreateWindowExW:          dq RVA(h_CreateWindowExW)
+__imp_DefWindowProcW:           dq RVA(h_DefWindowProcW)
+__imp_GetMessageW:              dq RVA(h_GetMessageW)
+__imp_DispatchMessageW:         dq RVA(h_DispatchMessageW)
+__imp_PostQuitMessage:          dq RVA(h_PostQuitMessage)
+__imp_DestroyWindow:            dq RVA(h_DestroyWindow)
+__imp_BeginPaint:               dq RVA(h_BeginPaint)
+__imp_EndPaint:                 dq RVA(h_EndPaint)
+__imp_GetClientRect:            dq RVA(h_GetClientRect)
+__imp_AdjustWindowRect:         dq RVA(h_AdjustWindowRect)
+__imp_GetSystemMetrics:         dq RVA(h_GetSystemMetrics)
+__imp_LoadCursorW:              dq RVA(h_LoadCursorW)
+__imp_TranslateMessage:         dq RVA(h_TranslateMessage)
+__imp_SendMessageW:             dq RVA(h_SendMessageW)
+__imp_SetFocus:                 dq RVA(h_SetFocus)
+__imp_MoveWindow:               dq RVA(h_MoveWindow)
+__imp_GetWindowTextW:           dq RVA(h_GetWindowTextW)
+__imp_SetWindowTextW:           dq RVA(h_SetWindowTextW)
+__imp_InvalidateRect:           dq RVA(h_InvalidateRect)
+__imp_DrawTextW:                dq RVA(h_DrawTextW)
+                                dq 0
+iat_gdi32:
+__imp_StretchDIBits:            dq RVA(h_StretchDIBits)
+__imp_SetStretchBltMode:        dq RVA(h_SetStretchBltMode)
+__imp_GetStockObject:           dq RVA(h_GetStockObject)
+__imp_CreateFontW:              dq RVA(h_CreateFontW)
+__imp_CreateSolidBrush:         dq RVA(h_CreateSolidBrush)
+__imp_SelectObject:             dq RVA(h_SelectObject)
+__imp_SetTextColor:             dq RVA(h_SetTextColor)
+__imp_SetBkMode:                dq RVA(h_SetBkMode)
+                                dq 0
+iat_ws2:
+__imp_WSAStartup:               dq RVA(h_WSAStartup)
+__imp_socket:                   dq RVA(h_socket)
+__imp_bind:                     dq RVA(h_bind)
+__imp_listen:                   dq RVA(h_listen)
+__imp_accept:                   dq RVA(h_accept)
+__imp_recv:                     dq RVA(h_recv)
+__imp_send:                     dq RVA(h_send)
+__imp_closesocket:              dq RVA(h_closesocket)
                                 dq 0
 iat_end:
 
 kernel32_name: db 'kernel32.dll', 0
+user32_name:   db 'user32.dll', 0
+gdi32_name:    db 'gdi32.dll', 0
+ws2_name:      db 'ws2_32.dll', 0
 
 ; Hint/Name entries: dw Hint (0), then the ASCII name, NUL. Each is 2-byte
 ; aligned (align before the label, so the label itself is even).
@@ -266,6 +367,127 @@ h_GetSystemInfo:            dw 0
   align 2
 h_CreateThread:             dw 0
   db 'CreateThread', 0
+  align 2
+h_SetThreadAffinityMask:    dw 0
+  db 'SetThreadAffinityMask', 0
+  align 2
+h_SetThreadPriority:        dw 0
+  db 'SetThreadPriority', 0
+h_AddVectoredExceptionHandler: dw 0
+  db 'AddVectoredExceptionHandler', 0
+h_RemoveVectoredExceptionHandler: dw 0
+  db 'RemoveVectoredExceptionHandler', 0
+  align 2
+h_RegisterClassExW:         dw 0
+  db 'RegisterClassExW', 0
+  align 2
+h_CreateWindowExW:          dw 0
+  db 'CreateWindowExW', 0
+  align 2
+h_DefWindowProcW:           dw 0
+  db 'DefWindowProcW', 0
+  align 2
+h_GetMessageW:              dw 0
+  db 'GetMessageW', 0
+  align 2
+h_DispatchMessageW:         dw 0
+  db 'DispatchMessageW', 0
+  align 2
+h_PostQuitMessage:          dw 0
+  db 'PostQuitMessage', 0
+  align 2
+h_DestroyWindow:            dw 0
+  db 'DestroyWindow', 0
+  align 2
+h_BeginPaint:               dw 0
+  db 'BeginPaint', 0
+  align 2
+h_EndPaint:                 dw 0
+  db 'EndPaint', 0
+  align 2
+h_GetClientRect:            dw 0
+  db 'GetClientRect', 0
+  align 2
+h_AdjustWindowRect:         dw 0
+  db 'AdjustWindowRect', 0
+  align 2
+h_GetSystemMetrics:         dw 0
+  db 'GetSystemMetrics', 0
+  align 2
+h_LoadCursorW:              dw 0
+  db 'LoadCursorW', 0
+  align 2
+h_TranslateMessage:         dw 0
+  db 'TranslateMessage', 0
+  align 2
+h_SendMessageW:             dw 0
+  db 'SendMessageW', 0
+  align 2
+h_SetFocus:                 dw 0
+  db 'SetFocus', 0
+  align 2
+h_MoveWindow:               dw 0
+  db 'MoveWindow', 0
+  align 2
+h_GetWindowTextW:           dw 0
+  db 'GetWindowTextW', 0
+  align 2
+h_SetWindowTextW:           dw 0
+  db 'SetWindowTextW', 0
+  align 2
+h_InvalidateRect:           dw 0
+  db 'InvalidateRect', 0
+  align 2
+h_DrawTextW:                dw 0
+  db 'DrawTextW', 0
+  align 2
+h_CreateFontW:              dw 0
+  db 'CreateFontW', 0
+  align 2
+h_CreateSolidBrush:         dw 0
+  db 'CreateSolidBrush', 0
+  align 2
+h_SelectObject:             dw 0
+  db 'SelectObject', 0
+  align 2
+h_SetTextColor:             dw 0
+  db 'SetTextColor', 0
+  align 2
+h_SetBkMode:                dw 0
+  db 'SetBkMode', 0
+  align 2
+h_WSAStartup:               dw 0
+  db 'WSAStartup', 0
+  align 2
+h_socket:                   dw 0
+  db 'socket', 0
+  align 2
+h_bind:                     dw 0
+  db 'bind', 0
+  align 2
+h_listen:                   dw 0
+  db 'listen', 0
+  align 2
+h_accept:                   dw 0
+  db 'accept', 0
+  align 2
+h_recv:                     dw 0
+  db 'recv', 0
+  align 2
+h_send:                     dw 0
+  db 'send', 0
+  align 2
+h_closesocket:              dw 0
+  db 'closesocket', 0
+  align 2
+h_StretchDIBits:            dw 0
+  db 'StretchDIBits', 0
+  align 2
+h_SetStretchBltMode:        dw 0
+  db 'SetStretchBltMode', 0
+  align 2
+h_GetStockObject:           dw 0
+  db 'GetStockObject', 0
   align 16
 %endif
 

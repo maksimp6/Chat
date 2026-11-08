@@ -126,6 +126,70 @@ rt_err:
   mov  rcx, [rel g_stderr]
   jmp  rt_write_h
 
+; The dialog file: dialog.txt (the boot volume's root on the USB build, the
+; current directory on Windows). While g_log_tee is set, every byte the runner
+; writes to the screen (rt_write_h: the prompts, the answers, the statistics)
+; also goes into a buffer; rt_log_add adds bytes directly; rt_log_flush appends
+; the buffer to the file (at the end of every turn, and when the buffer fills).
+LOG_CAP equ 1048576
+
+; rt_log_add(rcx=ptr, rdx=len) — bytes into the dialog buffer. Preserves the
+; nonvolatile registers; clobbers the volatile ones.
+rt_log_add:
+  push rbx
+  push rsi
+  WINPROLOGUE
+  mov  rbx, rcx
+  mov  rsi, rdx
+  cmp  qword [rel g_log_buf], 0
+  jne  .have
+  mov  rcx, LOG_CAP
+  call rt_alloc
+  mov  [rel g_log_buf], rax
+.have:
+  mov  rax, [rel g_log_len]
+  add  rax, rsi
+  cmp  rax, LOG_CAP
+  jbe  .room
+  call rt_log_flush
+  cmp  rsi, LOG_CAP
+  ja   .done                   ; larger than the buffer: dropped
+.room:
+  mov  rcx, [rel g_log_buf]
+  add  rcx, [rel g_log_len]
+  mov  rdx, rbx
+  mov  r8, rsi
+  call rt_memcpy
+  add  [rel g_log_len], rsi
+.done:
+  WINEPILOGUE
+  pop  rsi
+  pop  rbx
+  ret
+
+; rt_log_flush() — the dialog buffer to dialog.txt, then empty. A write that
+; fails is reported once; the conversation goes on. Clobbers the volatile
+; registers.
+rt_log_flush:
+  WINPROLOGUE
+  mov  r8, [rel g_log_len]
+  test r8, r8
+  jz   .empty
+  mov  qword [rel g_log_len], 0
+  mov  rdx, [rel g_log_buf]
+  lea  rcx, [rel g_log_name]
+  call rt_append_file
+  test eax, eax
+  jnz  .empty
+  cmp  qword [rel g_log_warned], 0
+  jne  .empty
+  mov  qword [rel g_log_warned], 1
+  lea  rcx, [rel s_log_fail]
+  call rt_err_str
+.empty:
+  WINEPILOGUE
+  ret
+
 ; rt_out_str(rcx=zstr) — strlen then rt_out. Clobbers rax,rdx (via rt_out).
 rt_out_str:
   xor  rdx, rdx
@@ -404,10 +468,15 @@ pool_worker:
   mov  rbp, rsp
   push rsi
   push rdi
-  sub  rsp, 32                 ; 32-byte shadow, rsp 16-aligned
+  push rbx
+  sub  rsp, 72                 ; 32-byte shadow + [rsp+32] instructions, [rsp+40] cycles, [rsp+48] stalls, [rsp+56] DRAM stalls at a job start; rsp 16-aligned
   mov  rsi, rcx                ; tid
   xor  edi, edi                ; last generation seen (initial gen is 0)
 .wloop:
+  rdtsc
+  shl  rdx, 32
+  or   rax, rdx
+  mov  rbx, rax                ; the tick the wait for the next job began
 .spin:
   mov  rax, [rel g_pool_gen]
   cmp  rax, rdi
@@ -418,33 +487,182 @@ pool_worker:
   jmp  .spin
 .go:
   mov  rdi, rax                ; remember this generation
+  rdtsc
+  shl  rdx, 32
+  or   rax, rdx
+  mov  rcx, rax
+  sub  rcx, rbx
+  lea  rdx, [rel g_pool_idle_ticks]
+  add  [rdx + rsi*8], rcx      ; this core's idle ticks (the waste metric)
+  mov  rbx, rax                ; the job's start tick
+  call pmu_read                ; rax = instructions, rdx = cycles (0 without the PMU)
+  mov  [rsp+32], rax
+  mov  [rsp+40], rdx
+  call pmu_read_stalls         ; rax = memory-stall cycles, rdx = DRAM-stall cycles
+  mov  [rsp+48], rax
+  mov  [rsp+56], rdx
   mov  rcx, [rel g_pool_arg]
   mov  rdx, rsi                ; tid
   mov  r8, [rel g_nthreads]
   call [rel g_pool_func]
+  call pmu_read
+  sub  rax, [rsp+32]
+  sub  rdx, [rsp+40]
+  lea  rcx, [rel g_pool_job_instr]
+  add  [rcx + rsi*8], rax
+  lea  rcx, [rel g_pool_job_cycles]
+  add  [rcx + rsi*8], rdx
+  call pmu_read_stalls
+  sub  rax, [rsp+48]
+  sub  rdx, [rsp+56]
+  lea  rcx, [rel g_pool_job_stall]
+  add  [rcx + rsi*8], rax
+  lea  rcx, [rel g_pool_job_dram]
+  add  [rcx + rsi*8], rdx
+  rdtsc
+  shl  rdx, 32
+  or   rax, rdx
+  sub  rax, rbx
+  lea  rcx, [rel g_pool_job_ticks]
+  add  [rcx + rsi*8], rax      ; this core's ticks inside jobs
   lock inc qword [rel g_pool_done]
   jmp  .wloop
 .quit:
-  add  rsp, 32
+  add  rsp, 72
+  pop  rbx
   pop  rdi
   pop  rsi
   pop  rbp
   ret
 
+; pool_counters_reset() — zero the waste counters and mark the window's start
+; tick (the generators call it when generation begins). Clobbers rax, rcx, rdx.
+pool_counters_reset:
+  mov  qword [rel g_pool_par_ns], 0
+  mov  qword [rel g_pool_wait_ns], 0
+  mov  qword [rel g_pool_jobs], 0
+  xor  ecx, ecx
+.z:
+  lea  rax, [rel g_pool_idle_ticks]
+  mov  qword [rax + rcx*8], 0
+  lea  rax, [rel g_pool_job_ticks]
+  mov  qword [rax + rcx*8], 0
+  lea  rax, [rel g_pool_job_instr]
+  mov  qword [rax + rcx*8], 0
+  lea  rax, [rel g_pool_job_cycles]
+  mov  qword [rax + rcx*8], 0
+  lea  rax, [rel g_pool_job_stall]
+  mov  qword [rax + rcx*8], 0
+  lea  rax, [rel g_pool_job_dram]
+  mov  qword [rax + rcx*8], 0
+  inc  ecx
+  cmp  ecx, MAX_THREADS
+  jb   .z
+  rdtsc
+  shl  rdx, 32
+  or   rax, rdx
+  mov  [rel g_pool_t0_tick], rax
+  ret
+
+; pmu_read() -> rax = instructions retired, rdx = unhalted core cycles of this
+; core, from the fixed performance counters, when g_pmu_on (the no-OS build
+; programs them in ring 0); both 0 otherwise. Clobbers rcx.
+pmu_read:
+  cmp  qword [rel g_pmu_on], 0
+  je   .none
+  push rbx
+  mov  ecx, 0x40000000         ; fixed counter 0: instructions retired
+  rdpmc
+  shl  rdx, 32
+  or   rax, rdx
+  mov  rbx, rax
+  mov  ecx, 0x40000001         ; fixed counter 1: unhalted core cycles
+  rdpmc
+  shl  rdx, 32
+  or   rdx, rax
+  mov  rax, rbx
+  pop  rbx
+  ret
+.none:
+  xor  eax, eax
+  xor  edx, edx
+  ret
+
+; pmu_read_stalls() -> rax = memory-stall cycles, rdx = DRAM-stall cycles of
+; this core (general counters 0 and 1, programmed by the no-OS build when
+; g_pmu_stalls); both 0 otherwise. Clobbers rcx.
+pmu_read_stalls:
+  cmp  qword [rel g_pmu_stalls], 0
+  je   .none
+  push rbx
+  xor  ecx, ecx                ; general counter 0
+  rdpmc
+  shl  rdx, 32
+  or   rax, rdx
+  mov  rbx, rax
+  mov  ecx, 1                  ; general counter 1
+  rdpmc
+  shl  rdx, 32
+  or   rdx, rax
+  mov  rax, rbx
+  pop  rbx
+  ret
+.none:
+  xor  eax, eax
+  xor  edx, edx
+  ret
+
 ; pool_run(rcx=func, rdx=arg) — run func(rcx=arg, rdx=tid, r8=nthreads) on every
 ; thread (tid 0 on the caller) and return when all have finished. rt_fatal if the
 ; workers have not reported back after POOL_WAIT_SPINS pauses. Clobbers
-; caller-saved registers.
+; caller-saved registers. For the waste metric it accumulates the time spent
+; inside jobs (g_pool_par_ns) and the time the caller waited for the slowest
+; worker at the end (g_pool_wait_ns).
 pool_run:
+  push rbx
+  push rsi
+  push rdi
+  push r12
   WINPROLOGUE
+  sub  rsp, 32                           ; [rsp+32] instructions, [rsp+40] cycles, [rsp+48] stalls, [rsp+56] DRAM stalls at the start
   mov  [rel g_pool_func], rcx
   mov  [rel g_pool_arg], rdx
+  call rt_now_ns
+  mov  rbx, rax                          ; the job's start
+  rdtsc
+  shl  rdx, 32
+  or   rax, rdx
+  mov  r12, rax                          ; its start tick
+  call pmu_read
+  mov  [rsp+32], rax
+  mov  [rsp+40], rdx
+  call pmu_read_stalls
+  mov  [rsp+48], rax
+  mov  [rsp+56], rdx
   mov  qword [rel g_pool_done], 0        ; reset before publishing the generation
   lock inc qword [rel g_pool_gen]        ; release workers (barrier orders func/arg first)
   mov  rcx, [rel g_pool_arg]
   xor  edx, edx                          ; tid 0
   mov  r8, [rel g_nthreads]
   call [rel g_pool_func]
+  call pmu_read
+  sub  rax, [rsp+32]
+  sub  rdx, [rsp+40]
+  add  [rel g_pool_job_instr], rax       ; core 0's instructions and cycles inside jobs
+  add  [rel g_pool_job_cycles], rdx
+  call pmu_read_stalls
+  sub  rax, [rsp+48]
+  sub  rdx, [rsp+56]
+  add  [rel g_pool_job_stall], rax       ; core 0's stall cycles inside jobs
+  add  [rel g_pool_job_dram], rdx
+  rdtsc
+  shl  rdx, 32
+  or   rax, rdx
+  mov  rdi, rax                          ; tid 0 finished its share (tick)
+  sub  rax, r12
+  add  [rel g_pool_job_ticks], rax       ; core 0's ticks inside jobs
+  call rt_now_ns
+  mov  rsi, rax                          ; (ns, for the ms metric)
   mov  rax, [rel g_nthreads]
   dec  rax                               ; workers expected to report done
   jz   .done                             ; single-threaded: no workers
@@ -459,7 +677,23 @@ pool_run:
   lea  rcx, [rel k_err_hang]
   call rt_fatal
 .done:
+  rdtsc
+  shl  rdx, 32
+  or   rax, rdx
+  sub  rax, rdi
+  add  [rel g_pool_idle_ticks], rax      ; core 0's barrier wait, in ticks
+  call rt_now_ns
+  mov  rcx, rax
+  sub  rcx, rsi
+  add  [rel g_pool_wait_ns], rcx         ; the barrier wait
+  sub  rax, rbx
+  add  [rel g_pool_par_ns], rax          ; the whole job
+  inc  qword [rel g_pool_jobs]
   WINEPILOGUE
+  pop  r12
+  pop  rdi
+  pop  rsi
+  pop  rbx
   ret
 
 ; ===========================================================================
@@ -852,6 +1086,14 @@ section .data
 g_stdout:       dq 0           ; Windows: STD_OUTPUT_HANDLE; UEFI: tag 1 (the screen)
 g_stderr:       dq 0           ; Windows: STD_ERROR_HANDLE;  UEFI: tag 2 (the screen)
 g_stdin:        dq 0           ; Windows: STD_INPUT_HANDLE;  UEFI: unused
+g_stdin_carry:  dq 0           ; Windows -i: bytes read past the line end, for the next rt_read_stdin
+g_stdin_carry_len: dq 0
+g_log_tee:      dq 0           ; 1: rt_write_h copies the screen output into the dialog buffer
+g_log_buf:      dq 0           ; the dialog buffer (LOG_CAP bytes, allocated on first use)
+g_log_len:      dq 0
+g_log_warned:   dq 0           ; rt_log_flush: the failure was reported
+g_log_name:     dw __utf16__("dialog.txt"), 0
+s_log_fail:     db "asmrun: dialog.txt could not be written; the conversation is not being saved", 10, 0
 g_stdin_line:   dq 0           ; 1 (-i): rt_read_stdin returns at the end of a line; 0: reads to the end of input
 g_has_vnni:     dq 0           ; 1 if AVX-VNNI is available, else 0
 g_nthreads:     dq 0           ; pool size (including the calling thread, tid 0)
@@ -860,6 +1102,18 @@ g_pool_arg:     dq 0           ; current job argument
 g_pool_gen:     dq 0           ; generation counter workers spin on
 g_pool_done:    dq 0           ; count of workers that finished the current job
 g_pool_quit:    dq 0           ; 1: idle workers return from pool_worker
+g_pool_par_ns:  dq 0           ; waste metric: ns inside pool_run jobs (the parallel phases)
+g_pool_wait_ns: dq 0           ;               ns the caller waited for the slowest worker
+g_pool_jobs:    dq 0           ;               jobs run
+g_pool_idle_ticks:  times MAX_THREADS dq 0 ;   per core (tid): TSC ticks waiting for a job or at a barrier (wasted)
+g_pool_job_ticks:   times MAX_THREADS dq 0 ;   per core: TSC ticks inside jobs
+g_pool_job_instr:   times MAX_THREADS dq 0 ;   per core: instructions retired inside jobs (PMU, no-OS build)
+g_pool_job_cycles:  times MAX_THREADS dq 0 ;   per core: unhalted core cycles inside jobs (PMU)
+g_pool_job_stall:   times MAX_THREADS dq 0 ;   per core: cycles stalled on a demand load miss inside jobs (PMU)
+g_pool_job_dram:    times MAX_THREADS dq 0 ;   per core: of those, the DRAM-served part
+g_pmu_on:           dq 0                   ;   1 once the fixed counters run on every core
+g_pmu_stalls:       dq 0                   ;   1 once the two general counters count the stalls
+g_pool_t0_tick:     dq 0                   ;   the TSC tick pool_counters_reset was called at
 g_argv:         times MAX_ARGS dq 0   ; parsed argument pointers (into the command line)
 
 g_bw_bytes:     dq 0           ; --bw buffer size in bytes

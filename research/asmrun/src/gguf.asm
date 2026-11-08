@@ -301,9 +301,14 @@ gguf_typename:
   je .f16
   cmp ecx, GGML_Q4_K
   je .q4
+  cmp ecx, GGML_Q5_K
+  je .q5
   cmp ecx, GGML_Q6_K
   je .q6
   lea rax, [rel tn_unk]
+  ret
+.q5:
+  lea rax, [rel tn_q5k]
   ret
 .f32:
   lea rax, [rel tn_f32]
@@ -437,6 +442,47 @@ gguf_open:
   call gguf_keyeq
   test rax, rax
   jnz .kv_pad
+  ; the same hyperparameters under the Qwen3.5 prefix
+  lea rcx, [rel k35_block]
+  call gguf_keyeq
+  test rax, rax
+  jnz .kv_block
+  lea rcx, [rel k35_nextn]
+  call gguf_keyeq
+  test rax, rax
+  jnz .kv_nextn
+  lea rcx, [rel k35_embd]
+  call gguf_keyeq
+  test rax, rax
+  jnz .kv_embd
+  lea rcx, [rel k35_ff]
+  call gguf_keyeq
+  test rax, rax
+  jnz .kv_ff
+  lea rcx, [rel k35_nhead]
+  call gguf_keyeq
+  test rax, rax
+  jnz .kv_nhead
+  lea rcx, [rel k35_nheadkv]
+  call gguf_keyeq
+  test rax, rax
+  jnz .kv_nheadkv
+  lea rcx, [rel k35_keylen]
+  call gguf_keyeq
+  test rax, rax
+  jnz .kv_keylen
+  lea rcx, [rel k35_ctx]
+  call gguf_keyeq
+  test rax, rax
+  jnz .kv_ctx
+  lea rcx, [rel k35_rope_key]
+  call gguf_keyeq
+  test rax, rax
+  jnz .kv_rope
+  lea rcx, [rel k35_eps]
+  call gguf_keyeq
+  test rax, rax
+  jnz .kv_eps
   ; unknown key: advance past its value
   mov ecx, [rsp+GO_VT]
   call gguf_skip_value
@@ -448,10 +494,24 @@ gguf_open:
   mov rcx, rsi               ; value pointer
   mov rdx, r8
   add rsi, r8                ; past value
+  mov [rsp+GO_VT], rcx       ; (the value pointer and length survive the compares)
+  mov r8, rdx
+  push rdx
+  push rdx
   lea r8, [rel v_qwen3]
   call gguf_zeq
+  pop rdx
+  pop rdx
   test rax, rax
-  jnz .kv_next
+  jnz .kv_next               ; Model.arch stays ARCH_QWEN3 (zero-filled)
+  mov rcx, [rsp+GO_VT]
+  lea r8, [rel v_qwen35]
+  call gguf_zeq
+  test rax, rax
+  jz .bad_arch
+  mov qword [rdi + Model.arch], ARCH_QWEN35
+  jmp .kv_next
+.bad_arch:
   lea rcx, [rel m_arch]
   call rt_fatal
 .kv_align:
@@ -463,6 +523,11 @@ gguf_open:
   mov ecx, [rsp+GO_VT]
   call gguf_read_int
   mov [rdi + Model.n_layer], rax
+  jmp .kv_next
+.kv_nextn:
+  mov ecx, [rsp+GO_VT]
+  call gguf_read_int
+  mov [rel g_gguf_nextn], rax  ; MTP draft blocks counted in block_count: not layers of the model
   jmp .kv_next
 .kv_embd:
   mov ecx, [rsp+GO_VT]
@@ -608,8 +673,12 @@ gguf_open:
   je .nb_f16
   cmp eax, GGML_Q4_K
   je .nb_q4k
+  cmp eax, GGML_Q5_K
+  je .nb_q5k
   cmp eax, GGML_Q6_K
   je .nb_q6k
+  cmp eax, GGML_Q8_0
+  je .nb_q8
   mov rcx, [r12 + Tensor.name]
   mov rdx, [r12 + Tensor.namelen]
   call rt_err                 ; name the offending tensor, then fatal
@@ -625,16 +694,24 @@ gguf_open:
   shr rcx, 8                  ; / QK_K blocks
   imul rcx, rcx, Q4K_BYTES
   jmp .nb_store
+.nb_q5k:
+  shr rcx, 8
+  imul rcx, rcx, Q5K_BYTES
+  jmp .nb_store
 .nb_q6k:
   shr rcx, 8
   imul rcx, rcx, Q6K_BYTES
+  jmp .nb_store
+.nb_q8:
+  shr rcx, 5                  ; blocks of 32
+  imul rcx, rcx, Q80_BYTES
 .nb_store:
   mov [r12 + Tensor.nbytes], rcx
   inc rbx
   jmp .tloop
 .tdone:
 
-  ; --- data_base = file_base + align_up(header_end_offset, alignment) ---
+  ; --- the data starts at align_up(header_end_offset, alignment) in the file ---
   mov rax, rsi
   sub rax, [rdi + Model.file_base]   ; header end offset
   mov rcx, [rsp+GO_ALIGN]
@@ -642,10 +719,12 @@ gguf_open:
   add rax, rcx                ; + (align - 1)
   not rcx                     ; ~(align - 1)
   and rax, rcx
-  add rax, [rdi + Model.file_base]
-  mov [rdi + Model.data_base], rax
+  mov [rdi + Model.data_base], rax   ; a file offset (the platform half turns it into memory)
 
-  ; resolve each tensor's .data = data_base + stored offset
+  ; resolve each tensor's .data: the platform gives the bytes at file offset
+  ; data_base + stored offset (Windows: inside the mapping; a machine with no
+  ; operating system: read into pages of their own, so a model larger than any
+  ; one free region of memory still loads)
   xor rbx, rbx
 .fix:
   cmp rbx, [rdi + Model.n_tensors]
@@ -655,12 +734,17 @@ gguf_open:
   imul rcx, rcx, Tensor_size
   add r12, rcx
   mov rcx, [r12 + Tensor.data]       ; offset
-  add rcx, rax                       ; + data_base (rax preserved, no calls here)
-  mov [r12 + Tensor.data], rcx
+  add rcx, [rdi + Model.data_base]   ; file offset of the tensor
+  mov rdx, [r12 + Tensor.nbytes]
+  call rt_tensor_data
+  mov [r12 + Tensor.data], rax
   inc rbx
   jmp .fix
 .fixdone:
 
+  ; the NextN (MTP) blocks at the end of block_count are a draft head, not layers
+  mov rax, [rel g_gguf_nextn]
+  sub [rdi + Model.n_layer], rax
   ; --- resolve named tensors ---
   mov rcx, rdi
   lea rdx, [rel t_tok_embd]
@@ -669,13 +753,19 @@ gguf_open:
   mov rcx, rdi
   lea rdx, [rel t_output]
   call gguf_find_tensor
+  test rax, rax
+  jnz .have_output
+  mov rax, [rdi + Model.tok_embd] ; tied embeddings: the lm head is the embedding table
+.have_output:
   mov [rdi + Model.output], rax
   mov rcx, rdi
   lea rdx, [rel t_output_norm]
   call gguf_find_tensor
   mov [rdi + Model.output_norm], rax
 
-  ; allocate Layer[n_layer]
+  ; allocate Layer[n_layer] (Qwen3 only: a Qwen3.5 layer is a different record, resolved by q35.asm)
+  cmp qword [rdi + Model.arch], ARCH_QWEN3
+  jne .layers_done
   mov rax, [rdi + Model.n_layer]
   imul rax, rax, Layer_size
   mov rcx, rax
@@ -733,6 +823,8 @@ gguf_open:
   je .missing
   cmp qword [rdi + Model.output_norm], 0
   je .missing
+  cmp qword [rdi + Model.arch], ARCH_QWEN3
+  jne .chk_done
   xor rbx, rbx
 .chk_layer:
   cmp rbx, [rdi + Model.n_layer]
@@ -984,6 +1076,19 @@ k_keylen:   db "qwen3.attention.key_length", 0
 k_ctx:      db "qwen3.context_length", 0
 k_rope_key: db "qwen3.rope.freq_base", 0
 k_eps:      db "qwen3.attention.layer_norm_rms_epsilon", 0
+k35_block:    db "qwen35.block_count", 0
+k35_embd:     db "qwen35.embedding_length", 0
+k35_ff:       db "qwen35.feed_forward_length", 0
+k35_nhead:    db "qwen35.attention.head_count", 0
+k35_nheadkv:  db "qwen35.attention.head_count_kv", 0
+k35_keylen:   db "qwen35.attention.key_length", 0
+k35_ctx:      db "qwen35.context_length", 0
+k35_rope_key: db "qwen35.rope.freq_base", 0
+k35_eps:      db "qwen35.attention.layer_norm_rms_epsilon", 0
+k35_nextn:    db "qwen35.nextn_predict_layers", 0
+  align 8
+g_gguf_nextn: dq 0
+v_qwen35:     db "qwen35", 0
 k_tokens:   db "tokenizer.ggml.tokens", 0
 k_merges:   db "tokenizer.ggml.merges", 0
 k_toktype:  db "tokenizer.ggml.token_type", 0
@@ -1031,6 +1136,7 @@ tn_f16: db "F16", 0
 tn_q4:  db "Q4_K", 0
 tn_q6:  db "Q6_K", 0
 tn_unk: db "?", 0
+tn_q5k: db "q5_K", 0
 
 m_magic: db "gguf: not a GGUF file (bad magic)", 0
 m_ver:   db "gguf: unsupported GGUF version (need 3)", 0

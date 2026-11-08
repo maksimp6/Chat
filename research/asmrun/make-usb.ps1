@@ -11,13 +11,23 @@
 # confirmation; otherwise the files are copied onto what is there.
 #
 # Usage:  .\make-usb.ps1 -Drive E: [-Model qwen3:1.7b] [-Args "model.gguf -i --chat -n 512"] [-Format]
+#
+# A model larger than a FAT32 file (4 GiB) is written in parts: \model.gguf holds
+# the first 4,000,000,000 bytes, \model.gguf.1 the next, and so on; the runner
+# opens them as one file. -ModelPath names a GGUF file directly (e.g. the
+# Qwen3.5-9B Q6_K download) instead of an Ollama model.
+#
+# Usage:  .\make-usb.ps1 -Drive E: -ModelPath C:\Users\Claude\models\Qwen3.5-9B-Q6_K.gguf
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Drive,
     [string]$Model = "qwen3:1.7b",
-    [string]$Args = "model.gguf -i --chat -n 512",
+    [string]$ModelPath = "",
+    [string]$Args = "",
+    [string]$Name = "model.gguf",
     [switch]$Format
 )
+$PartBytes = 4000000000   # under FAT32's 4 GiB - 1 per file
 
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -34,15 +44,21 @@ if ($disk) {
     if ($disk.BusType -ne "USB") { throw "${letter}: is not on a USB disk (bus $($disk.BusType)); refusing." }
 }
 
-# The model blob, from the Ollama manifest (same lookup as bench.ps1).
-$name, $tag = $Model.Split(":", 2)
-if (-not $tag) { $tag = "latest" }
-$modelsDir = if ($env:OLLAMA_MODELS) { $env:OLLAMA_MODELS } else { Join-Path $env:USERPROFILE ".ollama\models" }
-$manifestPath = Join-Path $modelsDir "manifests\registry.ollama.ai\library\$name\$tag"
-if (-not (Test-Path $manifestPath)) { throw "Ollama manifest not found: $manifestPath (is $Model pulled?)" }
-$manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-$modelLayer = $manifest.layers | Where-Object { $_.mediaType -eq "application/vnd.ollama.image.model" } | Select-Object -First 1
-$blob = Join-Path $modelsDir ("blobs\" + ($modelLayer.digest -replace ":", "-"))
+if ($ModelPath) {
+    # A GGUF file named directly.
+    if (-not (Test-Path $ModelPath)) { throw "model file not found: $ModelPath" }
+    $blob = (Get-Item $ModelPath).FullName
+} else {
+    # The model blob, from the Ollama manifest (same lookup as bench.ps1).
+    $name, $tag = $Model.Split(":", 2)
+    if (-not $tag) { $tag = "latest" }
+    $modelsDir = if ($env:OLLAMA_MODELS) { $env:OLLAMA_MODELS } else { Join-Path $env:USERPROFILE ".ollama\models" }
+    $manifestPath = Join-Path $modelsDir "manifests\registry.ollama.ai\library\$name\$tag"
+    if (-not (Test-Path $manifestPath)) { throw "Ollama manifest not found: $manifestPath (is $Model pulled?)" }
+    $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    $modelLayer = $manifest.layers | Where-Object { $_.mediaType -eq "application/vnd.ollama.image.model" } | Select-Object -First 1
+    $blob = Join-Path $modelsDir ("blobs\" + ($modelLayer.digest -replace ":", "-"))
+}
 $blobSize = (Get-Item $blob).Length
 Write-Host ("Model:  {0} ({1:N0} bytes)" -f $blob, $blobSize)
 
@@ -61,15 +77,52 @@ if ($vol.FileSystem -ne "FAT32") {
 }
 
 $root = "${letter}:\"
-$dstModel = Join-Path $root "model.gguf"
+$dstModel = Join-Path $root $Name
 $need = $blobSize + 1MB
-if ((Test-Path $dstModel) -and ((Get-Item $dstModel).Length -eq $blobSize)) {
-    Write-Host "model.gguf is already on the stick with the right size; not copied again."
+# The parts: model.gguf, model.gguf.1, ... each $PartBytes long but the last.
+$nParts = [int][math]::Ceiling($blobSize / $PartBytes)
+if ($nParts -lt 1) { $nParts = 1 }
+$partNames = @($Name)
+for ($i = 1; $i -lt $nParts; $i++) { $partNames += "$Name.$i" }
+$present = $true
+for ($i = 0; $i -lt $nParts; $i++) {
+    $len = if ($i -lt $nParts - 1) { $PartBytes } else { $blobSize - $PartBytes * ($nParts - 1) }
+    $p = Join-Path $root $partNames[$i]
+    if (-not ((Test-Path $p) -and ((Get-Item $p).Length -eq $len))) { $present = $false }
+}
+# Parts of an older, differently sized model are removed so the runner does not read them as a continuation.
+for ($i = $nParts; $i -lt 8; $i++) {
+    $stale = Join-Path $root "$Name.$i"
+    if (Test-Path $stale) { Remove-Item $stale -Force; Write-Host "Removed stale $stale" }
+}
+if ($present) {
+    Write-Host ("The model is already on the stick in {0} file(s) with the right sizes; not copied again." -f $nParts)
 } else {
     if ($vol.SizeRemaining -lt $need) { throw ("not enough free space on ${letter}: ({0:N0} bytes free, {1:N0} needed)" -f $vol.SizeRemaining, $need) }
-    Write-Host "Copying the model (this takes a few minutes on a USB stick)..."
+    Write-Host ("Copying the model in {0} file(s) (a USB stick takes minutes per GB)..." -f $nParts)
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    Copy-Item -Path $blob -Destination $dstModel -Force
+    if ($nParts -eq 1) {
+        Copy-Item -Path $blob -Destination $dstModel -Force
+    } else {
+        $buf = New-Object byte[] (64MB)
+        $in = [IO.File]::OpenRead($blob)
+        try {
+            for ($i = 0; $i -lt $nParts; $i++) {
+                $len = if ($i -lt $nParts - 1) { $PartBytes } else { $blobSize - $PartBytes * ($nParts - 1) }
+                $out = [IO.File]::Create((Join-Path $root $partNames[$i]))
+                try {
+                    $left = $len
+                    while ($left -gt 0) {
+                        $n = $in.Read($buf, 0, [int][math]::Min([long]$buf.Length, [long]$left))
+                        if ($n -le 0) { throw "unexpected end of $blob" }
+                        $out.Write($buf, 0, $n)
+                        $left -= $n
+                    }
+                } finally { $out.Close() }
+                Write-Host ("  {0}: {1:N0} bytes" -f $partNames[$i], $len)
+            }
+        } finally { $in.Close() }
+    }
     $sw.Stop()
     Write-Host ("  {0:N0} bytes in {1:N0} s ({2:N1} MB/s)" -f $blobSize, $sw.Elapsed.TotalSeconds, ($blobSize / 1MB / [math]::Max($sw.Elapsed.TotalSeconds, 0.001)))
 }
@@ -80,8 +133,7 @@ Copy-Item -Path $efi -Destination (Join-Path $bootDir "BOOTX64.EFI") -Force
 Write-Host "Copied BOOTX64.EFI to \EFI\BOOT\."
 
 # ASCII without a BOM: the runner reads the bytes as they are.
-[IO.File]::WriteAllText((Join-Path $root "asmrun.cfg"), $Args + "`r`n", (New-Object Text.ASCIIEncoding))
-Write-Host "Wrote asmrun.cfg: $Args"
+if ($Args) { [IO.File]::WriteAllText((Join-Path $root "asmrun.cfg"), $Args + "`r`n", (New-Object Text.ASCIIEncoding)); Write-Host "Wrote asmrun.cfg: $Args" } else { Write-Host "asmrun.cfg left as it is" }
 
 Write-Host ""
 Write-Host "Done. To run it:"
