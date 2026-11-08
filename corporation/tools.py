@@ -183,6 +183,21 @@ def _draft_offer(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     return {"success": True, "offer": oid, "price": round(price), "channel": channel, "seq": entry["seq"]}
 
 
+def _directive(args: dict[str, Any], cfg=None) -> dict[str, Any]:
+    """The founder's will: a directive the company gives itself (actor founder, never owner)."""
+    st = journal.state()
+    open_projects = sum(1 for p in st.projects.values() if p["status"] == "open")
+    if open_projects >= 2:
+        raise ValueError(f"{open_projects} projects are open already: make them sell before opening more (note what blocks them)")
+    if any(not d.get("project") for d in st.directives):
+        raise ValueError("a directive without a project is already waiting for the director")
+    text = str(args["text"])[:4000]
+    if len(text) < 40:
+        raise ValueError("a directive says what we make, for whom, at what price and why it pays: write it out")
+    entry = journal.ledger().append("board.directive", _actor(), {"text": text, "why": str(args.get("why") or "")[:2000]})
+    return {"success": True, "seq": entry["seq"], "note": "the director takes it on the next step"}
+
+
 def _note(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     step = _step()
     entry = journal.ledger().append("note", _actor(), {"text": str(args["text"])[:6000]},
@@ -266,6 +281,12 @@ CORPORATION_TOOLS = {
                 "required": ["price", "text"]},
         title="Оффер",
         description="Маркетинг: цена в рублях, канал и текст объявления для готового продукта.",
+    ),
+    "directive": _tool(
+        _directive, read_only=False,
+        schema={"properties": {"text": _TEXT, "why": _TEXT}, "required": ["text"]},
+        title="Директива основателя",
+        description="Основатель: что компания делает дальше (что, для кого, цена, почему принесёт деньги). Директор откроет по ней проект.",
     ),
     "note": _tool(
         _note, read_only=False,

@@ -17,8 +17,10 @@ Keys are the owner's (core/.env on the phone), never in the ledger:
 
 from __future__ import annotations
 
+import calendar
 import email
 import email.message
+import email.utils
 import imaplib
 import logging
 import os
@@ -91,7 +93,7 @@ def gate(st: journal.State, channel: str, action: str, *, text: str = "", client
     hour_ago = time.time() - 3600
     sent = 0
     for entry in reversed(journal.ledger().entries()):
-        if time.mktime(time.strptime(entry["at"], "%Y-%m-%dT%H:%M:%SZ")) < hour_ago:
+        if calendar.timegm(time.strptime(entry["at"], "%Y-%m-%dT%H:%M:%SZ")) < hour_ago:
             break
         if entry["kind"] in ("offer.published", "client.reply", "invoice", "delivery") and (entry.get("data") or {}).get("channel") == channel:
             sent += 1

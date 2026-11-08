@@ -24,6 +24,7 @@ in the ledger; that record is its authority, and a restart of the app resumes it
 
 from __future__ import annotations
 
+import calendar
 import json
 import logging
 import os
@@ -45,6 +46,7 @@ BETWEEN_STEPS_SECONDS = 2
 OWNER_WAIT_SECONDS = 5
 SNAPSHOT_EVERY = 10
 MODEL_SWITCH_TIMEOUT = 300
+FOUNDER_EVERY = 1800         # the founder's shift when idle: at most every half hour
 
 _current: dict[str, Any] = {}
 _thread: threading.Thread | None = None
@@ -208,7 +210,22 @@ def _pick(st: journal.State) -> tuple[str, dict[str, Any] | None] | None:
             return role, mine[0]
     if any(not d.get("project") for d in st.directives):
         return "director", None
+    # Nothing queued and no directive waiting: the one who wants gets the shift (owner,
+    # 08.11.2026: "who is going to want and move forward"). Not more often than every
+    # FOUNDER_EVERY seconds, and not while two projects are open and unsold.
+    open_projects = sum(1 for p in st.projects.values() if p["status"] == "open")
+    if open_projects < 2 and _seconds_since(st.last_founder) >= FOUNDER_EVERY:
+        return "founder", None
     return None
+
+
+def _seconds_since(stamp: str | None) -> float:
+    if not stamp:
+        return float("inf")
+    try:
+        return time.time() - calendar.timegm(time.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ"))
+    except ValueError:
+        return float("inf")
 
 
 def _project_conversation(st: journal.State, project_id: str | None) -> str:
@@ -242,9 +259,26 @@ def _brief(st: journal.State, role: Role, task: dict[str, Any] | None) -> str:
         if task.get("last_reply"):
             lines.append(f"Твой прошлый ход по этому поручению закончился словами: {task['last_reply'][:400]}")
         lines.append("Закончи поручение в этом ходе: сделай работу инструментами и вызови corporation finish_task или fail_task.")
+    elif role.name == "founder":
+        from corporation.roles import DEFAULT_GOAL
+
+        lines.append(f"Постоянная цель компании: {st.goal or DEFAULT_GOAL}")
+        history = []
+        for project in list(st.projects.values())[-6:]:
+            sold = sum(float(s.get("amount") or 0) for s in st.money["sales"] if s.get("product") in
+                       {p["id"] for p in st.products.values() if p["project"] == project["id"]})
+            history.append(f"{project['id']} «{project['title']}» ({project['status']}): продано на {sold:.0f} RUB")
+        failed = [t for t in st.tasks.values() if t["status"] == "failed"][-5:]
+        lines.append("Прошлые проекты: " + ("; ".join(history) if history else "ещё не было ни одного."))
+        if failed:
+            lines.append("Провалы: " + "; ".join(f"{t['id']} [{t['role']}] {str(t.get('result') or '')[:120]}" for t in failed))
+        if st.directives:
+            last = st.directives[-1]
+            lines.append(f"Последняя директива ([{last['seq']}], {last.get('by')}): {last['text'][:400]}")
+        lines.append("Очередь пуста. Реши, что компания делает дальше, и запиши директиву (corporation directive).")
     else:
         pending = [d for d in st.directives if not d.get("project")]
-        lines.append("Директивы правления без проекта:\n" + "\n".join(f"[{d['seq']}] {d['text']}" for d in pending[:3]))
+        lines.append("Директивы без проекта:\n" + "\n".join(f"[{d['seq']}] ({d.get('by')}) {d['text']}" for d in pending[:3]))
         lines.append("Открой проект по первой директиве и поставь задачи ролям; затем кратко отчитайся (note).")
     return "\n\n".join(lines)
 

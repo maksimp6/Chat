@@ -36,7 +36,7 @@ COLLECTION = "corporation"
 
 KINDS = frozenset(
     {
-        "board.directive", "board.decision", "board.money", "board.command",
+        "board.directive", "board.decision", "board.money", "board.command", "board.goal",
         "project.open", "project.close",
         "task.open", "task.start", "task.turn", "task.done", "task.failed",
         "product.draft", "product.review", "product.ready",
@@ -259,6 +259,8 @@ class State:
     notes: list[dict[str, Any]] = field(default_factory=list)
     records: int = 0
     last_backup: dict[str, Any] | None = None
+    goal: str | None = None          # the standing goal (board.goal); roles.DEFAULT_GOAL when none
+    last_founder: str | None = None  # when the founder last had a shift
 
     def next_id(self, prefix: str, table: dict[str, Any]) -> str:
         width = {"p": 4, "t": 5, "pr": 4, "o": 4}.get(prefix, 4)
@@ -287,6 +289,7 @@ class State:
         """The company's situation for a role's prompt: short, Russian, facts only."""
         lines = []
         money = self.money
+        lines.append(f"Цель компании: {self.goal or 'увеличивать подтверждённую выручку любой работой, которую можно сделать здесь и продать'}")
         lines.append(f"Касса: предложено {money['proposed']:.0f}, подтверждено {money['confirmed']:.0f}, расходы {money['expenses']:.0f} RUB.")
         open_dirs = [d for d in self.directives if not d.get("project")]
         if open_dirs:
@@ -317,7 +320,10 @@ def build_state(entries: list[dict[str, Any]]) -> State:
         kind, data = e["kind"], e.get("data") or {}
         st.records = e["seq"]
         if kind == "board.directive":
-            st.directives.append({"seq": e["seq"], "at": e["at"], "text": data.get("text", ""), "project": None})
+            st.directives.append({"seq": e["seq"], "at": e["at"], "text": data.get("text", ""), "project": None,
+                                  "by": e.get("actor"), "why": data.get("why")})
+        elif kind == "board.goal":
+            st.goal = data.get("text") or None
         elif kind == "board.decision":
             st.decisions.append({"seq": e["seq"], "at": e["at"], **data})
             target = data.get("target")
@@ -407,6 +413,8 @@ def build_state(entries: list[dict[str, Any]]) -> State:
             st.cycle["steps"] += 1
             st.cycle["last_tick"] = e["at"]
             st.cycle["last_role"] = data.get("role")
+            if data.get("role") == "founder":
+                st.last_founder = e["at"]
         elif kind == "model.switch":
             st.cycle["model"] = data.get("to")
         elif kind == "note":

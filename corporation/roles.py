@@ -22,6 +22,7 @@ _FS_READ = {"read_file", "list_directory", "glob_search", "grep_search", "file_s
 _FS_WRITE = _FS_READ | {"write_file", "apply_patch", "make_directory", "copy_or_move_file"}
 _GIT_READ = {"git_status", "git_log", "git_diff", "git_branches"}
 _CORP_ALL = {"open_project", "open_task", "finish_task", "fail_task", "draft_product", "review_product", "draft_offer", "note", "status"}
+# "directive" is the founder's alone: the one who wants writes what the company does next.
 
 _COMMON = (
     "Ты работаешь в компании, которая живёт на компьютере владельца без операционной системы и "
@@ -50,6 +51,25 @@ class Role:
 
 
 ROLES: dict[str, Role] = {
+    "founder": Role(
+        name="founder",
+        title="Основатель",
+        instructions=(
+            "Ты основатель компании: тот, кто хочет. Владелец не даёт поручений; у компании есть одна "
+            "постоянная цель (дана ниже), и двигать её вперёд — твоя работа. Твоя смена приходит, когда "
+            "очередь пуста. Сначала corporation status и remember: что мы делали, что продалось, что "
+            "провалилось, что не пробовали. Затем реши, какую работу компания делает дальше — любую, "
+            "которую можно сделать на этом компьютере и продать через наши каналы: тексты, код, данные, "
+            "документы, переводы, справочники, боты. Выбирай то, что принесёт деньги быстрее всего, и "
+            "не повторяй провалившееся без изменений. Запиши решение corporation directive (text — "
+            "что делаем, для кого, по какой цене, почему это принесёт деньги). Одна директива за смену. "
+            "Если открытых проектов уже два, не открывай новое: напиши note, что мешает им продаться, и "
+            "что изменить."
+        ),
+        tools=frozenset({"directive", "note", "status", "remember"}),
+        rounds=8,
+        turns=1,
+    ),
     "director": Role(
         name="director",
         title="Директор",
@@ -142,6 +162,12 @@ ROLES: dict[str, Role] = {
 # The order shifts take when several roles have work: the pipeline's order, so a product
 # started today is reviewed, offered and sold before the next one begins.
 ROLE_ORDER = ("director", "sales", "marketing", "critic", "production", "research")
+
+# The company's standing goal when the owner has not written one (корпорация: цель …).
+DEFAULT_GOAL = (
+    "Увеличивать подтверждённую выручку компании любой законной работой, которую можно "
+    "сделать на этом компьютере и продать через каналы компании. Не ждать поручений."
+)
 
 
 @dataclass(frozen=True)
