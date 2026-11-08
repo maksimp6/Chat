@@ -14,7 +14,7 @@ from webframe import Blueprint, jsonify, request
 from corporation import cash, commands, cycle
 from corporation import ledger as journal
 
-corporation_bp = Blueprint("corporation", __name__, url_prefix="/api/corporation")
+corporation_bp = Blueprint("corporation", __name__)
 
 _COMMAND_WORDS = {
     "start": "старт", "stop": "стоп", "directive": "директива", "decision": "решение", "sold": "продано",
@@ -22,7 +22,7 @@ _COMMAND_WORDS = {
 }
 
 
-@corporation_bp.route("", methods=["GET", "POST"])
+@corporation_bp.route("/api/corporation", methods=["GET", "POST"])
 def corporation_action() -> Any:
     data = request.get_json(silent=True) if request.method == "POST" else {}
     data = data if isinstance(data, dict) else {}
