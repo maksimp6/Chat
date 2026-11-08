@@ -130,9 +130,9 @@ def poll_vk(st: journal.State) -> list[dict[str, Any]]:
 
 
 def _actor() -> str:
-    from corporation import cycle
+    from corporation import context, cycle
 
-    return cycle.current().get("role") or "owner"
+    return context.current() or cycle.current().get("role") or "owner"
 
 
 def _refuse(channel: str, action: str, reason: str, **data: Any) -> GateRefused:

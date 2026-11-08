@@ -21,10 +21,9 @@ _TEXT = {"type": "string", "minLength": 1}
 
 
 def _actor() -> str:
-    from corporation import cycle
+    from corporation import context, cycle
 
-    step = cycle.current()
-    return step.get("role") or "owner"
+    return context.current() or cycle.current().get("role") or "owner"
 
 
 def _step() -> dict[str, Any]:

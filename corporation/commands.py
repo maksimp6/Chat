@@ -29,7 +29,9 @@ HELP = (
     "• корпорация: канал telegram|vk|email вкл|выкл\n"
     "• корпорация: статус — положение дел\n"
     "• корпорация: снимок — резервная копия сейчас\n"
-    "• корпорация: журнал [n] — последние записи"
+    "• корпорация: журнал [n] — последние записи\n"
+    "• корпорация: кабинеты — открыть кабинеты сотрудников (диалоги)\n"
+    "• корпорация: <имя> (Вера, Глеб, Ника, Макар, Инга, Лев, Дана) — кабинет сотрудника; пиши туда и он сделает"
 )
 
 
@@ -154,4 +156,22 @@ def handle(message: str) -> str:
         except ValueError:
             count = 20
         return _journal_text(max(1, count))
+    if word in ("кабинеты", "сотрудники", "offices", "staff"):
+        from corporation import office
+
+        made = office.ensure_all()
+        rows = "\n".join(f"• {o['title']} — диалог «{o['title']}» в списке чатов" for o in made)
+        return ("Кабинеты открыты. Напиши в диалог сотрудника — он сделает по-твоему, "
+                "с полным набором инструментов, и запишет результат в журнал:\n" + rows)
+    # корпорация: <имя или роль> — open or point to one employee's office
+    from corporation.roles import ROLES
+    by_name = {ROLES[r].person["name"].lower(): r for r in ROLES}
+    role = word if word in ROLES else by_name.get(word)
+    if role is not None:
+        from corporation import office
+
+        conv = office.ensure_office(role)
+        person = ROLES[role].person
+        return (f"Кабинет {person['name']} ({ROLES[role].title}) открыт: диалог «{office.title(role)}» в списке чатов. "
+                f"Пиши туда — {person['name']} делает по-твоему. conversation_id: {conv}")
     return "Не понял команду.\n" + HELP

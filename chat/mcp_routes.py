@@ -2398,6 +2398,24 @@ def _chat_turn(*, t_start, admission=None, live=None):
                 return jsonify(
                     error_body("invalid_params", message="unknown tool_policy")
                 ), 400
+        # An employee's office dialog: whatever the owner writes here is answered by that
+        # employee (owner, 08.11.2026: "talk to one of the employee and he will do as i say").
+        # The turn runs with the employee's own instructions and all the company's tools.
+        office_role = None
+        if tool_policy is None and data.get("tool_policy") is None:
+            try:
+                from corporation import office as corporation_office
+                from corporation.roles import ROLES, policy_for
+
+                office_role = corporation_office.role_of_conversation(conv_id)
+                if office_role in ROLES:
+                    params["instructions"] = ROLES[office_role].prompt()
+                    tool_policy = policy_for(office_role)
+                else:
+                    office_role = None
+            except Exception:
+                logger.exception("[CHAT] office role lookup failed")
+                office_role = None
         if retry and retry_message_id is not None:
             original = get_message(conv_id, retry_message_id)
             if (
@@ -2513,9 +2531,20 @@ def _chat_turn(*, t_start, admission=None, live=None):
             # Set after set_request, so the callable never enters the trace; every
             # tool round and continuation part copies it from these params.
             params["on_stream_event"] = live.provider_event
-        result = _execute_chat_model(
-            message, model_key, invocation, params, trace, execution_policy=tool_policy
-        )
+        office_token = None
+        if office_role is not None:
+            from corporation import context as corporation_context
+
+            office_token = corporation_context.set_role(office_role)
+        try:
+            result = _execute_chat_model(
+                message, model_key, invocation, params, trace, execution_policy=tool_policy
+            )
+        finally:
+            if office_token is not None:
+                from corporation import context as corporation_context
+
+                corporation_context.reset(office_token)
         if live is not None:
             live.provider_event({"kind": "finalizing"})
         total_ms = round((_time.perf_counter() - t_start) * 1000)

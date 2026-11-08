@@ -261,6 +261,8 @@ class State:
     last_backup: dict[str, Any] | None = None
     goal: str | None = None          # the standing goal (board.goal); roles.DEFAULT_GOAL when none
     last_founder: str | None = None  # when the founder last had a shift
+    offices: dict[str, str] = field(default_factory=dict)    # conversation id -> role (an employee's office dialog)
+    office_of: dict[str, str] = field(default_factory=dict)  # role -> conversation id
     court: list[dict[str, Any]] = field(default_factory=list)       # court.case records: the reject chute
     deliveries: list[dict[str, Any]] = field(default_factory=list)  # delivery records: boxes shipped
     published: list[dict[str, Any]] = field(default_factory=list)   # offer.published: boxes on the shelf
@@ -429,6 +431,9 @@ def build_state(entries: list[dict[str, Any]]) -> State:
             st.cycle["model"] = data.get("to")
         elif kind == "note":
             st.notes.append({"seq": e["seq"], "at": e["at"], "actor": e.get("actor"), **data})
+            if data.get("office") and data.get("conversation"):
+                st.offices[str(data["conversation"])] = data["office"]
+                st.office_of[data["office"]] = str(data["conversation"])
         elif kind == "backup":
             st.last_backup = {"at": e["at"], **data}
     return st
