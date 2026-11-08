@@ -161,7 +161,7 @@ def ask(
         raise OllamaError(f"asmrun HTTP {resp.status_code}: {resp.text[:500]}", status_code=resp.status_code)
     report = on_event if on_event is not None else (lambda _event: None)
     final: dict[str, Any] = {}
-    shown: list[str] = []
+    pending = ""  # text held back while it may be the start of <tool_call>
     silent = False
     try:
         for line in resp.iter_lines():
@@ -181,15 +181,27 @@ def ask(
             delta = chunk.get("delta")
             if not isinstance(delta, str) or not delta or silent:
                 continue
-            shown.append(delta)
-            if _TOOL_CALL_MARK in "".join(shown[-8:]):
+            # the model spells the marker in pieces ("<", "tool", "_call", ">"): a piece
+            # that may begin it waits until the next pieces decide
+            pending += delta
+            if pending.startswith(_TOOL_CALL_MARK):
                 silent = True  # the call's markup is not for the person; the final line carries the call
                 continue
-            report({"kind": "text_delta", "text": delta})
+            if _TOOL_CALL_MARK.startswith(pending):
+                continue
+            cut = pending.rfind("<")
+            if cut > 0 and _TOOL_CALL_MARK.startswith(pending[cut:]):
+                report({"kind": "text_delta", "text": pending[:cut]})
+                pending = pending[cut:]
+                continue
+            report({"kind": "text_delta", "text": pending})
+            pending = ""
     except requests.RequestException as exc:
         raise OllamaError(f"asmrun stream broke: {type(exc).__name__}: {exc}", status_code=200) from exc
     finally:
         resp.close()
+    if pending and not silent:
+        report({"kind": "text_delta", "text": pending})
     if not final:
         raise OllamaError("asmrun closed the stream without its final line", status_code=200)
     for call in final.get("tool_calls") or []:
