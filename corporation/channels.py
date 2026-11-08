@@ -4,7 +4,9 @@ Owner, 08.11.2026: "i don't want they coming to me". The sales role publishes of
 answers buyers, sends invoices and delivers products itself. Before anything leaves,
 ``gate`` runs the deterministic rules (code, not a prompt): the channel is enabled,
 the text carries no secret, the recipient is someone who wrote to the company or the
-company's own channel, the hourly rate is kept, a delivery has a confirmed payment.
+company's own channel, a delivery has a confirmed payment. No rate limits and no
+counts of ours (owner, 08.11.2026: "make them flexible do not make restrictions");
+the platforms keep their own.
 A refusal is a Court case and stops the channel; the record is written before the
 send, and the send's result is written after it.
 
@@ -19,7 +21,6 @@ Keys are the owner's (core/.env on the phone), never in the ledger:
 
 from __future__ import annotations
 
-import calendar
 import email
 import email.message
 import email.utils
@@ -40,7 +41,6 @@ logger = logging.getLogger("logos.corporation.channels")
 
 __all__ = ["CHANNEL_TOOLS", "GateRefused", "gate", "poll_inbox", "configured"]
 
-RATE_PER_HOUR = {"telegram": 30, "vk": 20, "email": 20}
 _SECRET_PATTERNS = (
     re.compile(r"\b\d{8,10}:[A-Za-z0-9_-]{35}\b"),          # a Telegram bot token
     re.compile(r"\b(sk|ghp|gho|github_pat|xox[abp])[-_][A-Za-z0-9_-]{16,}"),
@@ -158,15 +158,6 @@ def gate(st: journal.State, channel: str, action: str, *, text: str = "", client
         paid = st.clients.get(client or "", {}).get("paid") or []
         if product not in paid:
             raise GateRefused(f"client {client} has not paid for {product}; send an invoice first")
-    hour_ago = time.time() - 3600
-    sent = 0
-    for entry in reversed(journal.ledger().entries()):
-        if calendar.timegm(time.strptime(entry["at"], "%Y-%m-%dT%H:%M:%SZ")) < hour_ago:
-            break
-        if entry["kind"] in ("offer.published", "client.reply", "invoice", "delivery") and (entry.get("data") or {}).get("channel") == channel:
-            sent += 1
-    if sent >= RATE_PER_HOUR.get(channel, 20):
-        raise _refuse(channel, action, f"{sent} messages in the last hour: the rate limit")
 
 
 # ----- Telegram ----------------------------------------------------------------------------

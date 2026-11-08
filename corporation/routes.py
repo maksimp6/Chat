@@ -36,7 +36,7 @@ def corporation_action() -> Any:
             return jsonify({"success": True, **conveyor.board()})
         if action == "ledger":
             count = int(data.get("count") or request.args.get("count") or 50)
-            return jsonify({"success": True, "entries": journal.ledger().tail(max(1, min(count, 500))), "verify": journal.ledger().verify()})
+            return jsonify({"success": True, "entries": journal.ledger().tail(max(1, count)), "verify": journal.ledger().verify()})
         if action == "projects":
             st = journal.state()
             projects = []

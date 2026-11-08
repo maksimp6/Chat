@@ -86,7 +86,7 @@ def _entry_text(entry: dict[str, Any]) -> str:
             parts.append(f"{key} {entry[key]}")
     for key, value in data.items():
         if isinstance(value, (str, int, float)) and str(value).strip():
-            parts.append(f"{key}: {str(value)[:2000]}")
+            parts.append(f"{key}: {str(value)}")
     return "\n".join(parts)
 
 
@@ -307,7 +307,7 @@ class State:
                 f"провалено {sum(1 for t in tasks if t['status']=='failed')}); продуктов {sum(1 for p in self.products.values() if p['project']==pid)}."
             )
         text = "\n".join(lines)
-        return text[:limit_chars]
+        return text
 
 
 def _money(value: Any) -> float:

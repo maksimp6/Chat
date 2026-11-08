@@ -63,7 +63,7 @@ def _journal_text(count: int) -> str:
     for entry in journal.ledger().tail(count):
         data = entry.get("data") or {}
         what = data.get("text") or data.get("reason") or data.get("result") or data.get("reply") or data.get("title") or data.get("error") or ""
-        rows.append(f"{entry['seq']} {entry['at'][11:19]} {entry['kind']} [{entry.get('actor')}] {str(what)[:140]}")
+        rows.append(f"{entry['seq']} {entry['at'][11:19]} {entry['kind']} [{entry.get('actor')}] {str(what)}")
     return "\n".join(rows) or "Журнал пуст."
 
 
@@ -153,5 +153,5 @@ def handle(message: str) -> str:
             count = int(tail) if tail else 20
         except ValueError:
             count = 20
-        return _journal_text(max(1, min(count, 200)))
+        return _journal_text(max(1, count))
     return "Не понял команду.\n" + HELP

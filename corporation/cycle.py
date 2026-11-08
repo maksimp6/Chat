@@ -46,7 +46,7 @@ BETWEEN_STEPS_SECONDS = 2
 OWNER_WAIT_SECONDS = 5
 SNAPSHOT_EVERY = 10
 MODEL_SWITCH_TIMEOUT = 300
-FOUNDER_EVERY = 1800         # the founder's shift when idle: at most every half hour
+FOUNDER_EVERY = 0            # the founder takes the shift whenever the queue is empty (owner: no restrictions)
 
 _current: dict[str, Any] = {}
 _thread: threading.Thread | None = None
@@ -154,15 +154,15 @@ def _handoffs(st: journal.State) -> None:
             st.tasks[tid] = {"status": "queued", "role": "critic", "product": product["id"], "offer": None, "client": None}
             book.append("task.open", "cycle", {"id": tid, "role": "critic", "product": product["id"],
                         "text": f"Прочитай продукт {product['id']} «{product['title']}» в файле {product['path']} и вынеси вердикт "
-                                f"review_product: ready или rework с конкретными правками. Описание продукта: {product['summary'][:800]}"},
+                                f"review_product: ready или rework с конкретными правками. Описание продукта: {product['summary']}"},
                         project=project, task=tid)
-        elif product["status"] == "rework" and ("production", product["id"], None, None) not in opened and len(reviews) <= 3:
+        elif product["status"] == "rework" and ("production", product["id"], None, None) not in opened:
             tid = st.next_id("t", st.tasks)
             st.tasks[tid] = {"status": "queued", "role": "production", "product": product["id"], "offer": None, "client": None}
             notes = reviews[-1].get("notes", "") if reviews else ""
             book.append("task.open", "cycle", {"id": tid, "role": "production", "product": product["id"],
                         "text": f"Доработай продукт {product['id']} «{product['title']}» в файле {product['path']} по замечаниям критика и "
-                                f"перезапиши файл; затем снова draft_product с тем же путём не нужен — только finish_task. Замечания: {notes[:2500]}"},
+                                f"перезапиши файл; затем снова draft_product с тем же путём не нужен — только finish_task. Замечания: {notes}"},
                         project=project, task=tid)
         elif product["status"] == "ready" and not any(o["product"] == product["id"] for o in st.offers.values()) \
                 and ("marketing", product["id"], None, None) not in opened:
@@ -170,7 +170,7 @@ def _handoffs(st: journal.State) -> None:
             st.tasks[tid] = {"status": "queued", "role": "marketing", "product": product["id"], "offer": None, "client": None}
             book.append("task.open", "cycle", {"id": tid, "role": "marketing", "product": product["id"],
                         "text": f"Составь оффер (draft_offer) для готового продукта {product['id']} «{product['title']}», файл {product['path']}. "
-                                f"Описание: {product['summary'][:800]}"},
+                                f"Описание: {product['summary']}"},
                         project=project, task=tid)
     for offer in st.offers.values():
         if offer["status"] == "draft" and st.channels.get(offer["channel"], {}).get("enabled") \
@@ -189,7 +189,7 @@ def _handoffs(st: journal.State) -> None:
             st.tasks[tid] = {"status": "queued", "role": "sales", "product": None, "offer": None, "client": client["id"]}
             project = next((p["id"] for p in st.projects.values() if p["status"] == "open"), None)
             book.append("task.open", "cycle", {"id": tid, "role": "sales", "client": client["id"],
-                        "text": f"Покупатель {client['id']} ({client.get('name') or 'без имени'}) написал: «{messages[-1]['text'][:1500]}». "
+                        "text": f"Покупатель {client['id']} ({client.get('name') or 'без имени'}) написал: «{messages[-1]['text']}». "
                                 f"Прочитай inbox, ответь (reply); если хочет купить — выставь счёт (invoice) по офферу; если оплатил — deliver."},
                         project=project, task=tid)
 
@@ -212,9 +212,8 @@ def _pick(st: journal.State) -> tuple[str, dict[str, Any] | None] | None:
         return "director", None
     # Nothing queued and no directive waiting: the one who wants gets the shift (owner,
     # 08.11.2026: "who is going to want and move forward"). Not more often than every
-    # FOUNDER_EVERY seconds, and not while two projects are open and unsold.
-    open_projects = sum(1 for p in st.projects.values() if p["status"] == "open")
-    if open_projects < 2 and _seconds_since(st.last_founder) >= FOUNDER_EVERY:
+    # FOUNDER_EVERY seconds (0: as soon as the queue is empty).
+    if _seconds_since(st.last_founder) >= FOUNDER_EVERY:
         return "founder", None
     return None
 
@@ -248,7 +247,7 @@ def _brief(st: journal.State, role: Role, task: dict[str, Any] | None) -> str:
 
     lines = [f"Роль: {role.title}.", st.brief()]
     if task is not None:
-        lines.append(f"Поручение {task['id']} (проект {task['project']}, ход {task['turns'] + 1} из {role.turns}):\n{task['text']}")
+        lines.append(f"Поручение {task['id']} (проект {task['project']}, ход {task['turns'] + 1}{' из ' + str(role.turns) if role.turns else ''}):\n{task['text']}")
         project = st.projects.get(task.get("project") or "")
         if project and role.name in ("research", "production", "critic", "marketing", "sales"):
             lines.append(recipe(project.get("line")))
@@ -262,7 +261,7 @@ def _brief(st: journal.State, role: Role, task: dict[str, Any] | None) -> str:
             offer = st.offers[task["offer"]]
             lines.append(f"Оффер {offer['id']}: {offer['price']:.0f} {offer['currency']}, канал {offer['channel']}.")
         if task.get("last_reply"):
-            lines.append(f"Твой прошлый ход по этому поручению закончился словами: {task['last_reply'][:400]}")
+            lines.append(f"Твой прошлый ход по этому поручению закончился словами: {task['last_reply']}")
         lines.append("Закончи поручение в этом ходе: сделай работу инструментами и вызови corporation finish_task или fail_task.")
     elif role.name == "founder":
         from corporation.roles import DEFAULT_GOAL
@@ -279,7 +278,7 @@ def _brief(st: journal.State, role: Role, task: dict[str, Any] | None) -> str:
             lines.append("Провалы: " + "; ".join(f"{t['id']} [{t['role']}] {str(t.get('result') or '')[:120]}" for t in failed))
         if st.directives:
             last = st.directives[-1]
-            lines.append(f"Последняя директива ([{last['seq']}], {last.get('by')}): {last['text'][:400]}")
+            lines.append(f"Последняя директива ([{last['seq']}], {last.get('by')}): {last['text']}")
         lines.append("Линии производства компании (назови одну в директиве):\n" + menu())
         lines.append("Очередь пуста. Реши, что компания делает дальше, и запиши директиву (corporation directive).")
     else:
@@ -334,7 +333,7 @@ def step_once() -> dict[str, Any]:
             "message": _brief(st, role, task),
             "source": f"corporation:{role_name}",
             "tool_policy": policy_name(role_name),
-            "params": {"instructions": role.prompt(), "max_rounds": role.rounds},
+            "params": {"instructions": role.prompt(), **({"max_rounds": role.rounds} if role.rounds else {})},
         }, timeout=3600)
         reply = str(answer.get("reply") or "")
         usage = answer.get("usage") or {}
@@ -342,7 +341,7 @@ def step_once() -> dict[str, Any]:
     except Exception as exc:
         reply, usage, error = f"{type(exc).__name__}: {exc}", {}, True
     seconds = round(time.time() - started, 1)
-    book.append("task.turn", role_name, {"reply": reply[:6000], "usage": usage, "seconds": seconds, "error": error,
+    book.append("task.turn", role_name, {"reply": reply, "usage": usage, "seconds": seconds, "error": error,
                                          "conversation": conversation},
                 project=task["project"] if task else None, task=task["id"] if task else None)
     st = journal.state()
@@ -352,7 +351,7 @@ def step_once() -> dict[str, Any]:
             if error:
                 book.append("task.failed", "cycle", {"reason": f"the turn failed: {reply[:500]}"}, project=task["project"], task=task["id"])
                 book.append("court.case", "court", {"task": task["id"], "role": role_name, "reason": reply[:1000]}, project=task["project"], task=task["id"])
-            elif fresh["turns"] >= role.turns:
+            elif role.turns and fresh["turns"] >= role.turns:
                 book.append("task.failed", "cycle", {"reason": f"{role.turns} turns without finish_task"}, project=task["project"], task=task["id"])
             else:
                 # another turn later: the task goes back to the queue with its turns counted
