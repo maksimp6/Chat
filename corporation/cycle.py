@@ -244,9 +244,14 @@ def _project_conversation(st: journal.State, project_id: str | None) -> str:
 
 
 def _brief(st: journal.State, role: Role, task: dict[str, Any] | None) -> str:
+    from corporation.lines import menu, recipe
+
     lines = [f"Роль: {role.title}.", st.brief()]
     if task is not None:
         lines.append(f"Поручение {task['id']} (проект {task['project']}, ход {task['turns'] + 1} из {role.turns}):\n{task['text']}")
+        project = st.projects.get(task.get("project") or "")
+        if project and role.name in ("research", "production", "critic", "marketing", "sales"):
+            lines.append(recipe(project.get("line")))
         folder = journal.products_dir() / (task.get("project") or "x")
         if role.writes_products:
             lines.append(f"Каталог продуктов проекта: {folder}")
@@ -275,11 +280,13 @@ def _brief(st: journal.State, role: Role, task: dict[str, Any] | None) -> str:
         if st.directives:
             last = st.directives[-1]
             lines.append(f"Последняя директива ([{last['seq']}], {last.get('by')}): {last['text'][:400]}")
+        lines.append("Линии производства компании (назови одну в директиве):\n" + menu())
         lines.append("Очередь пуста. Реши, что компания делает дальше, и запиши директиву (corporation directive).")
     else:
         pending = [d for d in st.directives if not d.get("project")]
         lines.append("Директивы без проекта:\n" + "\n".join(f"[{d['seq']}] ({d.get('by')}) {d['text']}" for d in pending[:3]))
-        lines.append("Открой проект по первой директиве и поставь задачи ролям; затем кратко отчитайся (note).")
+        lines.append("Линии (поле line в open_project):\n" + menu())
+        lines.append("Открой проект по первой директиве на подходящей линии и поставь задачи ролям; затем кратко отчитайся (note).")
     return "\n\n".join(lines)
 
 

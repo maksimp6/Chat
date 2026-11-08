@@ -45,9 +45,17 @@ class Role:
     turns: int = 4              # turns per task before it fails
     gguf: str = DEFAULT_GGUF
     writes_products: bool = False
+    # A placeholder personality (owner, 08.11.2026: "дай им личности пустышки"): a name, a face
+    # for the window, one line of character. The owner replaces them; the work does not depend on them.
+    persona: tuple[str, str, str] = ("", "🤖", "")
+
+    @property
+    def person(self) -> dict[str, str]:
+        return {"name": self.persona[0] or self.title, "avatar": self.persona[1], "motto": self.persona[2]}
 
     def prompt(self) -> str:
-        return _COMMON + "\n\n" + self.instructions
+        who = f"Тебя зовут {self.persona[0]}; {self.persona[2]}\n\n" if self.persona[0] else ""
+        return _COMMON + "\n\n" + who + self.instructions
 
 
 ROLES: dict[str, Role] = {
@@ -69,6 +77,7 @@ ROLES: dict[str, Role] = {
         tools=frozenset({"directive", "note", "status", "remember"}),
         rounds=8,
         turns=1,
+        persona=("Вера", "💡", "ты основательница: хочешь, чтобы компания зарабатывала, и выбираешь то, что продастся быстрее."),
     ),
     "director": Role(
         name="director",
@@ -86,6 +95,7 @@ ROLES: dict[str, Role] = {
         tools=frozenset(_CORP_ALL | {"remember"}),
         rounds=10,
         turns=2,
+        persona=("Глеб", "🗂️", "ты директор: раскладываешь цель на задачи с измеримым результатом и не плодишь лишних."),
     ),
     "research": Role(
         name="research",
@@ -101,6 +111,7 @@ ROLES: dict[str, Role] = {
         rounds=12,
         turns=3,
         writes_products=True,
+        persona=("Ника", "🔭", "ты разведчица: факты, цифры, источники; домыслов не несёшь."),
     ),
     "production": Role(
         name="production",
@@ -116,6 +127,7 @@ ROLES: dict[str, Role] = {
         rounds=14,
         turns=4,
         writes_products=True,
+        persona=("Макар", "👨‍🔧", "ты мастер цеха: делаешь вещь до конца, без заготовок и отговорок."),
     ),
     "critic": Role(
         name="critic",
@@ -129,6 +141,7 @@ ROLES: dict[str, Role] = {
         tools=frozenset({"review_product", "finish_task", "fail_task", "note", "status"} | _FS_READ | _GIT_READ),
         rounds=8,
         turns=2,
+        persona=("Инга", "🕵️", "ты контролёр: придирчива по делу, хвалишь редко, брак называешь браком."),
     ),
     "marketing": Role(
         name="marketing",
@@ -136,19 +149,20 @@ ROLES: dict[str, Role] = {
         instructions=(
             "Ты маркетинг. Для готового продукта (путь и описание в поручении) пишешь оффер: заголовок, "
             "три строки пользы, цена в рублях (разумная для российских площадок, целое число), канал "
-            "(telegram или email). Вызови corporation draft_offer (product, price, channel, text), затем "
-            "corporation finish_task."
+            "(vk, telegram или email — тот, что включён; ВК для русской аудитории первый). Вызови "
+            "corporation draft_offer (product, price, channel, text), затем corporation finish_task."
         ),
         tools=frozenset({"remember", "draft_offer", "finish_task", "fail_task", "note", "status"} | _FS_READ),
         rounds=8,
         turns=2,
+        persona=("Лев", "🧑‍🎨", "ты маркетолог: пишешь коротко и ярко, цену называешь честно."),
     ),
     "sales": Role(
         name="sales",
         title="Продажи",
         instructions=(
-            "Ты продажи. Инструмент channels — твои руки наружу: publish (offer) публикует оффер в канал "
-            "компании, inbox читает новые сообщения покупателей, reply (client, text) отвечает покупателю, "
+            "Ты продажи: ты сидишь в ВК и в Telegram. Инструмент channels — твои руки наружу: publish (offer) "
+            "публикует оффер на стену сообщества или в канал, inbox читает новые сообщения покупателей, reply (client, text) отвечает покупателю, "
             "invoice (client, offer) выставляет счёт, deliver (client, product) отдаёт продукт после оплаты "
             "(до оплаты инструмент откажет). Отвечай покупателям вежливо и по делу, без обещаний сверх "
             "оффера. Что сделал — corporation finish_task."
@@ -156,6 +170,7 @@ ROLES: dict[str, Role] = {
         tools=frozenset({"publish", "inbox", "reply", "invoice", "deliver", "finish_task", "fail_task", "note", "status"} | _FS_READ),
         rounds=10,
         turns=2,
+        persona=("Дана", "🧑‍💼", "ты продавец: вежлива, конкретна, не обещаешь лишнего и доводишь до оплаты."),
     ),
 }
 

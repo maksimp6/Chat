@@ -261,6 +261,9 @@ class State:
     last_backup: dict[str, Any] | None = None
     goal: str | None = None          # the standing goal (board.goal); roles.DEFAULT_GOAL when none
     last_founder: str | None = None  # when the founder last had a shift
+    court: list[dict[str, Any]] = field(default_factory=list)       # court.case records: the reject chute
+    deliveries: list[dict[str, Any]] = field(default_factory=list)  # delivery records: boxes shipped
+    published: list[dict[str, Any]] = field(default_factory=list)   # offer.published: boxes on the shelf
 
     def next_id(self, prefix: str, table: dict[str, Any]) -> str:
         width = {"p": 4, "t": 5, "pr": 4, "o": 4}.get(prefix, 4)
@@ -334,7 +337,8 @@ def build_state(entries: list[dict[str, Any]]) -> State:
         elif kind == "project.open":
             pid = data["id"]
             st.projects[pid] = {"id": pid, "title": data.get("title", ""), "goal": data.get("goal", ""), "status": "open",
-                                "tasks": [], "opened": e["at"], "directive": data.get("directive"), "conversation": data.get("conversation")}
+                                "tasks": [], "opened": e["at"], "directive": data.get("directive"), "conversation": data.get("conversation"),
+                                "line": data.get("line") or "texts"}
             for d in st.directives:
                 if d["seq"] == data.get("directive"):
                     d["project"] = pid
@@ -383,6 +387,12 @@ def build_state(entries: list[dict[str, Any]]) -> State:
         elif kind == "offer.published":
             if e.get("offer") in st.offers:
                 st.offers[e["offer"]].update(status="published", published=e["at"], message_id=data.get("message_id"))
+            st.published.append({"at": e["at"], "offer": e.get("offer"), "product": e.get("product"), "channel": data.get("channel")})
+        elif kind == "delivery":
+            st.deliveries.append({"at": e["at"], "product": e.get("product"), "client": data.get("client"), "channel": data.get("channel")})
+        elif kind == "court.case":
+            st.court.append({"seq": e["seq"], "at": e["at"], "task": e.get("task") or data.get("task"), "project": e.get("project"),
+                             "reason": data.get("reason"), "channel": data.get("channel"), "action": data.get("action")})
         elif kind == "client.message":
             cid = str(data.get("client"))
             client = st.clients.setdefault(cid, {"id": cid, "name": data.get("name"), "channel": data.get("channel"), "messages": [], "paid": []})

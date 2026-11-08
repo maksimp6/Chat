@@ -12,6 +12,8 @@ Keys are the owner's (core/.env on the phone), never in the ledger:
   LOGOS_CORP_TELEGRAM_TOKEN      the bot's token (BotFather)
   LOGOS_CORP_TELEGRAM_CHANNEL    the channel or chat id the offers are posted to
   LOGOS_CORP_TELEGRAM_PROVIDER   the payments provider token for invoices (optional)
+  LOGOS_CORP_VK_TOKEN            a VK community token (wall, messages, docs)
+  LOGOS_CORP_VK_GROUP            the community id (a number); its wall is the shelf, its messages the counter
   LOGOS_CORP_MAIL_HOST / _USER / _PASSWORD / _IMAP_HOST   the company mailbox (optional)
 """
 
@@ -38,7 +40,7 @@ logger = logging.getLogger("logos.corporation.channels")
 
 __all__ = ["CHANNEL_TOOLS", "GateRefused", "gate", "poll_inbox", "configured"]
 
-RATE_PER_HOUR = {"telegram": 30, "email": 20}
+RATE_PER_HOUR = {"telegram": 30, "vk": 20, "email": 20}
 _SECRET_PATTERNS = (
     re.compile(r"\b\d{8,10}:[A-Za-z0-9_-]{35}\b"),          # a Telegram bot token
     re.compile(r"\b(sk|ghp|gho|github_pat|xox[abp])[-_][A-Za-z0-9_-]{16,}"),
@@ -57,8 +59,74 @@ def configured() -> dict[str, bool]:
     return {
         "telegram": bool(os.environ.get("LOGOS_CORP_TELEGRAM_TOKEN") and os.environ.get("LOGOS_CORP_TELEGRAM_CHANNEL")),
         "telegram_payments": bool(os.environ.get("LOGOS_CORP_TELEGRAM_PROVIDER")),
+        "vk": bool(os.environ.get("LOGOS_CORP_VK_TOKEN") and os.environ.get("LOGOS_CORP_VK_GROUP")),
         "email": bool(os.environ.get("LOGOS_CORP_MAIL_HOST") and os.environ.get("LOGOS_CORP_MAIL_USER")),
     }
+
+
+# ----- VK (a community: its wall is the shelf, its messages are the counter) ----------------
+
+VK_API = "https://api.vk.com/method/"
+VK_V = "5.199"
+
+
+def _vk(method: str, **params: Any) -> Any:
+    token = os.environ.get("LOGOS_CORP_VK_TOKEN") or ""
+    response = requests.post(VK_API + method, data={**params, "access_token": token, "v": VK_V}, timeout=60)
+    payload = response.json() if response.content else {}
+    if "error" in payload:
+        raise ValueError(f"vk {method}: {payload['error'].get('error_msg') or payload['error']}")
+    return payload.get("response")
+
+
+def _vk_group() -> int:
+    return int(os.environ.get("LOGOS_CORP_VK_GROUP") or 0)
+
+
+def _vk_peer(client: str) -> int:
+    """The VK peer id behind a client id of the form vk<peer>."""
+    return int(str(client)[2:]) if str(client).startswith("vk") else int(client)
+
+
+def _vk_send(client: str, text: str, attachment: str | None = None) -> Any:
+    params: dict[str, Any] = {"peer_id": _vk_peer(client), "random_id": int(time.time() * 1000) % 2_000_000_000, "message": text}
+    if attachment:
+        params["attachment"] = attachment
+    return _vk("messages.send", **params)
+
+
+def _vk_upload_doc(client: str, path: Path) -> str:
+    """The product file as a VK document for a message: ``doc<owner>_<id>``."""
+    server = _vk("docs.getMessagesUploadServer", type="doc", peer_id=_vk_peer(client))
+    with path.open("rb") as stream:
+        uploaded = requests.post(server["upload_url"], files={"file": (path.name, stream)}, timeout=120).json()
+    saved = _vk("docs.save", file=uploaded["file"], title=path.name)
+    doc = saved.get("doc") if isinstance(saved, dict) else None
+    if not doc:
+        raise ValueError("vk docs.save returned no document")
+    return f"doc{doc['owner_id']}_{doc['id']}"
+
+
+def poll_vk(st: journal.State) -> list[dict[str, Any]]:
+    """Unread conversations of the community become client messages (client id vk<peer>)."""
+    if not configured()["vk"] or not st.channels.get("vk", {}).get("enabled"):
+        return []
+    result = _vk("messages.getConversations", group_id=_vk_group(), filter="unread", count=20, extended=1)
+    book = journal.ledger()
+    new: list[dict[str, Any]] = []
+    names = {p["id"]: " ".join(part for part in (p.get("first_name"), p.get("last_name")) if part) for p in (result or {}).get("profiles") or []}
+    for item in (result or {}).get("items") or []:
+        message = item.get("last_message") or {}
+        peer = (item.get("conversation") or {}).get("peer", {}).get("id") or message.get("peer_id")
+        text = message.get("text") or ""
+        if not peer or not text:
+            continue
+        cid = f"vk{peer}"
+        book.append("client.message", "channels", {"client": cid, "name": names.get(message.get("from_id")), "channel": "vk",
+                                                     "text": text[:4000], "message_id": message.get("id")})
+        _vk("messages.markAsRead", peer_id=peer, group_id=_vk_group())
+        new.append({"client": cid, "text": text[:4000]})
+    return new
 
 
 def _actor() -> str:
@@ -119,10 +187,15 @@ def _channel_id() -> str:
 
 
 def poll_inbox(st: journal.State | None = None) -> list[dict[str, Any]]:
-    """New buyer messages and payments from Telegram, each written to the ledger."""
+    """New buyer messages and payments from every enabled channel, each written to the ledger."""
     st = st or journal.state()
+    new = list(poll_vk(st))
+    try:
+        poll_mail(st)
+    except Exception as exc:  # the mailbox is optional; a failure is logged, not fatal
+        logger.warning("[CORP] mail inbox: %s", exc)
     if not configured()["telegram"] or not st.channels.get("telegram", {}).get("enabled"):
-        return []
+        return new
     cursor = st.channels.get("telegram", {}).get("cursor")
     params: dict[str, Any] = {"timeout": 0, "allowed_updates": '["message","pre_checkout_query"]'}
     if cursor:
@@ -181,13 +254,17 @@ def _publish(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     if offer["status"] == "published":
         return {"success": True, "offer": oid, "note": "already published", "message_id": offer.get("message_id")}
     channel = offer["channel"]
-    text = f"{offer['text']}\n\nЦена: {offer['price']:.0f} {offer['currency']}. Чтобы купить, напишите боту: /buy {oid}"
+    how = {"telegram": f"напишите боту: /buy {oid}", "vk": f"напишите сообществу: куплю {oid}"}.get(channel, f"ответьте на это письмо: куплю {oid}")
+    text = f"{offer['text']}\n\nЦена: {offer['price']:.0f} {offer['currency']}. Чтобы купить, {how}"
     gate(st, channel, "publish", text=text)
     book = journal.ledger()
     book.append("note", _actor(), {"text": f"publishing {oid} to {channel}"}, offer=oid, product=offer["product"], project=offer["project"])
     if channel == "telegram":
         sent = _tg("sendMessage", chat_id=_channel_id(), text=text)
         message_id = sent.get("message_id")
+    elif channel == "vk":
+        posted = _vk("wall.post", owner_id=-_vk_group(), from_group=1, message=text)
+        message_id = (posted or {}).get("post_id")
     else:
         message_id = _mail_send(os.environ.get("LOGOS_CORP_MAIL_LIST") or os.environ.get("LOGOS_CORP_MAIL_USER") or "",
                                 f"Оффер {oid}", text)
@@ -222,6 +299,8 @@ def _reply(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     book.append("client.reply", _actor(), {"client": cid, "channel": channel, "text": text})
     if channel == "telegram":
         _tg("sendMessage", chat_id=cid, text=text)
+    elif channel == "vk":
+        _vk_send(cid, text)
     else:
         _mail_send(cid, "Ответ компании", text)
     return {"success": True, "client": cid, "channel": channel}
@@ -254,6 +333,8 @@ def _invoice(args: dict[str, Any], cfg=None) -> dict[str, Any]:
                 offer=oid, product=offer["product"])
     if channel == "telegram":
         _tg("sendMessage", chat_id=cid, text=text)
+    elif channel == "vk":
+        _vk_send(cid, text)
     else:
         _mail_send(cid, f"Счёт {oid}", text)
     return {"success": True, "client": cid, "offer": oid, "invoice": "text",
@@ -277,6 +358,8 @@ def _deliver(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     if channel == "telegram":
         with path.open("rb") as stream:
             _tg("sendDocument", chat_id=cid, caption=product["title"][:1000], _files={"document": (path.name, stream)})
+    elif channel == "vk":
+        _vk_send(cid, product["title"][:1000], attachment=_vk_upload_doc(cid, path))
     else:
         _mail_send(cid, product["title"], product.get("summary") or product["title"], attachment=path)
     return {"success": True, "client": cid, "product": prid, "delivered": channel}

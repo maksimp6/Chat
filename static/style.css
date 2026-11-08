@@ -2942,6 +2942,369 @@ body {
   color: var(--text-muted);
   font-size: 12px;
 }
+/* The working day (the owner's second picture): header, the line of events, department rows, the side */
+.logos-pro-app .corp-modal .logos-modal-content,
+.logos-pro-app .corp-modal .modal-content { max-width: 1200px; }
+.logos-pro-app .corp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px 0 10px;
+}
+.logos-pro-app .corp-brand-title { font-weight: 700; font-size: 20px; }
+.logos-pro-app .corp-pill {
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 13px;
+}
+.logos-pro-app .corp-pill-on { border-color: #2ecc71; }
+.logos-pro-app .corp-now { text-align: right; }
+.logos-pro-app .corp-now-time { font-weight: 700; font-size: 22px; }
+.logos-pro-app .corp-day {
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) 1fr minmax(200px, 250px);
+  gap: 10px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .logos-pro-app .corp-day { grid-template-columns: 1fr; }
+}
+.logos-pro-app .corp-timeline { font-size: 12px; }
+.logos-pro-app .corp-tl-row { display: flex; gap: 8px; padding: 3px 0; }
+.logos-pro-app .corp-tl-dot {
+  width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex: none;
+  background: #4aa3ff; box-shadow: 0 0 6px #4aa3ff;
+}
+.logos-pro-app .corp-tl-time { font-weight: 700; }
+.logos-pro-app .corp-tl-label { font-size: 12px; }
+.logos-pro-app .corp-tl-what { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logos-pro-app .corp-rows { display: flex; flex-direction: column; gap: 6px; }
+.logos-pro-app .corp-row {
+  display: grid;
+  grid-template-columns: 70px 1fr minmax(160px, 38%) 90px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 12px;
+}
+@media (max-width: 720px) {
+  .logos-pro-app .corp-row { grid-template-columns: 60px 1fr; }
+  .logos-pro-app .corp-row-checks { grid-column: 1 / -1; }
+}
+.logos-pro-app .corp-face { text-align: center; }
+.logos-pro-app .corp-face-sign { font-size: 24px; line-height: 1.1; }
+.logos-pro-app .corp-face-name { font-size: 11px; color: var(--text-muted); }
+.logos-pro-app .corp-row-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.logos-pro-app .corp-row-name { font-weight: 600; font-size: 13px; }
+.logos-pro-app .corp-tag {
+  font-size: 10px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--border); color: var(--text-muted);
+}
+.logos-pro-app .corp-row-checks { margin: 0; font-size: 11px; }
+.logos-pro-app .corp-check-none::before { content: "○ "; color: var(--text-muted); }
+.logos-pro-app .corp-badge {
+  justify-self: end;
+  padding: 3px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.logos-pro-app .corp-badge-done { border-color: #2ecc71; color: #2e8b57; }
+.logos-pro-app .corp-badge-work { border-color: #d9a400; color: #b8860b; }
+.logos-pro-app .corp-badge-queue { border-color: #4aa3ff; color: #2f7fd1; }
+.logos-pro-app .corp-badge-idle { color: var(--text-muted); }
+.logos-pro-app .corp-side { display: flex; flex-direction: column; gap: 10px; }
+.logos-pro-app .corp-metric { padding: 4px 0; border-top: 1px solid var(--border); }
+.logos-pro-app .corp-metric-val { font-weight: 700; font-size: 18px; }
+.logos-pro-app .corp-event { display: flex; gap: 8px; font-size: 12px; padding: 2px 0; }
+.logos-pro-app .corp-event-time { color: var(--text-muted); flex: none; }
+.logos-pro-app .corp-mood-title { font-weight: 700; font-size: 16px; }
+/* The company front (the owner's picture of 08.11.2026): panels, the orchestrator, the departments */
+.logos-pro-app .corp-top {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) 1fr;
+  gap: 10px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .logos-pro-app .corp-top { grid-template-columns: 1fr; }
+}
+.logos-pro-app .corp-panel {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.logos-pro-app .corp-panel-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.logos-pro-app .corp-panel-title-2 {
+  margin-top: 10px;
+}
+.logos-pro-app .corp-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+.logos-pro-app .corp-kv-key { color: var(--text-muted); }
+.logos-pro-app .corp-kv-val { font-weight: 600; text-align: right; }
+.logos-pro-app .corp-good { color: #2e8b57; }
+.logos-pro-app .corp-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: var(--text-muted);
+}
+.logos-pro-app .corp-dot-on { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+.logos-pro-app .corp-dot-off { background: #95a5a6; }
+.logos-pro-app .corp-main { display: flex; flex-direction: column; gap: 10px; }
+.logos-pro-app .corp-orch {
+  display: grid;
+  grid-template-columns: 1fr minmax(180px, 40%);
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 13px;
+}
+@media (max-width: 720px) {
+  .logos-pro-app .corp-orch { grid-template-columns: 1fr; }
+}
+.logos-pro-app .corp-orch-title { font-weight: 600; font-size: 15px; }
+.logos-pro-app .corp-bubble {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  align-self: center;
+}
+.logos-pro-app .corp-depts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+.logos-pro-app .corp-dept {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.logos-pro-app .corp-card-active {
+  border-color: var(--accent, #d9a400);
+  box-shadow: 0 0 0 2px rgba(217, 164, 0, 0.25);
+}
+.logos-pro-app .corp-dept-head { display: flex; gap: 6px; align-items: baseline; }
+.logos-pro-app .corp-dept-sign { font-size: 18px; }
+.logos-pro-app .corp-dept-name { font-weight: 600; }
+.logos-pro-app .corp-checks {
+  margin: 2px 0;
+  padding-left: 0;
+  list-style: none;
+}
+.logos-pro-app .corp-checks li::before {
+  content: "✔ ";
+  color: #2e8b57;
+}
+.logos-pro-app .corp-dept-foot {
+  margin-top: auto;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.logos-pro-app .corp-bottom {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  padding: 10px 0;
+}
+.logos-pro-app .corp-task {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.logos-pro-app .corp-task-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logos-pro-app .corp-task-state { white-space: nowrap; color: var(--text-muted); }
+.logos-pro-app .corp-task-working { color: #d9a400; }
+.logos-pro-app .corp-results {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+.logos-pro-app .corp-result-key { color: var(--text-muted); font-size: 11px; }
+.logos-pro-app .corp-result-val { font-weight: 700; font-size: 18px; }
+/* The factory floor: roof with the stack, the belt of stations, the yard */
+.logos-pro-app .corp-roof {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+.logos-pro-app .corp-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 28px;
+  line-height: 1;
+}
+.logos-pro-app .corp-smoke {
+  font-size: 14px;
+  color: var(--text-muted);
+  min-height: 16px;
+}
+.logos-pro-app .corp-stack-on .corp-smoke {
+  animation: corp-smoke 2.4s ease-in-out infinite;
+}
+@keyframes corp-smoke {
+  0% { opacity: 0.2; transform: translateY(4px); }
+  50% { opacity: 1; transform: translateY(-2px); }
+  100% { opacity: 0.2; transform: translateY(-8px); }
+}
+.logos-pro-app .corp-sign-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+.logos-pro-app .corp-floor {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.logos-pro-app .corp-belt-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-width: max-content;
+}
+.logos-pro-app .corp-arrow {
+  align-self: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.logos-pro-app .corp-station {
+  width: 148px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.logos-pro-app .corp-station-active {
+  border-color: var(--accent, #d9a400);
+  box-shadow: 0 0 0 2px rgba(217, 164, 0, 0.25);
+}
+.logos-pro-app .corp-station-head {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.logos-pro-app .corp-station-sign {
+  font-size: 18px;
+}
+.logos-pro-app .corp-station-name {
+  font-weight: 600;
+}
+.logos-pro-app .corp-station-does {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.logos-pro-app .corp-bin {
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 3px 5px;
+  min-height: 22px;
+}
+.logos-pro-app .corp-bin-label,
+.logos-pro-app .corp-counters {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.logos-pro-app .corp-counters {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+.logos-pro-app .corp-fail {
+  color: #c0392b;
+}
+.logos-pro-app .corp-blank {
+  font-size: 11px;
+}
+.logos-pro-app .corp-working {
+  font-weight: 600;
+  animation: corp-blink 1.2s steps(2) infinite;
+}
+@keyframes corp-blink {
+  to { opacity: 0.55; }
+}
+.logos-pro-app .corp-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.logos-pro-app .corp-part {
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+.logos-pro-app .corp-part-rework {
+  border-color: #c0392b;
+}
+.logos-pro-app .corp-part-ready {
+  border-color: #2e8b57;
+}
+.logos-pro-app .corp-belt {
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 5px;
+  background: repeating-linear-gradient(90deg, var(--border) 0 14px, transparent 14px 28px);
+  background-size: 28px 10px;
+}
+.logos-pro-app .corp-belt-on {
+  animation: corp-belt-run 1s linear infinite;
+}
+@keyframes corp-belt-run {
+  to { background-position-x: 28px; }
+}
+.logos-pro-app .corp-yard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 6px;
+  padding: 8px 0;
+}
+.logos-pro-app .corp-bay {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.logos-pro-app .corp-bay-title {
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.logos-pro-app .corp-chute {
+  border-style: dashed;
+}
 .logos-pro-app .logs-row-head {
   display: flex;
   flex-wrap: wrap;

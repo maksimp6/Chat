@@ -1,6 +1,6 @@
 """POST /api/corporation: the board window reads here; actions are the owner's commands.
 
-One endpoint, ``action`` picks what to do (status, ledger, projects, start, stop,
+One endpoint, ``action`` picks what to do (status, conveyor, ledger, projects, start, stop,
 directive, decision, sold, expense, channel, backup), the same words as the chat
 commands, so the window and the chat are one steering wheel.
 """
@@ -30,6 +30,10 @@ def corporation_action() -> Any:
     try:
         if action == "status":
             return jsonify({"success": True, **cycle.status()})
+        if action == "conveyor":
+            from corporation import conveyor
+
+            return jsonify({"success": True, **conveyor.board()})
         if action == "ledger":
             count = int(data.get("count") or request.args.get("count") or 50)
             return jsonify({"success": True, "entries": journal.ledger().tail(max(1, min(count, 500))), "verify": journal.ledger().verify()})

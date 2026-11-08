@@ -50,15 +50,20 @@ def _open_project(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     if directive_seq is None:
         pending = [d for d in st.directives if not d.get("project")]
         directive_seq = pending[0]["seq"] if pending else None
+    from corporation.lines import DEFAULT_LINE, LINES
+
+    line = str(args.get("line") or DEFAULT_LINE).lower()
+    if line not in LINES:
+        raise ValueError(f"line must be one of: {', '.join(LINES)}")
     folder = _project_dir(pid)
     folder.mkdir(parents=True, exist_ok=True)
     entry = journal.ledger().append(
         "project.open", _actor(),
         {"id": pid, "title": str(args["title"])[:200], "goal": str(args.get("goal") or "")[:4000],
-         "directive": directive_seq, "folder": str(folder)},
+         "directive": directive_seq, "folder": str(folder), "line": line},
         project=pid,
     )
-    return {"success": True, "project": pid, "folder": str(folder), "seq": entry["seq"]}
+    return {"success": True, "project": pid, "line": line, "folder": str(folder), "seq": entry["seq"]}
 
 
 def _open_task(args: dict[str, Any], cfg=None) -> dict[str, Any]:
@@ -172,8 +177,8 @@ def _draft_offer(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     if not (1 <= price <= 1_000_000):
         raise ValueError("price must be between 1 and 1000000 RUB")
     channel = str(args.get("channel") or "telegram").lower()
-    if channel not in ("telegram", "email"):
-        raise ValueError("channel must be telegram or email")
+    if channel not in ("telegram", "vk", "email"):
+        raise ValueError("channel must be telegram, vk or email")
     oid = st.next_id("o", st.offers)
     entry = journal.ledger().append(
         "offer.draft", _actor(),
@@ -240,9 +245,11 @@ def _tool(fn, *, read_only: bool, schema: dict[str, Any], title: str, descriptio
 CORPORATION_TOOLS = {
     "open_project": _tool(
         _open_project, read_only=False,
-        schema={"properties": {"title": _TEXT, "goal": _TEXT, "directive": {"type": ["integer", "string", "null"]}}, "required": ["title", "goal"]},
+        schema={"properties": {"title": _TEXT, "goal": _TEXT, "directive": {"type": ["integer", "string", "null"]},
+                               "line": {"type": "string", "enum": ["android", "bots", "texts", "docs", "data", "translation"]}},
+                "required": ["title", "goal", "line"]},
         title="Открыть проект",
-        description="Директор: новый проект по директиве правления (directive — номер записи директивы; без него берётся первая открытая). Создаёт каталог продуктов проекта.",
+        description="Директор: новый проект по директиве (directive — номер записи; без него первая открытая) на одной из линий: android (исходники приложений), bots, texts, docs, data, translation. Создаёт каталог продуктов проекта.",
     ),
     "open_task": _tool(
         _open_task, read_only=False,
@@ -277,10 +284,10 @@ CORPORATION_TOOLS = {
     ),
     "draft_offer": _tool(
         _draft_offer, read_only=False,
-        schema={"properties": {"product": _ID, "price": {"type": "number"}, "channel": {"type": "string", "enum": ["telegram", "email"]}, "text": _TEXT},
+        schema={"properties": {"product": _ID, "price": {"type": "number"}, "channel": {"type": "string", "enum": ["telegram", "vk", "email"]}, "text": _TEXT},
                 "required": ["price", "text"]},
         title="Оффер",
-        description="Маркетинг: цена в рублях, канал и текст объявления для готового продукта.",
+        description="Маркетинг: цена в рублях, канал (telegram, vk, email) и текст объявления для готового продукта.",
     ),
     "directive": _tool(
         _directive, read_only=False,

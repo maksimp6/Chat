@@ -26,7 +26,7 @@ HELP = (
     "• корпорация: решение <проект|задача> <close|requeue|keep> <текст>\n"
     "• корпорация: продано <продукт> <сумма> [покупатель] [примечание]\n"
     "• корпорация: расход <сумма> <на что>\n"
-    "• корпорация: канал telegram|email вкл|выкл\n"
+    "• корпорация: канал telegram|vk|email вкл|выкл\n"
     "• корпорация: статус — положение дел\n"
     "• корпорация: снимок — резервная копия сейчас\n"
     "• корпорация: журнал [n] — последние записи"
@@ -131,8 +131,8 @@ def handle(message: str) -> str:
         return f"Расход записан ([{made['seq']}]): {_fmt_money(amount)} ₽."
     if word in ("канал", "channel"):
         parts = tail.split()
-        if len(parts) < 2 or parts[0].lower() not in ("telegram", "email"):
-            return "Формат: корпорация: канал telegram|email вкл|выкл"
+        if len(parts) < 2 or parts[0].lower() not in ("telegram", "vk", "email"):
+            return "Формат: корпорация: канал telegram|vk|email вкл|выкл"
         name, switch = parts[0].lower(), parts[1].lower()
         if switch in ("вкл", "on"):
             from corporation import channels
