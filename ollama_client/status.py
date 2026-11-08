@@ -44,6 +44,10 @@ def status() -> dict[str, Any]:
     ]
     if error:
         result["errors"]["ps"] = error
+    hardware, error = _get("/v1/status")
+    result["hardware"] = hardware if isinstance(hardware, dict) else None
+    if error:
+        result["errors"]["status"] = error
     result["models"] = {}
     for key, info in settings.MODELS.items():
         shown, error = _get("/api/show", json={"model": info["upstream"]})

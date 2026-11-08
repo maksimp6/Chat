@@ -15,7 +15,8 @@ from collections.abc import Callable
 from typing import Any
 
 from ollama_client import settings
-from ollama_client.chat import OllamaError, ask as ollama_ask
+from ollama_client.chat import OllamaError
+from ollama_client.turn import ask as ollama_ask
 
 __all__ = ["OllamaClient", "OllamaClientError"]
 
@@ -75,8 +76,8 @@ class OllamaClient:
         execution_trace: Any = None,
         trace_step: Any = None,
     ) -> dict[str, Any]:
-        """One /api/chat request; Ollama keeps no conversation, so ``conversation_id``
-        is unused: the caller sends the whole dialog in ``params["input"]``."""
+        """One /v1/turn request; the runner keeps one context from boot, so ``conversation_id``
+        is unused: the caller sends the whole dialog in ``params["input"]`` and the turn client picks what is new."""
         params = dict(params or {})
         info = settings.MODELS.get(model_key)
         if info is None:

@@ -386,10 +386,16 @@
         var s = data.settings || {};
         var options = s.options || {};
         var models = s.models || {};
+        var hw = data.hardware || {};
         var html = ollamaRows(
           [
             ["Сервер", s.url],
             ["Версия asmrun", data.version],
+            ["Температура ядер, °C", Array.isArray(hw.temp_c) ? hw.temp_c.join("  ") : "нет датчика (Windows)"],
+            ["Температура корпуса, °C", hw.pkg_temp_c == null ? "нет датчика (Windows)" : hw.pkg_temp_c],
+            ["Частота ядра в работе, МГц", hw.mhz ? hw.mhz : "нет счётчика (Windows)"],
+            ["Контекст, токенов", hw.ctx != null ? hw.ctx_used + " из " + hw.ctx : ""],
+            ["Последний ход", hw.ctx != null ? hw.prompt_tokens + " токенов за " + hw.prompt_ms + " мс, ответ " + hw.gen_tokens + " за " + hw.gen_ms + " мс" : ""],
             [
               "Модели",
               Object.keys(models)
