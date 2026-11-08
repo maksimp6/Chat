@@ -640,6 +640,10 @@ q35_setup:
   mov  rcx, [r15 + Model.n_threads]
   imul rcx, [rel g35_ctx]
 <<<<<<< ours
+<<<<<<< ours
+=======
+  mov  [rel g_scores_n], rcx
+>>>>>>> theirs
 =======
   mov  [rel g_scores_n], rcx
 >>>>>>> theirs

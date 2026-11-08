@@ -466,7 +466,10 @@ Logos's client keeps its code; its settings name `asmrun-qwen35-9b` (commit on
 `develop`, 2026-11-08). A plain-text body on `/api/chat` is still the page's own API.
 
 <<<<<<< ours
+<<<<<<< ours
 =======
+=======
+>>>>>>> theirs
 **RAM and the batch (owner: "what about ram", "optimazi maximum").** The
 attention kernel now takes its per-thread score stride from the job
 (`AttnJob.stride`), so the embedder runs on its own 1024 positions
@@ -486,6 +489,9 @@ it against all the slots (5 + 4·T instructions per 32 weights instead of
 9·T), about 2x on prompts and embeddings. That rewrite of the Q6_K/Q4_K/
 Q5_K/Q8_0 kernels is the next piece of work.
 
+<<<<<<< ours
+>>>>>>> theirs
+=======
 >>>>>>> theirs
 **Embeddings (owner: "ok then use embeddings").** `--embed FILE` loads
 Qwen3-Embedding-0.6B (Q8_0, 639 MB; `qwen3-embedding-0.6b.gguf` on the

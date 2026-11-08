@@ -1336,7 +1336,11 @@ model_embed_load:
   mov  qword [rel g_tok_ready], 0 ; tok_init builds the embedder's own tables (it returns early on built ones)
   mov  rcx, rbx
 <<<<<<< ours
+<<<<<<< ours
   mov  rdx, rsi
+=======
+  mov  edx, EMBED_CTX           ; its own short context: a text to embed is one chunk, not a dialog
+>>>>>>> theirs
 =======
   mov  edx, EMBED_CTX           ; its own short context: a text to embed is one chunk, not a dialog
 >>>>>>> theirs
@@ -2695,6 +2699,10 @@ s_embed_ok3: db " MB of weights (POST /api/embed)", 10, 0
 s_embed_no:  db "asmrun: embeddings: --embed needs a Qwen3.5 chat model beside it (a Qwen3-family one owns the same buffers); none loaded", 10, 0
 TOK_STATE_BYTES equ 80         ; g_tok_ready .. g_merge_slots in tokenizer.asm: ten qwords
 <<<<<<< ours
+<<<<<<< ours
+=======
+EMBED_CTX equ 1024             ; the embedder's positions: Logos's 2000-character chunks are under this; 28 layers x 224 KB per position
+>>>>>>> theirs
 =======
 EMBED_CTX equ 1024             ; the embedder's positions: Logos's 2000-character chunks are under this; 28 layers x 224 KB per position
 >>>>>>> theirs
