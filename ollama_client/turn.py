@@ -29,6 +29,73 @@ __all__ = ["ask", "turn_body"]
 _TOOL_CALL_MARK = "<tool_call>"
 
 
+def _first_sentence(text: Any, limit: int = 160) -> str:
+    text = " ".join(str(text or "").split())
+    for stop in (". ", "\n"):
+        cut = text.find(stop)
+        if 0 < cut < limit:
+            return text[: cut + 1].strip()
+    return text[:limit].strip()
+
+
+def compact_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The category functions with their action list as one line each, no JSON
+    schemas: the registry's full form (every action's parameter schema under
+    anyOf, Russian descriptions) is ~21,000 tokens for filesystem and git alone,
+    which the local model reads at a few tokens a second and cannot keep in its
+    attention window. Here: name, a one-sentence description, the actions as
+    ``name(param, optional?) — what it does``, and parameters {tool, arguments}."""
+    result: list[dict[str, Any]] = []
+    for tool in tools:
+        function = tool.get("function") if isinstance(tool, dict) else None
+        if not isinstance(function, dict) or not function.get("name"):
+            continue
+        params = function.get("parameters") if isinstance(function.get("parameters"), dict) else {}
+        props = params.get("properties") if isinstance(params.get("properties"), dict) else {}
+        actions: list[tuple[str, list[str], str]] = []
+        arguments = props.get("arguments") if isinstance(props.get("arguments"), dict) else {}
+        for option in arguments.get("anyOf") or []:
+            if not isinstance(option, dict) or not option.get("title"):
+                continue
+            required = set(option.get("required") or [])
+            names = []
+            for key in (option.get("properties") or {}):
+                names.append(key if key in required else key + "?")
+            actions.append((str(option["title"]), names, _first_sentence(option.get("description"), 90)))
+        enum = []
+        tool_prop = props.get("tool") if isinstance(props.get("tool"), dict) else {}
+        if isinstance(tool_prop.get("enum"), list):
+            enum = [str(value) for value in tool_prop["enum"]]
+        if not enum:
+            enum = [name for name, _names, _desc in actions]
+        lines = [_first_sentence(function.get("description"))]
+        if actions:
+            lines.append("Действия (tool) и параметры (arguments):")
+            for name, names, desc in actions:
+                line = f"- {name}({', '.join(names)})"
+                if desc and not desc.startswith("Параметры действия"):
+                    line += " — " + desc
+                lines.append(line)
+        result.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": function["name"],
+                    "description": "\n".join(lines),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "tool": {"type": "string", "enum": enum},
+                            "arguments": {"type": "object"},
+                        },
+                        "required": ["tool", "arguments"],
+                    },
+                },
+            }
+        )
+    return result
+
+
 def turn_body(instructions: Any, items: Any, tools: Any) -> dict[str, Any]:
     """The /v1/turn body for Responses input: the trailing tool outputs as
     tool_results, else the last user message; the system text and the tools always."""
@@ -49,7 +116,7 @@ def turn_body(instructions: Any, items: Any, tools: Any) -> dict[str, Any]:
     body: dict[str, Any] = {}
     if system_parts:
         body["system"] = "\n\n".join(system_parts)
-    function_tools = chat_tools(tools)
+    function_tools = compact_tools(chat_tools(tools))
     if function_tools:
         body["tools"] = function_tools
     # the trailing tool outputs (after the model's calls) are this turn
