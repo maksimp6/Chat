@@ -820,45 +820,55 @@ model_load:
   movss xmm0, [r15 + Model.rope_theta]
   call k_rope_table
 
-  ; forward-pass scratch (module globals holding the allocated pointers).
+  ; forward-pass scratch (module globals holding the allocated pointers), each
+  ; ACT_SLOTS vectors deep: model_forward_batch (q3f.asm) keeps token t at
+  ; base + t*dim*4, model_forward uses vector 0
   mov  rax, [r15 + Model.n_embd]
+  imul rax, rax, ACT_SLOTS
   shl  rax, 2
   mov  rcx, rax
   call rt_alloc
   mov  [rel g_x], rax
   mov  rax, [r15 + Model.n_embd]
+  imul rax, rax, ACT_SLOTS
   shl  rax, 2
   mov  rcx, rax
   call rt_alloc
   mov  [rel g_xn], rax
   mov  rax, [r15 + Model.n_head]
   imul rax, [r15 + Model.head_dim]
+  imul rax, rax, ACT_SLOTS
   shl  rax, 2
   mov  rcx, rax
   call rt_alloc
   mov  [rel g_q], rax
   mov  rax, [r15 + Model.n_head]
   imul rax, [r15 + Model.head_dim]
+  imul rax, rax, ACT_SLOTS
   shl  rax, 2
   mov  rcx, rax
   call rt_alloc
   mov  [rel g_att_out], rax
   mov  rax, [r15 + Model.kv_dim]
+  imul rax, rax, ACT_SLOTS
   shl  rax, 2
   mov  rcx, rax
   call rt_alloc
   mov  [rel g_k], rax
   mov  rax, [r15 + Model.kv_dim]
+  imul rax, rax, ACT_SLOTS
   shl  rax, 2
   mov  rcx, rax
   call rt_alloc
   mov  [rel g_v], rax
   mov  rax, [r15 + Model.n_ff]
+  imul rax, rax, ACT_SLOTS
   shl  rax, 2
   mov  rcx, rax
   call rt_alloc
   mov  [rel g_g], rax
   mov  rax, [r15 + Model.n_ff]
+  imul rax, rax, ACT_SLOTS
   shl  rax, 2
   mov  rcx, rax
   call rt_alloc
@@ -893,13 +903,18 @@ model_load:
   call act_slots_init
 .slots_up:
 
-  ; attention scores: f32[n_threads][n_ctx].
+  ; attention scores: f32[n_threads][n_ctx]; a second model keeps the first
+  ; one's buffer when that is large enough (each job carries its own stride)
   mov  rax, [r15 + Model.n_threads]
   imul rax, [r15 + Model.n_ctx]
+  cmp  rax, [rel g_scores_n]
+  jbe  .scores_up
+  mov  [rel g_scores_n], rax
   shl  rax, 2
   mov  rcx, rax
   call rt_alloc
   mov  [rel g_scores], rax
+.scores_up:
 
   ; Pre-fault every weight page (one byte per 4 KiB) so page-in is counted in
   ; load time, and total the tensor bytes a token reads (every tensor except the
@@ -1162,6 +1177,8 @@ model_forward:
   mov  [r9 + AttnJob.out], rax
   mov  rax, [rel g_scores]
   mov  [r9 + AttnJob.scores], rax
+  mov  rax, [rbx + Model.n_ctx]
+  mov  [r9 + AttnJob.stride], rax
   mov  rax, rsi
   inc  rax
   mov  [r9 + AttnJob.seqlen], rax
@@ -1318,7 +1335,11 @@ model_embed_load:
   mov  rdi, [rel g_weight_bytes]
   mov  qword [rel g_tok_ready], 0 ; tok_init builds the embedder's own tables (it returns early on built ones)
   mov  rcx, rbx
+<<<<<<< ours
   mov  rdx, rsi
+=======
+  mov  edx, EMBED_CTX           ; its own short context: a text to embed is one chunk, not a dialog
+>>>>>>> theirs
   mov  r8, [rel g_nthreads]
   call model_load
   mov  [rel g_embed_model], rax
@@ -2618,6 +2639,7 @@ g_d8:           dq 0           ; f32[maxcols/256]   per-256-block activation sca
 g_bsums:        dq 0           ; i16[maxcols/16]    per-16 sums of g_q8 (Q6_K -32 offset term)
 g_bsums32:      dq 0           ; i16[maxcols/32]    per-32 sums of g_q8 (Q4_K mins term)
 g_scores:       dq 0           ; f32[n_threads*n_ctx]  attention score scratch
+g_scores_n:     dq 0           ; floats it holds (the largest model's n_threads*n_ctx)
 g_n_ctx:        dq 0           ; per-thread score-row stride read by k_attn_job
 g_weight_bytes: dq 0           ; tensor bytes read per token, for the bandwidth statistic
 g_prof_t0:      dq 0           ; PROF_BEGIN timestamp
@@ -2672,6 +2694,10 @@ s_embed_ok2: db " dims, ", 0
 s_embed_ok3: db " MB of weights (POST /api/embed)", 10, 0
 s_embed_no:  db "asmrun: embeddings: --embed needs a Qwen3.5 chat model beside it (a Qwen3-family one owns the same buffers); none loaded", 10, 0
 TOK_STATE_BYTES equ 80         ; g_tok_ready .. g_merge_slots in tokenizer.asm: ten qwords
+<<<<<<< ours
+=======
+EMBED_CTX equ 1024             ; the embedder's positions: Logos's 2000-character chunks are under this; 28 layers x 224 KB per position
+>>>>>>> theirs
   align 8
 g_embed_path:   dq 0           ; --embed FILE (UTF-16), or 0
 g_embed_model:  dq 0           ; the embedding model's Model*, or 0

@@ -169,7 +169,8 @@ struc AttnJob
   .kbase:    resq 1   ; -> f32[ seqlen ][ kv_dim ]    (this layer's K cache)
   .vbase:    resq 1   ; -> f32[ seqlen ][ kv_dim ]    (this layer's V cache)
   .out:      resq 1   ; -> f32[ n_head * head_dim ]
-  .scores:   resq 1   ; -> f32[ n_threads ][ n_ctx ]  (per-thread scratch)
+  .scores:   resq 1   ; -> f32[ n_threads ][ stride ]  (per-thread scratch)
+  .stride:   resq 1   ; floats per thread's score row (the model's own n_ctx)
   .seqlen:   resq 1   ; number of cached positions (pos + 1)
   .n_head:   resq 1
   .n_head_kv: resq 1

@@ -639,6 +639,10 @@ q35_setup:
   call act_slots_init          ; the int8 activation slots (ACT_SLOTS, for a prompt batch)
   mov  rcx, [r15 + Model.n_threads]
   imul rcx, [rel g35_ctx]
+<<<<<<< ours
+=======
+  mov  [rel g_scores_n], rcx
+>>>>>>> theirs
   shl  rcx, 2
   call rt_alloc
   mov  [rel g_scores], rax

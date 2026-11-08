@@ -1235,9 +1235,9 @@ k_attn_job:
   xor  rdx, rdx
   div  qword [r14 + AttnJob.n_head_kv]
   mov  A_group, rax             ; group = n_head/n_head_kv
-  ; scores_row = scores + tid*g_n_ctx
+  ; scores_row = scores + tid*stride (the job's own: two models share the kernel)
   mov  rax, A_tid
-  imul rax, [rel g_n_ctx]
+  imul rax, [r14 + AttnJob.stride]
   shl  rax, 2
   add  rax, [r14 + AttnJob.scores]
   mov  rsi, rax                 ; scores_row

@@ -324,6 +324,11 @@ q35_forward_batch:
   mov  [r9 + AttnJob.vbase], rax
   mov  rax, [rel g_scores]
   mov  [r9 + AttnJob.scores], rax
+<<<<<<< ours
+=======
+  mov  rax, [rel g35_ctx]
+  mov  [r9 + AttnJob.stride], rax
+>>>>>>> theirs
   mov  rax, [rel g35_pos0]
   add  rax, r15
   inc  rax

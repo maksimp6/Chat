@@ -465,6 +465,28 @@ answered correctly.
 Logos's client keeps its code; its settings name `asmrun-qwen35-9b` (commit on
 `develop`, 2026-11-08). A plain-text body on `/api/chat` is still the page's own API.
 
+<<<<<<< ours
+=======
+**RAM and the batch (owner: "what about ram", "optimazi maximum").** The
+attention kernel now takes its per-thread score stride from the job
+(`AttnJob.stride`), so the embedder runs on its own 1024 positions
+(`EMBED_CTX`; Logos's 2000-character chunks tokenise to ~550) instead of
+inheriting the chat model's 2048: its cache shrinks from 0.44 to 0.22 GiB,
+and the budget on the stick is 5.24 (Q4 9B) + 0.60 (embedder) + 0.13 + 0.22
++ ~0.1 GiB ≈ 6.3 of 7.74. `model_forward_batch` (`q3f.asm`) runs the Qwen3
+path for up to 32 tokens at once, the weights read once per layer for all of
+them; the vectors are identical to the token-by-token ones (0.646 / 0.192).
+But the measured gain is small: a 542-token chunk takes 14.2 s batched
+(26 ms per token) against ~22 ms per token unbatched on short texts. The
+reason is the one the counters gave for the 9B: the dot kernels are
+instruction-bound, and the batched kernel repeats the whole row dot, unpack
+included, for every slot, so a batch saves weight loads this CPU was not
+waiting for. The gain is in the kernel: unpack each weight block once and dot
+it against all the slots (5 + 4·T instructions per 32 weights instead of
+9·T), about 2x on prompts and embeddings. That rewrite of the Q6_K/Q4_K/
+Q5_K/Q8_0 kernels is the next piece of work.
+
+>>>>>>> theirs
 **Embeddings (owner: "ok then use embeddings").** `--embed FILE` loads
 Qwen3-Embedding-0.6B (Q8_0, 639 MB; `qwen3-embedding-0.6b.gguf` on the
 stick) as a second model beside the Qwen3.5 chat model: it takes the Qwen3

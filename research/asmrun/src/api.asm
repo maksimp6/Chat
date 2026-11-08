@@ -1588,6 +1588,7 @@ api_embed_one:
   mov  qword [rel g_embed_only], 1
   xor  r13d, r13d
   xor  r14d, r14d              ; the last state
+<<<<<<< ours
 .tok:
   cmp  r13, r12
   jae  .fed
@@ -1599,6 +1600,26 @@ api_embed_one:
   mov  r14, rax
   inc  r13
   jmp  .tok
+=======
+.slice:
+  cmp  r13, r12
+  jae  .fed
+  mov  r8, r12
+  sub  r8, r13
+  cmp  r8, ACT_SLOTS
+  jbe  .sl
+  mov  r8d, ACT_SLOTS
+.sl:
+  mov  rax, [rel g_api_ids]
+  lea  rdx, [rax + r13*4]
+  mov  rcx, rbx
+  mov  r9, r13
+  mov  [rsp+40], r8
+  call model_forward_batch     ; rax = the last token's normed state (g_embed_only)
+  mov  r14, rax
+  add  r13, [rsp+40]
+  jmp  .slice
+>>>>>>> theirs
 .fed:
   mov  qword [rel g_embed_only], 0
   ; unit length

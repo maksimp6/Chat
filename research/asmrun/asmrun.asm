@@ -70,6 +70,7 @@ section .text
 %include "view.asm"      ; pictures: BMP loading, test card, fit-and-centre scaling (rt_view_show shows them)
 %include "image.asm"     ; text to image (--image): the prompt, img_generate, the console prompt loop
 %include "model.asm"     ; forward pass, generation loop, main() and CLI dispatch
+%include "q3f.asm"       ; the Qwen3 path's forward pass for a batch of tokens (the embedder's texts)
 
 ; End of the code: pe.inc sizes .text from here. The bytes up to data_start are
 ; zero padding written by NASM.
