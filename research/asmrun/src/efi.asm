@@ -1969,6 +1969,22 @@ rt_write_file:
 rt_read_optional:
   jmp  efi_read_optional
 
+; rt_file_exists(rcx=path utf16) -> rax = 1 when the file opens on the boot volume.
+rt_file_exists:
+  WINPROLOGUE
+  call efi_open
+  test rax, rax
+  jz   .no
+  mov  rcx, rax
+  call [rax + FP_Close]
+  mov  eax, 1
+  WINEPILOGUE
+  ret
+.no:
+  xor  eax, eax
+  WINEPILOGUE
+  ret
+
 ; rt_delete_file(rcx=path utf16) -> rax = 1 when the file is gone (deleted,
 ; or it was not there), 0 when the firmware refused.
 rt_delete_file:

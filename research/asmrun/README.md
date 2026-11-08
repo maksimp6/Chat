@@ -682,7 +682,18 @@ it does). With `--auto` nobody is expected at the box:
 
 The first run under Windows (0.8B, `task-hello.txt` in the folder) answered
 into `task-hello.answer.txt` and deleted the task within the first idle
-second after the load. The cfg of 2026-11-08 evening:
+second after the load.
+
+**Model switch: `POST /v1/model {"name": "file.gguf"}`** (for Logos's
+corporation, whose roles may run on different models, one shift after
+another). The runner checks that the file exists on the boot volume (a plain
+name: letters, digits, `-`, `_`, `.`, ending in `.gguf`; no paths), rewrites
+the first word of `asmrun.cfg` to it (the rest of the cfg is kept), answers
+`{"model": "...", "reboot": true}`, closes the connection and restarts: a
+reset under `--auto` (the stick boots the new model in about 45 s for a 9B),
+the process's end under Windows. `GET /v1/status` now reports `model` as the
+loaded file's name (`qwen35-9b-opus-distill-q4.gguf`), not "asmrun", so the
+caller sees when the switch is done. The cfg of 2026-11-08 evening:
 `qwen35-9b-opus-distill-q4.gguf -i --chat -n 1024 -c 2048 --system system.txt
 --temp 0.7 --top-p 0.8 --top-k 20 --http 11434 --embed
 qwen3-embedding-0.6b.gguf --auto`.

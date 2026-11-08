@@ -79,6 +79,34 @@ api_route:
   lea  rax, [rel api_s_defname]
   mov  [rel g_model_name], rax
   mov  qword [rel g_model_namelen], API_S_DEFNAME_LEN
+  ; the loaded model's file name (the path's last segment) is the API's model name:
+  ; Logos's corporation compares it with the role's file before a shift
+  mov  rcx, [rel g_model_path_w]
+  test rcx, rcx
+  jz   .bufs
+  mov  rdx, rcx                ; the start of the last segment
+.seg:
+  movzx eax, word [rcx]
+  test eax, eax
+  jz   .segdone
+  add  rcx, 2
+  cmp  eax, '\'
+  je   .cut
+  cmp  eax, '/'
+  jne  .seg
+.cut:
+  mov  rdx, rcx
+  jmp  .seg
+.segdone:
+  mov  rcx, rdx
+  lea  rdx, [rel g_model_name8]
+  mov  r8d, 255
+  call rt_utf16_to_utf8        ; rax = bytes
+  test rax, rax
+  jz   .bufs
+  mov  [rel g_model_namelen], rax
+  lea  rax, [rel g_model_name8]
+  mov  [rel g_model_name], rax
 .bufs:
   cmp  dword [rsi], 'GET '
   jne  .post
@@ -118,6 +146,11 @@ api_route:
   call api_path_is
   test rax, rax
   jnz  .turn
+  lea  rdx, [rel api_p_model]
+  mov  rcx, rdi
+  call api_path_is
+  test rax, rax
+  jnz  .model
   lea  rdx, [rel api_p_chat]
   mov  rcx, rdi
   call api_path_is
@@ -231,6 +264,166 @@ api_route:
   call http_respond
   xor  eax, eax
   jmp  .ret
+.model:
+  ; POST /v1/model {"name":"file.gguf"}: the stick's cfg gets that model as its first
+  ; word and the runner restarts (a reset under --auto; the process ends under Windows),
+  ; so the shift change of Logos's corporation is a reboot of the box, nothing else.
+  mov  rcx, r12
+  mov  rdx, r13
+  call js_ws
+  lea  rdx, [r12 + r13]
+  cmp  rax, rdx
+  jae  .model_bad
+  cmp  byte [rax], '{'
+  jne  .model_bad
+  mov  rcx, rax
+  lea  r8, [rel api_k_name]
+  call js_find_key
+  test rax, rax
+  jz   .model_bad
+  cmp  byte [rax], '"'
+  jne  .model_bad
+  mov  rcx, rax
+  lea  rdx, [r12 + r13]
+  mov  r8, [rel g_api_str]
+  mov  r9d, 255
+  call js_str                  ; rax = the name's bytes in g_api_str
+  mov  rdi, rax
+  mov  rcx, [rel g_api_str]
+  mov  rdx, rax
+  call api_model_name_ok       ; rax = 1: a plain .gguf file name
+  test rax, rax
+  jz   .model_bad
+  ; the name in UTF-16 (ASCII only, checked above), then: is the file there?
+  mov  rcx, [rel g_api_str]
+  lea  rdx, [rel g_api_wname]
+  xor  eax, eax
+.mw:
+  cmp  rax, rdi
+  jae  .mwdone
+  movzx r8d, byte [rcx + rax]
+  mov  [rdx + rax*2], r8w
+  inc  rax
+  jmp  .mw
+.mwdone:
+  mov  word [rdx + rax*2], 0
+  lea  rcx, [rel g_api_wname]
+  call rt_file_exists
+  test rax, rax
+  jz   .model_bad
+  ; the cfg: its first word replaced by the name, the rest kept
+  lea  rcx, [rel api_w_cfg]
+  lea  rdx, [rsp+40]
+  call rt_read_optional        ; rax = the cfg's bytes or 0, [rsp+40] = length
+  mov  r8, rax
+  mov  r9, [rel g_api_render]  ; the new cfg is built here
+  mov  rcx, r9
+  mov  rdx, [rel g_api_str]
+  push r8
+  push r9
+  mov  r8, rdi
+  call rt_memcpy
+  pop  r9
+  pop  r8
+  add  r9, rdi
+  test r8, r8
+  jz   .mcfg_done
+  mov  rcx, [rsp+40]           ; bytes left in the old cfg
+  ; a UTF-8 BOM, then the first word, are skipped
+  cmp  rcx, 3
+  jb   .mskip
+  cmp  byte [r8], 0xEF
+  jne  .mskip
+  cmp  byte [r8+1], 0xBB
+  jne  .mskip
+  cmp  byte [r8+2], 0xBF
+  jne  .mskip
+  add  r8, 3
+  sub  rcx, 3
+.mskip:
+  test rcx, rcx
+  jz   .mcfg_done
+  movzx eax, byte [r8]
+  cmp  eax, ' '
+  je   .mrest
+  cmp  eax, 9
+  je   .mrest
+  cmp  eax, 13
+  je   .mrest
+  cmp  eax, 10
+  je   .mrest
+  inc  r8
+  dec  rcx
+  jmp  .mskip
+.mrest:
+  push rcx
+  push r9                      ; (rt_memcpy clobbers r8-r10)
+  mov  rdx, r8
+  mov  r8, rcx
+  mov  rcx, r9
+  call rt_memcpy
+  pop  r9
+  pop  rcx
+  add  r9, rcx
+.mcfg_done:
+  ; a line end, then the file
+  mov  byte [r9], 10
+  inc  r9
+  lea  rcx, [rel api_w_cfg]
+  mov  rdx, [rel g_api_render]
+  mov  r8, r9
+  sub  r8, rdx
+  call rt_write_file
+  test rax, rax
+  jz   .model_fail
+  ; the answer, then the restart once the connection is closed (http.asm, .drop)
+  mov  rdi, [rel g_api_out]
+  lea  rsi, [rel api_j_model1]
+  call api_cat
+  mov  rcx, [rel g_api_str]
+  lea  r8, [rel g_api_wname]   ; the length: the UTF-16 copy's end
+  xor  edx, edx
+.mlen:
+  cmp  word [r8 + rdx*2], 0
+  je   .mlend
+  inc  rdx
+  jmp  .mlen
+.mlend:
+  call api_cat_esc
+  lea  rsi, [rel api_j_model2]
+  call api_cat
+  mov  rax, rdi
+  sub  rax, [rel g_api_out]
+  mov  [rsp+32], rax
+  mov  r9, [rel g_api_out]
+  mov  qword [rel g_api_reboot], 1
+  lea  rcx, [rel api_s_model_log]
+  call rt_err_str
+  mov  rcx, [rel g_api_str]
+  mov  rdx, [rsp+32]
+  sub  rdx, API_J_MODEL1_LEN + API_J_MODEL2_LEN
+  call rt_err
+  lea  rcx, [rel api_s_nl]
+  call rt_err_str
+  jmp  .json200
+.model_fail:
+  mov  rcx, rbx
+  lea  rdx, [rel api_s_500]
+  lea  r8, [rel api_s_ct_json]
+  lea  r9, [rel api_j_cfgfail]
+  mov  qword [rsp+32], API_J_CFGFAIL_LEN
+  call http_respond
+  xor  eax, eax
+  jmp  .ret
+.model_bad:
+  mov  rcx, rbx
+  lea  rdx, [rel http_s_400]
+  lea  r8, [rel api_s_ct_json]
+  lea  r9, [rel api_j_badmodel]
+  mov  qword [rsp+32], API_J_BADMODEL_LEN
+  call http_respond
+  xor  eax, eax
+  jmp  .ret
 .bad:
   mov  rcx, rbx
   lea  rdx, [rel http_s_400]
@@ -250,6 +443,56 @@ api_route:
   pop  rdi
   pop  rsi
   pop  rbx
+  ret
+
+; api_model_name_ok(rcx=name, rdx=len) -> rax = 1 when the name is a plain file
+; name of a GGUF on the boot volume: 6..200 bytes of letters, digits, '-', '_',
+; '.', ending in ".gguf", no path separators, no "..". Leaf; clobbers rax, r8, r9.
+api_model_name_ok:
+  cmp  rdx, 6
+  jb   .no
+  cmp  rdx, 200
+  ja   .no
+  mov  r8, rdx
+  sub  r8, 5
+  cmp  dword [rcx + r8], '.ggu'
+  jne  .no
+  cmp  byte [rcx + r8 + 4], 'f'
+  jne  .no
+  xor  r8d, r8d
+.c:
+  cmp  r8, rdx
+  jae  .yes
+  movzx r9d, byte [rcx + r8]
+  cmp  r9d, '.'
+  jne  .notdot
+  cmp  r8, 0
+  je   .no                     ; a leading dot
+  cmp  byte [rcx + r8 - 1], '.'
+  je   .no                     ; ".."
+  jmp  .n
+.notdot:
+  cmp  r9d, '-'
+  je   .n
+  cmp  r9d, '_'
+  je   .n
+  cmp  r9d, '0'
+  jb   .no
+  cmp  r9d, '9'
+  jbe  .n
+  or   r9d, 0x20
+  cmp  r9d, 'a'
+  jb   .no
+  cmp  r9d, 'z'
+  ja   .no
+.n:
+  inc  r8
+  jmp  .c
+.yes:
+  mov  eax, 1
+  ret
+.no:
+  xor  eax, eax
   ret
 
 ; api_path_is(rcx=path start, rdx=zstr) -> rax = 1 when the path equals zstr
@@ -2817,6 +3060,20 @@ api_j_noembed:    db `{"error":"asmrun serves no embedding model yet"}`
 API_J_NOEMBED_LEN equ $ - api_j_noembed
 api_j_noq35:      db `{"error":"the loaded model has no API path (Qwen3.5 only)"}`
 API_J_NOQ35_LEN equ $ - api_j_noq35
+api_p_model:      db "/v1/model", 0
+api_s_500:        db "500 Internal Server Error", 0
+api_s_nl:         db 10, 0
+api_s_model_log:  db "asmrun: model: the cfg now names ", 0
+api_j_badmodel:   db `{"error":"name must be a .gguf file on the boot volume (letters, digits, - _ .)"}`
+API_J_BADMODEL_LEN equ $ - api_j_badmodel
+api_j_cfgfail:    db `{"error":"asmrun.cfg could not be written"}`
+API_J_CFGFAIL_LEN equ $ - api_j_cfgfail
+api_j_model1:     db `{"model":"`, 0
+API_J_MODEL1_LEN equ $ - api_j_model1 - 1
+api_j_model2:     db `","reboot":true}`, 0
+API_J_MODEL2_LEN equ $ - api_j_model2 - 1
+  align 2
+api_w_cfg:        dw __utf16__("asmrun.cfg"), 0
 api_j_nomsgs:     db `{"error":"messages missing"}`
 API_J_NOMSGS_LEN equ $ - api_j_nomsgs
 api_j_a1:         db `{"model":"`, 0
@@ -2864,6 +3121,11 @@ g_api_ntools:    dq 0
 g_api_tools_sent: dq 0        ; 1 once a tools block went into the context (one context since boot)
 g_api_created:   dq 0
 g_api_tmp:       dq 0
-g_model_name:    dq 0          ; the loaded model's name for the API (set in main)
+g_model_name:    dq 0          ; the loaded model's name for the API: its file name (api_route's first call), "asmrun" before
 g_model_namelen: dq 0
+g_model_path_w:  dq 0          ; the chat model's path (UTF-16) as given to model_load (model.asm)
+g_api_reboot:    dq 0          ; 1 after POST /v1/model: http.asm restarts the runner once the connection is closed
+g_model_name8:   times 256 db 0
+  align 2
+g_api_wname:     times 520 db 0 ; the requested model's file name, UTF-16
 section .text

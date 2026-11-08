@@ -253,6 +253,10 @@ http_wait_prompt:
 .drop:
   mov  rcx, rbx
   call net_close
+  cmp  qword [rel g_api_reboot], 0
+  je   .accept
+  xor  ecx, ecx                ; POST /v1/model answered and closed: the runner restarts on the new cfg
+  call rt_exit
   jmp  .accept
 .prompt:
   ; the body is the prompt; the answer is captured from here on

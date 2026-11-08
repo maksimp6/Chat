@@ -2417,6 +2417,7 @@ main:
   call rt_cpuid_check
   call rt_now_ns
   mov  [rsp+96], rax
+  mov  [rel g_model_path_w], rsi ; the API names the model after this file
   mov  rcx, rsi
   mov  rdx, [rsp+40]
   mov  r8, [rsp+48]

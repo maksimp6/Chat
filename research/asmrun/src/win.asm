@@ -332,6 +332,29 @@ rt_read_optional:
   pop  rbx
   ret
 
+; rt_file_exists(rcx=path utf16) -> rax = 1 when the file opens for reading.
+rt_file_exists:
+  WINPROLOGUE
+  sub  rsp, 32                 ; [rsp+32..56) CreateFileW's stack arguments
+  mov  edx, GENERIC_READ
+  mov  r8d, FILE_SHARE_READ
+  xor  r9d, r9d
+  mov  qword [rsp+32], OPEN_EXISTING
+  mov  qword [rsp+40], FILE_ATTRIBUTE_NORMAL
+  mov  qword [rsp+48], 0
+  call winimp(CreateFileW)
+  cmp  rax, INVALID_HANDLE
+  je   .no
+  mov  rcx, rax
+  call winimp(CloseHandle)
+  mov  eax, 1
+  WINEPILOGUE
+  ret
+.no:
+  xor  eax, eax
+  WINEPILOGUE
+  ret
+
 ; rt_delete_file(rcx=path utf16) -> rax = 1 when the file is gone (deleted, or
 ; it was not there), 0 when Windows refused.
 rt_delete_file:
