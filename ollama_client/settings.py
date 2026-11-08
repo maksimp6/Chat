@@ -101,7 +101,7 @@ def think(upstream_or_key: str) -> bool:
 # tokens/s. python (owner, 05.11.2026) runs code in the Logos interpreter on the phone;
 # filesystem and git (owner, 08.11.2026: "let's try using logos to work on repository")
 # work on the checkout the app runs from.
-TOOLS = ("remember", "python", "filesystem", "git")
+TOOLS = ("remember", "python", "filesystem", "git", "corporation", "channels")
 
 # The local model's instructions, ahead of every turn. They are constant, so the runner's
 # continuing state keeps the same beginning from turn to turn.

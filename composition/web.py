@@ -41,6 +41,8 @@ from organization.partner_relations import (
     prepare_partner_relations_records,
     partner_relations_bp,
 )
+from corporation.cycle import ensure_started as ensure_corporation_cycle
+from corporation.routes import corporation_bp
 from plugin_system.routes import plugin_bp
 from provider_accounts.credentials_routes import provider_credentials_bp
 from provider_accounts.model_routes import install as install_model_routes
@@ -80,6 +82,7 @@ BLUEPRINTS = (
     court_bp,
     rag_bp,
     vectors_bp,
+    corporation_bp,
 )
 
 # Turns opened before this process booted were killed with the previous one (#1710).
@@ -94,6 +97,7 @@ STORAGE_INITIALIZERS = (
     prepare_environment_records,
     ensure_rdc_server,
     partial(fail_interrupted_invocations, before=_BOOTED_AT),
+    ensure_corporation_cycle,  # the company's cycle resumes when its ledger says it was running
 )
 
 

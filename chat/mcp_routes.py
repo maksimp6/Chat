@@ -1373,10 +1373,14 @@ def _vector_dialog_reply(message, trace) -> _ChatReply:
     )
 
 
-def _execute_chat_model(message, model_key, invocation, params, trace):
-    """Run one provider/tool turn and collect its terminal response."""
+def _execute_chat_model(message, model_key, invocation, params, trace, execution_policy=None):
+    """Run one provider/tool turn and collect its terminal response.
+
+    ``execution_policy`` (a named policy of chat.tool_policies) bounds what the turn's
+    model is offered and may run: the corporation's roles work under theirs."""
     if invocation.conversation_id == VECTOR_CONVERSATION_ID:
         return _vector_dialog_reply(message, trace)
+    policy_kwargs = {"execution_policy": execution_policy} if execution_policy is not None else {}
     client = chat_client(model_key)
     local = is_local_model(model_key)
     if local:
@@ -1411,6 +1415,7 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
         settings_conversation_id=invocation.conversation_id,
         params=params,
         trace=trace,
+        **policy_kwargs,
     )
     if not local and _calls_deleted_tool(response):
         # The provider history holds calls of a tool since deleted (tools_cache), and
@@ -1427,6 +1432,7 @@ def _execute_chat_model(message, model_key, invocation, params, trace):
             settings_conversation_id=invocation.conversation_id,
             params=params,
             trace=trace,
+            **policy_kwargs,
         )
 
     api_requests = trace.trace.get("api_requests", [])
@@ -2359,6 +2365,39 @@ def _chat_turn(*, t_start, admission=None, live=None):
         owner_id = get_current_owner_id(required=False)
         if not check_access(conv_id, owner_id):
             return jsonify(error_body("conversation_not_found")), 404
+        # The board's steering lines ("корпорация: …") are answered by the company's
+        # books, not by a model: recorded as a turn of the dialog all the same.
+        from corporation import commands as corporation_commands
+
+        if corporation_commands.is_command(message) and not images:
+            reply = corporation_commands.handle(message)
+            user_message_id = add_message(
+                conv_id, "user", message, source=source, request_id=request_id
+            )
+            reply_message_id = add_message(conv_id, "assistant", reply, source="corporation")
+            return jsonify(
+                {
+                    "reply": reply,
+                    "user_message_id": user_message_id,
+                    "message_id": reply_message_id,
+                    "conversation_id": conv_id,
+                    "usage": None,
+                    "cost": 0,
+                    "timings": None,
+                    "total_duration_ms": round((_time.perf_counter() - t_start) * 1000),
+                }
+            )
+        # A named tool policy bounds the turn's tools (the corporation's roles); the name
+        # must be one trusted code registered, or the turn does not run.
+        tool_policy = None
+        if data.get("tool_policy") is not None:
+            from chat.tool_policies import get_policy
+
+            tool_policy = get_policy(data.get("tool_policy"))
+            if tool_policy is None:
+                return jsonify(
+                    error_body("invalid_params", message="unknown tool_policy")
+                ), 400
         if retry and retry_message_id is not None:
             original = get_message(conv_id, retry_message_id)
             if (
@@ -2474,7 +2513,9 @@ def _chat_turn(*, t_start, admission=None, live=None):
             # Set after set_request, so the callable never enters the trace; every
             # tool round and continuation part copies it from these params.
             params["on_stream_event"] = live.provider_event
-        result = _execute_chat_model(message, model_key, invocation, params, trace)
+        result = _execute_chat_model(
+            message, model_key, invocation, params, trace, execution_policy=tool_policy
+        )
         if live is not None:
             live.provider_event({"kind": "finalizing"})
         total_ms = round((_time.perf_counter() - t_start) * 1000)

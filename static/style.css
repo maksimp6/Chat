@@ -2912,6 +2912,36 @@ body {
   font-size: 12px;
   line-height: 1.45;
 }
+/* The corporation's board window (static/corporation.js) */
+.logos-pro-app .corp-status {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.logos-pro-app .corp-section {
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.logos-pro-app .corp-section-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.logos-pro-app .corp-card {
+  margin: 6px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.logos-pro-app .corp-card-title {
+  font-weight: 600;
+}
+.logos-pro-app .corp-muted,
+.logos-pro-app .corp-ledger-line {
+  color: var(--text-muted);
+  font-size: 12px;
+}
 .logos-pro-app .logs-row-head {
   display: flex;
   flex-wrap: wrap;

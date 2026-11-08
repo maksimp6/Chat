@@ -22,6 +22,7 @@
     actions.register("header.files.open", call("openFileManagerModal"));
     actions.register("header.treasury.open", call("openTreasuryPanel"));
     actions.register("header.departments.open", call("openDepartmentsModal"));
+    actions.register("header.corporation.open", call("openCorporationModal"));
     actions.register("header.court.open", call("openCourtHall"));
     actions.register("header.group.open", call("openGroupChatModal"));
     actions.register("header.credentials.open", call("openProviderCredentialsModal"));

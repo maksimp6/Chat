@@ -91,6 +91,18 @@ def _ssl_tools():
     return SSL_TOOLS
 
 
+def _corporation_tools():
+    from corporation.tools import CORPORATION_TOOLS
+
+    return CORPORATION_TOOLS
+
+
+def _channel_tools():
+    from corporation.channels import CHANNEL_TOOLS
+
+    return CHANNEL_TOOLS
+
+
 # (category, loader, log label, exception logged instead of raised)
 SOURCES = (
     ("government", _government_tools, "Government", Exception),
@@ -107,4 +119,6 @@ SOURCES = (
     ("remember", _remember_tools, "Remember", Exception),
     ("python", _python_tools, "Python", Exception),
     ("ssl", _ssl_tools, "SSL server", Exception),
+    ("corporation", _corporation_tools, "Corporation", Exception),
+    ("channels", _channel_tools, "Corporation channels", Exception),
 )
