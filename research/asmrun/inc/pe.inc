@@ -200,6 +200,11 @@ ilt:
   dq RVA(h_SetThreadPriority)
   dq RVA(h_AddVectoredExceptionHandler)
   dq RVA(h_RemoveVectoredExceptionHandler)
+  dq RVA(h_FindFirstFileW)
+  dq RVA(h_FindNextFileW)
+  dq RVA(h_FindClose)
+  dq RVA(h_DeleteFileW)
+  dq RVA(h_GetLastError)
   dq 0
 ilt_user32:
   dq RVA(h_RegisterClassExW)
@@ -243,6 +248,7 @@ ilt_ws2:
   dq RVA(h_recv)
   dq RVA(h_send)
   dq RVA(h_closesocket)
+  dq RVA(h_select)
   dq 0
 
 ; Import Address Table: the loader overwrites each slot with the function
@@ -269,6 +275,11 @@ __imp_SetThreadAffinityMask:    dq RVA(h_SetThreadAffinityMask)
 __imp_SetThreadPriority:        dq RVA(h_SetThreadPriority)
 __imp_AddVectoredExceptionHandler: dq RVA(h_AddVectoredExceptionHandler)
 __imp_RemoveVectoredExceptionHandler: dq RVA(h_RemoveVectoredExceptionHandler)
+__imp_FindFirstFileW:           dq RVA(h_FindFirstFileW)
+__imp_FindNextFileW:            dq RVA(h_FindNextFileW)
+__imp_FindClose:                dq RVA(h_FindClose)
+__imp_DeleteFileW:              dq RVA(h_DeleteFileW)
+__imp_GetLastError:             dq RVA(h_GetLastError)
                                 dq 0
 iat_user32:
 __imp_RegisterClassExW:         dq RVA(h_RegisterClassExW)
@@ -312,6 +323,7 @@ __imp_accept:                   dq RVA(h_accept)
 __imp_recv:                     dq RVA(h_recv)
 __imp_send:                     dq RVA(h_send)
 __imp_closesocket:              dq RVA(h_closesocket)
+__imp_select:                   dq RVA(h_select)
                                 dq 0
 iat_end:
 
@@ -377,6 +389,21 @@ h_AddVectoredExceptionHandler: dw 0
   db 'AddVectoredExceptionHandler', 0
 h_RemoveVectoredExceptionHandler: dw 0
   db 'RemoveVectoredExceptionHandler', 0
+  align 2
+h_FindFirstFileW:           dw 0
+  db 'FindFirstFileW', 0
+  align 2
+h_FindNextFileW:            dw 0
+  db 'FindNextFileW', 0
+  align 2
+h_FindClose:                dw 0
+  db 'FindClose', 0
+  align 2
+h_DeleteFileW:              dw 0
+  db 'DeleteFileW', 0
+  align 2
+h_GetLastError:             dw 0
+  db 'GetLastError', 0
   align 2
 h_RegisterClassExW:         dw 0
   db 'RegisterClassExW', 0
@@ -479,6 +506,9 @@ h_send:                     dw 0
   align 2
 h_closesocket:              dw 0
   db 'closesocket', 0
+  align 2
+h_select:                   dw 0
+  db 'select', 0
   align 2
 h_StretchDIBits:            dw 0
   db 'StretchDIBits', 0

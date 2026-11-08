@@ -718,7 +718,8 @@ rt_exit:
   call rt_err_u64
   lea  rcx, [rel e_s_stuck2]
   call rt_err_str
-  call efi_wait_key
+  call efi_exit_pause          ; a key, or five seconds when nobody is expected
+.reset:
   mov  rax, [rel g_rs]
   mov  ecx, EfiResetCold
   mov  rdx, EFI_ABORTED
@@ -735,7 +736,9 @@ rt_exit:
   call rt_err_u64
   lea  rcx, [rel e_s_exit2]
   call rt_err_str
-  call efi_wait_key
+  call efi_exit_pause
+  cmp  qword [rel g_auto], 0
+  jne  .reset                  ; autonomous: never back to the firmware's menu, boot the runner again
   cmp  qword [rel g_avx_on], 0
   je   .novz
   vzeroupper
@@ -776,6 +779,19 @@ rt_exit:
   je   .ok
   mov  rax, EFI_ABORTED
 .ok:
+  ret
+
+; efi_exit_pause — before leaving or resetting: wait for a key, unless the
+; runner is autonomous (--auto), when it waits five seconds so the message can
+; be read on a screen if one is attached, then goes on by itself.
+efi_exit_pause:
+  cmp  qword [rel g_auto], 0
+  je   efi_wait_key
+  WINPROLOGUE
+  mov  rax, [rel g_bs]
+  mov  ecx, 5000000
+  call [rax + BS_Stall]
+  WINEPILOGUE
   ret
 
 ; efi_wait_key — block until a key is pressed and consume it (a wake with no
@@ -1953,6 +1969,148 @@ rt_write_file:
 rt_read_optional:
   jmp  efi_read_optional
 
+; rt_delete_file(rcx=path utf16) -> rax = 1 when the file is gone (deleted,
+; or it was not there), 0 when the firmware refused.
+rt_delete_file:
+  WINPROLOGUE
+  sub  rsp, 16                 ; [rsp+32] Attributes (arg 5), [rsp+40] handle
+  call efi_set_path
+  mov  qword [rsp+40], 0
+  mov  rcx, [rel g_root]
+  lea  rdx, [rsp+40]
+  lea  r8, [rel g_path]
+  mov  r9d, EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE
+  mov  qword [rsp+32], 0
+  call [rcx + FP_Open]
+  test rax, rax
+  jnz  .gone                   ; not there
+  mov  rcx, [rsp+40]
+  call [rcx + FP_Delete]       ; (closes the handle too)
+  test rax, rax
+  jnz  .no
+.gone:
+  mov  eax, 1
+  WINEPILOGUE
+  ret
+.no:
+  xor  eax, eax
+  WINEPILOGUE
+  ret
+
+; rt_find_task(rcx=out utf16 buffer, rdx=cap in chars) -> rax = 1 when the
+; boot volume's root holds a task file: a name of the form task-*.txt that is
+; not an answer (*.answer.txt); the first one found is copied to the buffer.
+; The work queue of the autonomous runner (--auto): the owner drops
+; task-<name>.txt on the stick, the runner answers into task-<name>.answer.txt
+; and deletes the task. Preserves the nonvolatile registers.
+rt_find_task:
+  push rbx
+  push rsi
+  push rdi
+  push r12
+  WINPROLOGUE
+  sub  rsp, 32                 ; [rsp+32] size (in/out)
+  mov  rbx, rcx
+  mov  rsi, rdx
+  mov  rcx, [rel g_root]
+  xor  edx, edx
+  call [rcx + FP_SetPosition]
+.entry:
+  mov  qword [rsp+32], EFI_FINFO_BYTES
+  mov  rcx, [rel g_root]
+  lea  rdx, [rsp+32]
+  lea  r8, [rel g_finfo]
+  call [rcx + FP_Read]
+  test rax, rax
+  jnz  .none
+  cmp  qword [rsp+32], 0
+  je   .none
+  test byte [rel g_finfo + 72], 0x10
+  jnz  .entry                  ; a directory
+  lea  rdi, [rel g_finfo + 80]  ; the name, UTF-16
+  ; "task-" at the start
+  lea  rcx, [rel e_w_task]
+  mov  rdx, rdi
+  mov  r8d, 5
+  call rt_wprefix_ieq
+  test rax, rax
+  jz   .entry
+  ; length and the ".txt" tail, not ".answer.txt"
+  xor  r12d, r12d
+.len:
+  cmp  word [rdi + r12*2], 0
+  je   .lend
+  inc  r12
+  jmp  .len
+.lend:
+  cmp  r12, 10                 ; "task-x.txt" at least
+  jb   .entry
+  lea  rcx, [rel e_w_txt]
+  lea  rdx, [rdi + r12*2 - 8]
+  mov  r8d, 4
+  call rt_wprefix_ieq
+  test rax, rax
+  jz   .entry
+  cmp  r12, 16                 ; room for ".answer.txt"
+  jb   .take
+  lea  rcx, [rel e_w_answer_txt]
+  lea  rdx, [rdi + r12*2 - 22]
+  mov  r8d, 11
+  call rt_wprefix_ieq
+  test rax, rax
+  jnz  .entry                  ; an answer, not a task
+.take:
+  lea  rax, [r12 + 1]
+  cmp  rax, rsi
+  ja   .none                   ; longer than the buffer
+  mov  rcx, rbx
+  mov  rdx, rdi
+  lea  r8, [r12*2 + 2]
+  call rt_memcpy
+  mov  eax, 1
+  jmp  .ret
+.none:
+  xor  eax, eax
+.ret:
+  WINEPILOGUE
+  pop  r12
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+
+; rt_kick() — the autonomous runner's heartbeat: the firmware's watchdog is
+; re-armed for ten minutes; a hang anywhere lets it reset the machine, and
+; the stick boots the runner again. Nothing without --auto (the watchdog
+; stays disabled, as the entry left it). Clobbers rax, rcx, rdx, r8, r9.
+rt_kick:
+  cmp  qword [rel g_auto], 0
+  je   .ret
+  WINPROLOGUE
+  mov  rax, [rel g_bs]
+  mov  ecx, 600                ; seconds
+  xor  edx, edx
+  xor  r8d, r8d
+  xor  r9d, r9d
+  call [rax + BS_SetWatchdogTimer]
+  WINEPILOGUE
+.ret:
+  ret
+
+; rt_key_ready() -> rax = 1 when a keystroke is waiting on the console.
+; CheckEvent on ConIn's WaitForKey; the key itself stays for rt_read_stdin.
+rt_key_ready:
+  WINPROLOGUE
+  mov  rax, [rel g_bs]
+  mov  rcx, [rel g_conin]
+  mov  rcx, [rcx + TXTIN_WaitForKey]
+  call [rax + BS_CheckEvent]
+  test rax, rax
+  setz al
+  movzx eax, al
+  WINEPILOGUE
+  ret
+
 ; rt_list_root(rcx=buf, rdx=cap) -> rax = bytes written: every file in the
 ; boot volume's root as "name  size\n" (directories left out), as far as the
 ; buffer holds. Preserves the nonvolatile registers.
@@ -2775,6 +2933,9 @@ e_guid_gop:                    ; EFI_GRAPHICS_OUTPUT_PROTOCOL 9042A9DE-23DC-4A38
   db 0x96, 0xFB, 0x7A, 0xDE, 0xD0, 0x80, 0x51, 0x6A
 
 e_w_cfg:        dw __utf16__("asmrun.cfg"), 0
+e_w_task:       dw __utf16__("task-")
+e_w_txt:        dw __utf16__(".txt")
+e_w_answer_txt: dw __utf16__(".answer.txt")
 e_w_prog:       dw __utf16__("asmrun "), 0
 e_default_args: db "model.gguf -i"
 E_DEFAULT_ARGS_LEN equ $ - e_default_args

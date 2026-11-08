@@ -274,6 +274,8 @@ tcp4_wait:
 ; tcp4_accept() -> rax = the connection (its EFI_TCP4_PROTOCOL*) or 0.
 tcp4_accept:
   WINPROLOGUE
+  cmp  qword [rel g_tcp_lpend], 0
+  jne  .pending                ; the listen token from the last call is still out
   lea  rdx, [rel g_tcp_ltok]
   mov  rax, [rel g_tcp_ev]
   mov  [rdx + TTOK_Event], rax
@@ -283,10 +285,23 @@ tcp4_accept:
   call [rcx + TCP4_Accept]
   test rax, rax
   jnz  .fail
+  mov  qword [rel g_tcp_lpend], 1
+.pending:
   mov  rcx, [rel g_tcp_lp]
   mov  rdx, [rel g_tcp_ev]
-  xor  r8d, r8d
+  xor  r8d, r8d                ; wait for a peer
+  cmp  qword [rel g_auto], 0
+  je   .wait
+  mov  r8, 1000000000          ; autonomous: a second, then back to the idle loop (keyboard, queue, heartbeat); the token stays out
+.wait:
   call tcp4_wait
+  test rax, rax
+  jz   .fired
+  xor  eax, eax                ; timeout: no peer yet
+  WINEPILOGUE
+  ret
+.fired:
+  mov  qword [rel g_tcp_lpend], 0
   cmp  qword [rel g_tcp_ltok + TTOK_Status], 0
   jne  .fail
   mov  rcx, [rel g_tcp_ltok + TTOK_Child]
@@ -501,6 +516,7 @@ g_tcp_lp:       dq 0           ; its EFI_TCP4_PROTOCOL*
 g_tcp_ch:       dq 0           ; the accepted connection's handle
 g_tcp_cp:       dq 0           ; its EFI_TCP4_PROTOCOL*
 g_tcp_ev:       dq 0, 0, 0     ; events: listen, io, close
+g_tcp_lpend:    dq 0           ; 1 while a listen token is out (tcp4_accept came back on a timeout)
 g_tcp_zero:     dd 0
   align 8
 g_tcp_cfg:      times TCFG_BYTES db 0

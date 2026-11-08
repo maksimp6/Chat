@@ -465,13 +465,6 @@ answered correctly.
 Logos's client keeps its code; its settings name `asmrun-qwen35-9b` (commit on
 `develop`, 2026-11-08). A plain-text body on `/api/chat` is still the page's own API.
 
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
-=======
 **The runner owns no tools (owner, 2026-11-08: "remove all tool from asm
 leave them to logos").** `src/tools.asm` and its file tools (list, read,
 write, append on the stick), the built-in tools block, the `--no-tools` flag
@@ -497,7 +490,6 @@ function with one line per action (`compact_tools`). A model that answers
 "file read" without a tool call is the failure to watch for when the model
 works on the repository: every claim needs a tool result behind it.
 
->>>>>>> theirs
 **RAM and the batch (owner: "what about ram", "optimazi maximum").** The
 attention kernel now takes its per-thread score stride from the job
 (`AttnJob.stride`), so the embedder runs on its own 1024 positions
@@ -517,13 +509,6 @@ it against all the slots (5 + 4·T instructions per 32 weights instead of
 9·T), about 2x on prompts and embeddings. That rewrite of the Q6_K/Q4_K/
 Q5_K/Q8_0 kernels is the next piece of work.
 
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 **Embeddings (owner: "ok then use embeddings").** `--embed FILE` loads
 Qwen3-Embedding-0.6B (Q8_0, 639 MB; `qwen3-embedding-0.6b.gguf` on the
 stick) as a second model beside the Qwen3.5 chat model: it takes the Qwen3
@@ -663,10 +648,44 @@ no tool calls), so the system turn is the `--system` file alone and the first
 prompt costs seconds instead of minutes; `persona.txt` on the stick describes
 one person (name, town, job, dog, how she texts: short turns, questions back,
 never "as an AI") and the cfg of 2026-11-08 is `-i --chat -n 1024 -c 2048
---no-tools --system persona.txt --temp 1.0 --top-p 0.95 --top-k 50`. For the
-executor with file tools, put `system.txt` back and drop `--no-tools`. The
+--no-tools --system persona.txt --temp 1.0 --top-p 0.95 --top-k 50`. The
 model that holds a person best is `qwen35-9b-opus-distill` (trained on Claude
-conversations), then `qwen35-9b-uncensored`.
+conversations), then `qwen35-9b-uncensored`. The persona lasted a day: on
+2026-11-08 the owner wanted "an effective war machine", not a friend, and the
+cfg went back to `system.txt` (the executor) with the model authors' sampling
+(0.7 / 0.8 / 20); `persona.txt` stays on the stick for whoever wants it back.
+
+**Autonomous: `--auto` (owner, 2026-11-08: "i want it to always non stop
+work").** Without the flag the runner is a program that waits for a human at
+three places: a fatal error prints and waits for a key before the reset, a
+full context (`-c`) ends the conversation with "start a new conversation", and
+the HTTP accept blocks until a client connects (nothing else can happen while
+it does). With `--auto` nobody is expected at the box:
+
+- A fatal error, an exit and a stuck pool pause five seconds (so a screen, if
+  one is attached, shows the message), then **reset the machine**; the stick
+  boots the runner again. Under Windows the process exits as before.
+- The firmware **watchdog** is re-armed for ten minutes on every pass of the
+  idle loop (`rt_kick`): a hang anywhere resets the box the same way.
+- A **full context** is reset (`q35_reset`: the DeltaNet states, the
+  attention ring and the position) and the next prompt starts from the system
+  turn again; the conversation goes on instead of dying.
+- The **accept** waits a second at a time (the TCP4 listen token stays out
+  between passes; Winsock uses `select`), and between the waits the idle loop
+  looks at the stick's **task queue** and the keyboard. A file
+  `task-<name>.txt` on the boot volume (or in the working directory under
+  Windows) is read as a prompt, answered as a plain-text request is (the
+  stdout capture), the answer written to `task-<name>.answer.txt` and the
+  task deleted; a keystroke makes the loop read one prompt from the console,
+  then it goes back to the network. The owner can drop a task file on the
+  stick from any PC and collect the answer; nothing on the stick ever waits.
+
+The first run under Windows (0.8B, `task-hello.txt` in the folder) answered
+into `task-hello.answer.txt` and deleted the task within the first idle
+second after the load. The cfg of 2026-11-08 evening:
+`qwen35-9b-opus-distill-q4.gguf -i --chat -n 1024 -c 2048 --system system.txt
+--temp 0.7 --top-p 0.8 --top-k 20 --http 11434 --embed
+qwen3-embedding-0.6b.gguf --auto`.
 
 FAT32 holds at most 4 GiB per file and the firmware reads nothing but FAT32,
 so `make-usb.ps1` writes a larger model in 4,000,000,000-byte parts and the

@@ -639,18 +639,7 @@ q35_setup:
   call act_slots_init          ; the int8 activation slots (ACT_SLOTS, for a prompt batch)
   mov  rcx, [r15 + Model.n_threads]
   imul rcx, [rel g35_ctx]
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-=======
   mov  [rel g_scores_n], rcx
->>>>>>> theirs
-=======
-  mov  [rel g_scores_n], rcx
->>>>>>> theirs
-=======
-  mov  [rel g_scores_n], rcx
->>>>>>> theirs
   shl  rcx, 2
   call rt_alloc
   mov  [rel g_scores], rax
@@ -658,10 +647,6 @@ q35_setup:
   shl  rcx, 10
   call rt_alloc
   mov  [rel g35_scratch], rax
-<<<<<<< ours
-  call tl_setup                ; the file tools' buffers
-=======
->>>>>>> theirs
   ; the rope table for the rotary part of a head
   mov  rcx, [rel g35_posmax]
   imul rcx, [rel g35_rot]
@@ -772,11 +757,6 @@ q35_generate:
   mov  rsi, rdx
   mov  rdi, r8
   mov  r12, r9
-<<<<<<< ours
-  mov  qword [rel g_tl_turnlen], 0
-  mov  qword [rel g_tl_rounds], 0
-=======
->>>>>>> theirs
   mov  qword [rel g35_traced], 0
   mov  qword [rel g35_stop_len], 0
   mov  qword [rel g35_gen_total], 0
@@ -787,6 +767,7 @@ q35_generate:
 .prompt:
   cmp  r13, rdi
   jae  .pdone
+  call rt_kick                 ; (and through a long prompt)
   mov  rax, [rel g35_pos]
   cmp  rax, [rel g35_posmax]
   jae  .full
@@ -848,6 +829,7 @@ q35_generate:
   call rt_now_ns
   mov  [rsp+32], rax
 .gen:
+  call rt_kick                 ; --auto: the watchdog stays off our back through a long answer
   mov  rax, [rsp+48]
   cmp  rax, r12
   jae  .gdone_len
@@ -872,12 +854,6 @@ q35_generate:
   lea  rcx, [rel g35_decbuf]
   mov  rdx, rax
   call rt_out                  ; (teed into dialog.txt's buffer by rt_write_h)
-<<<<<<< ours
-  lea  rcx, [rel g35_decbuf]
-  mov  rdx, r14
-  call tl_turn_add             ; the turn's text, for the tool-call search
-=======
->>>>>>> theirs
   mov  rax, [rel g35_pos]
   cmp  rax, [rel g35_posmax]
   jae  .full
@@ -913,70 +889,8 @@ q35_generate:
 .gdone_len:
   mov  qword [rel g35_stop_len], 1 ; -n reached: the answer is cut (the API's done_reason "length")
 .gdone:
-<<<<<<< ours
-  ; a tool call in the turn? run it, show the result, feed the tool turn, go on
-  cmp  qword [rel g_tools_off], 0
-  jne  .no_tool
-  mov  rcx, [rel g_tl_turn]
-  mov  rdx, [rel g_tl_turnlen]
-  call tl_run
-  test rax, rax
-  jz   .no_tool
-  cmp  qword [rel g_tl_rounds], TL_ROUNDS
-  jae  .no_tool
-  inc  qword [rel g_tl_rounds]
-  lea  rcx, [rel tl_s_shown]
-  call rt_out_str
-  mov  rcx, [rel g_tl_res]
-  mov  rdx, [rel g_tl_reslen]
-  call rt_out
-  lea  rcx, [rel q35_s_nl]
-  call rt_out_str
-  mov  rcx, [rel g_tl_ids]
-  mov  edx, TL_IDS_CAP
-  call tl_encode_response
-  mov  rsi, [rel g_tl_ids]
-  mov  rdi, rax
-  mov  qword [rel g_tl_turnlen], 0
-  mov  qword [rsp+48], 0       ; -n counts anew for the answer that follows
-  xor  r13d, r13d
-.tool_feed:
-  cmp  r13, rdi
-  jae  .tool_fed
-  mov  rax, [rel g35_pos]
-  cmp  rax, [rel g35_posmax]
-  jae  .full
-  mov  r8, rdi                 ; the slice, as for the prompt
-  sub  r8, r13
-  cmp  r8, ACT_SLOTS
-  jbe  .tsl1
-  mov  r8d, ACT_SLOTS
-.tsl1:
-  mov  rcx, [rel g35_posmax]
-  sub  rcx, rax
-  cmp  r8, rcx
-  jbe  .tsl2
-  mov  r8, rcx
-.tsl2:
-  mov  r14, r8
-  mov  rcx, rbx
-  lea  rdx, [rsi + r13*4]
-  mov  r9, rax
-  call q35_forward_batch
-  mov  [rsp+64], rax
-  add  [rel g35_pos], r14
-  add  r13, r14
-  jmp  .tool_feed
-.tool_fed:
-  mov  rcx, [rsp+64]
-  mov  rdx, [rel g35_vocab]
-  call k_sample
-  mov  [rsp+56], rax
-  jmp  .gen
-=======
   ; the runner runs no tools: a <tool_call> in the answer is Logos's to run
   ; (api.asm hands it back as JSON). The turn ends here.
->>>>>>> theirs
 .no_tool:
   call rt_now_ns
   mov  [rsp+40], rax
@@ -1022,6 +936,11 @@ q35_generate:
   jmp  .ret
 .full:
   lea  rcx, [rel q35_s_full]
+  call rt_err_str
+  cmp  qword [rel g_auto], 0
+  je   .ret
+  call q35_reset               ; autonomous: the context starts over (the system turn comes back with the next prompt) instead of a dead end
+  lea  rcx, [rel q35_s_reset]
   call rt_err_str
 .ret:
   call rt_log_flush            ; this turn (prompt, answer, statistics) to dialog.txt
@@ -1512,19 +1431,6 @@ q35_encode_chat:
   lea  rcx, [rel s_chat_system]
   mov  edx, S_CHAT_SYSTEM_LEN
   call q35_chat_text
-<<<<<<< ours
-  cmp  qword [rel g_tools_off], 0
-  jne  .sys_text               ; --no-tools: the system turn is --system's text alone
-  lea  rcx, [rel tl_sys_text]
-  mov  edx, TL_SYS_LEN
-  call q35_chat_text
-  cmp  qword [rel g_system_len], 0
-  je   .sys_end
-  lea  rcx, [rel q35_s_lflf]
-  mov  edx, 2
-  call q35_chat_text
-=======
->>>>>>> theirs
 .sys_text:
   cmp  qword [rel g_system_len], 0
   je   .sys_end
@@ -1810,6 +1716,7 @@ q35_s_lf:          db 10
 q35_s_nl:          db 10, 0
 q35_s_missing:     db "asmrun: Qwen3.5 tensor missing: ", 0
 q35_s_full:        db "asmrun: the context (-c) is full; start a new conversation", 10, 0
+q35_s_reset:       db "asmrun: auto: the context was reset; the conversation goes on from the system turn", 10, 0
 q35_err_qgate:     db "the attention gate is neither fused into attn_q nor an attn_gate tensor", 0
 q35_err_conv:      db "ssm_conv1d is not an f32 [4][channels] tensor", 0
 q35_err_dims:      db "the linear-attention shapes do not fit the Gated DeltaNet layout", 0

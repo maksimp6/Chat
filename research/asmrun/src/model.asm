@@ -1335,19 +1335,7 @@ model_embed_load:
   mov  rdi, [rel g_weight_bytes]
   mov  qword [rel g_tok_ready], 0 ; tok_init builds the embedder's own tables (it returns early on built ones)
   mov  rcx, rbx
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-  mov  rdx, rsi
-=======
   mov  edx, EMBED_CTX           ; its own short context: a text to embed is one chunk, not a dialog
->>>>>>> theirs
-=======
-  mov  edx, EMBED_CTX           ; its own short context: a text to embed is one chunk, not a dialog
->>>>>>> theirs
-=======
-  mov  edx, EMBED_CTX           ; its own short context: a text to embed is one chunk, not a dialog
->>>>>>> theirs
   mov  r8, [rel g_nthreads]
   call model_load
   mov  [rel g_embed_model], rax
@@ -1885,14 +1873,6 @@ main:
   test rax, rax
   jz   .opt_system
   mov  rcx, r15
-<<<<<<< ours
-  lea  rdx, [rel f_no_tools]
-  call rt_wcmp_ascii
-  test rax, rax
-  jz   .opt_no_tools
-  mov  rcx, r15
-=======
->>>>>>> theirs
   lea  rdx, [rel f_http]
   call rt_wcmp_ascii
   test rax, rax
@@ -1917,6 +1897,11 @@ main:
   call rt_wcmp_ascii
   test rax, rax
   jz   .opt_embed
+  mov  rcx, r15
+  lea  rdx, [rel f_auto]
+  call rt_wcmp_ascii
+  test rax, rax
+  jz   .opt_auto
   ; positional argument: the first one is the GGUF path (with --view, the picture)
   test rsi, rsi
   jnz  .arg_next
@@ -2047,12 +2032,9 @@ main:
 .opt_trace:
   mov  qword [rel g35_trace], 1
   jmp  .arg_next
-<<<<<<< ours
-.opt_no_tools:
-  mov  qword [rel g_tools_off], 1
+.opt_auto:                     ; --auto: the runner never stops for a human (owner: "i want it to always non stop work")
+  mov  qword [rel g_auto], 1
   jmp  .arg_next
-=======
->>>>>>> theirs
 .opt_http:                     ; --http PORT: prompts from the network; the loop goes on like -i
   inc  r13
   cmp  r13, r12
@@ -2495,7 +2477,12 @@ main:
   lea  rcx, [rsp+72]
   call http_wait_prompt         ; --http: the previous answer goes out, the next POST's body comes in
   test rax, rax
-  jz   .stdin                   ; the server could not start: g_http_port is 0 now, the console it is
+  jnz  .have_prompt_http
+  cmp  qword [rel g_http_key], 0
+  je   .stdin                   ; the server could not start: g_http_port is 0 now, the console it is
+  mov  qword [rel g_http_key], 0 ; --auto: a key was pressed while idle; this one prompt comes from the console
+  jmp  .console
+.have_prompt_http:
   mov  [rsp+64], rax
   jmp  .have_prompt
 .console:
@@ -2561,11 +2548,7 @@ main:
   ; ids buffer = (len + system len + 64) u32 (text tokens <= byte length; chat adds a few control ids)
   mov  rcx, [rsp+72]
   add  rcx, [rel g_system_len]
-<<<<<<< ours
-  add  rcx, TL_SYS_LEN + 64     ; (the tools block opens a Qwen3.5 conversation)
-=======
   add  rcx, 64
->>>>>>> theirs
   shl  rcx, 2
   call rt_alloc
   mov  [rsp+80], rax
@@ -2574,11 +2557,7 @@ main:
   mov  r8, [rsp+80]
   mov  r9, [rsp+72]
   add  r9, [rel g_system_len]
-<<<<<<< ours
-  add  r9, TL_SYS_LEN + 64      ; the capacity: the same as the allocation
-=======
   add  r9, 64                   ; the capacity: the same as the allocation
->>>>>>> theirs
   cmp  qword [rsp+120], 0
   je   .enc_raw
   mov  rax, [rsp+56]
@@ -2705,32 +2684,20 @@ f_temp:     db "--temp", 0
 f_top_p:    db "--top-p", 0
 f_top_k:    db "--top-k", 0
 f_system:   db "--system", 0
-<<<<<<< ours
-f_no_tools: db "--no-tools", 0
-=======
->>>>>>> theirs
 f_http:     db "--http", 0
 f_ip:       db "--ip", 0
 f_mask:     db "--mask", 0
 f_gw:       db "--gw", 0
 f_embed:    db "--embed", 0
+f_auto:     db "--auto", 0
+  align 8
+g_auto:     dq 0               ; --auto: no key waits, a fatal error reboots, the context resets when full, the idle loop serves the stick's task queue
 s_embed_ok1: db "asmrun: embeddings: ", 0
 s_embed_ok2: db " dims, ", 0
 s_embed_ok3: db " MB of weights (POST /api/embed)", 10, 0
 s_embed_no:  db "asmrun: embeddings: --embed needs a Qwen3.5 chat model beside it (a Qwen3-family one owns the same buffers); none loaded", 10, 0
 TOK_STATE_BYTES equ 80         ; g_tok_ready .. g_merge_slots in tokenizer.asm: ten qwords
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-=======
 EMBED_CTX equ 1024             ; the embedder's positions: Logos's 2000-character chunks are under this; 28 layers x 224 KB per position
->>>>>>> theirs
-=======
-EMBED_CTX equ 1024             ; the embedder's positions: Logos's 2000-character chunks are under this; 28 layers x 224 KB per position
->>>>>>> theirs
-=======
-EMBED_CTX equ 1024             ; the embedder's positions: Logos's 2000-character chunks are under this; 28 layers x 224 KB per position
->>>>>>> theirs
   align 8
 g_embed_path:   dq 0           ; --embed FILE (UTF-16), or 0
 g_embed_model:  dq 0           ; the embedding model's Model*, or 0
@@ -2739,10 +2706,6 @@ g_embed_only:   dq 0           ; 1 while model_forward returns the normed state 
 g_tok_main:     times 80 db 0  ; the chat model's tokenizer tables (a copy of the globals)
 g_tok_embed:    times 80 db 0  ; the embedder's
   align 8
-<<<<<<< ours
-g_tools_off:   dq 0           ; --no-tools: no tools block in the system turn, no tool calls run
-=======
->>>>>>> theirs
 g_system_text: dq 0           ; --system FILE: the text (UTF-8), or 0
 g_system_len:  dq 0
 s_chat_system: db "system", 10 ; the ChatML role line of the system turn

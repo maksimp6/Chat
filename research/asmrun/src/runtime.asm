@@ -938,6 +938,36 @@ rt_watoi:
 .done:
   ret
 
+; rt_wprefix_ieq(rcx=pattern utf16, rdx=text utf16, r8=chars) -> rax = 1 when
+; the first r8 UTF-16 units agree, ASCII letters compared without case. Leaf;
+; clobbers rax, r9, r10, r11.
+rt_wprefix_ieq:
+  xor  r11d, r11d
+.c:
+  cmp  r11, r8
+  jae  .yes
+  movzx r9d, word [rcx + r11*2]
+  movzx r10d, word [rdx + r11*2]
+  cmp  r9d, r10d
+  je   .n
+  or   r9d, 0x20
+  or   r10d, 0x20
+  cmp  r9d, r10d
+  jne  .no
+  cmp  r9d, 'a'
+  jb   .no
+  cmp  r9d, 'z'
+  ja   .no
+.n:
+  inc  r11
+  jmp  .c
+.yes:
+  mov  eax, 1
+  ret
+.no:
+  xor  eax, eax
+  ret
+
 ; rt_wcmp_ascii(rcx=wstr, rdx=ascii_zstr) -> rax = 0 if the UTF-16 string equals
 ; the ASCII zstr (code point == byte at every position, same length), else 1.
 ; Leaf; clobbers rax,rcx,rdx,r8.

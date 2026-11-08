@@ -332,6 +332,107 @@ rt_read_optional:
   pop  rbx
   ret
 
+; rt_delete_file(rcx=path utf16) -> rax = 1 when the file is gone (deleted, or
+; it was not there), 0 when Windows refused.
+rt_delete_file:
+  WINPROLOGUE
+  call winimp(DeleteFileW)
+  test eax, eax
+  jnz  .ok
+  call winimp(GetLastError)
+  cmp  eax, 2                  ; ERROR_FILE_NOT_FOUND
+  jne  .no
+.ok:
+  mov  eax, 1
+  WINEPILOGUE
+  ret
+.no:
+  xor  eax, eax
+  WINEPILOGUE
+  ret
+
+; rt_find_task(rcx=out utf16 buffer, rdx=cap in chars) -> rax = 1 when the
+; working directory holds a task file: task-*.txt that is not *.answer.txt; the
+; first one found is copied to the buffer (the --auto work queue; the stick's
+; root on the USB build). Preserves the nonvolatile registers.
+rt_find_task:
+  push rbx
+  push rsi
+  push rdi
+  push r12
+  WINPROLOGUE
+  sub  rsp, 608                ; [rsp+32..624) WIN32_FIND_DATAW (592 bytes): attributes at +0, the name at +44
+  mov  rbx, rcx
+  mov  rsi, rdx
+  lea  rcx, [rel w_task_glob]
+  lea  rdx, [rsp+32]
+  call winimp(FindFirstFileW)
+  cmp  rax, INVALID_HANDLE
+  je   .none
+  mov  rdi, rax
+.entry:
+  test dword [rsp+32], 0x10    ; a directory
+  jnz  .next
+  lea  rcx, [rsp+76]           ; the name
+  xor  r12d, r12d
+.len:
+  cmp  word [rcx + r12*2], 0
+  je   .lend
+  inc  r12
+  jmp  .len
+.lend:
+  cmp  r12, 16                 ; room for ".answer.txt"
+  jb   .take
+  lea  rcx, [rel w_answer_txt]
+  lea  rdx, [rsp+76 + r12*2 - 22]
+  mov  r8d, 11
+  call rt_wprefix_ieq
+  test rax, rax
+  jnz  .next                   ; an answer, not a task
+.take:
+  lea  rax, [r12 + 1]
+  cmp  rax, rsi
+  ja   .next                   ; longer than the buffer
+  mov  rcx, rbx
+  lea  rdx, [rsp+76]
+  lea  r8, [r12*2 + 2]
+  call rt_memcpy
+  mov  rcx, rdi
+  call winimp(FindClose)
+  mov  eax, 1
+  jmp  .ret
+.next:
+  mov  rcx, rdi
+  lea  rdx, [rsp+32]
+  call winimp(FindNextFileW)
+  test eax, eax
+  jnz  .entry
+  mov  rcx, rdi
+  call winimp(FindClose)
+.none:
+  xor  eax, eax
+.ret:
+  WINEPILOGUE
+  pop  r12
+  pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+
+; rt_kick() — the --auto heartbeat re-arms the firmware's watchdog on the USB
+; build; Windows has no watchdog to arm.
+rt_kick:
+  ret
+
+; rt_key_ready() -> rax = 1 when a keystroke is waiting. On Windows the
+; console is a pipe or a terminal the test bench drives; nothing is polled.
+rt_key_ready:
+  xor  eax, eax
+  ret
+
+w_task_glob:    dw __utf16__("task-*.txt"), 0
+w_answer_txt:   dw __utf16__(".answer.txt")
+
 ; rt_append_file(rcx=path utf16, rdx=ptr, r8=len) -> rax = 1 when the bytes were
 ; appended to the file (created when absent), else 0.
 rt_append_file:

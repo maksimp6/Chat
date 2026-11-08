@@ -17,6 +17,7 @@ section .text
 HTTP_REQ_CAP equ 65536               ; request bytes kept (headers + body)
 HTTP_CAP_CAP equ 1048576             ; answer bytes captured
 HTTP_HDR_CAP equ 512
+HTTP_TASK_CHARS equ 128              ; a task file's name (UTF-16 units, with the terminator)
 
 ; http_wait_prompt(rcx=&len) -> rax = prompt bytes (UTF-8), [rcx] = length;
 ; rax = 0 when the server could not start (g_http_port is then cleared and the
@@ -33,6 +34,10 @@ http_wait_prompt:
   mov  r12, rcx                ; &len
   ; the previous request: its answer is the captured stdout
   mov  qword [rel g_http_cap_on], 0
+  cmp  qword [rel g_http_task], 0
+  je   .notask
+  call http_task_finish        ; --auto: the answer to a task file goes to its .answer.txt, the task is deleted
+.notask:
   mov  rcx, [rel g_http_conn]
   test rcx, rcx
   jz   .nofinish
@@ -92,7 +97,69 @@ http_wait_prompt:
 .accept:
   call net_accept
   test rax, rax
+  jnz  .got
+  call rt_kick                 ; the heartbeat (the watchdog, under --auto)
+  cmp  qword [rel g_auto], 0
+  je   .accept
+  ; idle under --auto: a task file on the stick, or a key on the console
+  lea  rcx, [rel g_http_taskname]
+  mov  edx, HTTP_TASK_CHARS
+  call rt_find_task
+  test rax, rax
+  jnz  .task
+  call rt_key_ready
+  test rax, rax
   jz   .accept
+  mov  qword [rel g_http_key], 1 ; the caller reads this one prompt from the console
+  xor  eax, eax
+  jmp  .ret
+.task:
+  lea  rcx, [rel g_http_taskname]
+  lea  rdx, [rel g_http_tasklen]
+  call rt_read_optional
+  test rax, rax
+  jz   .accept                 ; gone before it could be read
+  mov  rbx, rax
+  lea  rcx, [rel http_s_task]
+  call rt_err_str
+  lea  rcx, [rel g_http_taskname]
+  lea  rdx, [rel g_http_taskname8]
+  mov  r8d, HTTP_TASK_CHARS*3
+  call rt_utf16_to_utf8
+  lea  rcx, [rel g_http_taskname8]
+  mov  rdx, rax
+  call rt_err
+  lea  rcx, [rel http_s_nl]
+  call rt_err_str
+  ; the file is the prompt, without a UTF-8 BOM (Notepad writes one) and its
+  ; trailing line ends; the answer is captured
+  mov  rdx, [rel g_http_tasklen]
+  cmp  rdx, 3
+  jb   .tstrip
+  cmp  byte [rbx], 0xEF
+  jne  .tstrip
+  cmp  byte [rbx+1], 0xBB
+  jne  .tstrip
+  cmp  byte [rbx+2], 0xBF
+  jne  .tstrip
+  add  rbx, 3
+  sub  rdx, 3
+.tstrip:
+  test rdx, rdx
+  jz   .tlen
+  cmp  byte [rbx + rdx - 1], 0x20
+  ja   .tlen
+  dec  rdx
+  jmp  .tstrip
+.tlen:
+  mov  [r12], rdx
+  mov  qword [rel g_http_task], 1
+  mov  qword [rel g_http_cap_len], 0
+  mov  qword [rel g_http_cap_on], 1
+  mov  qword [rel g_api_mode], 0
+  mov  rax, rbx
+  jmp  .ret
+.got:
   mov  rbx, rax                ; the connection
   ; read the request: headers to their end, then Content-Length body bytes
   mov  rsi, [rel g_http_req]
@@ -230,6 +297,54 @@ http_wait_prompt:
   pop  r13
   pop  r12
   pop  rdi
+  pop  rsi
+  pop  rbx
+  ret
+
+; http_task_finish — the answer captured for the task file in g_http_taskname
+; goes to <name>.answer.txt beside it (task-x.txt -> task-x.answer.txt), then
+; the task file is deleted so the queue moves on. Preserves the nonvolatile
+; registers.
+http_task_finish:
+  push rbx
+  push rsi
+  WINPROLOGUE
+  mov  qword [rel g_http_task], 0
+  ; the answer's name: the task's without ".txt", then ".answer.txt" and the terminator
+  lea  rbx, [rel g_http_taskname]
+  xor  esi, esi
+.len:
+  cmp  word [rbx + rsi*2], 0
+  je   .lend
+  inc  rsi
+  jmp  .len
+.lend:
+  sub  rsi, 4
+  lea  rcx, [rel g_http_answname]
+  mov  rdx, rbx
+  lea  r8, [rsi*2]
+  call rt_memcpy
+  lea  rcx, [rel g_http_answname]
+  lea  rcx, [rcx + rsi*2]
+  lea  rdx, [rel http_w_answer_txt]
+  mov  r8d, 24
+  call rt_memcpy
+  lea  rcx, [rel g_http_answname]
+  mov  rdx, [rel g_http_cap]
+  mov  r8, [rel g_http_cap_len]
+  call rt_write_file
+  test rax, rax
+  jz   .keep                   ; the answer could not be written: the task stays for the next pass
+  lea  rcx, [rel g_http_taskname]
+  call rt_delete_file
+  lea  rcx, [rel http_s_task_done]
+  call rt_err_str
+  jmp  .ret
+.keep:
+  lea  rcx, [rel http_s_task_fail]
+  call rt_err_str
+.ret:
+  WINEPILOGUE
   pop  rsi
   pop  rbx
   ret
@@ -626,6 +741,12 @@ HTTP_S_BIG_LEN equ $ - http_s_big
 http_s_apiturn: db "(api turn)"
 HTTP_S_APITURN_LEN equ $ - http_s_apiturn
 http_s_fail:    db "asmrun: http: the server could not start; the console takes the prompts", 10, 0
+http_s_task:    db "asmrun: auto: task ", 0
+http_s_nl:      db 10, 0
+http_s_task_done: db "asmrun: auto: the answer was written, the task deleted", 10, 0
+http_s_task_fail: db "asmrun: auto: the answer could not be written; the task stays", 10, 0
+  align 2
+http_w_answer_txt: dw __utf16__(".answer.txt"), 0
 
 ; The page: one column, the log above, the input below; a POST of the text to
 ; /api/chat, the plain-text answer appended.
@@ -652,6 +773,12 @@ g_http_cap:     dq 0           ; the answer buffer (HTTP_CAP_CAP)
 g_http_cap_len: dq 0
 g_http_cap_on:  dq 0           ; 1: rt_write_h copies stdout into the answer buffer
 g_http_conn:    dq 0           ; the connection waiting for its answer, or 0
+g_http_key:     dq 0           ; --auto: 1 when http_wait_prompt came back for a keystroke; the loop reads the console once
+g_http_task:    dq 0           ; --auto: 1 while the prompt being answered came from a task file
+g_http_tasklen: dq 0
+g_http_taskname: times HTTP_TASK_CHARS*2 db 0   ; the task file's name (UTF-16, zero-terminated)
+g_http_answname: times HTTP_TASK_CHARS*2 + 24 db 0 ; its answer's
+g_http_taskname8: times HTTP_TASK_CHARS*3 db 0  ; the name in UTF-8 for the log
 g_http_ip:      dq 0           ; --ip: the station address (network order), 0 = the firmware's own (DHCP)
 g_http_mask:    dq 0           ; --mask
 g_http_gw:      dq 0           ; --gw

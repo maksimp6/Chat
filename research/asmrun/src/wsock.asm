@@ -65,12 +65,32 @@ net_listen:
 ; net_accept() -> rax = the connection (a SOCKET) or 0.
 net_accept:
   WINPROLOGUE
+  sub  rsp, 544                ; [rsp+40] timeval, [rsp+48..568) fd_set (count, then 64 sockets)
+  cmp  qword [rel g_auto], 0
+  je   .block
+  ; autonomous: a second on select, then back to the idle loop (the task queue)
+  mov  dword [rsp+48], 1
+  mov  rax, [rel g_ws_listen]
+  mov  [rsp+56], rax
+  mov  dword [rsp+40], 1       ; tv_sec
+  mov  dword [rsp+44], 0       ; tv_usec
+  xor  ecx, ecx
+  lea  rdx, [rsp+48]
+  xor  r8d, r8d
+  xor  r9d, r9d
+  lea  rax, [rsp+40]
+  mov  [rsp+32], rax
+  call winimp(select)
+  cmp  eax, 1
+  jne  .none                   ; 0: nothing in a second; -1: failed
+.block:
   mov  rcx, [rel g_ws_listen]
   xor  edx, edx
   xor  r8d, r8d
   call winimp(accept)
   cmp  rax, WS_INVALID
   jne  .ret
+.none:
   xor  eax, eax
 .ret:
   WINEPILOGUE
