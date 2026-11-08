@@ -98,8 +98,10 @@ def think(upstream_or_key: str) -> bool:
 
 # The tool categories the local model is given. All tool schemas together are ~33,000
 # tokens: they do not fit its context, and the N100 reads a prompt at a few dozen
-# tokens/s. python (owner, 05.11.2026) runs code in the Logos interpreter on the phone.
-TOOLS = ("remember", "python")
+# tokens/s. python (owner, 05.11.2026) runs code in the Logos interpreter on the phone;
+# filesystem and git (owner, 08.11.2026: "let's try using logos to work on repository")
+# work on the checkout the app runs from.
+TOOLS = ("remember", "python", "filesystem", "git")
 
 # The local model's instructions, ahead of every turn. They are constant, so the runner's
 # continuing state keeps the same beginning from turn to turn.
