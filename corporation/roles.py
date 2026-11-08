@@ -17,11 +17,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-__all__ = ["ROLES", "ROLE_ORDER", "DEFAULT_GOAL", "Role", "RolePolicy", "policy_for", "policy_name"]
+__all__ = ["ROLES", "ROLE_ORDER", "DEFAULT_GOAL", "WATCHDOG_ROUNDS", "Role", "RolePolicy", "policy_for", "policy_name"]
 
 # The chat model the stick boots with today; a role that names another file makes the
 # cycle switch the runner's model at the shift boundary (POST /v1/model, a reboot).
 DEFAULT_GGUF = "qwen35-9b-opus-distill-q4.gguf"
+
+# The one operational limit kept after the owner removed the business caps (08.11.2026,
+# "no restrictions"): a ceiling on tool rounds in a single turn. Not a business limit — it
+# does not bound what an employee may do or how many turns a task takes; it only stops a
+# single turn from looping forever (the chat's local tool loop is otherwise unbounded, and
+# a weak model will re-call the same tool without end). Generous; the owner can raise it.
+WATCHDOG_ROUNDS = 20
 
 _COMMON = (
     "Ты работаешь в компании, которая живёт на компьютере владельца без операционной системы и "

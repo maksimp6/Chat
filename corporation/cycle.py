@@ -35,7 +35,7 @@ import urllib.request
 from typing import Any
 
 from corporation import ledger as journal
-from corporation.roles import ROLE_ORDER, ROLES, Role, policy_name
+from corporation.roles import ROLE_ORDER, ROLES, WATCHDOG_ROUNDS, Role, policy_name
 
 logger = logging.getLogger("logos.corporation.cycle")
 
@@ -333,7 +333,7 @@ def step_once() -> dict[str, Any]:
             "message": _brief(st, role, task),
             "source": f"corporation:{role_name}",
             "tool_policy": policy_name(role_name),
-            "params": {"instructions": role.prompt(), **({"max_rounds": role.rounds} if role.rounds else {})},
+            "params": {"instructions": role.prompt(), "max_rounds": role.rounds or WATCHDOG_ROUNDS},
         }, timeout=3600)
         reply = str(answer.get("reply") or "")
         usage = answer.get("usage") or {}

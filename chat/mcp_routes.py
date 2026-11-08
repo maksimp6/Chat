@@ -2405,11 +2405,14 @@ def _chat_turn(*, t_start, admission=None, live=None):
         if tool_policy is None and data.get("tool_policy") is None:
             try:
                 from corporation import office as corporation_office
-                from corporation.roles import ROLES, policy_for
+                from corporation.roles import ROLES, WATCHDOG_ROUNDS, policy_for
 
                 office_role = corporation_office.role_of_conversation(conv_id)
                 if office_role in ROLES:
                     params["instructions"] = ROLES[office_role].prompt()
+                    # the operational watchdog, unless the owner's request set a round limit
+                    if not params.get("max_rounds"):
+                        params["max_rounds"] = ROLES[office_role].rounds or WATCHDOG_ROUNDS
                     tool_policy = policy_for(office_role)
                 else:
                     office_role = None
