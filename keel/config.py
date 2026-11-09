@@ -11,8 +11,6 @@ import yaml
 class ConfigError(Exception):
     """Configuration validation error."""
 
-    pass
-
 
 def _is_secret_pattern(value: Any) -> bool:
     """Check if a value looks like a secret (base64, hex, PEM key, etc)."""

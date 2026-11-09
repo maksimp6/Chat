@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Iterable
+from collections.abc import Iterable
 
 logger = logging.getLogger("logos.browser.settings")
 
@@ -179,7 +179,6 @@ class SessionSettings:
 
 __all__ = [
     "CLIENT_HINTS",
-    "ChromeOptions",
     "DEFAULT_ACCEPT_LANGUAGE",
     "DEFAULT_USER_AGENT",
     "DIALOG_MODES",
@@ -187,5 +186,6 @@ __all__ = [
     "ENGINE_MODES",
     "MOBILE_CLIENT_HINTS",
     "MOBILE_USER_AGENT",
+    "ChromeOptions",
     "SessionSettings",
 ]

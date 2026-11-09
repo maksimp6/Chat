@@ -39,7 +39,7 @@ from tool_providers.schema import object_schema
 
 logger = logging.getLogger("logos.tool_providers.tty")
 
-_SESSIONS: dict[str, "TtySession"] = {}
+_SESSIONS: dict[str, TtySession] = {}
 _SESSIONS_LOCK = threading.Lock()
 # Process-wide one-time step: the exit hook, registered with the first session.
 _PROCESS_STATE: dict[str, bool] = {"atexit": False}
@@ -372,7 +372,11 @@ def _cwd_arg(args: Mapping[str, Any]) -> str | None:
     value = args.get("cwd")
     if value is None:
         return None
-    if not isinstance(value, str) or not os.path.isabs(value) or not os.path.isdir(value):
+    if (
+        not isinstance(value, str)
+        or not os.path.isabs(value)
+        or not os.path.isdir(value)
+    ):
         raise ValueError("cwd must be an existing absolute directory")
     return value
 
@@ -399,7 +403,9 @@ def _owned_session(
         return None, _failure(_NO_OWNER, "authorization")
     session = get_session(session_id)
     if session is None:
-        return None, _failure(f"Terminal session {session_id} was not found", "execution")
+        return None, _failure(
+            f"Terminal session {session_id} was not found", "execution"
+        )
     if session.owner != owner:
         return None, _failure(
             "The terminal session belongs to another owner", "authorization"

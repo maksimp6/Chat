@@ -12,7 +12,8 @@ listing the tools imports neither ``requests`` nor Chrome support.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Mapping
+from typing import Any
+from collections.abc import Callable, Mapping
 
 from browser._vendor.schema import object_schema
 from browser.context import CallContext
@@ -40,7 +41,13 @@ _VIEWS = [
     "console",
 ]
 _TRANSPORTS = ["responses_api", "local_agent", "mcp"]
-_RESULT_REDACT = ["password", "authorization", "set_cookie", "cookie_value", "proxy_authorization"]
+_RESULT_REDACT = [
+    "password",
+    "authorization",
+    "set_cookie",
+    "cookie_value",
+    "proxy_authorization",
+]
 
 
 def _opt(schema: Mapping[str, Any]) -> dict[str, Any]:
@@ -147,7 +154,9 @@ REF = _string(
     "форма, T1 — таблица, M4 — изображение"
 )
 TEXT_T = _string("Видимый текст элемента, если метки нет")
-SELECTOR_T = _string("CSS-селектор элемента (в http — подмножество, в chrome — полный CSS)")
+SELECTOR_T = _string(
+    "CSS-селектор элемента (в http — подмножество, в chrome — полный CSS)"
+)
 NTH = {
     "type": "integer",
     "minimum": 1,
@@ -160,7 +169,9 @@ INCLUDE_HIDDEN = _boolean("Показать и скрытые элементы")
 def _handler(name: str) -> Callable[..., dict[str, Any]]:
     """The registry function of one tool: run its operation, map BrowserError to a result."""
 
-    def run(arguments: Mapping[str, Any] | None, cfg: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    def run(
+        arguments: Mapping[str, Any] | None, cfg: Mapping[str, Any] | None = None
+    ) -> dict[str, Any]:
         args = dict(arguments or {})
         ctx = CallContext(name, args, cfg)
         try:
@@ -268,8 +279,12 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
             "view": VIEW,
             "offset": OFFSET,
             "selector": _string("CSS-селектор: показать только эти элементы"),
-            "ref": _string("Показать только этот элемент: таблицу T2, форму F1, запрос N5"),
-            "section": _string("Номер раздела из outline (например 2.1) или текст заголовка"),
+            "ref": _string(
+                "Показать только этот элемент: таблицу T2, форму F1, запрос N5"
+            ),
+            "section": _string(
+                "Номер раздела из outline (например 2.1) или текст заголовка"
+            ),
             "filter": _string(
                 "Отбор строк для links, images, interactive, network, console: подстрока "
                 "без учёта регистра или /регулярное выражение/"
@@ -323,7 +338,7 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
             "[attr$=v], [attr*=v], пробел, >, +, ~, запятую, :nth-child(), "
             ":nth-last-child(), :nth-of-type(), :first-child, :last-child, :only-child, "
             ":first-of-type, :last-of-type, :not(), :empty, :root, :checked, :disabled, "
-            ":enabled, :contains(\"текст\"); в chrome — полный CSS."
+            ':enabled, :contains("текст"); в chrome — полный CSS.'
         ),
         properties={
             "selector": _string("CSS-селектор"),
@@ -419,7 +434,9 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
                                 "description": "Несколько вариантов списка multiple",
                             }
                         ),
-                        "checked": _opt(_boolean("Флажок/переключатель: отметить или снять")),
+                        "checked": _opt(
+                            _boolean("Флажок/переключатель: отметить или снять")
+                        ),
                         "file_paths": _opt(
                             {
                                 "type": "array",
@@ -435,7 +452,9 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
             "max_chars": MAX_CHARS,
             "session": SESSION,
             "tab": TAB,
-            "form": _string("Форма: метка F1 или CSS-селектор; не указана — форма первого поля"),
+            "form": _string(
+                "Форма: метка F1 или CSS-селектор; не указана — форма первого поля"
+            ),
             "submit": _boolean("Отправить форму после заполнения"),
             "submit_button": _string(
                 "Кнопка отправки: метка B2 или её текст; не указана — первая кнопка отправки"
@@ -553,7 +572,9 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
             "ref": REF,
             "selector": SELECTOR_T,
             "await_promise": _boolean("Ждать результата Promise; не указано — да"),
-            "result_id": _string("Дочитать сохранённый результат (E1…) без повторного выполнения"),
+            "result_id": _string(
+                "Дочитать сохранённый результат (E1…) без повторного выполнения"
+            ),
             "offset": OFFSET,
             "timeout_seconds": TIMEOUT,
         },
@@ -656,7 +677,9 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
                 "вкладку tab текущей; close — закрыть вкладку tab (не указана — текущую)",
             },
             "session": SESSION,
-            "tab": _string("Вкладка для switch и close (t1, t2…); для close не указана — текущая"),
+            "tab": _string(
+                "Вкладка для switch и close (t1, t2…); для close не указана — текущая"
+            ),
             "url": _string("Для new: сразу открыть адрес"),
             "engine": ENGINE,
             "view": _with(
@@ -692,11 +715,15 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
                 "type": "string",
                 "description": "desktop, mobile, своя строка или пустая — стандартный",
             },
-            "accept_language": _string("Заголовок Accept-Language, например ru-RU,ru;q=0.9,en;q=0.8"),
+            "accept_language": _string(
+                "Заголовок Accept-Language, например ru-RU,ru;q=0.9,en;q=0.8"
+            ),
             "headers": _pairs(
                 "Доп. заголовки для всех запросов; заменяют прежние; пустой список — убрать"
             ),
-            "default_engine": _with(ENGINE, "Движок новых вкладок: auto, http или chrome"),
+            "default_engine": _with(
+                ENGINE, "Движок новых вкладок: auto, http или chrome"
+            ),
             "viewport_width": {
                 "type": "integer",
                 "minimum": 1,
@@ -712,7 +739,9 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
                 "exclusiveMinimum": 0,
                 "description": "Плотность пикселей окна chrome (1 — обычная, 2 — Retina)",
             },
-            "mobile": _boolean("Мобильный режим chrome (сенсорный ввод, мобильная вёрстка)"),
+            "mobile": _boolean(
+                "Мобильный режим chrome (сенсорный ввод, мобильная вёрстка)"
+            ),
             "javascript": _boolean("Выполнять JavaScript в chrome"),
             "load_images": _boolean("Загружать изображения в chrome"),
             "dialogs": {
@@ -720,7 +749,10 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
                 "enum": ["accept", "dismiss"],
                 "description": "Ответ на alert/confirm/prompt",
             },
-            "dialog_prompt_text": {"type": "string", "description": "Текст ответа на prompt"},
+            "dialog_prompt_text": {
+                "type": "string",
+                "description": "Текст ответа на prompt",
+            },
             "proxy": {
                 "type": "string",
                 "description": "Прокси http://host:port; пустая строка — из окружения",
@@ -750,7 +782,9 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
                 "clear — удалить все (или домена domain)",
             },
             "session": SESSION,
-            "domain": _string("Домен: отбор для list/delete/clear, домен cookie для set"),
+            "domain": _string(
+                "Домен: отбор для list/delete/clear, домен cookie для set"
+            ),
             "url": _string("Адрес, для которого установить cookie (вместо domain)"),
             "name": _string("Имя cookie"),
             "value": {"type": "string", "description": "Значение cookie (для set)"},
@@ -817,7 +851,9 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
             "result_selector": _string("custom: CSS-селектор блока одного результата"),
             "title_selector": _string("custom: CSS-селектор заголовка внутри блока"),
             "link_selector": _string("custom: CSS-селектор ссылки внутри блока"),
-            "snippet_selector": _string("custom: CSS-селектор фрагмента текста внутри блока"),
+            "snippet_selector": _string(
+                "custom: CSS-селектор фрагмента текста внутри блока"
+            ),
             "page_size": {
                 "type": "integer",
                 "minimum": 1,
@@ -859,7 +895,9 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
                     {
                         "name": _string("Имя поля формы"),
                         "path": _string("Путь к файлу"),
-                        "filename": _opt(_string("Имя файла в запросе; не указано — из пути")),
+                        "filename": _opt(
+                            _string("Имя файла в запросе; не указано — из пути")
+                        ),
                         "content_type": _opt(
                             _string("Content-Type файла; не указан — по расширению")
                         ),
@@ -868,8 +906,13 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
                 ),
             },
             "body": {"type": "string", "description": "Сырое тело (UTF-8)"},
-            "body_base64": {"type": "string", "description": "Сырое двоичное тело в base64"},
-            "use_cookies": _boolean("Отправлять и сохранять cookies сессии; не указано — да"),
+            "body_base64": {
+                "type": "string",
+                "description": "Сырое двоичное тело в base64",
+            },
+            "use_cookies": _boolean(
+                "Отправлять и сохранять cookies сессии; не указано — да"
+            ),
             "follow_redirects": _boolean("Следовать перенаправлениям; не указано — да"),
             "max_redirects": MAX_REDIRECTS,
             "max_bytes": MAX_BYTES,
@@ -877,9 +920,12 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
             "tab": _string("Загрузить ответ во вкладку: id или new"),
             "save_to": _string("Сохранить тело в файл потоково: файл или папка"),
             "overwrite": _with(
-                OVERWRITE, "Перезаписать существующий файл (для save_to); не указано — нет"
+                OVERWRITE,
+                "Перезаписать существующий файл (для save_to); не указано — нет",
             ),
-            "response_id": _string("Дочитать сохранённый ответ (R1…) без нового запроса"),
+            "response_id": _string(
+                "Дочитать сохранённый ответ (R1…) без нового запроса"
+            ),
             "json_path": _string(
                 "Путь в JSON: data.items[0].name, items[*].id, $['ключ'] или JSON Pointer /items/0"
             ),
@@ -909,7 +955,9 @@ BROWSER_TOOLS: dict[str, dict[str, Any]] = {
             "url": _string("Адрес файла http(s)://…, data:… или file://…"),
             "ref": _string("Метка ссылки или изображения: L5, M2"),
             "tab": TAB,
-            "use_cookies": _boolean("Отправлять и сохранять cookies сессии; не указано — да"),
+            "use_cookies": _boolean(
+                "Отправлять и сохранять cookies сессии; не указано — да"
+            ),
             "max_bytes": MAX_BYTES,
             "max_redirects": MAX_REDIRECTS,
             "timeout_seconds": TIMEOUT,

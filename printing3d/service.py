@@ -64,16 +64,16 @@ def calculate_quote(data: dict) -> dict:
     if platform_fee + margin >= 100:
         raise ValueError("platform_fee_percent + target_margin_percent must be < 100")
 
-    material = grams / Decimal("1000") * material_cost_per_kg
-    electricity = print_hours * power_watts / Decimal("1000") * electricity_per_kwh
+    material = grams / Decimal(1000) * material_cost_per_kg
+    electricity = print_hours * power_watts / Decimal(1000) * electricity_per_kwh
     depreciation = print_hours * depreciation_per_hour
     direct_cost = material + electricity + depreciation + packaging_cost
-    failure_reserve = direct_cost * failure_rate / Decimal("100")
+    failure_reserve = direct_cost * failure_rate / Decimal(100)
     cost_with_risk = direct_cost + failure_reserve
 
-    denominator = Decimal("1") - (platform_fee + margin) / Decimal("100")
+    denominator = Decimal(1) - (platform_fee + margin) / Decimal(100)
     recommended_price = cost_with_risk / denominator if denominator else cost_with_risk
-    expected_platform_fee = recommended_price * platform_fee / Decimal("100")
+    expected_platform_fee = recommended_price * platform_fee / Decimal(100)
     estimated_total_cost = cost_with_risk + expected_platform_fee
     expected_profit = recommended_price - estimated_total_cost
 
@@ -257,10 +257,10 @@ def get_financial_summary(store: PrintStore, owner_id: str) -> dict:
                 "orders": 0,
                 "open_orders": 0,
                 "paid_orders": 0,
-                "quoted_revenue": Decimal("0"),
-                "settled_revenue": Decimal("0"),
-                "settled_cost": Decimal("0"),
-                "settled_profit": Decimal("0"),
+                "quoted_revenue": Decimal(0),
+                "settled_revenue": Decimal(0),
+                "settled_cost": Decimal(0),
+                "settled_profit": Decimal(0),
             },
         )
         bucket["orders"] += 1
@@ -310,7 +310,7 @@ def _publish_settlement(
     with store.transaction() as tx:
         current = tx.get(key)
         if current is None:
-            return None
+            return
         if current.get("settled_at"):
             if current["actual_revenue"] != revenue or current["actual_cost"] != cost:
                 raise ValueError("order is already settled")

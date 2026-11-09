@@ -14,7 +14,8 @@ import html
 import logging
 import re
 from html.parser import HTMLParser
-from typing import Any, Callable, Iterator
+from typing import Any
+from collections.abc import Callable, Iterator
 
 logger = logging.getLogger("logos.browser.dom")
 
@@ -132,7 +133,7 @@ _JS_TYPES = frozenset(
     }
 )
 _CHUNK = 64 * 1024
-_CDATA_SECTION = re.compile(r"<!\[CDATA\[(.*?)\]\]>", re.S)
+_CDATA_SECTION = re.compile(r"<!\[CDATA\[(.*?)\]\]>", re.DOTALL)
 
 
 def normalize_space(text: str | None) -> str:
@@ -145,7 +146,7 @@ def normalize_space(text: str | None) -> str:
 class Element:
     """One element: lowercase tag, attributes, children (elements and strings)."""
 
-    __slots__ = ("tag", "attrs", "children", "parent", "index", "_cache")
+    __slots__ = ("_cache", "attrs", "children", "index", "parent", "tag")
 
     def __init__(
         self,
@@ -282,9 +283,7 @@ class Document:
 
     def _first(self, tag: str) -> Element | None:
         if tag not in self._found:
-            self._found[tag] = next(
-                (el for el in self.elements if el.tag == tag), None
-            )
+            self._found[tag] = next((el for el in self.elements if el.tag == tag), None)
         return self._found[tag]
 
     @property
@@ -432,7 +431,9 @@ class _Builder(HTMLParser):
         if tag in _P_CLOSERS:
             self.close_in_scope("p", _BUTTON_SCOPE)
         if tag == "li":
-            self.close_lowest(frozenset({"li"}), frozenset({"ul", "ol", "menu"}) | _LIST_STOP)
+            self.close_lowest(
+                frozenset({"li"}), frozenset({"ul", "ol", "menu"}) | _LIST_STOP
+            )
         elif tag in ("dt", "dd"):
             self.close_lowest(frozenset({"dt", "dd"}), frozenset({"dl"}) | _LIST_STOP)
         elif tag == "tr":
@@ -443,7 +444,9 @@ class _Builder(HTMLParser):
         elif tag in ("td", "th"):
             self.close_lowest(
                 frozenset({"td", "th"}),
-                frozenset({"tr", "table", "tbody", "thead", "tfoot", "template", "html"}),
+                frozenset(
+                    {"tr", "table", "tbody", "thead", "tfoot", "template", "html"}
+                ),
             )
         elif tag in ("thead", "tbody", "tfoot"):
             self.close_lowest(
@@ -453,7 +456,9 @@ class _Builder(HTMLParser):
         elif tag == "option":
             self.close_lowest(
                 frozenset({"option"}),
-                frozenset({"select", "datalist", "optgroup", "html", "body", "template"}),
+                frozenset(
+                    {"select", "datalist", "optgroup", "html", "body", "template"}
+                ),
             )
         elif tag == "optgroup":
             self.close_lowest(
@@ -471,11 +476,13 @@ class _Builder(HTMLParser):
             self.close_in_scope("button", _BUTTON_SCOPE - {"button"})
         elif tag in ("rb", "rtc"):
             self.close_lowest(
-                frozenset({"rb", "rt", "rp", "rtc"}), frozenset({"ruby", "html", "body"})
+                frozenset({"rb", "rt", "rp", "rtc"}),
+                frozenset({"ruby", "html", "body"}),
             )
         elif tag in ("rt", "rp"):
             self.close_lowest(
-                frozenset({"rb", "rt", "rp"}), frozenset({"ruby", "rtc", "html", "body"})
+                frozenset({"rb", "rt", "rp"}),
+                frozenset({"ruby", "rtc", "html", "body"}),
             )
         elif tag in ("input", "textarea", "keygen"):
             if self.has_open("select", frozenset({"template", "html"})):
@@ -635,7 +642,9 @@ def _xml_mode_of(node: Element) -> bool:
     return False
 
 
-def _open_tag(element: Element, drop_prefix: str | None, *, self_close: bool = False) -> str:
+def _open_tag(
+    element: Element, drop_prefix: str | None, *, self_close: bool = False
+) -> str:
     parts = [element.tag]
     for name, value in element.attrs.items():
         if drop_prefix and name.startswith(drop_prefix):
@@ -682,9 +691,7 @@ def serialize(
             continue
         element: Element = payload
         if element.tag != "#document":
-            if not element.children and (
-                xml_mode or element.tag in VOID_ELEMENTS
-            ):
+            if not element.children and (xml_mode or element.tag in VOID_ELEMENTS):
                 out.append(_open_tag(element, drop_attr_prefix, self_close=xml_mode))
                 continue
             out.append(_open_tag(element, drop_attr_prefix))
@@ -722,7 +729,9 @@ def _serialize_indented(
             if not has_elements:
                 text = "".join(element.children).strip()
                 if not text and (xml_mode or element.tag in VOID_ELEMENTS):
-                    lines.append(pad + _open_tag(element, drop_prefix, self_close=xml_mode))
+                    lines.append(
+                        pad + _open_tag(element, drop_prefix, self_close=xml_mode)
+                    )
                     continue
                 body = text if raw else html.escape(text, quote=False)
                 lines.append(
@@ -738,16 +747,20 @@ def _serialize_indented(
                 text = child.strip()
                 if text:
                     stack.append(
-                        ("text", text if raw else html.escape(text, quote=False), depth + 1)
+                        (
+                            "text",
+                            text if raw else html.escape(text, quote=False),
+                            depth + 1,
+                        )
                     )
     return "\n".join(lines)
 
 
 __all__ = [
-    "Document",
-    "Element",
     "HEADING_TAGS",
     "VOID_ELEMENTS",
+    "Document",
+    "Element",
     "normalize_space",
     "parse_html",
     "serialize",

@@ -29,24 +29,6 @@ def _optional_int(value: Any, name: str) -> int | None:
     return number
 
 
-def _plan_row(row) -> dict[str, Any]:
-    return {
-        "owner_id": row["owner_id"],
-        "printer_model": row["printer_model"],
-        "equipment_price": row["equipment_price"],
-        "setup_cost": row["setup_cost"],
-        "down_payment": row["down_payment"],
-        "credit_principal": row["credit_principal"],
-        "credit_total_repayment": row["credit_total_repayment"],
-        "monthly_payment": row["monthly_payment"],
-        "term_months": row["term_months"],
-        "psk_percent": row["psk_percent"],
-        "currency": row["currency"],
-        "started_at": row["started_at"],
-        "updated_at": row["updated_at"],
-    }
-
-
 def set_financing_plan(
     store: PrintStore, owner_id: str, data: dict[str, Any]
 ) -> dict[str, Any]:
@@ -125,7 +107,7 @@ def _month_profit(
 ) -> Decimal:
     from printing3d.service import list_orders
 
-    profit = Decimal("0")
+    profit = Decimal(0)
     for order in list_orders(store, owner_id, status="paid"):
         if str(order.get("currency") or "RUB") != currency:
             continue
@@ -145,7 +127,7 @@ def _cumulative_profit(store: PrintStore, owner_id: str, currency: str) -> Decim
     for bucket in summary["currencies"]:
         if bucket["currency"] == currency:
             return Decimal(str(bucket["settled_profit"]))
-    return Decimal("0")
+    return Decimal(0)
 
 
 def get_payback_status(
@@ -165,18 +147,18 @@ def get_payback_status(
     total_repayment_raw = plan.get("credit_total_repayment")
 
     financing_cost_known = total_repayment_raw is not None or credit_principal == 0
-    financing_cost = Decimal("0")
+    financing_cost = Decimal(0)
     if total_repayment_raw is not None:
         financing_cost = Decimal(str(total_repayment_raw)) - credit_principal
 
     known_cost_basis = equipment_price + setup_cost + financing_cost
     cumulative_profit = _cumulative_profit(store, owner_id, plan["currency"])
     month_profit = _month_profit(store, owner_id, plan["currency"], selected_month)
-    remaining = max(known_cost_basis - cumulative_profit, Decimal("0"))
+    remaining = max(known_cost_basis - cumulative_profit, Decimal(0))
 
     progress = None
     if known_cost_basis > 0:
-        progress = cumulative_profit / known_cost_basis * Decimal("100")
+        progress = cumulative_profit / known_cost_basis * Decimal(100)
 
     monthly_payment_raw = plan.get("monthly_payment")
     payment_coverage_ratio = None
@@ -342,7 +324,7 @@ def assess_financing(
     if purchase_mode == "cash":
         down = equipment
     elif down_payment is None:
-        down = max(equipment - principal, Decimal("0"))
+        down = max(equipment - principal, Decimal(0))
     else:
         down = decimal_field(down_payment, "down_payment")
     result["resolved_terms"]["down_payment"] = money_float(down)
@@ -356,10 +338,10 @@ def assess_financing(
     if coverage_target < 1:
         raise ValueError("target_payment_coverage must be >= 1")
 
-    payment = Decimal("0")
+    payment = Decimal(0)
     months = None
-    repayment = Decimal("0")
-    financing_cost = Decimal("0")
+    repayment = Decimal(0)
+    financing_cost = Decimal(0)
     if purchase_mode == "credit":
         payment = decimal_field(monthly_payment, "monthly_payment")
         months = _optional_int(term_months, "term_months")

@@ -30,7 +30,7 @@ from remote_runtime.host import (
 
 _runtime_dispatcher_instance = None
 _runtime_dispatcher_lock = threading.Lock()
-_RUNTIME_WORKERS: dict[str, "EnvironmentRuntime"] = {}
+_RUNTIME_WORKERS: dict[str, EnvironmentRuntime] = {}
 _RUNTIME_WORKERS_LOCK = threading.RLock()
 _RUNTIME_STOP = object()
 _STREAM_IDLE_SECONDS = 60.0

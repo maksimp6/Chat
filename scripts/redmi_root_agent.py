@@ -254,33 +254,111 @@ ABS_MT_TRACKING_ID = 0x39
 KEY_LEFTSHIFT = 42
 # Linux key codes for ASCII on a US layout (Android's Generic.kcm): char -> (code, shift).
 _PLAIN = {
-    **dict(zip("abcdefghijklmnopqrstuvwxyz",
-               (30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38, 50,
-                49, 24, 25, 16, 19, 31, 20, 22, 47, 17, 45, 21, 44))),
+    **dict(
+        zip(
+            "abcdefghijklmnopqrstuvwxyz",
+            (
+                30,
+                48,
+                46,
+                32,
+                18,
+                33,
+                34,
+                35,
+                23,
+                36,
+                37,
+                38,
+                50,
+                49,
+                24,
+                25,
+                16,
+                19,
+                31,
+                20,
+                22,
+                47,
+                17,
+                45,
+                21,
+                44,
+            ),
+        )
+    ),
     **dict(zip("1234567890", range(2, 12))),
-    " ": 57, "-": 12, "=": 13, "[": 26, "]": 27, ";": 39, "'": 40, "`": 41,
-    "\\": 43, ",": 51, ".": 52, "/": 53, "\t": 15,
+    " ": 57,
+    "-": 12,
+    "=": 13,
+    "[": 26,
+    "]": 27,
+    ";": 39,
+    "'": 40,
+    "`": 41,
+    "\\": 43,
+    ",": 51,
+    ".": 52,
+    "/": 53,
+    "\t": 15,
 }
-_SHIFTED = dict(zip('!@#$%^&*()_+{}:"~|<>?', (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
-                                              26, 27, 39, 40, 41, 43, 51, 52, 53)))
+_SHIFTED = dict(
+    zip(
+        '!@#$%^&*()_+{}:"~|<>?',
+        (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 26, 27, 39, 40, 41, 43, 51, 52, 53),
+    )
+)
 ASCII_KEYS = {c: (k, False) for c, k in _PLAIN.items()}
 ASCII_KEYS.update({c.upper(): (k, True) for c, k in _PLAIN.items() if c.isalpha()})
 ASCII_KEYS.update({c: (k, True) for c, k in _SHIFTED.items()})
 # Android key names and numbers -> Linux key codes (Generic.kl).
 ANDROID_KEYS = {
-    "HOME": 172, "BACK": 158, "ENTER": 28, "DEL": 14, "FORWARD_DEL": 111,
-    "TAB": 15, "SPACE": 57, "ESCAPE": 1, "MENU": 139, "POWER": 116,
-    "WAKEUP": 143, "VOLUME_UP": 115, "VOLUME_DOWN": 114, "VOLUME_MUTE": 113,
-    "DPAD_UP": 103, "DPAD_DOWN": 108, "DPAD_LEFT": 105, "DPAD_RIGHT": 106,
-    "APP_SWITCH": 580, "SEARCH": 217, "MOVE_HOME": 102, "MOVE_END": 107,
-    "PAGE_UP": 104, "PAGE_DOWN": 109,
+    "HOME": 172,
+    "BACK": 158,
+    "ENTER": 28,
+    "DEL": 14,
+    "FORWARD_DEL": 111,
+    "TAB": 15,
+    "SPACE": 57,
+    "ESCAPE": 1,
+    "MENU": 139,
+    "POWER": 116,
+    "WAKEUP": 143,
+    "VOLUME_UP": 115,
+    "VOLUME_DOWN": 114,
+    "VOLUME_MUTE": 113,
+    "DPAD_UP": 103,
+    "DPAD_DOWN": 108,
+    "DPAD_LEFT": 105,
+    "DPAD_RIGHT": 106,
+    "APP_SWITCH": 580,
+    "SEARCH": 217,
+    "MOVE_HOME": 102,
+    "MOVE_END": 107,
+    "PAGE_UP": 104,
+    "PAGE_DOWN": 109,
     **{c.upper(): k for c, k in _PLAIN.items() if c.isalnum()},
 }
 ANDROID_NUMBERS = {
-    3: "HOME", 4: "BACK", 19: "DPAD_UP", 20: "DPAD_DOWN", 21: "DPAD_LEFT",
-    22: "DPAD_RIGHT", 24: "VOLUME_UP", 25: "VOLUME_DOWN", 26: "POWER",
-    61: "TAB", 62: "SPACE", 66: "ENTER", 67: "DEL", 82: "MENU", 84: "SEARCH",
-    111: "ESCAPE", 112: "FORWARD_DEL", 164: "VOLUME_MUTE", 187: "APP_SWITCH",
+    3: "HOME",
+    4: "BACK",
+    19: "DPAD_UP",
+    20: "DPAD_DOWN",
+    21: "DPAD_LEFT",
+    22: "DPAD_RIGHT",
+    24: "VOLUME_UP",
+    25: "VOLUME_DOWN",
+    26: "POWER",
+    61: "TAB",
+    62: "SPACE",
+    66: "ENTER",
+    67: "DEL",
+    82: "MENU",
+    84: "SEARCH",
+    111: "ESCAPE",
+    112: "FORWARD_DEL",
+    164: "VOLUME_MUTE",
+    187: "APP_SWITCH",
     224: "WAKEUP",
 }
 
@@ -332,8 +410,14 @@ class VirtualDevice:
                 self._ioctl(self.fd, UI_SET_EVBIT, EV_KEY)
                 self._ioctl(self.fd, UI_SET_KEYBIT, BTN_TOUCH)
                 self._ioctl(self.fd, UI_SET_EVBIT, EV_ABS)
-                for axis in (ABS_X, ABS_Y, ABS_MT_SLOT, ABS_MT_POSITION_X,
-                             ABS_MT_POSITION_Y, ABS_MT_TRACKING_ID):
+                for axis in (
+                    ABS_X,
+                    ABS_Y,
+                    ABS_MT_SLOT,
+                    ABS_MT_POSITION_X,
+                    ABS_MT_POSITION_Y,
+                    ABS_MT_TRACKING_ID,
+                ):
                     self._ioctl(self.fd, UI_SET_ABSBIT, axis)
                 self._ioctl(self.fd, UI_SET_PROPBIT, INPUT_PROP_DIRECT)
                 absmax[ABS_X] = absmax[ABS_MT_POSITION_X] = width - 1
@@ -341,9 +425,22 @@ class VirtualDevice:
                 absmax[ABS_MT_TRACKING_ID] = 65535
             # struct uinput_user_dev: name, input_id (BUS_VIRTUAL), ff_effects_max,
             # absmax, absmin, absfuzz, absflat.
-            os.write(self.fd, struct.pack(
-                "80sHHHHI64i64i64i64i", name.encode("ascii"), 0x06, 0x1D6B, 0x0104,
-                1, 0, *absmax, *([0] * 64), *([0] * 64), *([0] * 64)))
+            os.write(
+                self.fd,
+                struct.pack(
+                    "80sHHHHI64i64i64i64i",
+                    name.encode("ascii"),
+                    0x06,
+                    0x1D6B,
+                    0x0104,
+                    1,
+                    0,
+                    *absmax,
+                    *([0] * 64),
+                    *([0] * 64),
+                    *([0] * 64),
+                ),
+            )
             self._ioctl(self.fd, UI_DEV_CREATE)
         except Exception:
             os.close(self.fd)
@@ -424,7 +521,9 @@ class Injector:
         device = self._down(x, y)
         steps = max(8, min(120, duration_ms // 16))
         for index in range(1, steps + 1):
-            self._point(device, x + (x2 - x) * index // steps, y + (y2 - y) * index // steps)
+            self._point(
+                device, x + (x2 - x) * index // steps, y + (y2 - y) * index // steps
+            )
             device.sync()
             time.sleep(duration_ms / 1000 / steps)
         self._up(device)
@@ -547,8 +646,12 @@ def wake_display():
     actions = (
         ("mouse", mouse_nudge),
         ("power_key", press_power_key),
-        ("keyevent", lambda: bounded_command(
-            ["/system/bin/input", "keyevent", "KEYCODE_WAKEUP"])),
+        (
+            "keyevent",
+            lambda: bounded_command(
+                ["/system/bin/input", "keyevent", "KEYCODE_WAKEUP"]
+            ),
+        ),
     )
     for name, action in actions:
         if wakefulness() == "Awake":
@@ -816,7 +919,10 @@ def worker(request):
         if any(
             not _bounded_int(value, 0, limit)
             for value, limit in (
-                (x, width - 1), (y, height - 1), (x2, width - 1), (y2, height - 1)
+                (x, width - 1),
+                (y, height - 1),
+                (x2, width - 1),
+                (y2, height - 1),
             )
         ):
             raise AgentError("coordinates_out_of_bounds")
@@ -907,7 +1013,9 @@ def worker(request):
         if not isinstance(steps, list) or not 1 <= len(steps) <= 30:
             raise AgentError("invalid_batch")
         waits = sum(
-            s.get("wait", 0) for s in steps if isinstance(s, dict) and type(s.get("wait")) is int
+            s.get("wait", 0)
+            for s in steps
+            if isinstance(s, dict) and type(s.get("wait")) is int
         )
         if waits > 150000:
             raise AgentError("batch_wait_limit")
@@ -921,7 +1029,9 @@ def worker(request):
         injector = Injector(width, height)
         diagnostics = []
         try:
-            done = [run_step(step, injector, width, height, diagnostics) for step in steps]
+            done = [
+                run_step(step, injector, width, height, diagnostics) for step in steps
+            ]
         finally:
             injector.close()
         png = bounded_command(["/system/bin/screencap", "-p"], PNG_LIMIT, 15)
@@ -1116,6 +1226,7 @@ def run_client(args, output, runner_values, worker_mode="_worker"):
         capture_output=True,
         env=environment,
         timeout=300,
+        check=False,
     )
     if len(result.stdout) > 13 * 1024 * 1024:
         raise AgentError("worker_reply_limit")

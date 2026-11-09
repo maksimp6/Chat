@@ -10,7 +10,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 from urllib.parse import unquote
 
 from browser.adapters import _CREDENTIAL_ASSIGNMENT
@@ -91,7 +92,7 @@ def is_sensitive_name(name: Any) -> bool:
 
 
 def mask_value(value: Any) -> str:
-    """"<скрыто: N симв.>" for a secret value."""
+    """ "<скрыто: N симв.>" for a secret value."""
     return f"<скрыто: {len(str(value or ''))} симв.>"
 
 

@@ -19,7 +19,8 @@ import itertools
 import json
 import logging
 import threading
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from browser.errors import (
     E_CHROME_DIED,
@@ -63,7 +64,7 @@ class ChromeClosed(BrowserError):
 
 
 class _Pending:
-    __slots__ = ("event", "response", "error")
+    __slots__ = ("error", "event", "response")
 
     def __init__(self) -> None:
         self.event = threading.Event()
@@ -76,7 +77,7 @@ class Waiter:
 
     def __init__(
         self,
-        connection: "CdpConnection",
+        connection: CdpConnection,
         method: str,
         predicate: Callable[[dict], bool] | None,
         session_id: str | None,
@@ -114,7 +115,9 @@ class Waiter:
     def done(self) -> bool:
         return self._event.is_set()
 
-    def wait(self, deadline: Deadline | None = None, *, what: str | None = None) -> dict[str, Any]:
+    def wait(
+        self, deadline: Deadline | None = None, *, what: str | None = None
+    ) -> dict[str, Any]:
         """The event's params; BrowserTimeout when the deadline passes first."""
         try:
             remaining = deadline.remaining() if deadline is not None else None
@@ -160,10 +163,14 @@ class CdpConnection:
         try:
             self._ws = connect(ws_url, **kwargs)
         except TimeoutError:
-            raise BrowserTimeout(timeout_message(deadline.seconds, "подключение к Chrome")) from None
+            raise BrowserTimeout(
+                timeout_message(deadline.seconds, "подключение к Chrome")
+            ) from None
         except Exception as exc:
             reason = redact_text(f"{type(exc).__name__}: {exc}")
-            raise CdpError(f"Не удалось подключиться к Chrome по DevTools: {reason}") from None
+            raise CdpError(
+                f"Не удалось подключиться к Chrome по DevTools: {reason}"
+            ) from None
         self.alive = True
         self.on_lost: Callable[[str], None] | None = None
         self.closed_reason: str | None = None
@@ -175,13 +182,17 @@ class CdpConnection:
         self._subscribers: list[Subscriber] = []
         self._closing = False
         self._finished = False
-        self._reader = threading.Thread(target=self._read_loop, name="logos-browser-cdp", daemon=True)
+        self._reader = threading.Thread(
+            target=self._read_loop, name="logos-browser-cdp", daemon=True
+        )
         self._reader.start()
 
     # -- errors
 
     def _closed_error(self) -> ChromeClosed:
-        return ChromeClosed(E_CHROME_DIED.format(exit=self.closed_reason or "соединение закрыто"))
+        return ChromeClosed(
+            E_CHROME_DIED.format(exit=self.closed_reason or "соединение закрыто")
+        )
 
     # -- sending
 
@@ -214,7 +225,11 @@ class CdpConnection:
                 raise self._closed_error()
             message_id = next(self._ids)
             self._pending[message_id] = slot
-        message: dict[str, Any] = {"id": message_id, "method": method, "params": params or {}}
+        message: dict[str, Any] = {
+            "id": message_id,
+            "method": method,
+            "params": params or {},
+        }
         if session_id:
             message["sessionId"] = session_id
         try:
@@ -257,14 +272,22 @@ class CdpConnection:
         return result if isinstance(result, dict) else {}
 
     def send_nowait(
-        self, method: str, params: dict[str, Any] | None = None, *, session_id: str | None = None
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        *,
+        session_id: str | None = None,
     ) -> None:
         """Send a command without waiting; its reply is dropped. Never raises."""
         if not self.alive:
             return
         with self._state_lock:
             message_id = next(self._ids)
-        message: dict[str, Any] = {"id": message_id, "method": method, "params": params or {}}
+        message: dict[str, Any] = {
+            "id": message_id,
+            "method": method,
+            "params": params or {},
+        }
         if session_id:
             message["sessionId"] = session_id
         try:
@@ -306,7 +329,9 @@ class CdpConnection:
         with self._state_lock:
             waiters = list(self._waiters)
             subscribers = list(self._subscribers)
-        matched = [waiter for waiter in waiters if waiter._offer(method, params, session_id)]
+        matched = [
+            waiter for waiter in waiters if waiter._offer(method, params, session_id)
+        ]
         if matched:
             with self._state_lock:
                 for waiter in matched:
@@ -318,7 +343,9 @@ class CdpConnection:
             try:
                 callback(method, params, session_id)
             except Exception as exc:
-                logger.debug("cdp subscriber failed on %s: %s", method, type(exc).__name__)
+                logger.debug(
+                    "cdp subscriber failed on %s: %s", method, type(exc).__name__
+                )
 
     # -- reader
 

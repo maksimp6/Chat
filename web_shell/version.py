@@ -33,7 +33,10 @@ def static_file_states(root=None) -> dict[str, tuple[int, int]]:
     states = {}
     for path in _fingerprinted_static_files(root):
         stat = path.stat()
-        states[path.relative_to(root / "static").as_posix()] = (stat.st_mtime_ns, stat.st_size)
+        states[path.relative_to(root / "static").as_posix()] = (
+            stat.st_mtime_ns,
+            stat.st_size,
+        )
     return states
 
 

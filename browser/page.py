@@ -15,7 +15,8 @@ import os
 import re
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING, Any
+from collections.abc import Iterable
 from urllib.parse import urljoin
 
 from browser import css
@@ -104,12 +105,12 @@ NEGATIVE = re.compile(
     r"comment|meta|footer|footnote|nav|menu|sidebar|sponsor|\bad-|\bads\b|advert|"
     r"banner|cookie|consent|share|social|related|promo|breadcrumb|pagination|pager|"
     r"popup|modal|subscribe|newsletter|masthead|widget|outbrain|taboola",
-    re.I,
+    re.IGNORECASE,
 )
 POSITIVE = re.compile(
     r"article|body|content|entry|hentry|main|page|post|text|blog|story|news|"
     r"статья|текст|материал",
-    re.I,
+    re.IGNORECASE,
 )
 # Script-rendered page detection thresholds.
 SCRIPT_PAGE_MAX_TEXT = 200
@@ -128,7 +129,9 @@ APP_MOUNTS = (
     "[ng-app]",
     "[id^=ember]",
 )
-_NOSCRIPT_JS = re.compile(r"(enable|включите|требуется|requires?|нужен).{0,40}javascript", re.I)
+_NOSCRIPT_JS = re.compile(
+    r"(enable|включите|требуется|requires?|нужен).{0,40}javascript", re.IGNORECASE
+)
 
 INPUT_TYPES = frozenset(
     {
@@ -240,12 +243,15 @@ _LEAF_DIV_BLOCKERS = frozenset(
 _SCORE_TAGS = frozenset(
     {"p", "pre", "blockquote", "li", "td", "dd", "h2", "h3", "h4", "h5", "h6"}
 )
-_NEVER_MAIN = frozenset({"nav", "aside", "footer", "header", "form", "html", "#document"})
+_NEVER_MAIN = frozenset(
+    {"nav", "aside", "footer", "header", "form", "html", "#document"}
+)
 _LANDMARK_ROLES = frozenset(
     {"navigation", "complementary", "contentinfo", "banner", "search", "form"}
 )
 _STYLE_HIDDEN = re.compile(
-    r"(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse))\b", re.I
+    r"(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse))\b",
+    re.IGNORECASE,
 )
 _URL_WHITESPACE = re.compile(r"[\t\n\r]")
 _COMMAS = re.compile(r"[,，、]")
@@ -267,7 +273,9 @@ class FieldState:
 
     values: dict[int, str] = field(default_factory=dict)
     checked: dict[int, bool] = field(default_factory=dict)
-    selected: dict[int, tuple[int, ...]] = field(default_factory=dict)  # select → options
+    selected: dict[int, tuple[int, ...]] = field(
+        default_factory=dict
+    )  # select → options
     files: dict[int, tuple[str, ...]] = field(default_factory=dict)
     focused: int | None = None
 
@@ -306,7 +314,7 @@ def option_label(option: Element) -> str:
 
 
 def element_descriptor(element: Element) -> str:
-    """"div.price#id" style description of an element."""
+    """ "div.price#id" style description of an element."""
     text = element.tag
     classes = element.attrs.get("class", "").split()
     if classes:
@@ -390,7 +398,9 @@ class PageModel:
         self.url = url or ""
         self.engine = engine
         self.stamped = stamped
-        self.render_noscript = (not stamped) if render_noscript is None else bool(render_noscript)
+        self.render_noscript = (
+            (not stamped) if render_noscript is None else bool(render_noscript)
+        )
         self.state = state if state is not None else FieldState()
         self.charset = charset or "utf-8"
         self.focused_ref = normalize_ref(focused_ref) if focused_ref else None
@@ -431,7 +441,10 @@ class PageModel:
             title = self.document.title
             if not title:
                 for element in self.document.elements:
-                    if element.tag == "meta" and element.attrs.get("property", "").lower() == "og:title":
+                    if (
+                        element.tag == "meta"
+                        and element.attrs.get("property", "").lower() == "og:title"
+                    ):
                         title = normalize_space(element.attrs.get("content"))
                         if title:
                             break
@@ -594,7 +607,11 @@ class PageModel:
         if tag == "textarea":
             return "textarea"
         editable = element.attrs.get("contenteditable")
-        if editable is not None and editable.strip().lower() in ("", "true", "plaintext-only"):
+        if editable is not None and editable.strip().lower() in (
+            "",
+            "true",
+            "plaintext-only",
+        ):
             return "contenteditable"
         return "custom"
 
@@ -754,7 +771,11 @@ class PageModel:
             for label in self._labels_for(element_id):
                 parts.append(self._name_text(label, exclude=element))
         parent = element.parent
-        wrapper = parent.closest(lambda node: node.tag == "label") if parent is not None else None
+        wrapper = (
+            parent.closest(lambda node: node.tag == "label")
+            if parent is not None
+            else None
+        )
         if wrapper is not None:
             target = (wrapper.attrs.get("for") or "").strip()
             if not target or target == element_id:
@@ -827,13 +848,20 @@ class PageModel:
                 return self._name_text(element)
             return ""
         if tag in ("img", "area"):
-            return normalize_space(attrs.get("alt")) or normalize_space(attrs.get("title"))
+            return normalize_space(attrs.get("alt")) or normalize_space(
+                attrs.get("title")
+            )
         if tag in ("iframe", "frame"):
-            return normalize_space(attrs.get("title")) or normalize_space(attrs.get("name"))
+            return normalize_space(attrs.get("title")) or normalize_space(
+                attrs.get("name")
+            )
         if tag in ("video", "audio"):
             return normalize_space(attrs.get("title"))
         if tag == "table":
-            caption = next((kid for kid in element.element_children() if kid.tag == "caption"), None)
+            caption = next(
+                (kid for kid in element.element_children() if kid.tag == "caption"),
+                None,
+            )
             if caption is not None:
                 text = self._name_text(caption)
                 if text:
@@ -854,7 +882,11 @@ class PageModel:
             target = self.document.by_id((element.attrs.get("form") or "").strip())
             return target if target is not None and target.tag == "form" else None
         parent = element.parent
-        return parent.closest(lambda node: node.tag == "form") if parent is not None else None
+        return (
+            parent.closest(lambda node: node.tag == "form")
+            if parent is not None
+            else None
+        )
 
     def options(self, element: Element) -> list[Element]:
         """Options of a select or datalist in tree order (optgroup children included)."""
@@ -865,7 +897,11 @@ class PageModel:
         multiple = "multiple" in element.attrs
         if self.stamped:
             if any(SELECTED_ATTR in option.attrs for option in options):
-                return [option for option in options if option.attrs.get(SELECTED_ATTR) == "1"]
+                return [
+                    option
+                    for option in options
+                    if option.attrs.get(SELECTED_ATTR) == "1"
+                ]
         else:
             chosen = self.state.selected.get(element.index)
             if chosen is not None:
@@ -876,7 +912,9 @@ class PageModel:
             return marked
         if marked:
             return [marked[-1]]
-        first = next((option for option in options if not css.is_disabled(option)), None)
+        first = next(
+            (option for option in options if not css.is_disabled(option)), None
+        )
         return [first] if first is not None else []
 
     def field_value(self, element: Element) -> str:
@@ -911,7 +949,11 @@ class PageModel:
             value = element.attrs.get(name)
             if value is not None:
                 return value
-        if kind == "contenteditable" or self.role(element) in ("textbox", "searchbox", "combobox"):
+        if kind == "contenteditable" or self.role(element) in (
+            "textbox",
+            "searchbox",
+            "combobox",
+        ):
             return normalize_space(element.text())
         return ""
 
@@ -962,7 +1004,10 @@ class PageModel:
     def element_states(self, element: Element) -> list[str]:
         attrs = element.attrs
         states: list[str] = []
-        if css.is_disabled(element) or (attrs.get("aria-disabled") or "").lower() == "true":
+        if (
+            css.is_disabled(element)
+            or (attrs.get("aria-disabled") or "").lower() == "true"
+        ):
             states.append("disabled")
         if "required" in attrs or (attrs.get("aria-required") or "").lower() == "true":
             states.append("required")
@@ -971,7 +1016,8 @@ class PageModel:
         role = self.role(element)
         if (
             self.field_kind(element) in ("checkbox", "radio")
-            or role in ("checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio")
+            or role
+            in ("checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio")
         ) and self.field_checked(element):
             states.append("checked")
         if (attrs.get("aria-selected") or "").lower() == "true":
@@ -980,7 +1026,9 @@ class PageModel:
         if element.tag == "summary":
             parent = element.parent
             expanded = expanded or (
-                parent is not None and parent.tag == "details" and "open" in parent.attrs
+                parent is not None
+                and parent.tag == "details"
+                and "open" in parent.attrs
             )
         if expanded:
             states.append("expanded")
@@ -1054,19 +1102,24 @@ class PageModel:
         if not wanted and not multiple:
             raise BrowserError(
                 E_OPTION_NOT_FOUND.format(
-                    ref=self.ref_label(element), value="", options=self._options_text(options)
+                    ref=self.ref_label(element),
+                    value="",
+                    options=self._options_text(options),
                 )
             )
         chosen: list[Element] = []
         for value in wanted:
             text = normalize_space(value)
-            match = next((option for option in options if option_value(option) == value), None)
+            match = next(
+                (option for option in options if option_value(option) == value), None
+            )
             if match is None:
                 match = next(
                     (
                         option
                         for option in options
-                        if normalize_space(option.text()) == text or option_label(option) == text
+                        if normalize_space(option.text()) == text
+                        or option_label(option) == text
                     ),
                     None,
                 )
@@ -1157,7 +1210,11 @@ class PageModel:
 
             def rank(element: Element) -> tuple[int, int, int]:
                 ref = self.ref_of(element) or "I"
-                return (0 if ref[0] in "LB" else 1, int(self.is_hidden(element)), element.index)
+                return (
+                    0 if ref[0] in "LB" else 1,
+                    int(self.is_hidden(element)),
+                    element.index,
+                )
 
             return sorted(chosen, key=rank)
         return []
@@ -1200,7 +1257,9 @@ class PageModel:
             if nth:
                 if nth < 1 or nth > len(found):
                     raise BrowserNotFound(
-                        E_NTH_RANGE.format(nth=nth, target=f"текст «{text}»", count=len(found))
+                        E_NTH_RANGE.format(
+                            nth=nth, target=f"текст «{text}»", count=len(found)
+                        )
                     )
                 return found[nth - 1], notes
             if len(found) > 1:
@@ -1351,7 +1410,9 @@ class PageModel:
                 if ancestor is None or ancestor.tag == "#document":
                     break
                 if self._can_be_main(ancestor):
-                    scores[ancestor.index] = scores.get(ancestor.index, 0.0) + score * weight
+                    scores[ancestor.index] = (
+                        scores.get(ancestor.index, 0.0) + score * weight
+                    )
                 ancestor = ancestor.parent
         best: Element | None = None
         best_score = 0.0
@@ -1418,7 +1479,10 @@ class PageModel:
             if element.index in skipped:
                 continue
             role = (element.attrs.get("role") or "").lower().split()[:1]
-            if element.tag in ("nav", "aside") or role in (["navigation"], ["complementary"]):
+            if element.tag in ("nav", "aside") or role in (
+                ["navigation"],
+                ["complementary"],
+            ):
                 skipped.update(node.index for node in element.iter())
         return skipped
 
@@ -1480,11 +1544,8 @@ class PageModel:
 __all__ = [
     "ATTRIBUTE_NAMES",
     "CHECKED_ATTR",
-    "FieldState",
     "HIDDEN_ATTR",
-    "Heading",
     "MATCH_ATTR",
-    "PageModel",
     "REF_ATTR",
     "REF_COUNT_NAMES",
     "REF_KINDS",
@@ -1492,6 +1553,9 @@ __all__ = [
     "SRC_ATTR",
     "VALUE_ATTR",
     "VALUE_LEN_ATTR",
+    "FieldState",
+    "Heading",
+    "PageModel",
     "element_descriptor",
     "option_label",
     "option_value",

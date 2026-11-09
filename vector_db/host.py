@@ -31,9 +31,9 @@ __all__ = [
     "bind",
     "bound",
     "current",
-    "provide",
     "embed_texts",
     "get_store",
+    "provide",
 ]
 
 

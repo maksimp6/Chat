@@ -180,7 +180,7 @@ class CloudRuObjectStorage:
     @classmethod
     def from_env(
         cls, env: Mapping[str, str] | None = None, **kwargs: Any
-    ) -> "CloudRuObjectStorage":
+    ) -> CloudRuObjectStorage:
         env = dict(os.environ) if env is None else env
         return cls(
             env.get("CLOUDRU_STORAGE_BUCKET", ""),

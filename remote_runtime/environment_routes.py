@@ -175,7 +175,8 @@ def _proxy(environment_id, subpath=""):
     headers = [
         (key, value)
         for key, value in request.headers.items()
-        if key.lower() not in {"host", "content-length", "connection", "accept-encoding"}
+        if key.lower()
+        not in {"host", "content-length", "connection", "accept-encoding"}
     ]
     try:
         upstream = dispatch_environment_http(

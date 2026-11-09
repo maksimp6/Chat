@@ -18,7 +18,9 @@ _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 class TestResponse(Response):
     """The response of an in-process call; the body is read when it is asked for."""
 
-    def __init__(self, app_iter: Any, status: str, headers: list[tuple[str, str]]) -> None:
+    def __init__(
+        self, app_iter: Any, status: str, headers: list[tuple[str, str]]
+    ) -> None:
         super().__init__(app_iter, status=status, headers=headers)
 
 
@@ -39,7 +41,11 @@ def make_environ(
     if query_string is None:
         query = query_from_path
     elif isinstance(query_string, (dict, MultiDict)):
-        items = query_string.items(multi=True) if isinstance(query_string, MultiDict) else query_string.items()
+        items = (
+            query_string.items(multi=True)
+            if isinstance(query_string, MultiDict)
+            else query_string.items()
+        )
         query = urlencode(list(items), doseq=True)
     else:
         query = str(query_string)
@@ -118,11 +124,15 @@ class _StartedIterable:
             close()
 
 
-def run_wsgi_app(app: Any, environ: dict[str, Any], buffered: bool = False) -> TestResponse:
+def run_wsgi_app(
+    app: Any, environ: dict[str, Any], buffered: bool = False
+) -> TestResponse:
     """Call ``app`` once and wrap what it answered."""
     started: list[Any] = []
 
-    def start_response(status: str, headers: list[tuple[str, str]], exc_info: Any = None) -> Any:
+    def start_response(
+        status: str, headers: list[tuple[str, str]], exc_info: Any = None
+    ) -> Any:
         started[:] = [status, list(headers)]
         return lambda data: None
 
@@ -157,7 +167,7 @@ class Client:
     def __enter__(self) -> Client:
         return self
 
-    def __exit__(self, *exc_info: Any) -> None:
+    def __exit__(self, *exc_info: object) -> None:
         return None
 
     def open(

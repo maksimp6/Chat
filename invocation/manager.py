@@ -376,11 +376,14 @@ def fail_interrupted_invocations(before: float) -> int:
     client = get_memory_client(memory_file_path())
     failed = 0
     for key, record in client.items(_INVOCATION_PREFIX).items():
-        if not isinstance(record, dict) or record.get("status") not in {"created", "running"}:
+        if not isinstance(record, dict) or record.get("status") not in {
+            "created",
+            "running",
+        }:
             continue
         if (record.get("created_at") or 0) >= before:
             continue
-        invocation_id = str(record.get("id") or key[len(_INVOCATION_PREFIX):])
+        invocation_id = str(record.get("id") or key[len(_INVOCATION_PREFIX) :])
         error = {
             "code": "interrupted_by_restart",
             "message": "the Logos process stopped before the turn finished",
@@ -403,7 +406,9 @@ def fail_interrupted_invocations(before: float) -> int:
                     trace={"invocation_id": invocation_id, "error": error},
                 )
         except Exception:
-            logger.exception("interrupted turn %s was not reported in its dialog", invocation_id)
+            logger.exception(
+                "interrupted turn %s was not reported in its dialog", invocation_id
+            )
     if failed:
         logger.error("[BOOT] %d turn(s) were interrupted by the last restart", failed)
     return failed
@@ -419,7 +424,9 @@ def _complete(
 
 def conversation_turn_running(conversation_id: str) -> bool:
     """True while an invocation of this conversation is created or running."""
-    for record in get_memory_client(memory_file_path()).items(_INVOCATION_PREFIX).values():
+    for record in (
+        get_memory_client(memory_file_path()).items(_INVOCATION_PREFIX).values()
+    ):
         if (
             isinstance(record, dict)
             and record.get("conversation_id") == str(conversation_id)

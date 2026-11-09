@@ -52,12 +52,12 @@ def _run_termux_cmd(cmd: list, timeout: int = 15) -> dict:
 # --- 1. Питание и Сеть ---
 
 
-def get_battery_status(args: dict, cfg: dict = None) -> dict:
+def get_battery_status(args: dict, cfg: dict | None = None) -> dict:
     """Получить статус батареи (уровень заряда, статус подключения, температуру)."""
     return _run_termux_cmd(["termux-battery-status"])
 
 
-def get_wifi_status(args: dict, cfg: dict = None) -> dict:
+def get_wifi_status(args: dict, cfg: dict | None = None) -> dict:
     """Получить сведения о текущем Wi-Fi подключении (SSID, BSSID, IP, скорость, сила сигнала)."""
     return _run_termux_cmd(["termux-wifi-connectioninfo"])
 
@@ -65,7 +65,7 @@ def get_wifi_status(args: dict, cfg: dict = None) -> dict:
 # --- 2. Локация и Сенсоры ---
 
 
-def get_location(args: dict, cfg: dict = None) -> dict:
+def get_location(args: dict, cfg: dict | None = None) -> dict:
     """Получить GPS/сетевые координаты устройства (требуется разрешение на геопозицию)."""
     provider = args.get("provider", "network")  # 'gps', 'network', 'passive'
     request_type = args.get("type", "once")  # 'once', 'last'
@@ -76,12 +76,12 @@ def get_location(args: dict, cfg: dict = None) -> dict:
 # --- 3. Буфер обмена (Clipboard) ---
 
 
-def get_clipboard(args: dict, cfg: dict = None) -> dict:
+def get_clipboard(args: dict, cfg: dict | None = None) -> dict:
     """Считать текущий текст из системного буфера обмена Android."""
     return _run_termux_cmd(["termux-clipboard-get"])
 
 
-def set_clipboard(args: dict, cfg: dict = None) -> dict:
+def set_clipboard(args: dict, cfg: dict | None = None) -> dict:
     """Скопировать текст в системный буфер обмена Android."""
     text = args.get("text", "")
     if not text:
@@ -92,7 +92,7 @@ def set_clipboard(args: dict, cfg: dict = None) -> dict:
 # --- 4. Уведомления и Обратная связь ---
 
 
-def send_notification(args: dict, cfg: dict = None) -> dict:
+def send_notification(args: dict, cfg: dict | None = None) -> dict:
     """Показать всплывающее уведомление в системной шторке Android."""
     title = args.get("title", "Logos")
     content = args.get("content") or args.get("message", "")
@@ -108,7 +108,7 @@ def send_notification(args: dict, cfg: dict = None) -> dict:
     return _run_termux_cmd(cmd)
 
 
-def show_toast(args: dict, cfg: dict = None) -> dict:
+def show_toast(args: dict, cfg: dict | None = None) -> dict:
     """Показать быстрое всплывающее сообщение (Android Toast)."""
     message = args.get("message") or args.get("text", "")
     if not message:
@@ -120,7 +120,7 @@ def show_toast(args: dict, cfg: dict = None) -> dict:
     return _run_termux_cmd(cmd)
 
 
-def tts_speak(args: dict, cfg: dict = None) -> dict:
+def tts_speak(args: dict, cfg: dict | None = None) -> dict:
     """Озвучить текст голосом через стандартный движок Android Text-To-Speech."""
     text = args.get("text", "")
     if not text:
@@ -134,13 +134,13 @@ def tts_speak(args: dict, cfg: dict = None) -> dict:
     return _run_termux_cmd(cmd, timeout=20)
 
 
-def trigger_vibration(args: dict, cfg: dict = None) -> dict:
+def trigger_vibration(args: dict, cfg: dict | None = None) -> dict:
     """Подать вибросигнал заданной длительности (в миллисекундах)."""
     duration = int(args.get("duration_ms", 300))
     return _run_termux_cmd(["termux-vibrate", "-d", str(duration)])
 
 
-def set_torch(args: dict, cfg: dict = None) -> dict:
+def set_torch(args: dict, cfg: dict | None = None) -> dict:
     """Включить или выключить фонарик смартфона."""
     enabled = args.get("enabled", True)
     if isinstance(enabled, str):
@@ -152,12 +152,12 @@ def set_torch(args: dict, cfg: dict = None) -> dict:
 # --- 5. Звук и Экран ---
 
 
-def get_system_volume(args: dict, cfg: dict = None) -> dict:
+def get_system_volume(args: dict, cfg: dict | None = None) -> dict:
     """Получить уровни громкости всех аудиоканалов устройства."""
     return _run_termux_cmd(["termux-volume"])
 
 
-def set_system_volume(args: dict, cfg: dict = None) -> dict:
+def set_system_volume(args: dict, cfg: dict | None = None) -> dict:
     """Установить громкость для аудиоканала (music, call, system, ring, alarm, notification)."""
     stream = args.get("stream", "music")
     volume = args.get("volume")
@@ -166,7 +166,7 @@ def set_system_volume(args: dict, cfg: dict = None) -> dict:
     return _run_termux_cmd(["termux-volume", str(stream), str(volume)])
 
 
-def set_screen_brightness(args: dict, cfg: dict = None) -> dict:
+def set_screen_brightness(args: dict, cfg: dict | None = None) -> dict:
     """Установить яркость экрана (от 0 до 255) или включить автояркость ('auto')."""
     level = args.get("level", 128)
     return _run_termux_cmd(["termux-brightness", str(level)])
@@ -175,12 +175,12 @@ def set_screen_brightness(args: dict, cfg: dict = None) -> dict:
 # --- 6. Контакты, SMS и Камера ---
 
 
-def list_contacts(args: dict, cfg: dict = None) -> dict:
+def list_contacts(args: dict, cfg: dict | None = None) -> dict:
     """Получить список контактов из телефонной книги устройства."""
     return _run_termux_cmd(["termux-contact-list"], timeout=20)
 
 
-def list_sms(args: dict, cfg: dict = None) -> dict:
+def list_sms(args: dict, cfg: dict | None = None) -> dict:
     """Прочитать список входящих/исходящих SMS-сообщений."""
     limit = int(args.get("limit", 10))
     offset = int(args.get("offset", 0))
@@ -190,7 +190,7 @@ def list_sms(args: dict, cfg: dict = None) -> dict:
     return _run_termux_cmd(cmd, timeout=20)
 
 
-def send_sms(args: dict, cfg: dict = None) -> dict:
+def send_sms(args: dict, cfg: dict | None = None) -> dict:
     """Отправить SMS-сообщение на указанный номер (требует подтверждения)."""
     number = args.get("phone_number") or args.get("number")
     text = args.get("message") or args.get("text")
@@ -201,7 +201,7 @@ def send_sms(args: dict, cfg: dict = None) -> dict:
     )
 
 
-def take_photo(args: dict, cfg: dict = None) -> dict:
+def take_photo(args: dict, cfg: dict | None = None) -> dict:
     """Сделать фото с камеры смартфона (0 = задняя, 1 = передняя).
 
     The photo is written only to the Logos photo directory: a caller supplies a file name, never

@@ -28,7 +28,7 @@ _app_ctx: ContextVar[Application | None] = ContextVar(
 class RequestContext:
     """The application and request a thread works in while it serves one request."""
 
-    __slots__ = ("app", "request", "_tokens")
+    __slots__ = ("_tokens", "app", "request")
 
     def __init__(self, app: Application, request: Request) -> None:
         self.app = app
@@ -51,14 +51,14 @@ class RequestContext:
         self.push()
         return self
 
-    def __exit__(self, *exc_info: Any) -> None:
+    def __exit__(self, *exc_info: object) -> None:
         self.pop()
 
 
 class AppContext:
     """``with app.app_context():`` makes ``current_app`` available without a request."""
 
-    __slots__ = ("app", "_tokens")
+    __slots__ = ("_tokens", "app")
 
     def __init__(self, app: Application) -> None:
         self.app = app
@@ -78,7 +78,7 @@ class AppContext:
         self.push()
         return self
 
-    def __exit__(self, *exc_info: Any) -> None:
+    def __exit__(self, *exc_info: object) -> None:
         self.pop()
 
 
@@ -120,7 +120,7 @@ def _current_app() -> Application:
 class _Proxy:
     """Forwards every attribute to the object a resolver returns at access time."""
 
-    __slots__ = ("_resolve", "__weakref__")
+    __slots__ = ("__weakref__", "_resolve")
 
     def __init__(self, resolve: Callable[[], Any]) -> None:
         object.__setattr__(self, "_resolve", resolve)

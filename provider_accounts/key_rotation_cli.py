@@ -63,7 +63,7 @@ def rotate_yandex_key() -> int:
             return 0
 
         provider = bound.YandexApiKeyProvider(project_id=str(row["project_id"]))
-        new_id, issued_at, expires_at = rotate_active_key(
+        new_id, _issued_at, expires_at = rotate_active_key(
             db=conn,
             provider=provider,
             encrypt=bound.encrypt_secret,
@@ -160,7 +160,7 @@ def rotate_cloudru_key() -> int:
         if not row or not rotation_needed(row["expires_at"]):
             return 0
 
-        new_id, issued_at, expires_at = rotate_active_key(
+        new_id, _issued_at, expires_at = rotate_active_key(
             db=conn,
             provider=provider,
             encrypt=bound.encrypt_secret,

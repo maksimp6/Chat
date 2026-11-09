@@ -45,7 +45,13 @@ def _origin(url: str) -> str:
     return f"{parts.scheme}://{parts.netloc}"
 
 
-def _http_json(method: str, url: str, *, data: dict[str, Any] | None = None, form: dict[str, str] | None = None) -> dict[str, Any]:
+def _http_json(
+    method: str,
+    url: str,
+    *,
+    data: dict[str, Any] | None = None,
+    form: dict[str, str] | None = None,
+) -> dict[str, Any]:
     headers = {"Accept": "application/json", "User-Agent": "logos-mcp-oauth"}
     body: bytes | None = None
     if form is not None:
@@ -62,7 +68,9 @@ def _http_json(method: str, url: str, *, data: dict[str, Any] | None = None, for
         detail = error.read().decode("utf-8", "replace")[:300]
         raise OAuthError(f"{_origin(url)} ответил {error.code}: {detail}") from None
     except (urllib.error.URLError, OSError, ValueError) as error:
-        raise OAuthError(f"Сервер авторизации не ответил ({type(error).__name__})") from None
+        raise OAuthError(
+            f"Сервер авторизации не ответил ({type(error).__name__})"
+        ) from None
     try:
         parsed = json.loads(raw)
     except ValueError:
@@ -107,7 +115,10 @@ def _challenge_metadata_url(server_url: str) -> str | None:
     request = urllib.request.Request(
         server_url,
         method="GET",
-        headers={"Accept": "application/json, text/event-stream", "User-Agent": "logos-mcp-oauth"},
+        headers={
+            "Accept": "application/json, text/event-stream",
+            "User-Agent": "logos-mcp-oauth",
+        },
     )
     try:
         with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT):
@@ -165,7 +176,10 @@ def _authorization_server(issuer: str) -> dict[str, Any] | None:
         ]
     for url in candidates:
         meta = _try_json(url)
-        if meta and all(isinstance(meta.get(field), str) for field in ("authorization_endpoint", "token_endpoint")):
+        if meta and all(
+            isinstance(meta.get(field), str)
+            for field in ("authorization_endpoint", "token_endpoint")
+        ):
             return meta
     return None
 
@@ -192,10 +206,14 @@ def discover(server_url: str) -> dict[str, Any]:
                 if meta is not None:
                     break
         if meta is None:
-            raise OAuthError("Сервер авторизации MCP-сервера не отдаёт метаданные OAuth")
+            raise OAuthError(
+                "Сервер авторизации MCP-сервера не отдаёт метаданные OAuth"
+            )
         meta = dict(meta)
         meta["resource"] = resource_meta["resource"]
-        meta["resource_scopes"] = [s for s in resource_meta.get("scopes_supported") or [] if isinstance(s, str)]
+        meta["resource_scopes"] = [
+            s for s in resource_meta.get("scopes_supported") or [] if isinstance(s, str)
+        ]
         return meta
     meta = _http_json("GET", origin + "/.well-known/oauth-authorization-server")
     for field in ("authorization_endpoint", "token_endpoint"):
@@ -212,7 +230,9 @@ def _client_key(issuer: str, redirect_uri: str) -> str:
     return "mcp/oauth/client/" + digest
 
 
-def _register_client(meta: dict[str, Any], redirect_uri: str, scope: str) -> dict[str, Any]:
+def _register_client(
+    meta: dict[str, Any], redirect_uri: str, scope: str
+) -> dict[str, Any]:
     """A client registered for this issuer and redirect URI, reused across connects."""
     issuer = str(meta.get("issuer") or "")
     key = _client_key(issuer, redirect_uri)
@@ -251,7 +271,11 @@ def _register_client(meta: dict[str, Any], redirect_uri: str, scope: str) -> dic
 
 def _pkce() -> tuple[str, str]:
     verifier = secrets.token_urlsafe(64)[:96]
-    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    challenge = (
+        base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
+        .rstrip(b"=")
+        .decode()
+    )
     return verifier, challenge
 
 
@@ -263,7 +287,10 @@ def start(server_id: str, *, owner_id: str, redirect_uri: str) -> str:
     if not redirect_uri.startswith(("http://", "https://")):
         raise OAuthError("Некорректный redirect_uri")
     meta = discover(str(server["server_url"]))
-    scope = " ".join(meta["resource_scopes"] or meta.get("scopes_supported") or []) or DEFAULT_SCOPE
+    scope = (
+        " ".join(meta["resource_scopes"] or meta.get("scopes_supported") or [])
+        or DEFAULT_SCOPE
+    )
     client = _register_client(meta, redirect_uri, scope)
     verifier, challenge = _pkce()
     state = secrets.token_urlsafe(24)
@@ -329,4 +356,6 @@ def finish(state: str, code: str) -> str:
     if not updated:
         raise OAuthError("MCP-сервер исчез во время авторизации")
     server = storage.get_server(pending["server_id"], owner_id=pending["owner_id"])
-    return str((server or {}).get("name") or (server or {}).get("server_label") or "MCP-сервер")
+    return str(
+        (server or {}).get("name") or (server or {}).get("server_label") or "MCP-сервер"
+    )

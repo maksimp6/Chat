@@ -32,7 +32,16 @@ from typing import Any
 
 from vector_db.host import embed_texts, get_store
 
-__all__ = ["CHUNK_CHARS", "add", "collections", "delete", "drop", "has", "search", "unit_vectors"]
+__all__ = [
+    "CHUNK_CHARS",
+    "add",
+    "collections",
+    "delete",
+    "drop",
+    "has",
+    "search",
+    "unit_vectors",
+]
 
 logger = logging.getLogger("logos.vector_db")
 
@@ -72,7 +81,8 @@ def _pack_stored() -> None:
     """Rewrites the chunks stored with a ``vector`` list into the packed form, PACK_BATCH per transaction."""
     store = get_store()
     names = [
-        name for name, record in store.items(prefix=PREFIX).items()
+        name
+        for name, record in store.items(prefix=PREFIX).items()
         if isinstance(record, dict) and isinstance(record.get("vector"), list)
     ]
     if not names:
@@ -84,14 +94,20 @@ def _pack_stored() -> None:
             for name in names[start : start + PACK_BATCH]:
                 record = tx.get(name)
                 # Replaced or deleted since the listing: the newer value stays as it is.
-                if not isinstance(record, dict) or not isinstance(record.get("vector"), list):
+                if not isinstance(record, dict) or not isinstance(
+                    record.get("vector"), list
+                ):
                     continue
-                packed = {key: value for key, value in record.items() if key != "vector"}
+                packed = {
+                    key: value for key, value in record.items() if key != "vector"
+                }
                 packed["vector_f32"] = _pack(record["vector"])
                 packed["dimensions"] = len(record["vector"])
                 tx.set(name, packed)
                 done += 1
-    logger.info("[VECTOR_DB] packed %d stored vectors in %.1f s", done, time.monotonic() - began)
+    logger.info(
+        "[VECTOR_DB] packed %d stored vectors in %.1f s", done, time.monotonic() - began
+    )
 
 
 def _start_packing() -> None:
@@ -137,7 +153,9 @@ def chunks(text: str) -> list[str]:
     return parts
 
 
-def _embed(texts: list[str], model: str, trace: Any) -> tuple[list[list[float]], int, str]:
+def _embed(
+    texts: list[str], model: str, trace: Any
+) -> tuple[list[list[float]], int, str]:
     vectors, tokens = [], 0
     for start in range(0, len(texts), BATCH):
         result = embed_texts(texts[start : start + BATCH], model=model, trace=trace)
@@ -163,17 +181,29 @@ def _doc_prefix(collection: str, doc_id: str) -> str:
 
 def has(collection: str, doc_id: str) -> bool:
     """Whether ``collection`` holds the document ``doc_id``."""
-    return bool(get_store().items(prefix=_doc_prefix(_name(collection, "collection"), _name(doc_id, "id"))))
+    return bool(
+        get_store().items(
+            prefix=_doc_prefix(_name(collection, "collection"), _name(doc_id, "id"))
+        )
+    )
 
 
 def add(
-    collection: str, text: str, doc_id: str | None = None, metadata: dict | None = None, trace: Any = None
+    collection: str,
+    text: str,
+    doc_id: str | None = None,
+    metadata: dict | None = None,
+    trace: Any = None,
 ) -> dict[str, Any]:
     """Embed ``text`` into ``collection``; a document with the same id is replaced."""
     collection = _name(collection, "collection")
     if not isinstance(text, str) or not text.strip():
         raise ValueError("text must be a non-empty string")
-    doc_id = _name(doc_id, "id") if doc_id else hashlib.sha256(text.encode()).hexdigest()[:24]
+    doc_id = (
+        _name(doc_id, "id")
+        if doc_id
+        else hashlib.sha256(text.encode()).hexdigest()[:24]
+    )
     _start_packing()
     parts = chunks(text)
     vectors, tokens, model = _embed(parts, DOC_MODEL, trace)
@@ -188,12 +218,26 @@ def add(
         with store.transaction() as tx:
             tx.set(
                 f"{_doc_prefix(collection, doc_id)}{index:05d}",
-                {"collection": collection, "id": doc_id, "chunk": index, "text": part,
-                 "metadata": metadata or {}, "vector_f32": _pack(vector), "model": model,
-                 "dimensions": len(vector), "at": now},
+                {
+                    "collection": collection,
+                    "id": doc_id,
+                    "chunk": index,
+                    "text": part,
+                    "metadata": metadata or {},
+                    "vector_f32": _pack(vector),
+                    "model": model,
+                    "dimensions": len(vector),
+                    "at": now,
+                },
             )
-    result = {"collection": collection, "id": doc_id, "chunks": len(parts), "tokens": tokens,
-              "model": model, "dimensions": len(vectors[0]) if vectors else 0}
+    result = {
+        "collection": collection,
+        "id": doc_id,
+        "chunks": len(parts),
+        "tokens": tokens,
+        "model": model,
+        "dimensions": len(vectors[0]) if vectors else 0,
+    }
     _trace(trace, "vector_db_add", result)
     return result
 
@@ -204,7 +248,9 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / norm if norm else 0.0
 
 
-def search(query: str, collection: str | None = None, k: int | None = None, trace: Any = None) -> dict[str, Any]:
+def search(
+    query: str, collection: str | None = None, k: int | None = None, trace: Any = None
+) -> dict[str, Any]:
     """Chunks ranked by meaning; every collection when none is named, every match when no ``k``."""
     if not isinstance(query, str) or not query.strip():
         raise ValueError("query must be a non-empty string")
@@ -221,27 +267,46 @@ def search(query: str, collection: str | None = None, k: int | None = None, trac
         packed = record.get("vector_f32")
         if isinstance(packed, str) and record.get("dimensions") == len(vector):
             score = math.sumprod(query_unit, _unpack(packed))
-        elif isinstance(record.get("vector"), list) and len(record["vector"]) == len(vector):
+        elif isinstance(record.get("vector"), list) and len(record["vector"]) == len(
+            vector
+        ):
             # Stored before the packed form and not rewritten yet (_pack_stored runs after start).
             score = _cosine(vector, record["vector"])
         else:
             continue
         hits.append(
-            {"score": round(score, 6),
-             **{key: record.get(key) for key in ("collection", "id", "chunk", "text", "metadata")}}
+            {
+                "score": round(score, 6),
+                **{
+                    key: record.get(key)
+                    for key in ("collection", "id", "chunk", "text", "metadata")
+                },
+            }
         )
     hits.sort(key=lambda hit: hit["score"], reverse=True)
     results = hits if k is None else hits[: max(0, int(k))]
-    _trace(trace, "vector_db_search", {
-        "collection": collection, "searched": len(hits), "results": len(results),
-        "top_score": results[0]["score"] if results else None, "tokens": tokens, "model": model,
-    })
+    _trace(
+        trace,
+        "vector_db_search",
+        {
+            "collection": collection,
+            "searched": len(hits),
+            "results": len(results),
+            "top_score": results[0]["score"] if results else None,
+            "tokens": tokens,
+            "model": model,
+        },
+    )
     return {"results": results, "searched": len(hits), "tokens": tokens, "model": model}
 
 
 def delete(collection: str, doc_id: str) -> dict[str, Any]:
     store = get_store()
-    keys = list(store.items(prefix=_doc_prefix(_name(collection, "collection"), _name(doc_id, "id"))))
+    keys = list(
+        store.items(
+            prefix=_doc_prefix(_name(collection, "collection"), _name(doc_id, "id"))
+        )
+    )
     for key in keys:
         with store.transaction() as tx:
             tx.delete(key)
@@ -261,10 +326,18 @@ def collections() -> dict[str, Any]:
     counts: dict[str, dict[str, Any]] = {}
     for record in get_store().items(prefix=PREFIX).values():
         if isinstance(record, dict):
-            entry = counts.setdefault(record.get("collection"), {"documents": set(), "chunks": 0})
+            entry = counts.setdefault(
+                record.get("collection"), {"documents": set(), "chunks": 0}
+            )
             entry["documents"].add(record.get("id"))
             entry["chunks"] += 1
-    return {"collections": [
-        {"collection": name, "documents": len(entry["documents"]), "chunks": entry["chunks"]}
-        for name, entry in sorted(counts.items(), key=lambda item: str(item[0]))
-    ]}
+    return {
+        "collections": [
+            {
+                "collection": name,
+                "documents": len(entry["documents"]),
+                "chunks": entry["chunks"],
+            }
+            for name, entry in sorted(counts.items(), key=lambda item: str(item[0]))
+        ]
+    }

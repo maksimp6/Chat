@@ -48,7 +48,9 @@ def discover():
         ["su", "-c", "/system/bin/ip -o -4 addr show wlan0"],
     ):
         try:
-            result = subprocess.run(command, capture_output=True, text=True, timeout=5)
+            result = subprocess.run(
+                command, capture_output=True, text=True, timeout=5, check=False
+            )
             if result.returncode == 0:
                 return parse_wifi_ip(result.stdout)
         except (OSError, subprocess.TimeoutExpired, ProbeFailure):

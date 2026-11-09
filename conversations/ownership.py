@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from threading import RLock
 import time
-from typing import Optional, TypedDict
+from typing import TypedDict
 from typing import Any
 from conversations.host import (
     bound,
@@ -82,7 +82,7 @@ def list_owned_conversations(user_id: str) -> list[ConversationView]:
 
 def get_owned_conversation(
     conversation_id: str, user_id: str
-) -> Optional[ConversationView]:
+) -> ConversationView | None:
     record = _conversation_record(conversation_id)
     if record is None:
         return None

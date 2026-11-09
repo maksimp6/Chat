@@ -18,8 +18,9 @@ import os
 import re
 import time
 from dataclasses import replace
-from datetime import datetime, timezone
-from typing import Any, Callable, Mapping
+from datetime import datetime, UTC
+from typing import Any
+from collections.abc import Callable, Mapping
 from urllib.parse import unquote, urlencode, urlsplit
 
 from browser import css, forms, views
@@ -127,8 +128,24 @@ _WAIT_UNTIL = ("commit", "domcontentloaded", "load", "networkidle", "networkidle
 _OPEN_SCHEMES = ("http", "https", "file", "data")
 _KNOWN_SCHEMES = frozenset(
     {
-        "http", "https", "file", "data", "about", "javascript", "mailto", "tel", "ftp",
-        "ws", "wss", "blob", "chrome", "view-source", "sms", "geo", "magnet", "intent",
+        "http",
+        "https",
+        "file",
+        "data",
+        "about",
+        "javascript",
+        "mailto",
+        "tel",
+        "ftp",
+        "ws",
+        "wss",
+        "blob",
+        "chrome",
+        "view-source",
+        "sms",
+        "geo",
+        "magnet",
+        "intent",
     }
 )
 _CHALLENGE_TITLES = frozenset(
@@ -142,7 +159,9 @@ _CHALLENGE_TITLES = frozenset(
         "checking your browser before accessing",
     }
 )
-_REOPENED_NOTE = "Страница открыта в chrome, метки обновились — повторите действие с новой меткой"
+_REOPENED_NOTE = (
+    "Страница открыта в chrome, метки обновились — повторите действие с новой меткой"
+)
 _CAPTURE_MIMES = {"png": "image/png", "jpeg": "image/jpeg", "pdf": "application/pdf"}
 _CAPTURE_EXTENSIONS = {".png": "png", ".jpg": "jpeg", ".jpeg": "jpeg", ".pdf": "pdf"}
 _MARKDOWN_HEADING = re.compile(r"^(#{1,6}) (.+?)\s*$")
@@ -169,7 +188,10 @@ def _optional_offset(args: Mapping[str, Any]) -> int | None:
 
 
 def _choice(
-    args: Mapping[str, Any], name: str, allowed: tuple[str, ...] | list[str], default: str | None = None
+    args: Mapping[str, Any],
+    name: str,
+    allowed: tuple[str, ...] | list[str],
+    default: str | None = None,
 ) -> str | None:
     value = arg_str(args, name)
     if value is None:
@@ -181,7 +203,9 @@ def _choice(
         if item.lower() == lowered:
             return item
     raise BrowserError(
-        E_ARG_TYPE.format(name=name, expected="одним из: " + ", ".join(allowed), value=value)
+        E_ARG_TYPE.format(
+            name=name, expected="одним из: " + ", ".join(allowed), value=value
+        )
     )
 
 
@@ -196,7 +220,9 @@ def _target(args: Mapping[str, Any]) -> ElementTarget:
     ref = arg_str(args, "ref")
     nth = arg_int(args, "nth")
     if nth is not None and nth < 1:
-        raise BrowserError(E_ARG_TYPE.format(name="nth", expected="числом от 1", value=nth))
+        raise BrowserError(
+            E_ARG_TYPE.format(name="nth", expected="числом от 1", value=nth)
+        )
     return ElementTarget(
         ref=normalize_ref(ref) if ref else None,
         selector=arg_str(args, "selector"),
@@ -239,11 +265,13 @@ def _host(url: str | None) -> str:
         return ""
 
 
-def _iso_date(timestamp: float | int | None) -> str:
+def _iso_date(timestamp: float | None) -> str:
     if timestamp is None:
         return ""
     try:
-        return datetime.fromtimestamp(float(timestamp), timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        return datetime.fromtimestamp(float(timestamp), UTC).strftime(
+            "%Y-%m-%d %H:%M UTC"
+        )
     except (OverflowError, OSError, ValueError):
         return str(timestamp)
 
@@ -272,7 +300,9 @@ def _binary_error(tab: Tab, page: views.ViewPage) -> BrowserError:
         E_BINARY_VIEW.format(
             tab=tab.id,
             mime=(info.mime if info else snapshot.mime) or "application/octet-stream",
-            size=human_bytes(info.length if info and info.length is not None else snapshot.bytes),
+            size=human_bytes(
+                info.length if info and info.length is not None else snapshot.bytes
+            ),
         )
     )
 
@@ -341,7 +371,9 @@ def page_result(
     all_notes = _merge_notes(notes, snapshot.notes)
     if text is not None or view != "none":
         if text is None:
-            text, view_notes = views.render_view(page, view, **dict(render_kwargs or {}))
+            text, view_notes = views.render_view(
+                page, view, **dict(render_kwargs or {})
+            )
             all_notes = _merge_notes(all_notes, view_notes)
         result["view"] = view
         result.update(paginate(text, offset, max_chars))
@@ -371,7 +403,11 @@ def view_scope(
         if engine is not None and engine.name == "chrome":
             page = engine.mark_matches(selector)
             model = page.model
-            found = [el for el in model.document.elements if MATCH_ATTR in el.attrs] if model else []
+            found = (
+                [el for el in model.document.elements if MATCH_ATTR in el.attrs]
+                if model
+                else []
+            )
         else:
             found = css.select(page.model.document, selector)
         if not found and require:
@@ -390,8 +426,12 @@ def _apply(
         ids = session.adopt_popups(popups)
         if ids:
             extra["popups"] = ids
-            notes.append(f"Страница открыла новую вкладку: {', '.join(ids)} (теперь текущая {ids[-1]})")
-    downloads = session.record_downloads(list(getattr(outcome, "downloads", None) or []))
+            notes.append(
+                f"Страница открыла новую вкладку: {', '.join(ids)} (теперь текущая {ids[-1]})"
+            )
+    downloads = session.record_downloads(
+        list(getattr(outcome, "downloads", None) or [])
+    )
     downloads.extend(session.drain_chrome(ctx))
     if downloads:
         extra["downloads"] = [
@@ -425,7 +465,9 @@ def _apply(
     navigation = getattr(outcome, "new_tab_navigation", None)
     if navigation is not None:
         new_tab = session.new_tab(mode=tab.mode, opener=tab.id)
-        nav_outcome, nav_notes = _navigate(session, new_tab, navigation, ctx, action="browser_click")
+        nav_outcome, nav_notes = _navigate(
+            session, new_tab, navigation, ctx, action="browser_click"
+        )
         more_notes, more_extra = _apply(session, new_tab, nav_outcome, ctx)
         notes.append(f"Открыто в новой вкладке {new_tab.id}")
         notes.extend(nav_notes)
@@ -436,7 +478,9 @@ def _apply(
     return notes, extra
 
 
-def apply_outcome(session: BrowserSession, tab: Tab, outcome: Any, ctx: Any) -> list[str]:
+def apply_outcome(
+    session: BrowserSession, tab: Tab, outcome: Any, ctx: Any
+) -> list[str]:
     """Adopt popups, record downloads, dialogs and blocked requests, open new-tab navigations."""
     return _apply(session, tab, outcome, ctx)[0]
 
@@ -445,7 +489,9 @@ def challenge_reason(page: views.ViewPage) -> str | None:
     """Why an http page looks like a bot check that only a real browser passes."""
     snapshot = page.snapshot
     headers = snapshot.headers.response_headers if snapshot.headers is not None else []
-    mitigated = next((value for name, value in headers if name.lower() == "cf-mitigated"), "")
+    mitigated = next(
+        (value for name, value in headers if name.lower() == "cf-mitigated"), ""
+    )
     if snapshot.status in (403, 503) and mitigated.strip().lower() == "challenge":
         return "проверка Cloudflare (cf-mitigated: challenge)"
     title = (page.title or "").strip()
@@ -460,7 +506,9 @@ def _chrome_status() -> tuple[Any, str | None]:
     return chrome_launch.chrome_status()
 
 
-def _ensure_live(session: BrowserSession, tab: Tab, *, action: str, deadline: Deadline, ctx: Any) -> None:
+def _ensure_live(
+    session: BrowserSession, tab: Tab, *, action: str, deadline: Deadline, ctx: Any
+) -> None:
     """For a chrome tab: detect a dead Chrome and move the cookie store to Chrome."""
     engine = tab.engine
     if engine is None or engine.name != "chrome" or tab.lost_reason:
@@ -490,11 +538,18 @@ def _navigate(
     deadline = nav.deadline
     if mode == "chrome" and not http_only:
         engine = session.engine_for(
-            tab, "chrome", deadline=deadline, ctx=ctx, action=action, reason="режим вкладки chrome"
+            tab,
+            "chrome",
+            deadline=deadline,
+            ctx=ctx,
+            action=action,
+            reason="режим вкладки chrome",
         )
         return engine.load(nav, ctx), notes
     if mode == "chrome":
-        notes.append("Этот переход выполняет движок http (адрес file:, data: или отправка формы без chrome)")
+        notes.append(
+            "Этот переход выполняет движок http (адрес file:, data: или отправка формы без chrome)"
+        )
     current = tab.engine
     if (
         mode == "auto"
@@ -508,10 +563,22 @@ def _navigate(
         and session.chrome_if_running() is not None
     ):
         engine = session.engine_for(
-            tab, "chrome", deadline=deadline, ctx=ctx, action=action, reason="тот же сайт уже открыт в chrome"
+            tab,
+            "chrome",
+            deadline=deadline,
+            ctx=ctx,
+            action=action,
+            reason="тот же сайт уже открыт в chrome",
         )
         return engine.load(nav, ctx), notes
-    engine = session.engine_for(tab, "http", deadline=deadline, ctx=ctx, action=action, reason=f"режим вкладки {mode}")
+    engine = session.engine_for(
+        tab,
+        "http",
+        deadline=deadline,
+        ctx=ctx,
+        action=action,
+        reason=f"режим вкладки {mode}",
+    )
     outcome = engine.load(nav, ctx)
     if mode != "auto" or http_only:
         return outcome, notes
@@ -529,7 +596,9 @@ def _navigate(
         notes.append(auto_no_chrome_message(reason, problem))
         return outcome, notes
     try:
-        chrome_engine = session.make_engine(tab, "chrome", deadline=deadline, ctx=ctx, action=action)
+        chrome_engine = session.make_engine(
+            tab, "chrome", deadline=deadline, ctx=ctx, action=action
+        )
     except BrowserError as exc:
         notes.append(f"Не удалось открыть в chrome: {exc}")
         return outcome, notes
@@ -571,7 +640,9 @@ def chrome_only_guard(
     if (page.snapshot.method or "GET").upper() != "GET" or not _is_http_url(page.url):
         raise BrowserError(chrome_only_message(action, tab.id, display))
     navigation = Navigation(url=page.url, initiator="reload", deadline=deadline)
-    chrome_engine = session.make_engine(tab, "chrome", deadline=deadline, ctx=ctx, action=action)
+    chrome_engine = session.make_engine(
+        tab, "chrome", deadline=deadline, ctx=ctx, action=action
+    )
     try:
         outcome = chrome_engine.load(navigation, ctx)
     except BaseException:
@@ -580,7 +651,9 @@ def chrome_only_guard(
         except Exception:
             pass
         raise
-    session.attach_engine(tab, chrome_engine, ctx=ctx, reason=f"«{action}» выполняется только в chrome")
+    session.attach_engine(
+        tab, chrome_engine, ctx=ctx, reason=f"«{action}» выполняется только в chrome"
+    )
     more_notes, extra = _apply(session, tab, outcome, ctx)
     extra["reopened_in_chrome"] = True
     view = "content" if max_chars is not None else "none"
@@ -621,7 +694,9 @@ def _perform(
         binary, problem = _chrome_status()
         if binary is None:
             raise BrowserUnavailable(chrome_missing_message(label, problem)) from None
-        return None, chrome_only_guard(session, tab, label, ctx, action.deadline, max_chars=max_chars)
+        return None, chrome_only_guard(
+            session, tab, label, ctx, action.deadline, max_chars=max_chars
+        )
 
 
 def _changes_text(before: Any, page: views.ViewPage) -> str:
@@ -653,7 +728,12 @@ def _after_action(
     if shown is None:
         shown = tab
     if outcome.navigated or shown is not tab:
-        if shown is tab and outcome.page is not None and tab.engine is not None and tab.engine.name == "http":
+        if (
+            shown is tab
+            and outcome.page is not None
+            and tab.engine is not None
+            and tab.engine.name == "http"
+        ):
             page = outcome.page
         else:
             page = current_page(session, shown)
@@ -670,7 +750,14 @@ def _after_action(
     page = current_page(session, tab)
     if view:
         return page_result(
-            session, tab, page, view=view, max_chars=max_chars, navigated=False, notes=all_notes, extra=more_extra
+            session,
+            tab,
+            page,
+            view=view,
+            max_chars=max_chars,
+            navigated=False,
+            notes=all_notes,
+            extra=more_extra,
         )
     return page_result(
         session,
@@ -697,14 +784,16 @@ def _normalize_open_url(raw: str) -> tuple[str, list[str]]:
     if text.startswith("//"):
         url = "https:" + text
         return url, [f"Адрес без схемы: открыт {display_url(url)}"]
-    match = re.match(r"^([A-Za-z][A-Za-z0-9+.\-]*):(.*)$", text, re.S)
+    match = re.match(r"^([A-Za-z][A-Za-z0-9+.\-]*):(.*)$", text, re.DOTALL)
     if match:
         scheme = match.group(1).lower()
         rest = match.group(2)
         if scheme in _OPEN_SCHEMES:
             return text, []
         port_like = re.match(r"^\d+(?:[/?#]|$)", rest) is not None
-        if not port_like and (scheme in _KNOWN_SCHEMES or rest.startswith("//") or "." not in scheme):
+        if not port_like and (
+            scheme in _KNOWN_SCHEMES or rest.startswith("//") or "." not in scheme
+        ):
             raise BrowserError(E_URL_SCHEME)
     url = "https://" + text
     return url, [f"Адрес без схемы: открыт {display_url(url)}"]
@@ -765,7 +854,9 @@ def op_open(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
 # browser_read, browser_find, browser_extract
 
 
-def _render_kwargs(args: Mapping[str, Any], scope: list[Element] | None) -> dict[str, Any]:
+def _render_kwargs(
+    args: Mapping[str, Any], scope: list[Element] | None
+) -> dict[str, Any]:
     kwargs: dict[str, Any] = {}
     if scope is not None:
         kwargs["scope"] = scope
@@ -789,7 +880,9 @@ def op_read(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     selector = arg_str(args, "selector")
     ref = arg_str(args, "ref")
     if selector and ref:
-        raise BrowserError(E_VIEW_PARAM.format(param="selector вместе с ref", view=view))
+        raise BrowserError(
+            E_VIEW_PARAM.format(param="selector вместе с ref", view=view)
+        )
     parsed = parse_ref(ref) if ref else None
     if ref and parsed is not None and parsed[0] == "N":
         engine = tab.engine
@@ -813,7 +906,9 @@ def op_read(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
             text=views.render_network_entry(entry, body_text),
         )
     if (selector or ref) and view not in views.DOM_VIEWS:
-        raise BrowserError(E_VIEW_PARAM.format(param="selector" if selector else "ref", view=view))
+        raise BrowserError(
+            E_VIEW_PARAM.format(param="selector" if selector else "ref", view=view)
+        )
     page, scope = view_scope(session, tab, page, selector, ref)
     kwargs = _render_kwargs(args, scope)
     engine = tab.engine
@@ -850,7 +945,9 @@ def _markdown_headings(text: str) -> list[tuple[int, int, str]]:
     return found
 
 
-def _find_headings(page: views.ViewPage, view: str, text: str) -> list[tuple[int, str, int, str]]:
+def _find_headings(
+    page: views.ViewPage, view: str, text: str
+) -> list[tuple[int, str, int, str]]:
     """Section headings of the searched text with the outline numbers of the page."""
     if page.model is None or page.kind == "binary":
         return []
@@ -882,7 +979,9 @@ def _find_headings(page: views.ViewPage, view: str, text: str) -> list[tuple[int
 def op_find(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     query = arg_raw_str(args, "query")
     if query is None or not query.strip():
-        raise BrowserError(E_ARG_TYPE.format(name="query", expected="непустой строкой", value=query))
+        raise BrowserError(
+            E_ARG_TYPE.format(name="query", expected="непустой строкой", value=query)
+        )
     tab = session.get_tab(arg_str(args, "tab"))
     page = current_page(session, tab)
     view = _choice(args, "view", ("page", "content", "text", "html"), "page") or "page"
@@ -890,7 +989,9 @@ def op_find(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     offset = _optional_offset(args)
     context_chars = arg_int(args, "context_chars")
     if context_chars is not None and context_chars < 0:
-        raise BrowserError(E_ARG_NEGATIVE.format(name="context_chars", value=context_chars))
+        raise BrowserError(
+            E_ARG_NEGATIVE.format(name="context_chars", value=context_chars)
+        )
     if page.kind == "binary":
         raise _binary_error(tab, page)
     text, notes = views.render_view(page, view)
@@ -921,12 +1022,21 @@ def op_find(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
 def op_extract(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     selector = arg_str(args, "selector")
     if not selector:
-        raise BrowserError(E_ARG_TYPE.format(name="selector", expected="CSS-селектором", value=selector))
+        raise BrowserError(
+            E_ARG_TYPE.format(
+                name="selector", expected="CSS-селектором", value=selector
+            )
+        )
     tab = session.get_tab(arg_str(args, "tab"))
     page = current_page(session, tab)
-    output = _choice(args, "output", ("text", "markdown", "html", "attributes"), "text") or "text"
+    output = (
+        _choice(args, "output", ("text", "markdown", "html", "attributes"), "text")
+        or "text"
+    )
     attributes_arg = arg_list(args, "attributes")
-    attributes = [str(item) for item in attributes_arg] if attributes_arg is not None else None
+    attributes = (
+        [str(item) for item in attributes_arg] if attributes_arg is not None else None
+    )
     include_hidden = arg_bool(args, "include_hidden", False)
     max_chars = _non_negative(args, "max_chars")
     offset = _optional_offset(args)
@@ -966,7 +1076,9 @@ def op_click(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     has_point = target.x is not None or target.y is not None
     if has_point and (target.x is None or target.y is None):
         raise BrowserError(E_TARGET_REQUIRED)
-    chosen = sum(bool(item) for item in (target.ref, target.text, target.selector, has_point))
+    chosen = sum(
+        bool(item) for item in (target.ref, target.text, target.selector, has_point)
+    )
     if chosen != 1:
         raise BrowserError(E_TARGET_REQUIRED)
     tab = session.get_tab(arg_str(args, "tab"))
@@ -987,7 +1099,9 @@ def op_click(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         max_bytes=_non_negative(args, "max_bytes"),
     )
     engine_name = tab.engine.name if tab.engine is not None else ""
-    outcome, reopened = _perform(session, tab, action, ctx, label="browser_click", max_chars=max_chars)
+    outcome, reopened = _perform(
+        session, tab, action, ctx, label="browser_click", max_chars=max_chars
+    )
     if reopened is not None:
         return reopened
     assert outcome is not None
@@ -1001,7 +1115,9 @@ def op_click(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
             "navigated": bool(outcome.navigated),
         },
     )
-    return _after_action(session, tab, before, outcome, ctx, view=view, max_chars=max_chars, notes=[])
+    return _after_action(
+        session, tab, before, outcome, ctx, view=view, max_chars=max_chars, notes=[]
+    )
 
 
 def _is_secret_field(model: Any, element: Element) -> bool:
@@ -1013,10 +1129,24 @@ def _is_secret_field(model: Any, element: Element) -> bool:
 
 
 def op_act(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
-    kinds = ("type", "press", "hover", "scroll", "select", "check", "uncheck", "focus", "clear")
+    kinds = (
+        "type",
+        "press",
+        "hover",
+        "scroll",
+        "select",
+        "check",
+        "uncheck",
+        "focus",
+        "clear",
+    )
     kind = _choice(args, "action", kinds)
     if kind is None:
-        raise BrowserError(E_ARG_TYPE.format(name="action", expected="одним из: " + ", ".join(kinds), value=None))
+        raise BrowserError(
+            E_ARG_TYPE.format(
+                name="action", expected="одним из: " + ", ".join(kinds), value=None
+            )
+        )
     target = _target(args)
     target.x = None
     target.y = None
@@ -1026,11 +1156,19 @@ def op_act(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         raise BrowserError(E_TARGET_REQUIRED)
     if kind == "press" and not (value or "").strip():
         raise BrowserError(
-            E_ARG_TYPE.format(name="value", expected="клавишами, например Enter или Control+A", value=value)
+            E_ARG_TYPE.format(
+                name="value",
+                expected="клавишами, например Enter или Control+A",
+                value=value,
+            )
         )
     if kind == "select" and value is None:
         raise BrowserError(
-            E_ARG_TYPE.format(name="value", expected="вариантом списка (несколько — через перевод строки)", value=value)
+            E_ARG_TYPE.format(
+                name="value",
+                expected="вариантом списка (несколько — через перевод строки)",
+                value=value,
+            )
         )
     tab = session.get_tab(arg_str(args, "tab"))
     deadline = _deadline(args)
@@ -1040,7 +1178,12 @@ def op_act(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     view = _choice(args, "view", tuple(views.NAV_VIEWS))
     wait_until = _wait_until(args)
     element_target = None if target.is_empty() else target
-    if kind == "type" and value and element_target is not None and page.model is not None:
+    if (
+        kind == "type"
+        and value
+        and element_target is not None
+        and page.model is not None
+    ):
         try:
             element, _notes = page.model.resolve_target(element_target, "I")
         except BrowserError:
@@ -1048,18 +1191,51 @@ def op_act(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         if element is not None and _is_secret_field(page.model, element):
             ctx.secret(value)
     if kind == "type":
-        action = Action(kind="type", target=element_target, value=value or "", replace=True, wait_until=wait_until, deadline=deadline)
+        action = Action(
+            kind="type",
+            target=element_target,
+            value=value or "",
+            replace=True,
+            wait_until=wait_until,
+            deadline=deadline,
+        )
     elif kind == "press":
-        action = Action(kind="press", target=element_target, value=(value or "").strip(), wait_until=wait_until, deadline=deadline)
+        action = Action(
+            kind="press",
+            target=element_target,
+            value=(value or "").strip(),
+            wait_until=wait_until,
+            deadline=deadline,
+        )
     elif kind == "scroll":
-        action = Action(kind="scroll", target=element_target, value=(value or "").strip() or None, wait_until=wait_until, deadline=deadline)
+        action = Action(
+            kind="scroll",
+            target=element_target,
+            value=(value or "").strip() or None,
+            wait_until=wait_until,
+            deadline=deadline,
+        )
     elif kind == "select":
-        action = Action(kind="select", target=element_target, values=(value or "").split("\n"), wait_until=wait_until, deadline=deadline)
+        action = Action(
+            kind="select",
+            target=element_target,
+            values=(value or "").split("\n"),
+            wait_until=wait_until,
+            deadline=deadline,
+        )
     else:
-        action = Action(kind=kind, target=element_target, value=value, wait_until=wait_until, deadline=deadline)
+        action = Action(
+            kind=kind,
+            target=element_target,
+            value=value,
+            wait_until=wait_until,
+            deadline=deadline,
+        )
     before = views.semantic_snapshot(page)
     engine_name = tab.engine.name if tab.engine is not None else ""
-    outcome, reopened = _perform(session, tab, action, ctx, label=f"browser_act {kind}", max_chars=max_chars)
+    outcome, reopened = _perform(
+        session, tab, action, ctx, label=f"browser_act {kind}", max_chars=max_chars
+    )
     if reopened is not None:
         return reopened
     assert outcome is not None
@@ -1067,8 +1243,16 @@ def op_act(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     if kind == "type" and submit and not outcome.navigated:
         notes.extend(outcome.notes)
         selected = list(outcome.selected)
-        follow = Action(kind="press", target=element_target, value="Enter", wait_until=wait_until, deadline=deadline)
-        outcome, reopened = _perform(session, tab, follow, ctx, label="browser_act press", max_chars=max_chars)
+        follow = Action(
+            kind="press",
+            target=element_target,
+            value="Enter",
+            wait_until=wait_until,
+            deadline=deadline,
+        )
+        outcome, reopened = _perform(
+            session, tab, follow, ctx, label="browser_act press", max_chars=max_chars
+        )
         if reopened is not None:
             return reopened
         assert outcome is not None
@@ -1084,12 +1268,17 @@ def op_act(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
             "navigated": bool(outcome.navigated),
         },
     )
-    return _after_action(session, tab, before, outcome, ctx, view=view, max_chars=max_chars, notes=notes)
+    return _after_action(
+        session, tab, before, outcome, ctx, view=view, max_chars=max_chars, notes=notes
+    )
 
 
 def _css_string(value: str) -> str:
     return (
-        value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\a ").replace("\r", "\\d ")
+        value.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\a ")
+        .replace("\r", "\\d ")
     )
 
 
@@ -1107,17 +1296,25 @@ def _element_target(model: Any, element: Element) -> ElementTarget:
     else:
         selector = element.tag
     matches = css.select(model.document, selector)
-    nth = next((position for position, item in enumerate(matches, 1) if item is element), 1)
+    nth = next(
+        (position for position, item in enumerate(matches, 1) if item is element), 1
+    )
     return ElementTarget(selector=selector, nth=nth if len(matches) > 1 else None)
 
 
-def _pick_in_group(model: Any, elements: list[Element], value: str | None, spec: str) -> list[Element]:
+def _pick_in_group(
+    model: Any, elements: list[Element], value: str | None, spec: str
+) -> list[Element]:
     if value is None:
         if len(elements) == 1:
             return elements
         options = ", ".join(f"«{model.field_value(element)}»" for element in elements)
         raise BrowserError(
-            E_OPTION_NOT_FOUND.format(ref=model.ref_label(elements[0]), value="(не указан value)", options=options)
+            E_OPTION_NOT_FOUND.format(
+                ref=model.ref_label(elements[0]),
+                value="(не указан value)",
+                options=options,
+            )
         )
     for element in elements:
         if model.field_value(element) == value:
@@ -1127,18 +1324,30 @@ def _pick_in_group(model: Any, elements: list[Element], value: str | None, spec:
         if model.accessible_name(element).strip().casefold() == folded:
             return [element]
     options = ", ".join(f"«{model.field_value(element)}»" for element in elements)
-    raise BrowserError(E_OPTION_NOT_FOUND.format(ref=model.ref_label(elements[0]), value=value, options=options))
+    raise BrowserError(
+        E_OPTION_NOT_FOUND.format(
+            ref=model.ref_label(elements[0]), value=value, options=options
+        )
+    )
 
 
 def _filled_line(model: Any, element: Element, description: str) -> str:
-    label = model.accessible_name(element) or element.get("name") or model.field_kind(element)
+    label = (
+        model.accessible_name(element)
+        or element.get("name")
+        or model.field_kind(element)
+    )
     return f"[{model.ref_label(element)}] «{label}» {description}"
 
 
 def op_fill_form(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     items = args.get("fields")
     if not isinstance(items, (list, tuple)) or not items:
-        raise BrowserError(E_ARG_TYPE.format(name="fields", expected="непустым списком полей", value=items))
+        raise BrowserError(
+            E_ARG_TYPE.format(
+                name="fields", expected="непустым списком полей", value=items
+            )
+        )
     tab = session.get_tab(arg_str(args, "tab"))
     deadline = _deadline(args)
     _ensure_live(session, tab, action="browser_fill_form", deadline=deadline, ctx=ctx)
@@ -1174,12 +1383,20 @@ def op_fill_form(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any
     for position, item in enumerate(items):
         if not isinstance(item, Mapping):
             raise BrowserError(
-                E_ARG_TYPE.format(name=f"fields[{position}]", expected="объектом {field, value…}", value=item)
+                E_ARG_TYPE.format(
+                    name=f"fields[{position}]",
+                    expected="объектом {field, value…}",
+                    value=item,
+                )
             )
         spec = str(item.get("field") or "").strip()
         if not spec:
             raise BrowserError(
-                E_ARG_TYPE.format(name=f"fields[{position}].field", expected="непустой строкой", value=item.get("field"))
+                E_ARG_TYPE.format(
+                    name=f"fields[{position}].field",
+                    expected="непустой строкой",
+                    value=item.get("field"),
+                )
             )
         try:
             elements = forms.find_field(model, form_element, spec)
@@ -1222,8 +1439,15 @@ def op_fill_form(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any
         secret = any(_is_secret_field(model, candidate) for candidate in elements)
         if file_paths:
             paths = [files_mod.resolve_input_path(str(path)) for path in file_paths]
-            action = Action(kind="set_files", target=_element_target(model, element), values=paths, deadline=deadline)
-            description = "файлы: " + ", ".join(os.path.basename(path) for path in paths)
+            action = Action(
+                kind="set_files",
+                target=_element_target(model, element),
+                values=paths,
+                deadline=deadline,
+            )
+            description = "файлы: " + ", ".join(
+                os.path.basename(path) for path in paths
+            )
         elif checked is not None:
             chosen = _pick_in_group(model, elements, value, spec)[0]
             element = chosen
@@ -1234,27 +1458,50 @@ def op_fill_form(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any
             )
             description = "✓ отмечен" if bool(checked) else "✗ снят"
         elif values is not None:
-            selected = [str(entry) for entry in (values if isinstance(values, (list, tuple)) else [values])]
-            action = Action(kind="select", target=_element_target(model, element), values=selected, deadline=deadline)
+            selected = [
+                str(entry)
+                for entry in (values if isinstance(values, (list, tuple)) else [values])
+            ]
+            action = Action(
+                kind="select",
+                target=_element_target(model, element),
+                values=selected,
+                deadline=deadline,
+            )
             description = "= " + ", ".join(f"«{entry}»" for entry in selected)
             if secret:
                 for entry in selected:
                     ctx.secret(entry)
         elif value is not None:
             if element.tag == "select":
-                action = Action(kind="select", target=_element_target(model, element), values=[value], deadline=deadline)
+                action = Action(
+                    kind="select",
+                    target=_element_target(model, element),
+                    values=[value],
+                    deadline=deadline,
+                )
                 description = f"= «{value}»"
             elif kind in ("checkbox", "radio"):
                 chosen = _pick_in_group(model, elements, value, spec)[0]
                 element = chosen
-                action = Action(kind="check", target=_element_target(model, chosen), deadline=deadline)
+                action = Action(
+                    kind="check",
+                    target=_element_target(model, chosen),
+                    deadline=deadline,
+                )
                 description = f"✓ отмечен вариант «{value}»"
             else:
                 action = Action(
-                    kind="set_value", target=_element_target(model, element), value=value, replace=True, deadline=deadline
+                    kind="set_value",
+                    target=_element_target(model, element),
+                    value=value,
+                    replace=True,
+                    deadline=deadline,
                 )
                 if kind == "password":
-                    description = f"= (заполнено, {len(value)} симв.)" if value else "= (пусто)"
+                    description = (
+                        f"= (заполнено, {len(value)} симв.)" if value else "= (пусто)"
+                    )
                 elif secret:
                     description = f"= (скрыто, {len(value)} симв.)"
                 else:
@@ -1264,7 +1511,9 @@ def op_fill_form(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any
         else:
             raise BrowserError(
                 E_ARG_TYPE.format(
-                    name=f"поле «{spec}»", expected="с value, values, checked или file_paths", value=dict(item)
+                    name=f"поле «{spec}»",
+                    expected="с value, values, checked или file_paths",
+                    value=dict(item),
                 )
             )
         outcome = engine.perform(action, ctx)
@@ -1275,16 +1524,22 @@ def op_fill_form(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any
             names.append(field_name)
     if arg_bool(args, "submit", False):
         if form_element is None:
-            raise BrowserError(E_PRESS_NO_FORM.format(ref=model.ref_label(plan[0][2][0])))
+            raise BrowserError(
+                E_PRESS_NO_FORM.format(ref=model.ref_label(plan[0][2][0]))
+            )
         info = forms.form_info(model, form_element)
         submitter = None
         button = arg_str(args, "submit_button")
         if button:
             submitter = (
-                ElementTarget(ref=normalize_ref(button)) if parse_ref(button) else ElementTarget(text=button)
+                ElementTarget(ref=normalize_ref(button))
+                if parse_ref(button)
+                else ElementTarget(text=button)
             )
         if engine.name == "http" and info.has_onsubmit:
-            notes.append("Форма может обрабатываться JavaScript; если результат неверный — engine='chrome'")
+            notes.append(
+                "Форма может обрабатываться JavaScript; если результат неверный — engine='chrome'"
+            )
         action = Action(
             kind="submit",
             target=_element_target(model, form_element),
@@ -1294,7 +1549,9 @@ def op_fill_form(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any
             max_redirects=_non_negative(args, "max_redirects"),
             max_bytes=_non_negative(args, "max_bytes"),
         )
-        outcome, reopened = _perform(session, tab, action, ctx, label="browser_fill_form", max_chars=max_chars)
+        outcome, reopened = _perform(
+            session, tab, action, ctx, label="browser_fill_form", max_chars=max_chars
+        )
         if reopened is not None:
             return reopened
         assert outcome is not None
@@ -1332,7 +1589,9 @@ def op_fill_form(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any
                 form_after = None
         if form_after is not None:
             notes.extend(forms.validation_notes(model_after, form_after))
-    notes.append("Форма не отправлена: submit=true или browser_click по кнопке отправки")
+    notes.append(
+        "Форма не отправлена: submit=true или browser_click по кнопке отправки"
+    )
     if view:
         return page_result(
             session,
@@ -1344,7 +1603,12 @@ def op_fill_form(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any
             notes=_merge_notes(notes),
             extra={"filled": filled},
         )
-    text = "Заполнено:\n" + "\n".join(filled) + "\n\nИзменения на странице:\n" + _changes_text(before, page_after)
+    text = (
+        "Заполнено:\n"
+        + "\n".join(filled)
+        + "\n\nИзменения на странице:\n"
+        + _changes_text(before, page_after)
+    )
     return page_result(
         session,
         tab,
@@ -1373,7 +1637,12 @@ def op_wait(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         raise BrowserError(E_ARG_NEGATIVE.format(name="seconds", value=seconds))
     request = WaitRequest(
         selector=arg_str(args, "selector"),
-        selector_state=_choice(args, "selector_state", ("visible", "attached", "hidden", "detached"), "visible")
+        selector_state=_choice(
+            args,
+            "selector_state",
+            ("visible", "attached", "hidden", "detached"),
+            "visible",
+        )
         or "visible",
         text=arg_str(args, "text"),
         text_gone=arg_str(args, "text_gone"),
@@ -1392,11 +1661,17 @@ def op_wait(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         if engine.name == "http" and _needs_chrome(exc) and tab.mode != "http":
             binary, problem = _chrome_status()
             if binary is None:
-                raise BrowserUnavailable(chrome_missing_message("browser_wait", problem)) from None
+                raise BrowserUnavailable(
+                    chrome_missing_message("browser_wait", problem)
+                ) from None
             return chrome_only_guard(session, tab, "browser_wait", ctx, deadline)
         raise
     notes, extra = _apply(session, tab, None, ctx)
-    data: dict[str, Any] = {"session": session.key, "tab": tab.id, "engine": engine.name}
+    data: dict[str, Any] = {
+        "session": session.key,
+        "tab": tab.id,
+        "engine": engine.name,
+    }
     data.update(result or {})
     data.update(extra)
     if notes:
@@ -1413,7 +1688,9 @@ def op_evaluate(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]
         text = session.evaluations.get(key)
         if text is None:
             raise BrowserNotFound(
-                E_RESULT_ID.format(id=result_id, ids=", ".join(session.evaluations) or "нет")
+                E_RESULT_ID.format(
+                    id=result_id, ids=", ".join(session.evaluations) or "нет"
+                )
             )
         data = {"session": session.key, "result_id": key}
         data.update(paginate(text, offset, max_chars))
@@ -1427,14 +1704,18 @@ def op_evaluate(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]
         raise BrowserError(E_TAB_EMPTY.format(tab=tab.id))
     deadline = _deadline(args)
     if engine.name == "http":
-        return chrome_only_guard(session, tab, "browser_evaluate", ctx, deadline, max_chars=max_chars)
+        return chrome_only_guard(
+            session, tab, "browser_evaluate", ctx, deadline, max_chars=max_chars
+        )
     _ensure_live(session, tab, action="browser_evaluate", deadline=deadline, ctx=ctx)
     _check_lost(tab)
     ref = arg_str(args, "ref")
     selector = arg_str(args, "selector")
     target = None
     if ref or selector:
-        target = ElementTarget(ref=normalize_ref(ref) if ref else None, selector=selector)
+        target = ElementTarget(
+            ref=normalize_ref(ref) if ref else None, selector=selector
+        )
     outcome = engine.evaluate(
         expression,
         target=target,
@@ -1499,13 +1780,21 @@ def op_screenshot(session: BrowserSession, args: dict, ctx: Any) -> dict[str, An
     selector = arg_str(args, "selector")
     target = None
     if ref or selector:
-        target = ElementTarget(ref=normalize_ref(ref) if ref else None, selector=selector)
+        target = ElementTarget(
+            ref=normalize_ref(ref) if ref else None, selector=selector
+        )
     quality = arg_int(args, "quality")
     if quality is not None and not 0 <= quality <= 100:
-        raise BrowserError(E_ARG_TYPE.format(name="quality", expected="числом от 0 до 100", value=quality))
+        raise BrowserError(
+            E_ARG_TYPE.format(
+                name="quality", expected="числом от 0 до 100", value=quality
+            )
+        )
     scale = arg_float(args, "scale")
     if scale is not None and scale <= 0:
-        raise BrowserError(E_ARG_TYPE.format(name="scale", expected="числом больше 0", value=scale))
+        raise BrowserError(
+            E_ARG_TYPE.format(name="scale", expected="числом больше 0", value=scale)
+        )
     request = CaptureRequest(
         format=fmt,
         full_page=arg_bool(args, "full_page", False),
@@ -1521,7 +1810,9 @@ def op_screenshot(session: BrowserSession, args: dict, ctx: Any) -> dict[str, An
     with AtomicWriter(final, overwrite=overwrite) as writer:
         outcome = engine.capture(request, writer)
         size, _sha256 = writer.commit()
-    ctx.event("browser_capture", {"tab": tab.id, "format": fmt, "path": final, "bytes": size})
+    ctx.event(
+        "browser_capture", {"tab": tab.id, "format": fmt, "path": final, "bytes": size}
+    )
     data: dict[str, Any] = {
         "session": session.key,
         "tab": tab.id,
@@ -1553,14 +1844,19 @@ def _history_line(item: Any) -> str:
 
 def _previous_summary(tab: Tab) -> str:
     return ", ".join(
-        f"[{item.engine}] {('«' + item.title + '» ') if item.title else ''}{item.url}" for item in tab.previous
+        f"[{item.engine}] {('«' + item.title + '» ') if item.title else ''}{item.url}"
+        for item in tab.previous
     )
 
 
 def op_history(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     action = _choice(args, "action", ("back", "forward", "reload", "list"))
     if action is None:
-        raise BrowserError(E_ARG_TYPE.format(name="action", expected="back, forward, reload или list", value=None))
+        raise BrowserError(
+            E_ARG_TYPE.format(
+                name="action", expected="back, forward, reload или list", value=None
+            )
+        )
     tab = session.get_tab(arg_str(args, "tab"))
     max_chars = _non_negative(args, "max_chars")
     engine = tab.engine
@@ -1575,7 +1871,9 @@ def op_history(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         if tab.previous:
             lines.append("")
             lines.append("Раньше в этой вкладке (другой движок):")
-            lines.extend(_history_line(item).replace("→", " ", 1) for item in tab.previous)
+            lines.extend(
+                _history_line(item).replace("→", " ", 1) for item in tab.previous
+            )
         text = "\n".join(lines) if lines else "История вкладки пуста"
         data: dict[str, Any] = {
             "session": session.key,
@@ -1601,21 +1899,33 @@ def op_history(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         if args.get("max_bytes") is not None:
             extra_kwargs["max_bytes"] = _non_negative(args, "max_bytes")
     if action == "reload":
-        outcome = engine.reload(wait_until=wait_until, deadline=deadline, ctx=ctx, **extra_kwargs)
+        outcome = engine.reload(
+            wait_until=wait_until, deadline=deadline, ctx=ctx, **extra_kwargs
+        )
     else:
         steps = arg_int(args, "steps")
         if steps is None:
             steps = 1
         if steps < 1:
-            raise BrowserError(E_ARG_TYPE.format(name="steps", expected="числом от 1", value=steps))
+            raise BrowserError(
+                E_ARG_TYPE.format(name="steps", expected="числом от 1", value=steps)
+            )
         items = engine.history()
-        position = next((index for index, item in enumerate(items) if item.current), len(items) - 1)
+        position = next(
+            (index for index, item in enumerate(items) if item.current), len(items) - 1
+        )
         if action == "back" and position - steps < 0:
-            raise BrowserError(history_back_message(tab.id, engine.name, _previous_summary(tab) or None))
+            raise BrowserError(
+                history_back_message(
+                    tab.id, engine.name, _previous_summary(tab) or None
+                )
+            )
         if action == "forward" and position + steps >= len(items):
             raise BrowserError(E_HISTORY_FWD.format(tab=tab.id))
         delta = -steps if action == "back" else steps
-        outcome = engine.go(delta, wait_until=wait_until, deadline=deadline, ctx=ctx, **extra_kwargs)
+        outcome = engine.go(
+            delta, wait_until=wait_until, deadline=deadline, ctx=ctx, **extra_kwargs
+        )
     more_notes, extra = _apply(session, tab, outcome, ctx)
     return page_result(
         session,
@@ -1655,7 +1965,11 @@ def _tab_line(session: BrowserSession, tab: Tab) -> str:
 def op_tabs(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     action = _choice(args, "action", ("list", "new", "switch", "close"))
     if action is None:
-        raise BrowserError(E_ARG_TYPE.format(name="action", expected="list, new, switch или close", value=None))
+        raise BrowserError(
+            E_ARG_TYPE.format(
+                name="action", expected="list, new, switch или close", value=None
+            )
+        )
     max_chars = _non_negative(args, "max_chars")
     if action == "new":
         engine_mode = _choice(args, "engine", ENGINE_MODES)
@@ -1674,12 +1988,20 @@ def op_tabs(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
             "mode": tab.mode,
             "tabs": len(session.tabs),
         }
-        data.update(paginate(f"Открыта пустая вкладка {tab.id} (режим {tab.mode})", None, max_chars))
+        data.update(
+            paginate(
+                f"Открыта пустая вкладка {tab.id} (режим {tab.mode})", None, max_chars
+            )
+        )
         return data
     if action == "switch":
         tab_arg = arg_str(args, "tab")
         if not tab_arg:
-            raise BrowserError(E_ARG_TYPE.format(name="tab", expected="id вкладки (t1, t2…)", value=None))
+            raise BrowserError(
+                E_ARG_TYPE.format(
+                    name="tab", expected="id вкладки (t1, t2…)", value=None
+                )
+            )
         tab = session.get_tab(tab_arg)
         session.current_tab = tab.id
         if tab.engine is not None and tab.engine.has_page() and not tab.lost_reason:
@@ -1693,19 +2015,35 @@ def op_tabs(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
                 navigated=False,
                 notes=[f"Текущая вкладка: {tab.id}"],
             )
-        data = {"session": session.key, "tab": tab.id, "mode": tab.mode, "tabs": len(session.tabs)}
+        data = {
+            "session": session.key,
+            "tab": tab.id,
+            "mode": tab.mode,
+            "tabs": len(session.tabs),
+        }
         data.update(paginate(_tab_line(session, tab), None, max_chars))
         return data
     if action == "close":
         closing = session.get_tab(arg_str(args, "tab")).id
         current = session.close_tab(closing, ctx)
-        text = f"Вкладка {closing} закрыта" + (f"; текущая {current}" if current else "; вкладок не осталось")
-        data = {"session": session.key, "closed": closing, "current": current, "tabs": len(session.tabs)}
+        text = f"Вкладка {closing} закрыта" + (
+            f"; текущая {current}" if current else "; вкладок не осталось"
+        )
+        data = {
+            "session": session.key,
+            "closed": closing,
+            "current": current,
+            "tabs": len(session.tabs),
+        }
         data.update(paginate(text, None, max_chars))
         return data
     lines = [_tab_line(session, tab) for tab in session.tabs.values()]
     text = "\n".join(lines) if lines else "Вкладок нет: начните с browser_open(url=…)"
-    data = {"session": session.key, "current": session.current_tab, "tabs": len(session.tabs)}
+    data = {
+        "session": session.key,
+        "current": session.current_tab,
+        "tabs": len(session.tabs),
+    }
     data.update(paginate(text, None, max_chars))
     return data
 
@@ -1723,7 +2061,11 @@ def _cookie_line(row: Mapping[str, Any]) -> str:
     if row.get("same_site"):
         flags.append(f"[samesite={row['same_site']}]")
     expires = row.get("expires")
-    lifetime = f"истекает {_iso_date(expires)}" if expires is not None and not row.get("session") else "до конца сессии"
+    lifetime = (
+        f"истекает {_iso_date(expires)}"
+        if expires is not None and not row.get("session")
+        else "до конца сессии"
+    )
     return (
         f"{row.get('name')}  {row.get('domain')}  {row.get('path')}  "
         + (" ".join(flags) + "  " if flags else "")
@@ -1734,7 +2076,11 @@ def _cookie_line(row: Mapping[str, Any]) -> str:
 def op_cookies(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     action = _choice(args, "action", ("list", "set", "delete", "clear"))
     if action is None:
-        raise BrowserError(E_ARG_TYPE.format(name="action", expected="list, set, delete или clear", value=None))
+        raise BrowserError(
+            E_ARG_TYPE.format(
+                name="action", expected="list, set, delete или clear", value=None
+            )
+        )
     client = session.http()
     jar = client.cookies
     domain = arg_str(args, "domain")
@@ -1747,7 +2093,9 @@ def op_cookies(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         data: dict[str, Any] = {
             "session": session.key,
             "count": len(rows),
-            "domains": sorted({str(row.get("domain") or "").lstrip(".") for row in rows}),
+            "domains": sorted(
+                {str(row.get("domain") or "").lstrip(".") for row in rows}
+            ),
         }
         data.update(paginate(text, offset, max_chars))
         return data
@@ -1773,7 +2121,12 @@ def op_cookies(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         count = 1
         text = f"Cookie {name} установлена для {domain or _host(url)}"
     elif action == "delete":
-        count = delete_cookies(jar, name=name, domain=domain or (_host(url) if url else None), path=arg_str(args, "path"))
+        count = delete_cookies(
+            jar,
+            name=name,
+            domain=domain or (_host(url) if url else None),
+            path=arg_str(args, "path"),
+        )
         text = f"Удалено cookies: {count}"
     else:
         count = clear_cookies(jar, domain=domain or (_host(url) if url else None))
@@ -1809,18 +2162,28 @@ def op_cookies(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
 def op_search(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     query = arg_str(args, "query")
     if not query:
-        raise BrowserError(E_ARG_TYPE.format(name="query", expected="непустой строкой", value=query))
+        raise BrowserError(
+            E_ARG_TYPE.format(name="query", expected="непустой строкой", value=query)
+        )
     engine_name = _choice(args, "engine", search_mod.ENGINES)
     if engine_name is None:
         raise BrowserError(
-            E_ARG_TYPE.format(name="engine", expected="одним из: " + ", ".join(search_mod.ENGINES), value=None)
+            E_ARG_TYPE.format(
+                name="engine",
+                expected="одним из: " + ", ".join(search_mod.ENGINES),
+                value=None,
+            )
         )
     page_number = arg_int(args, "page") or 1
     if page_number < 1:
-        raise BrowserError(E_ARG_TYPE.format(name="page", expected="числом от 1", value=page_number))
+        raise BrowserError(
+            E_ARG_TYPE.format(name="page", expected="числом от 1", value=page_number)
+        )
     page_size = arg_int(args, "page_size")
     if page_size is not None and page_size < 1:
-        raise BrowserError(E_ARG_TYPE.format(name="page_size", expected="числом от 1", value=page_size))
+        raise BrowserError(
+            E_ARG_TYPE.format(name="page_size", expected="числом от 1", value=page_size)
+        )
     custom = None
     if engine_name == "custom":
         custom = search_mod.CustomEngine(
@@ -1865,11 +2228,24 @@ def op_search(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     }
     tab_arg = arg_str(args, "tab")
     if tab_arg and outcome.documents:
-        tab = session.new_tab(mode=None) if tab_arg.lower() == "new" else session.get_tab(tab_arg)
+        tab = (
+            session.new_tab(mode=None)
+            if tab_arg.lower() == "new"
+            else session.get_tab(tab_arg)
+        )
         session.current_tab = tab.id
-        engine = session.engine_for(tab, "http", deadline=deadline, ctx=ctx, action="browser_search", reason="страница результатов поиска")
+        engine = session.engine_for(
+            tab,
+            "http",
+            deadline=deadline,
+            ctx=ctx,
+            action="browser_search",
+            reason="страница результатов поиска",
+        )
         if not isinstance(engine, HttpTabEngine):
-            raise BrowserError("Вкладку для результатов поиска не удалось открыть движком http")
+            raise BrowserError(
+                "Вкладку для результатов поиска не удалось открыть движком http"
+            )
         shown = engine.push_document(outcome.documents[-1], initiator="search")
         tab.last_url = shown.url
         tab.last_title = shown.title
@@ -1903,14 +2279,20 @@ def _response_key(value: str) -> str:
     return text
 
 
-def _json_text(text: str, content_type: str, json_path: str | None, notes: list[str]) -> str:
+def _json_text(
+    text: str, content_type: str, json_path: str | None, notes: list[str]
+) -> str:
     """Pretty JSON (or the json_path selection); a body that is not JSON stays as is."""
     try:
         value = json.loads(text)
     except ValueError as exc:
         if json_path:
-            raise BrowserError(E_NOT_JSON.format(ct=content_type or "не указан", reason=str(exc))) from None
-        notes.append(f"Тело помечено как JSON, но не разбирается ({exc}); показано как есть")
+            raise BrowserError(
+                E_NOT_JSON.format(ct=content_type or "не указан", reason=str(exc))
+            ) from None
+        notes.append(
+            f"Тело помечено как JSON, но не разбирается ({exc}); показано как есть"
+        )
         return text
     if json_path:
         return views.render_json(value, json_path)
@@ -1937,13 +2319,20 @@ def _stored_view(stored: StoredResponse) -> dict[str, Any]:
 
 def _request_body(
     args: Mapping[str, Any], jar: Any, url: str, ctx: Any, has_content_type: bool
-) -> tuple[bytes | None, Any, int | None, str | None, Callable[[], tuple[Any, str, int]] | None]:
+) -> tuple[
+    bytes | None, Any, int | None, str | None, Callable[[], tuple[Any, str, int]] | None
+]:
     json_body = arg_raw_str(args, "json_body")
     form_given = args.get("form") is not None
     files_arg = arg_list(args, "files") or []
     body = arg_raw_str(args, "body")
     body_base64 = arg_raw_str(args, "body_base64")
-    given = [json_body is not None, form_given or bool(files_arg), body is not None, body_base64 is not None]
+    given = [
+        json_body is not None,
+        form_given or bool(files_arg),
+        body is not None,
+        body_base64 is not None,
+    ]
     if sum(given) > 1:
         raise BrowserError(E_BODY_CONFLICT)
 
@@ -1956,15 +2345,29 @@ def _request_body(
             json.loads(text)
         except ValueError as exc:
             raise BrowserError(E_JSON_BODY.format(reason=str(exc))) from None
-        return text.encode("utf-8"), None, None, None if has_content_type else "application/json", None
+        return (
+            text.encode("utf-8"),
+            None,
+            None,
+            None if has_content_type else "application/json",
+            None,
+        )
     if form_given or files_arg:
         pairs = [(name, substitute(value)) for name, value in arg_pairs(args, "form")]
         if files_arg:
             items: list[tuple[str, str, str | None, str | None]] = []
             for position, item in enumerate(files_arg):
-                if not isinstance(item, Mapping) or not item.get("name") or not item.get("path"):
+                if (
+                    not isinstance(item, Mapping)
+                    or not item.get("name")
+                    or not item.get("path")
+                ):
                     raise BrowserError(
-                        E_ARG_TYPE.format(name=f"files[{position}]", expected="объектом {name, path}", value=item)
+                        E_ARG_TYPE.format(
+                            name=f"files[{position}]",
+                            expected="объектом {name, path}",
+                            value=item,
+                        )
                     )
                 items.append(
                     (
@@ -1981,7 +2384,13 @@ def _request_body(
             body_file, content_type, length = encode()
             return None, body_file, length, content_type, encode
         encoded = urlencode(pairs).encode("ascii")
-        return encoded, None, None, None if has_content_type else "application/x-www-form-urlencoded", None
+        return (
+            encoded,
+            None,
+            None,
+            None if has_content_type else "application/x-www-form-urlencoded",
+            None,
+        )
     if body is not None:
         return substitute(body).encode("utf-8"), None, None, None, None
     if body_base64 is not None:
@@ -1990,7 +2399,11 @@ def _request_body(
         try:
             raw = base64.b64decode(compact, validate=True)
         except (binascii.Error, ValueError) as exc:
-            raise BrowserError(E_BAD_REQUEST.format(reason=f"body_base64 не является корректным base64 ({exc})")) from None
+            raise BrowserError(
+                E_BAD_REQUEST.format(
+                    reason=f"body_base64 не является корректным base64 ({exc})"
+                )
+            ) from None
         return raw, None, None, None, None
     return None, None, None, None, None
 
@@ -2005,7 +2418,9 @@ def op_request(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         stored = session.responses.get(key)
         if stored is None:
             raise BrowserNotFound(
-                E_RESPONSE_ID.format(id=response_id, ids=", ".join(session.responses) or "нет")
+                E_RESPONSE_ID.format(
+                    id=response_id, ids=", ".join(session.responses) or "нет"
+                )
             )
         notes: list[str] = []
         text = stored.text
@@ -2032,8 +2447,12 @@ def op_request(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         value = substitute_cookie_placeholders(value, jar, url, ctx.secret)
         _secret_header(ctx, name, value)
         headers.append((name, value))
-    has_content_type = any(name.lower() == "content-type" and value for name, value in headers)
-    body, body_file, body_length, content_type, encode = _request_body(args, jar, url, ctx, has_content_type)
+    has_content_type = any(
+        name.lower() == "content-type" and value for name, value in headers
+    )
+    body, body_file, body_length, content_type, encode = _request_body(
+        args, jar, url, ctx, has_content_type
+    )
     deadline = _deadline(args)
     spec = RequestSpec(
         url=url,
@@ -2064,10 +2483,18 @@ def op_request(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     tab_arg = arg_str(args, "tab")
     notes = list(url_notes)
     if save_to and tab_arg:
-        raise BrowserError(E_ARG_TYPE.format(name="save_to и tab", expected="только одним из параметров", value=f"{save_to}, {tab_arg}"))
+        raise BrowserError(
+            E_ARG_TYPE.format(
+                name="save_to и tab",
+                expected="только одним из параметров",
+                value=f"{save_to}, {tab_arg}",
+            )
+        )
     if save_to:
         try:
-            saved = client.stream_to_file(spec, save_to, overwrite=arg_bool(args, "overwrite", False))
+            saved = client.stream_to_file(
+                spec, save_to, overwrite=arg_bool(args, "overwrite", False)
+            )
         finally:
             if body_file is not None:
                 body_file.close()
@@ -2095,7 +2522,13 @@ def op_request(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
             "sha256": saved["sha256"],
             "free_bytes": saved["free_bytes"],
         }
-        data.update(paginate(f"Тело ответа сохранено: {saved['path']} ({human_bytes(saved['bytes'])})", None, max_chars))
+        data.update(
+            paginate(
+                f"Тело ответа сохранено: {saved['path']} ({human_bytes(saved['bytes'])})",
+                None,
+                max_chars,
+            )
+        )
         if notes:
             data["notes"] = notes
         return data
@@ -2105,15 +2538,32 @@ def op_request(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
         finally:
             if body_file is not None:
                 body_file.close()
-        tab = session.new_tab(mode=None) if tab_arg.lower() == "new" else session.get_tab(tab_arg)
+        tab = (
+            session.new_tab(mode=None)
+            if tab_arg.lower() == "new"
+            else session.get_tab(tab_arg)
+        )
         session.current_tab = tab.id
-        engine = session.engine_for(tab, "http", deadline=deadline, ctx=ctx, action="browser_request", reason="ответ запроса во вкладке")
+        engine = session.engine_for(
+            tab,
+            "http",
+            deadline=deadline,
+            ctx=ctx,
+            action="browser_request",
+            reason="ответ запроса во вкладке",
+        )
         if not isinstance(engine, HttpTabEngine):
             raise BrowserError("Вкладку для ответа не удалось открыть движком http")
         page = engine.push_document(doc, initiator="request")
         ctx.event(
             "browser_request",
-            {"method": method, "url": display_url(doc.url), "status": doc.status, "bytes": doc.size, "saved_to": None},
+            {
+                "method": method,
+                "url": display_url(doc.url),
+                "status": doc.status,
+                "bytes": doc.size,
+                "saved_to": None,
+            },
         )
         return page_result(
             session,
@@ -2124,7 +2574,9 @@ def op_request(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
             offset=offset,
             navigated=True,
             notes=_merge_notes(notes, doc.notes),
-            render_kwargs={"json_path": json_path} if json_path and doc.kind == "json" else None,
+            render_kwargs={"json_path": json_path}
+            if json_path and doc.kind == "json"
+            else None,
             extra={"method": method},
         )
     try:
@@ -2154,7 +2606,9 @@ def op_request(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
             raw, cut = response.read_body(spec.max_bytes)
             size = len(raw)
             if raw:
-                text, charset, _source, had_errors = decode_body(raw, response.content_type, kind)
+                text, charset, _source, had_errors = decode_body(
+                    raw, response.content_type, kind
+                )
                 if had_errors:
                     notes.append(f"в тексте есть неразборчивые байты ({charset})")
             else:
@@ -2197,11 +2651,21 @@ def op_request(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
     shown = stored_text
     if json_path:
         if kind != "json" and not text:
-            raise BrowserError(E_NOT_JSON.format(ct=response.content_type or "не указан", reason="тело пустое"))
+            raise BrowserError(
+                E_NOT_JSON.format(
+                    ct=response.content_type or "не указан", reason="тело пустое"
+                )
+            )
         shown = _json_text(text, response.content_type, json_path, notes)
     ctx.event(
         "browser_request",
-        {"method": method, "url": stored.url, "status": stored.status, "bytes": size, "saved_to": None},
+        {
+            "method": method,
+            "url": stored.url,
+            "status": stored.status,
+            "bytes": size,
+            "saved_to": None,
+        },
     )
     data = {"session": session.key, **_stored_view(stored)}
     data["redirects"] = hop_lines(stored.hops, response.url) if stored.hops else []
@@ -2215,10 +2679,15 @@ def op_request(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]:
 # browser_download
 
 
-def _write_bytes(path: str | None, payload: bytes, mime: str, overwrite: bool, source_url: str) -> dict[str, Any]:
+def _write_bytes(
+    path: str | None, payload: bytes, mime: str, overwrite: bool, source_url: str
+) -> dict[str, Any]:
     started = time.monotonic()
     final = resolve_target(
-        path, suggested_name="download" + extension_for(mime), content_type=mime, overwrite=overwrite
+        path,
+        suggested_name="download" + extension_for(mime),
+        content_type=mime,
+        overwrite=overwrite,
     )
     with AtomicWriter(final, overwrite=overwrite) as writer:
         writer.write(payload)
@@ -2237,16 +2706,24 @@ def _write_bytes(path: str | None, payload: bytes, mime: str, overwrite: bool, s
     }
 
 
-def _copy_local(path: str | None, source: str, overwrite: bool, max_bytes: int) -> dict[str, Any]:
+def _copy_local(
+    path: str | None, source: str, overwrite: bool, max_bytes: int
+) -> dict[str, Any]:
     started = time.monotonic()
     if not source:
         raise BrowserNotFound(E_FILE_MISSING.format(path=source))
     # The same path rule as file:// pages and the filesystem tools (host port).
     source = files_mod.resolve_input_path(source)
     final = resolve_target(
-        path, suggested_name=os.path.basename(source), content_type=None, overwrite=overwrite
+        path,
+        suggested_name=os.path.basename(source),
+        content_type=None,
+        overwrite=overwrite,
     )
-    with AtomicWriter(final, overwrite=overwrite) as writer, open(source, "rb") as handle:
+    with (
+        AtomicWriter(final, overwrite=overwrite) as writer,
+        open(source, "rb") as handle,
+    ):
         while True:
             chunk = handle.read(65536)
             if not chunk:
@@ -2310,7 +2787,9 @@ def op_download(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]
         if scheme == "blob":
             raise BrowserError(E_BLOB_LINK.format(dir=session.downloads_dir()))
         if scheme not in ("http", "https", "data", "file"):
-            raise BrowserError(f"{E_URL_SCHEME}. Метка {normalize_ref(ref)} ведёт на {display_url(target_url)}")
+            raise BrowserError(
+                f"{E_URL_SCHEME}. Метка {normalize_ref(ref)} ведёт на {display_url(target_url)}"
+            )
         rel = (element.get("rel") or "").lower().split()
         referrer = referrer_value(page.url, target_url, noreferrer="noreferrer" in rel)
         spec = RequestSpec(url=target_url, referrer=referrer)
@@ -2338,9 +2817,17 @@ def op_download(session: BrowserSession, args: dict, ctx: Any) -> dict[str, Any]
             raise BrowserError(
                 f"Данные больше max_bytes={max_bytes} ({human_bytes(len(payload))}); ничего не сохранено"
             )
-        result = _write_bytes(path, payload, media_type.split(";", 1)[0].strip(), overwrite, "data:" + media_type)
+        result = _write_bytes(
+            path,
+            payload,
+            media_type.split(";", 1)[0].strip(),
+            overwrite,
+            "data:" + media_type,
+        )
     elif scheme == "file":
-        result = _copy_local(path, unquote(urlsplit(target_url).path), overwrite, max_bytes)
+        result = _copy_local(
+            path, unquote(urlsplit(target_url).path), overwrite, max_bytes
+        )
     else:
         spec.deadline = deadline
         spec.max_bytes = max_bytes
@@ -2389,12 +2876,16 @@ def _chrome_lines(session: BrowserSession) -> list[str]:
         except Exception:
             info = {}
         details = ", ".join(
-            f"{key}: {value}" for key, value in info.items() if value not in (None, "", [], {})
+            f"{key}: {value}"
+            for key, value in info.items()
+            if value not in (None, "", [], {})
         )
         return [f"chrome — запущен ({details})" if details else "chrome — запущен"]
     binary, problem = _chrome_status()
     if binary is not None:
-        return [f"chrome — не запущен; найден {getattr(binary, 'path', binary)} (запустится по требованию)"]
+        return [
+            f"chrome — не запущен; найден {getattr(binary, 'path', binary)} (запустится по требованию)"
+        ]
     return [f"chrome — недоступен: {problem or 'Chrome/Chromium не найден'}"]
 
 
@@ -2406,10 +2897,15 @@ def _status_text(session: BrowserSession) -> str:
     client = session.http()
     rows = cookie_rows(client.cookies)
     domains = sorted({str(row.get("domain") or "").lstrip(".") for row in rows})
-    lines.append(f"Cookies: {len(rows)}" + (f" (домены: {', '.join(domains)})" if domains else ""))
     lines.append(
-        "Сохранённые ответы: " + (", ".join(session.responses) or "нет")
-        + "; результаты JavaScript: " + (", ".join(session.evaluations) or "нет")
+        f"Cookies: {len(rows)}"
+        + (f" (домены: {', '.join(domains)})" if domains else "")
+    )
+    lines.append(
+        "Сохранённые ответы: "
+        + (", ".join(session.responses) or "нет")
+        + "; результаты JavaScript: "
+        + (", ".join(session.evaluations) or "нет")
     )
     if session.chrome_downloads:
         lines.append("Загрузки Chrome:")
@@ -2428,10 +2924,16 @@ def _status_text(session: BrowserSession) -> str:
     return "\n".join(lines)
 
 
-def _apply_settings(session: BrowserSession, args: Mapping[str, Any], ctx: Any) -> list[str]:
+def _apply_settings(
+    session: BrowserSession, args: Mapping[str, Any], ctx: Any
+) -> list[str]:
     settings = session.settings
     changed: list[str] = []
-    explicit = [name for name in ("mobile", "viewport_width", "viewport_height") if args.get(name) is not None]
+    explicit = [
+        name
+        for name in ("mobile", "viewport_width", "viewport_height")
+        if args.get(name) is not None
+    ]
     agent = arg_raw_str(args, "user_agent")
     if agent is not None:
         settings.apply_user_agent(agent, explicit=explicit)
@@ -2454,13 +2956,19 @@ def _apply_settings(session: BrowserSession, args: Mapping[str, Any], ctx: Any) 
         value = arg_int(args, name)
         if value is not None:
             if value < 1:
-                raise BrowserError(E_ARG_TYPE.format(name=name, expected="числом от 1", value=value))
+                raise BrowserError(
+                    E_ARG_TYPE.format(name=name, expected="числом от 1", value=value)
+                )
             setattr(settings, name, value)
             changed.append(name)
     scale = arg_float(args, "device_scale_factor")
     if scale is not None:
         if scale <= 0:
-            raise BrowserError(E_ARG_TYPE.format(name="device_scale_factor", expected="числом больше 0", value=scale))
+            raise BrowserError(
+                E_ARG_TYPE.format(
+                    name="device_scale_factor", expected="числом больше 0", value=scale
+                )
+            )
         settings.device_scale_factor = scale
         changed.append("device_scale_factor")
     for name in ("mobile", "javascript", "load_images"):
@@ -2486,7 +2994,9 @@ def _apply_settings(session: BrowserSession, args: Mapping[str, Any], ctx: Any) 
         changed.append("proxy")
     notes: list[str] = []
     if not changed:
-        notes.append("Ничего не изменено: передайте параметры, например user_agent='mobile' или proxy='http://host:port'")
+        notes.append(
+            "Ничего не изменено: передайте параметры, например user_agent='mobile' или proxy='http://host:port'"
+        )
         return notes
     browser = session.chrome_if_running()
     if browser is not None:
@@ -2498,10 +3008,16 @@ def _apply_settings(session: BrowserSession, args: Mapping[str, Any], ctx: Any) 
 
 
 def op_session(session: BrowserSession | None, args: dict, ctx: Any) -> dict[str, Any]:
-    action = _choice(args, "action", ("list", "status", "configure", "clear", "reset", "close"))
+    action = _choice(
+        args, "action", ("list", "status", "configure", "clear", "reset", "close")
+    )
     if action is None:
         raise BrowserError(
-            E_ARG_TYPE.format(name="action", expected="list, status, configure, clear, reset или close", value=None)
+            E_ARG_TYPE.format(
+                name="action",
+                expected="list, status, configure, clear, reset или close",
+                value=None,
+            )
         )
     key = ctx.session_key
     explicit = arg_str(args, "session") is not None
@@ -2510,7 +3026,11 @@ def op_session(session: BrowserSession | None, args: dict, ctx: Any) -> dict[str
     data: dict[str, Any] = {"action": action}
     if action == "list":
         sessions = list_sessions()
-        text = "\n".join(item.describe() for item in sessions) if sessions else "Сессий нет"
+        text = (
+            "\n".join(item.describe() for item in sessions)
+            if sessions
+            else "Сессий нет"
+        )
         data.update({"session": key, "sessions": len(sessions)})
         data.update(paginate(text, offset, max_chars))
         ctx.event("browser_session", {"action": action, "session": key})
@@ -2543,7 +3063,11 @@ def op_session(session: BrowserSession | None, args: dict, ctx: Any) -> dict[str
             done.append(target.key)
             ctx.event("browser_session", {"action": action, "session": target.key})
         verb = "сброшены" if action == "reset" else "закрыты"
-        text = f"Сессии {verb}: {', '.join(done)}" if done else "Сессия ещё не создана — делать нечего"
+        text = (
+            f"Сессии {verb}: {', '.join(done)}"
+            if done
+            else "Сессия ещё не создана — делать нечего"
+        )
         data.update({"session": key, "sessions": done})
         data.update(paginate(text, offset, max_chars))
         return data

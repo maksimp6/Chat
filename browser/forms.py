@@ -137,7 +137,11 @@ def is_submit_button(model: PageModel, element: Element) -> bool:
 
 
 def submit_buttons(model: PageModel, form: Element) -> list[Element]:
-    return [element for element in form_fields(model, form) if is_submit_button(model, element)]
+    return [
+        element
+        for element in form_fields(model, form)
+        if is_submit_button(model, element)
+    ]
 
 
 def form_info(model: PageModel, form: Element) -> FormInfo:
@@ -162,7 +166,9 @@ def _field_candidates(model: PageModel, form: Element | None) -> list[Element]:
         controls = form_fields(model, form)
         inside = {element.index for element in form.iter()}
     else:
-        controls = [element for element in model.document.elements if element.tag in _CONTROLS]
+        controls = [
+            element for element in model.document.elements if element.tag in _CONTROLS
+        ]
         inside = None
     seen = {element.index for element in controls}
     extra = []
@@ -257,11 +263,14 @@ def find_field(model: PageModel, form: Element | None, spec: str) -> list[Elemen
             found = [
                 element
                 for element in selected
-                if element.index in allowed or (form is None and model.is_field(element))
+                if element.index in allowed
+                or (form is None and model.is_field(element))
             ]
             if found:
                 return _expand_group(model, found)
-    listing = ", ".join(_describe_field(model, element) for element in fields) or "нет полей"
+    listing = (
+        ", ".join(_describe_field(model, element) for element in fields) or "нет полей"
+    )
     form_ref = model.ref_label(form) if form is not None else None
     raise BrowserNotFound(field_not_found_message(text, form_ref, listing))
 
@@ -288,7 +297,12 @@ def build_submission(
 ) -> FormSubmission:
     """The form's entry list and request parameters (WHATWG form submission)."""
     info = form_info(model, form)
-    method, action, enctype, target = info.method, info.action, info.enctype, info.target
+    method, action, enctype, target = (
+        info.method,
+        info.action,
+        info.enctype,
+        info.target,
+    )
     if submitter is not None and is_submit_button(model, submitter):
         attrs = submitter.attrs
         if "formmethod" in attrs:
@@ -463,7 +477,9 @@ def validation_notes(model: PageModel, form: Element) -> list[str]:
             except re.error:
                 matched = True
             if not matched:
-                notes.append(f"{who}: значение не соответствует шаблону pattern «{pattern}»")
+                notes.append(
+                    f"{who}: значение не соответствует шаблону pattern «{pattern}»"
+                )
     return notes
 
 

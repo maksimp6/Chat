@@ -30,7 +30,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 from tool_providers.schema import object_schema
 
@@ -127,8 +128,10 @@ def _validated(args: Mapping[str, Any]) -> tuple[str, str]:
         return command, ""
     if command == "batch":
         steps = args.get("steps")
-        if not isinstance(steps, list) or not 1 <= len(steps) <= BATCH_LIMIT or any(
-            not isinstance(step, dict) or len(step) != 1 for step in steps
+        if (
+            not isinstance(steps, list)
+            or not 1 <= len(steps) <= BATCH_LIMIT
+            or any(not isinstance(step, dict) or len(step) != 1 for step in steps)
         ):
             raise ValueError(
                 "batch требует steps: список из 1..30 шагов вида "
@@ -144,14 +147,20 @@ def _validated(args: Mapping[str, Any]) -> tuple[str, str]:
         return command, json.dumps(steps, ensure_ascii=False)
     if command == "browse":
         url = args.get("url")
-        if not isinstance(url, str) or len(url) > URL_LIMIT or URL.fullmatch(url) is None:
+        if (
+            not isinstance(url, str)
+            or len(url) > URL_LIMIT
+            or URL.fullmatch(url) is None
+        ):
             raise ValueError("browse требует url вида https://ru.wikipedia.org")
         return command, url
     if command == "capture":
         if package is None:
             return command, ""
         if not isinstance(package, str) or PACKAGE.fullmatch(package) is None:
-            raise ValueError("capture принимает необязательный package вида com.example.app")
+            raise ValueError(
+                "capture принимает необязательный package вида com.example.app"
+            )
         return command, package
     if command in ("move", "click"):
         dx = _bounded_int(args, "dx", -DELTA_LIMIT, DELTA_LIMIT)
@@ -173,7 +182,9 @@ def _validated(args: Mapping[str, Any]) -> tuple[str, str]:
     if command == "text":
         text = args.get("text")
         if not isinstance(text, str) or not text or len(text) > TEXT_LIMIT:
-            raise ValueError(f"text должен быть непустой строкой не длиннее {TEXT_LIMIT} символов")
+            raise ValueError(
+                f"text должен быть непустой строкой не длиннее {TEXT_LIMIT} символов"
+            )
         if any(ch in text for ch in ("\x00", "\n", "\r")):
             raise ValueError("text должен быть одной строкой без переводов строки")
         if any(ch not in KEYBOARD_CHARS for ch in text):
@@ -202,7 +213,9 @@ def _configured() -> tuple[str, str, str]:
             "execution",
         )
     if REPOSITORY.fullmatch(repository) is None:
-        raise _Failure(f"{REPOSITORY_ENV} должна быть в виде владелец/репозиторий", "execution")
+        raise _Failure(
+            f"{REPOSITORY_ENV} должна быть в виде владелец/репозиторий", "execution"
+        )
     owner, name = repository.split("/", 1)
     return token, owner, name
 
@@ -242,7 +255,9 @@ def _github_message(error: urllib.error.HTTPError, token: str) -> str:
     return text.replace(token, "[скрыто]")[:300]
 
 
-def _http_failure(error: urllib.error.HTTPError, token: str, **metadata: Any) -> _Failure:
+def _http_failure(
+    error: urllib.error.HTTPError, token: str, **metadata: Any
+) -> _Failure:
     return _Failure(
         f"GitHub отклонил запрос (HTTP {error.code}): {_github_message(error, token)}",
         "execution",
@@ -336,7 +351,8 @@ def _results_file(
         raise _http_failure(error, token) from None
     except Exception as error:
         raise _Failure(
-            f"GitHub не ответил на чтение результата ({type(error).__name__})", "execution"
+            f"GitHub не ответил на чтение результата ({type(error).__name__})",
+            "execution",
         ) from None
     try:
         payload = json.loads(raw)
@@ -415,13 +431,17 @@ def _run_local(cli: str, command: str, args: Mapping[str, Any]) -> dict[str, Any
             )
         except subprocess.TimeoutExpired:
             return _Failure(
-                "Команда на телефоне не завершилась за отведённое время", "execution",
-                local=True, command=command,
+                "Команда на телефоне не завершилась за отведённое время",
+                "execution",
+                local=True,
+                command=command,
             ).result
         except OSError as error:
             return _Failure(
                 f"Не удалось запустить устройство локально ({type(error).__name__})",
-                "execution", local=True, command=command,
+                "execution",
+                local=True,
+                command=command,
             ).result
     finally:
         try:
@@ -439,12 +459,17 @@ def _run_local(cli: str, command: str, args: Mapping[str, Any]) -> dict[str, Any
         payload = None
     if not isinstance(payload, dict):
         return _Failure(
-            "Устройство вернуло не JSON-объект", "execution", local=True, command=command
+            "Устройство вернуло не JSON-объект",
+            "execution",
+            local=True,
+            command=command,
         ).result
     if completed.returncode or payload.get("ok") is False:
         return _Failure(
             f"Устройство отклонило команду: {payload.get('error', 'root_worker_failed')}",
-            "execution", local=True, command=command,
+            "execution",
+            local=True,
+            command=command,
         ).result
     # run_client prints the worker metadata directly; a screenshot rides as png_base64.
     result = payload
@@ -494,7 +519,9 @@ def rootagent_run(
         try:
             _, raw = _github(
                 "POST",
-                _repository_url(owner, name, f"actions/workflows/{WORKFLOW_FILE}/dispatches"),
+                _repository_url(
+                    owner, name, f"actions/workflows/{WORKFLOW_FILE}/dispatches"
+                ),
                 token,
                 body,
             )
@@ -518,7 +545,11 @@ def rootagent_run(
                 "GitHub принял запуск, но не вернул его номер. Не отправляйте запуск "
                 "повторно: найдите его в Actions на ветке develop"
             ),
-            "metadata": {"phase": "execution", "dispatch": "accepted", "command": command},
+            "metadata": {
+                "phase": "execution",
+                "dispatch": "accepted",
+                "command": command,
+            },
         }
     # The phone runner's job reads its request from pending/<run_id>.json on the
     # results branch (it cannot resolve workflow inputs), waiting up to a minute.
@@ -551,7 +582,9 @@ def rootagent_result(
 ) -> dict[str, Any]:
     run_id = dict(arguments or {}).get("run_id")
     if type(run_id) is not int or run_id < 1:
-        raise ValueError("run_id должен быть положительным целым числом из rootagent_run")
+        raise ValueError(
+            "run_id должен быть положительным целым числом из rootagent_run"
+        )
     try:
         token, owner, name = _configured()
         run = _api_json(owner, name, token, f"actions/runs/{run_id}")

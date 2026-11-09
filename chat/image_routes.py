@@ -55,11 +55,17 @@ def _embed_prompt(conv_id, request_id, message_id, prompt):
             "dialogs",
             prompt,
             f"{conv_id}-image-{request_id}",
-            {"conversation_id": conv_id, "message_id": message_id, "request_id": request_id},
+            {
+                "conversation_id": conv_id,
+                "message_id": message_id,
+                "request_id": request_id,
+            },
         )
     except Exception as exc:
         logger.exception("[VECTORS] The image prompt was not embedded")
-        _file_court_failure(conv_id, "dialog_embedding_failed", exc, message_id=message_id)
+        _file_court_failure(
+            conv_id, "dialog_embedding_failed", exc, message_id=message_id
+        )
 
 
 def _image_reply(conv_id, request_id):
@@ -187,9 +193,7 @@ def generate_image():
         return jsonify(error_body("message is required")), 400
     prompt = prompt.strip()
     if len(prompt) > bound.MAX_PROMPT_CHARS:
-        return jsonify(
-            error_body("prompt_too_long", limit=bound.MAX_PROMPT_CHARS)
-        ), 400
+        return jsonify(error_body("prompt_too_long", limit=bound.MAX_PROMPT_CHARS)), 400
     if size is not None and (
         not isinstance(size, str) or size not in bound.IMAGE_SIZES
     ):
@@ -386,7 +390,9 @@ def read_generated_image(conv_id, request_id):
         # size comes from its descriptor.
         size = os.fstat(image.fileno()).st_size
         response.content_length = size
-        return response.make_conditional(request, accept_ranges=True, complete_length=size)
+        return response.make_conditional(
+            request, accept_ranges=True, complete_length=size
+        )
     except Exception:
         image.close()
         raise

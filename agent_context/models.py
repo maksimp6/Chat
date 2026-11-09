@@ -110,7 +110,7 @@ class EvidenceVersion:
     def fingerprint(self) -> str:
         return _canonical_hash(self.as_dict())
 
-    def changed_components(self, other: "EvidenceVersion") -> tuple[str, ...]:
+    def changed_components(self, other: EvidenceVersion) -> tuple[str, ...]:
         return tuple(
             name
             for name in _EVIDENCE_COMPONENTS

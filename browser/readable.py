@@ -175,13 +175,15 @@ _WHITESPACE = re.compile(r"\s+")
 _SPACES = re.compile(r"[ \t\f\v\r]+")
 _AROUND_BREAKS = re.compile(r" ?\n ?")
 _HEADING_MARK = re.compile(r"\x00(\d+)\x00")
-_LANGUAGE = re.compile(r"^(?:language|lang)-(.+)$", re.I)
+_LANGUAGE = re.compile(r"^(?:language|lang)-(.+)$", re.IGNORECASE)
 
 
 @dataclass
 class Rendered:
     text: str
-    headings: list[tuple[int, str, int, str]] = field(default_factory=list)  # offset, number, level, title
+    headings: list[tuple[int, str, int, str]] = field(
+        default_factory=list
+    )  # offset, number, level, title
 
 
 def _collapse(text: str) -> str:
@@ -210,11 +212,13 @@ def _quote_value(value: str) -> str:
 
 
 def field_inline(model: PageModel, element: Element) -> str:
-    """"[I2 {kind word} «label» (name=x) = "value"]" for a field."""
+    """ "[I2 {kind word} «label» (name=x) = "value"]" for a field."""
     ref = model.ref_of(element)
     kind = model.field_kind(element)
     role = model.role(element) or ""
-    word = KIND_WORDS.get(kind) if kind != "custom" else _ROLE_KIND_WORDS.get(role, "поле")
+    word = (
+        KIND_WORDS.get(kind) if kind != "custom" else _ROLE_KIND_WORDS.get(role, "поле")
+    )
     word = word or "поле"
     checkable = kind in ("checkbox", "radio") or (
         kind == "custom" and role in ("checkbox", "radio", "switch")
@@ -236,7 +240,9 @@ def field_inline(model: PageModel, element: Element) -> str:
         count = len(options)
         variants = f"{count} {plural(count, 'вариант', 'варианта', 'вариантов')}"
         if chosen:
-            value_part = "= " + ", ".join(f"«{label}»" for label in chosen) + f", {variants}"
+            value_part = (
+                "= " + ", ".join(f"«{label}»" for label in chosen) + f", {variants}"
+            )
         else:
             value_part = f"= ничего не выбрано, {variants}"
     elif checkable:
@@ -244,7 +250,9 @@ def field_inline(model: PageModel, element: Element) -> str:
     elif kind == "file":
         files = model.state.files.get(element.index) or ()
         if files:
-            value_part = "= " + ", ".join(f"«{os.path.basename(path)}»" for path in files)
+            value_part = "= " + ", ".join(
+                f"«{os.path.basename(path)}»" for path in files
+            )
     elif kind == "password":
         length = model.value_length(element)
         value_part = f"= (заполнено, {length} симв.)" if length else "= (пусто)"
@@ -263,9 +271,11 @@ def field_inline(model: PageModel, element: Element) -> str:
 
 
 class _Frame:
-    __slots__ = ("element", "kind", "start", "generation", "data")
+    __slots__ = ("data", "element", "generation", "kind", "start")
 
-    def __init__(self, element: Element, kind: str, start: int, generation: int, data: Any = None):
+    def __init__(
+        self, element: Element, kind: str, start: int, generation: int, data: Any = None
+    ):
         self.element = element
         self.kind = kind
         self.start = start
@@ -293,7 +303,9 @@ class _Renderer:
         self.lines: list[str] = []
         self.inline: list[str] = []
         self.frames: list[_Frame] = []
-        self.containers: list[list[Any]] = []  # ["li", marker, used] | ["quote", "> ", True]
+        self.containers: list[
+            list[Any]
+        ] = []  # ["li", marker, used] | ["quote", "> ", True]
         self.lists: list[dict[str, Any]] = []
         self.dls: list[int] = []
         self.generation = 0
@@ -383,7 +395,9 @@ class _Renderer:
         self.lines[-1] = self.lines[-1].rstrip() + " " + marker
 
     def push(self, element: Element, kind: str, data: Any = None) -> bool:
-        self.frames.append(_Frame(element, kind, len(self.inline), self.generation, data))
+        self.frames.append(
+            _Frame(element, kind, len(self.inline), self.generation, data)
+        )
         return True
 
     def take_since(self, frame: _Frame) -> tuple[str, bool, bool]:
@@ -407,7 +421,10 @@ class _Renderer:
             return False
         if tag == "template" and "shadowrootmode" not in element.attrs:
             return False
-        if tag == "input" and (element.attrs.get("type") or "").strip().lower() == "hidden":
+        if (
+            tag == "input"
+            and (element.attrs.get("type") or "").strip().lower() == "hidden"
+        ):
             return False
         # noscript visibility is part of is_hidden (render_noscript, or Chrome's own state).
         if not self.include_hidden and self.model.is_hidden(element):
@@ -493,7 +510,9 @@ class _Renderer:
         if tag == "img":
             if self.refs:
                 alt = model.accessible_name(element)
-                self.inline.append(f" [изображение «{alt}»] " if alt else " [изображение] ")
+                self.inline.append(
+                    f" [изображение «{alt}»] " if alt else " [изображение] "
+                )
             return False
         if tag in ("input", "select", "textarea", "video", "audio", "iframe", "frame"):
             return False
@@ -656,7 +675,9 @@ class _Renderer:
             return
         content, lead, trail = self.take_since(frame)
         if not content:
-            content = self.model.accessible_name(element) or ("ссылка" if self.refs else "")
+            content = self.model.accessible_name(element) or (
+                "ссылка" if self.refs else ""
+            )
         if not content:
             self.put("", lead, trail)
             return
@@ -712,7 +733,11 @@ class _Renderer:
             wrapped = f"«{content}»"
         elif tag == "abbr":
             title = " ".join((frame.element.attrs.get("title") or "").split())
-            wrapped = f"{content} ({title})" if title and self.refs and title != content else content
+            wrapped = (
+                f"{content} ({title})"
+                if title and self.refs and title != content
+                else content
+            )
         elif not self.refs or "\n" in content:
             wrapped = content
         elif marker == "`":
@@ -748,7 +773,9 @@ class _Renderer:
                     continue
                 if ref and ref[0] == "M":
                     name = model.accessible_name(node)
-                    parts.append(f"[{ref} изображение" + (f" «{name}»" if name else "") + "]")
+                    parts.append(
+                        f"[{ref} изображение" + (f" «{name}»" if name else "") + "]"
+                    )
                     continue
                 if ref and ref[0] in "LB":
                     stack.append(f" [{ref}]")
@@ -777,7 +804,9 @@ class _Renderer:
             self.emit(text)
             return
         language = ""
-        holders = [element] + [kid for kid in element.element_children() if kid.tag == "code"][:1]
+        holders = [element] + [
+            kid for kid in element.element_children() if kid.tag == "code"
+        ][:1]
         for holder in holders:
             for name in holder.attrs.get("class", "").split():
                 match = _LANGUAGE.match(name)
@@ -803,7 +832,13 @@ class _Renderer:
             start = 1
         nested = any(container[0] == "li" for container in self.containers)
         self.lists.append(
-            {"ordered": ordered, "next": start, "step": -1 if backwards else 1, "count": 0, "nested": nested}
+            {
+                "ordered": ordered,
+                "next": start,
+                "step": -1 if backwards else 1,
+                "count": 0,
+                "nested": nested,
+            }
         )
         if self.flat:
             self.flat_break()
@@ -816,7 +851,11 @@ class _Renderer:
         marker = "- "
         if state is not None and state["ordered"]:
             value_raw = (element.attrs.get("value") or "").strip()
-            number = int(value_raw) if re.fullmatch(r"[+-]?\d+", value_raw) else state["next"]
+            number = (
+                int(value_raw)
+                if re.fullmatch(r"[+-]?\d+", value_raw)
+                else state["next"]
+            )
             state["next"] = number + state["step"]
             marker = f"{number}. "
         if self.flat:
@@ -992,16 +1031,28 @@ def _cell_markdown(text: str) -> str:
 
 
 def render_table(model: PageModel, table: Element, *, refs: bool = True) -> str:
-    """"[T2] caption" and a Markdown table (tab-separated rows when refs is False)."""
+    """ "[T2] caption" and a Markdown table (tab-separated rows when refs is False)."""
     ref = model.ref_of(table)
     if is_layout_table(model, table):
         body = render_markdown(model, table, refs=refs).text
         if refs and ref:
-            return f"[{ref}] таблица-раскладка:\n\n{body}" if body else f"[{ref}] таблица-раскладка"
+            return (
+                f"[{ref}] таблица-раскладка:\n\n{body}"
+                if body
+                else f"[{ref}] таблица-раскладка"
+            )
         return body
-    caption_element = next((kid for kid in table.element_children() if kid.tag == "caption"), None)
-    caption = render_flat(model, caption_element, refs=refs).replace("\n", " ") if caption_element is not None else ""
-    head_line = " ".join(part for part in ((f"[{ref}]" if refs and ref else ""), caption) if part)
+    caption_element = next(
+        (kid for kid in table.element_children() if kid.tag == "caption"), None
+    )
+    caption = (
+        render_flat(model, caption_element, refs=refs).replace("\n", " ")
+        if caption_element is not None
+        else ""
+    )
+    head_line = " ".join(
+        part for part in ((f"[{ref}]" if refs and ref else ""), caption) if part
+    )
     rows = [row for row in _table_rows(model, table) if not model.is_hidden(row)]
     grid: dict[tuple[int, int], tuple[str, bool]] = {}
     header_rows: set[int] = set()
@@ -1027,14 +1078,19 @@ def render_table(model: PageModel, table: Element, *, refs: bool = True) -> str:
                         break
                     key = (target, column + offset)
                     if key not in grid:
-                        grid[key] = (text if offset == 0 else "", offset == 0 and down == 0)
+                        grid[key] = (
+                            text if offset == 0 else "",
+                            offset == 0 and down == 0,
+                        )
             column += colspan
             width = max(width, column)
     if not header_rows and rows:
         first = [cell for cell in _row_cells(rows[0]) if not model.is_hidden(cell)]
         if first and all(cell.tag == "th" for cell in first):
             header_rows.add(0)
-    origin_columns = sorted({column for (_, column), (_, origin) in grid.items() if origin})
+    origin_columns = sorted(
+        {column for (_, column), (_, origin) in grid.items() if origin}
+    )
     if not rows or not origin_columns:
         empty = "(пустая таблица)"
         return f"{head_line} {empty}".strip() if head_line else empty
@@ -1048,7 +1104,9 @@ def render_table(model: PageModel, table: Element, *, refs: bool = True) -> str:
         lines.append(head_line)
     if not refs:
         for index in sorted(header_rows) + body_rows:
-            lines.append("\t".join(value.replace("\n", " ") for value in row_values(index)))
+            lines.append(
+                "\t".join(value.replace("\n", " ") for value in row_values(index))
+            )
         return "\n".join(lines)
     if header_rows:
         headers = []
@@ -1064,7 +1122,11 @@ def render_table(model: PageModel, table: Element, *, refs: bool = True) -> str:
     lines.append("| " + " | ".join(_cell_markdown(value) for value in headers) + " |")
     lines.append("| " + " | ".join("---" for _ in headers) + " |")
     for index in body_rows:
-        lines.append("| " + " | ".join(_cell_markdown(value) for value in row_values(index)) + " |")
+        lines.append(
+            "| "
+            + " | ".join(_cell_markdown(value) for value in row_values(index))
+            + " |"
+        )
     return "\n".join(lines)
 
 

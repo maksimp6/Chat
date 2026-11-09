@@ -160,7 +160,7 @@ _SNIFF_XML = (b"<?xml", b"<rss", b"<feed", b"<rdf:rdf")
 _BINARY_MAGIC = (b"%PDF", b"\x89PNG", b"GIF8", b"\xff\xd8\xff", b"PK\x03\x04")
 
 _META_CHARSET = re.compile(
-    r"""<meta\b[^>]*?charset\s*=\s*["']?\s*([A-Za-z0-9_.:\-]+)""", re.I
+    r"""<meta\b[^>]*?charset\s*=\s*["']?\s*([A-Za-z0-9_.:\-]+)""", re.IGNORECASE
 )
 _XML_DECLARATION = re.compile(
     r"""^\s*<\?xml\b[^>]*?\bencoding\s*=\s*["']([A-Za-z0-9_.:\-]+)["']"""
@@ -370,8 +370,7 @@ def decode_body(
         charset, source = "utf-8", "utf-8 с заменой"
         text = data.decode("utf-8", errors="replace")
         had_errors = "�" in text
-    if text.startswith("﻿"):
-        text = text[1:]
+    text = text.removeprefix("﻿")
     return text, charset, source, had_errors
 
 

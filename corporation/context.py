@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from contextvars import ContextVar, Token
 
-_current_role: ContextVar[str | None] = ContextVar("corporation_current_role", default=None)
+_current_role: ContextVar[str | None] = ContextVar(
+    "corporation_current_role", default=None
+)
 
-__all__ = ["current", "set_role", "reset"]
+__all__ = ["current", "reset", "set_role"]
 
 
 def current() -> str | None:

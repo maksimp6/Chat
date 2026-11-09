@@ -22,7 +22,7 @@ from typing import Any
 from corporation import ledger as journal
 from corporation.roles import ROLES
 
-__all__ = ["title", "role_of_conversation", "ensure_office", "ensure_all", "offices"]
+__all__ = ["ensure_all", "ensure_office", "offices", "role_of_conversation", "title"]
 
 
 def title(role: str) -> str:
@@ -45,9 +45,15 @@ def _create_conversation(role: str) -> str:
     from ollama_client import settings
 
     port = os.environ.get("LOGOS_PORT") or "8080"
-    body = json.dumps({"title": title(role), "model": next(iter(settings.MODELS))}).encode("utf-8")
-    req = urllib.request.Request(f"http://127.0.0.1:{port}/api/conversations", data=body, method="POST",
-                                 headers={"Content-Type": "application/json", "Accept": "application/json"})
+    body = json.dumps(
+        {"title": title(role), "model": next(iter(settings.MODELS))}
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{port}/api/conversations",
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
     with urllib.request.urlopen(req, timeout=60) as response:
         made = json.loads(response.read().decode("utf-8") or "{}")
     return str(made["id"])
@@ -61,8 +67,16 @@ def ensure_office(role: str) -> str:
     if existing:
         return existing
     conv = _create_conversation(role)
-    journal.ledger().append("note", "owner", {"office": role, "conversation": conv, "title": title(role),
-                                              "text": f"кабинет {ROLES[role].person['name']} ({role})"})
+    journal.ledger().append(
+        "note",
+        "owner",
+        {
+            "office": role,
+            "conversation": conv,
+            "title": title(role),
+            "text": f"кабинет {ROLES[role].person['name']} ({role})",
+        },
+    )
     return conv
 
 
@@ -71,5 +85,12 @@ def ensure_all() -> list[dict[str, str]]:
     result = []
     for role in ROLES:
         conv = ensure_office(role)
-        result.append({"role": role, "name": ROLES[role].person["name"], "title": title(role), "conversation": conv})
+        result.append(
+            {
+                "role": role,
+                "name": ROLES[role].person["name"],
+                "title": title(role),
+                "conversation": conv,
+            }
+        )
     return result

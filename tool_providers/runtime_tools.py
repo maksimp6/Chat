@@ -158,7 +158,9 @@ def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     raw_timeout = args.get("timeout_seconds")
     timeout = None if raw_timeout in (None, 0) else float(raw_timeout)
     if timeout is not None and (not math.isfinite(timeout) or timeout <= 0):
-        raise ValueError("timeout_seconds must be a positive number, 0 or null (no limit)")
+        raise ValueError(
+            "timeout_seconds must be a positive number, 0 or null (no limit)"
+        )
 
     raw_cwd = args.get("cwd")
     cwd = os.path.abspath(os.path.expanduser(str(raw_cwd))) if raw_cwd else os.getcwd()

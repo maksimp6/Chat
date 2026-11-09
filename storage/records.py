@@ -147,10 +147,14 @@ def delete_conversation(conv_id: str) -> None:
 
 
 def get_messages(conv_id: str) -> list[dict[str, Any]]:
-    records = get_store().items(
-        prefix="chat/message/",
-        where=lambda item: item["conversation_id"] == conv_id,
-    ).values()
+    records = (
+        get_store()
+        .items(
+            prefix="chat/message/",
+            where=lambda item: item["conversation_id"] == conv_id,
+        )
+        .values()
+    )
     return [
         {
             "id": item["id"],
@@ -261,7 +265,9 @@ def get_yandex_conversation(conv_id: str) -> str | None:
     return get_store().get("chat/yandex/" + conv_id)
 
 
-def set_yandex_conversation(conv_id: str, yandex_id: str, *, replace: bool = False) -> str:
+def set_yandex_conversation(
+    conv_id: str, yandex_id: str, *, replace: bool = False
+) -> str:
     """Map a chat to its provider conversation once; a concurrent first message keeps the first id (#A-005).
 
     ``replace`` maps the chat to a rebuilt conversation instead of keeping the stored one."""

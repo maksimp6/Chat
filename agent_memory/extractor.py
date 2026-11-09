@@ -93,7 +93,12 @@ def _embed_facts() -> None:
     try:
         for row in list_global_memory_facts():
             if not vector_has("memory_facts", row["id"]):
-                vector_add("memory_facts", row["fact"], row["id"], {"category": row["category"]})
+                vector_add(
+                    "memory_facts",
+                    row["fact"],
+                    row["id"],
+                    {"category": row["category"]},
+                )
     except Exception:
         logger.exception("[VECTORS] Memory facts were not embedded")
 

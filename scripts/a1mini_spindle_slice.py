@@ -177,7 +177,13 @@ def main():
         str(stl),
     ]
     result = subprocess.run(
-        command, cwd=out, env=env, text=True, capture_output=True, timeout=240
+        command,
+        cwd=out,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=240,
+        check=False,
     )
     print(
         "SLICER_EXIT",

@@ -31,7 +31,14 @@ from typing import Any
 
 from vector_db import store
 
-__all__ = ["DOCUMENTS", "SENSE_PHRASES", "answer", "best_documents", "extract", "phrases"]
+__all__ = [
+    "DOCUMENTS",
+    "SENSE_PHRASES",
+    "answer",
+    "best_documents",
+    "extract",
+    "phrases",
+]
 
 # Documents read per question; the best chunk of each. From the traces of 04-05.11.2026: the
 # only piece with the asked-for answer was the third document found.
@@ -59,7 +66,9 @@ _LIST_MARK = re.compile(
 # a dash between spaces, unless a number stands before a hyphen ("12 - 5 = 7"); a mark inside a
 # word ("2+2=4", "file.py", "qwen3:4b") stays. A colon ends nothing: what follows it belongs to
 # what precedes it ("Имя: Максим", "Код выхода: 0").
-_CLAUSE_END = re.compile(r"([.!?…]+(?=\s|$)|[,;](?=\s|$)|[()\[\]{}«»\"“”\n]|\s[—–]\s|(?<!\d)\s-\s)")
+_CLAUSE_END = re.compile(
+    r"([.!?…]+(?=\s|$)|[,;](?=\s|$)|[()\[\]{}«»\"“”\n]|\s[—–]\s|(?<!\d)\s-\s)"
+)
 # The marks that part a phrase with a negation from a word alone after them. A quote, a bracket, a
 # question mark and a line end do not: "система не «убивает» агента", "Файла нет?\n\nЛогос: Нет.".
 _PARTS = re.compile(r"[.!…,;—–-]")
@@ -71,12 +80,15 @@ _EDGE = ".,;:!?()[]{}\"'«»“”‘’…*_`#|<>~=-—–"
 _OPENING = ",;'‘’…*`|"
 _CLOSING = ".,;:!?'‘’…*`|—–"
 # A sign means something between two words and nothing at the end of a phrase.
-_SIGNS = frozenset(("<", ">", "<=", ">=", "=", "==", "===", "!=", "!==", "<>", "-", "*"))
+_SIGNS = frozenset(
+    ("<", ">", "<=", ">=", "=", "==", "===", "!=", "!==", "<>", "-", "*")
+)
 # Words that say nothing at the end of a phrase; inside a phrase they stay, so it reads as said.
 # Negations, numbers, "да", "есть", "можно", "надо", "нужно", "только" and "only" are not among
 # them: without one of them a phrase says something else.
-STOP_WORDS = frozenset(
-    """
+STOP_WORDS = (
+    frozenset(
+        """
     а более бы был была были было быть в вам вас вдруг ведь во вот впрочем все всегда всего
     всех всю вы где даже для до его ее ей ему если еще ещё же за зачем здесь и из или им
     иногда их к как какая какой когда конечно кто куда ли лучше между меня мне много может
@@ -91,7 +103,9 @@ STOP_WORDS = frozenset(
     then there these they this those to too up us was we were what when where which who why will
     with would you your hmm ok okay well
     """.split()
-) | _SIGNS
+    )
+    | _SIGNS
+)
 # Words that turn what stands beside them into its opposite, on either side: "не вызывает",
 # "запускать нельзя".
 NEGATIONS = frozenset(
@@ -107,7 +121,8 @@ NEGATIONS = frozenset(
 # with a next line that opens with no such mark: only a length could tell it from a wrap (a
 # script's "gc.pruneExpire never", then "pin_tips").
 _WRAPPED_NEGATION = re.compile(
-    r"(?<=[^\s:] )(" + "|".join(map(re.escape, NEGATIONS)) + r")\n[ \t]*(?=\S)", re.IGNORECASE
+    r"(?<=[^\s:] )(" + "|".join(map(re.escape, NEGATIONS)) + r")\n[ \t]*(?=\S)",
+    re.IGNORECASE,
 )
 
 
@@ -128,7 +143,10 @@ def _blocks(words: list[str]) -> list[list[str]]:
     side of it saying the opposite ("Запускать тесты на этом устройстве без отдельной команды нельзя")."""
     if _negated(words):
         return [words]
-    return [words[start : start + PHRASE_WORDS] for start in range(0, len(words), PHRASE_WORDS)]
+    return [
+        words[start : start + PHRASE_WORDS]
+        for start in range(0, len(words), PHRASE_WORDS)
+    ]
 
 
 def _trimmed(words: list[str]) -> list[str]:
@@ -136,8 +154,10 @@ def _trimmed(words: list[str]) -> list[str]:
     start, end = 0, len(words)
     while start < end and words[start].casefold() in STOP_WORDS:
         start += 1
-    while end > start and words[end - 1].casefold() in STOP_WORDS and not (
-        end - 2 >= start and words[end - 2].casefold() in NEGATIONS
+    while (
+        end > start
+        and words[end - 1].casefold() in STOP_WORDS
+        and not (end - 2 >= start and words[end - 2].casefold() in NEGATIONS)
     ):
         end -= 1
     return words[start:end]
@@ -166,7 +186,9 @@ def phrases(text: str) -> list[str]:
     semicolon, a dash or a sentence end other than a question mark parts them ("Порт не 8080, а 9090.")."""
     found: list[list[str]] = []
     parted = False
-    pieces = _CLAUSE_END.split(_WRAPPED_NEGATION.sub(r"\1 ", _LABEL.sub(" ", _LIST_MARK.sub(".\n", text))))
+    pieces = _CLAUSE_END.split(
+        _WRAPPED_NEGATION.sub(r"\1 ", _LABEL.sub(" ", _LIST_MARK.sub(".\n", text)))
+    )
     for clause, mark in zip(pieces[::2], pieces[1::2] + [""]):
         words = [word for word in map(_word, clause.split()) if word]
         for block in _blocks(words):
@@ -177,7 +199,9 @@ def phrases(text: str) -> list[str]:
                 found.append(phrase)
             parted = parted and not phrase
         parted = parted or _PARTS.search(mark) is not None
-    return [" ".join(phrase) for phrase in found if any(map(str.isalnum, "".join(phrase)))]
+    return [
+        " ".join(phrase) for phrase in found if any(map(str.isalnum, "".join(phrase)))
+    ]
 
 
 def _usable(text: str, asked_text: str) -> list[str]:
@@ -185,12 +209,15 @@ def _usable(text: str, asked_text: str) -> list[str]:
     alone after another phrase can be the answer ("Мысли Логоса: Файла нет.", "Логос: Нет.")."""
     found = phrases(text)
     return [
-        phrase for index, phrase in enumerate(found)
+        phrase
+        for index, phrase in enumerate(found)
         if phrase.casefold() not in asked_text or (index and " " not in phrase)
     ]
 
 
-def best_documents(query: str, hits: list[dict[str, Any]], count: int = DOCUMENTS) -> list[dict[str, Any]]:
+def best_documents(
+    query: str, hits: list[dict[str, Any]], count: int = DOCUMENTS
+) -> list[dict[str, Any]]:
     """The best chunk of each of the ``count`` best documents of ``hits`` (a search's results, best first).
 
     A result of whole chunks repeated one past turn: the chunks of a document share its id. A chunk
@@ -212,7 +239,10 @@ def best_documents(query: str, hits: list[dict[str, Any]], count: int = DOCUMENT
 
 
 def extract(
-    query: str, hits: list[dict[str, Any]], trace: Any = None, shown: frozenset | set = frozenset()
+    query: str,
+    hits: list[dict[str, Any]],
+    trace: Any = None,
+    shown: frozenset | set = frozenset(),
 ) -> dict[str, Any]:
     """The sense of the chunks ``hits`` for ``query``: ``{"text", "candidates", "tokens"}``.
 
@@ -235,38 +265,56 @@ def extract(
     while pool and len(chosen) < SENSE_PHRASES:
         best = max(
             pool,
-            key=lambda i: scores[i]
-            - REPEAT_PENALTY * max((math.sumprod(units[i], units[j]) for j in chosen), default=0.0),
+            key=lambda i: (
+                scores[i]
+                - REPEAT_PENALTY
+                * max((math.sumprod(units[i], units[j]) for j in chosen), default=0.0)
+            ),
         )
         pool.remove(best)
         chosen.append(best)
     given = [i for i in chosen if keys[i] not in shown]
     text = "; ".join(found[i] for i in given)
     if trace is not None and hasattr(trace, "add_event"):
-        trace.add_event("sense_extracted", {
-            "documents": [
-                {key: hit.get(key) for key in ("collection", "id", "chunk", "score")} for hit in hits
-            ],
-            "candidates": len(found),
-            "phrases": [{"phrase": found[i], "key": keys[i], "score": round(scores[i], 6)} for i in given],
-            "repeats_left_out": len(chosen) - len(given),
-            "tokens": tokens,
-        })
+        trace.add_event(
+            "sense_extracted",
+            {
+                "documents": [
+                    {
+                        key: hit.get(key)
+                        for key in ("collection", "id", "chunk", "score")
+                    }
+                    for hit in hits
+                ],
+                "candidates": len(found),
+                "phrases": [
+                    {"phrase": found[i], "key": keys[i], "score": round(scores[i], 6)}
+                    for i in given
+                ],
+                "repeats_left_out": len(chosen) - len(given),
+                "tokens": tokens,
+            },
+        )
     return {"text": text, "candidates": len(found), "tokens": tokens}
 
 
 def _said_in(hit: dict[str, Any], conversation: str) -> bool:
     metadata = hit.get("metadata")
-    return isinstance(metadata, dict) and metadata.get("conversation_id") == conversation
+    return (
+        isinstance(metadata, dict) and metadata.get("conversation_id") == conversation
+    )
 
 
-def answer(question: str, *, exclude_conversation: str | None = None, trace: Any = None) -> dict[str, Any]:
+def answer(
+    question: str, *, exclude_conversation: str | None = None, trace: Any = None
+) -> dict[str, Any]:
     """What the vector database holds on ``question``: ``{"text", "searched", "tokens"}``.
 
     A stored turn of ``exclude_conversation`` is left out, so a dialog does not read itself back."""
     found = store.search(question, None, None, trace=trace)
     hits = [
-        hit for hit in found["results"]
+        hit
+        for hit in found["results"]
         if exclude_conversation is None or not _said_in(hit, exclude_conversation)
     ]
     sense = extract(question, best_documents(question, hits), trace=trace)

@@ -44,15 +44,15 @@ __all__ = [
     "bind",
     "bound",
     "current",
-    "provide",
     "delete_conversation",
     "get_conversations",
     "get_current_owner_id",
     "get_memory_client",
+    "global_settings",
     "memory_file_path",
+    "provide",
     "update_conversation_model",
     "update_conversation_title",
-    "global_settings",
     "validate_dialog_model",
 ]
 

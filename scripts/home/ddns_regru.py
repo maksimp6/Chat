@@ -63,10 +63,14 @@ def call(method: str, account: dict[str, str], **params: object) -> dict:
     with urllib.request.urlopen(API + method, data=body, timeout=30) as response:
         answer = json.loads(response.read().decode("utf-8"))
     if answer.get("result") != "success":
-        raise RuntimeError(f"{method}: {answer.get('error_code')} {answer.get('error_text')}")
+        raise RuntimeError(
+            f"{method}: {answer.get('error_code')} {answer.get('error_text')}"
+        )
     domain = answer["answer"]["domains"][0]
     if domain.get("result") != "success":
-        raise RuntimeError(f"{method}: {domain.get('error_code')} {domain.get('error_text')}")
+        raise RuntimeError(
+            f"{method}: {domain.get('error_code')} {domain.get('error_text')}"
+        )
     return domain
 
 
@@ -76,13 +80,20 @@ def update(account: dict[str, str]) -> None:
     actions: list[dict[str, str]] = []
     for sub in SUBDOMAINS:
         current = sorted(
-            r["content"] for r in records if r.get("rectype") == "A" and r.get("subname") == sub
+            r["content"]
+            for r in records
+            if r.get("rectype") == "A" and r.get("subname") == sub
         )
         if current == [address]:
             continue
         for content in current:
             actions.append(
-                {"action": "remove_record", "subdomain": sub, "record_type": "A", "content": content}
+                {
+                    "action": "remove_record",
+                    "subdomain": sub,
+                    "record_type": "A",
+                    "content": content,
+                }
             )
         actions.append({"action": "add_alias", "subdomain": sub, "ipaddr": address})
         log(f"{sub}.{DOMAIN}: {', '.join(current) or 'no A record'} -> {address}")
@@ -119,7 +130,10 @@ def save_and_start(account: dict[str, str]) -> None:
     with open(LOG, "a", encoding="utf-8") as log_file:
         subprocess.Popen(
             [sys.executable, str(Path(__file__).resolve())],
-            stdin=subprocess.DEVNULL, stdout=log_file, stderr=log_file, start_new_session=True,
+            stdin=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=log_file,
+            start_new_session=True,
         )
 
 
@@ -138,7 +152,9 @@ def setup() -> int:
         print(f"Не получилось: {exc}")
         print(HINT)
         return 1
-    print(f"Готово: {DOMAIN} указывает на этот дом и будет обновляться сам, в том числе после перезагрузки.")
+    print(
+        f"Готово: {DOMAIN} указывает на этот дом и будет обновляться сам, в том числе после перезагрузки."
+    )
     return 0
 
 

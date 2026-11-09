@@ -146,12 +146,16 @@ def _sue(args, cfg=None):
 def _interrogate(args, cfg=None):
     return {
         "success": True,
-        **interrogate(str(args.get("conversation_id") or ""), str(args.get("message") or "")),
+        **interrogate(
+            str(args.get("conversation_id") or ""), str(args.get("message") or "")
+        ),
     }
 
 
 def _conclude(args, cfg=None):
-    hearing = conclude(str(args.get("conversation_id") or ""), str(args.get("text") or ""))
+    hearing = conclude(
+        str(args.get("conversation_id") or ""), str(args.get("text") or "")
+    )
     return {"success": True, "hearing": hearing}
 
 
@@ -172,48 +176,124 @@ def _reopen(args, cfg=None):
 # The whole hall is one tool: ``action`` names what to do. Each action keeps its own
 # function, the fields it needs and whether it changes the hall.
 _ACTIONS: dict[str, dict[str, Any]] = {
-    "rules": {"fn": _rules, "required": [], "write": False,
-              "about": "правила судов и состояния решений"},
-    "judge_dialog": {"fn": _judge, "required": [], "write": False,
-                     "about": "суд над диалогом без записи заседания (conversation_id или messages)"},
-    "hearings_list": {"fn": _list, "required": [], "write": False,
-                      "about": "заседания зала"},
-    "hearing_get": {"fn": _get, "required": ["hearing_id"], "write": False,
-                    "about": "одно заседание целиком"},
-    "hearing_open": {"fn": _open, "required": ["conversation_id"], "write": True,
-                     "about": "открыть заседание над диалогом"},
-    "hearing_rejudge": {"fn": _rejudge, "required": ["hearing_id"], "write": True,
-                        "about": "пересмотр заседания: суды проходят заново"},
-    "hearing_decide": {"fn": _decide, "required": ["hearing_id", "case", "decision", "reason"], "write": True,
-                       "about": "решение владельца по делу заседания"},
-    "case_file": {"fn": _file, "required": ["hearing_id", "case"], "write": True,
-                  "about": "подать дело заседания в GitHub"},
-    "speak": {"fn": _speak, "required": ["conversation_id"], "write": True,
-              "about": "слово суда в групповом чате диалога"},
-    "sue": {"fn": _sue, "required": ["conversation_id"], "write": True,
-            "about": "иск владельца по диалогу conversation_id: создаёт диалог «⚖️ Суд: …», где судья сразу "
-                     "ищет, в чём виноват ИИ, и выносит вердикты; пользователь всегда прав"},
-    "interrogate": {"fn": _interrogate, "required": ["conversation_id", "message"], "write": True,
-                    "about": "допрос обвиняемого: message уходит от лица пользователя в копию его диалога "
-                             "conversation_id, оригинал не меняется и обвиняемый не знает о суде; ответ — его реплика"},
-    "conclusion": {"fn": _conclude, "required": ["conversation_id", "text"], "write": True,
-                   "about": "заключение вины в открытое заседание над диалогом conversation_id: почему ИИ ответил плохо"},
-    "hearing_close": {"fn": _close, "required": ["hearing_id", "reason"], "write": True,
-                      "about": "закрыть заседание с причиной"},
-    "hearing_reopen": {"fn": _reopen, "required": ["hearing_id", "reason"], "write": True,
-                       "about": "возобновить закрытое заседание с причиной"},
-    "trace_get": {"fn": trace_get, "required": [], "write": False,
-                  "about": "трассировка вызова: invocation_id, либо conversation_id и message_id сообщения; "
-                           "с состоянием вызова (running, completed, failed)"},
-    "trace_refs": {"fn": trace_refs, "required": ["conversation_id"], "write": False,
-                   "about": "сообщения диалога conversation_id с трассировками и их invocation_id"},
-    "branch": {"fn": branch, "required": ["conversation_id"], "write": True,
-               "about": "ветка диалога conversation_id: новый диалог из сказанного; before_message_id обрезает, "
-                        "edits [{message_id, text}] правят сообщения, drop_message_ids убирают; оригинал не меняется"},
-    "yandex_operations": {"fn": yandex_operations, "required": [], "write": False,
-                          "about": "операции API Yandex, которые суд может вызвать (только чтение и создание)"},
-    "yandex_call": {"fn": yandex_call, "required": ["operation"], "write": True,
-                    "about": "вызов операции API Yandex по имени operation: path_params, query и body по её контракту"},
+    "rules": {
+        "fn": _rules,
+        "required": [],
+        "write": False,
+        "about": "правила судов и состояния решений",
+    },
+    "judge_dialog": {
+        "fn": _judge,
+        "required": [],
+        "write": False,
+        "about": "суд над диалогом без записи заседания (conversation_id или messages)",
+    },
+    "hearings_list": {
+        "fn": _list,
+        "required": [],
+        "write": False,
+        "about": "заседания зала",
+    },
+    "hearing_get": {
+        "fn": _get,
+        "required": ["hearing_id"],
+        "write": False,
+        "about": "одно заседание целиком",
+    },
+    "hearing_open": {
+        "fn": _open,
+        "required": ["conversation_id"],
+        "write": True,
+        "about": "открыть заседание над диалогом",
+    },
+    "hearing_rejudge": {
+        "fn": _rejudge,
+        "required": ["hearing_id"],
+        "write": True,
+        "about": "пересмотр заседания: суды проходят заново",
+    },
+    "hearing_decide": {
+        "fn": _decide,
+        "required": ["hearing_id", "case", "decision", "reason"],
+        "write": True,
+        "about": "решение владельца по делу заседания",
+    },
+    "case_file": {
+        "fn": _file,
+        "required": ["hearing_id", "case"],
+        "write": True,
+        "about": "подать дело заседания в GitHub",
+    },
+    "speak": {
+        "fn": _speak,
+        "required": ["conversation_id"],
+        "write": True,
+        "about": "слово суда в групповом чате диалога",
+    },
+    "sue": {
+        "fn": _sue,
+        "required": ["conversation_id"],
+        "write": True,
+        "about": "иск владельца по диалогу conversation_id: создаёт диалог «⚖️ Суд: …», где судья сразу "
+        "ищет, в чём виноват ИИ, и выносит вердикты; пользователь всегда прав",
+    },
+    "interrogate": {
+        "fn": _interrogate,
+        "required": ["conversation_id", "message"],
+        "write": True,
+        "about": "допрос обвиняемого: message уходит от лица пользователя в копию его диалога "
+        "conversation_id, оригинал не меняется и обвиняемый не знает о суде; ответ — его реплика",
+    },
+    "conclusion": {
+        "fn": _conclude,
+        "required": ["conversation_id", "text"],
+        "write": True,
+        "about": "заключение вины в открытое заседание над диалогом conversation_id: почему ИИ ответил плохо",
+    },
+    "hearing_close": {
+        "fn": _close,
+        "required": ["hearing_id", "reason"],
+        "write": True,
+        "about": "закрыть заседание с причиной",
+    },
+    "hearing_reopen": {
+        "fn": _reopen,
+        "required": ["hearing_id", "reason"],
+        "write": True,
+        "about": "возобновить закрытое заседание с причиной",
+    },
+    "trace_get": {
+        "fn": trace_get,
+        "required": [],
+        "write": False,
+        "about": "трассировка вызова: invocation_id, либо conversation_id и message_id сообщения; "
+        "с состоянием вызова (running, completed, failed)",
+    },
+    "trace_refs": {
+        "fn": trace_refs,
+        "required": ["conversation_id"],
+        "write": False,
+        "about": "сообщения диалога conversation_id с трассировками и их invocation_id",
+    },
+    "branch": {
+        "fn": branch,
+        "required": ["conversation_id"],
+        "write": True,
+        "about": "ветка диалога conversation_id: новый диалог из сказанного; before_message_id обрезает, "
+        "edits [{message_id, text}] правят сообщения, drop_message_ids убирают; оригинал не меняется",
+    },
+    "yandex_operations": {
+        "fn": yandex_operations,
+        "required": [],
+        "write": False,
+        "about": "операции API Yandex, которые суд может вызвать (только чтение и создание)",
+    },
+    "yandex_call": {
+        "fn": yandex_call,
+        "required": ["operation"],
+        "write": True,
+        "about": "вызов операции API Yandex по имени operation: path_params, query и body по её контракту",
+    },
 }
 
 
@@ -222,7 +302,10 @@ def court(args, cfg=None):
     action = args.get("action")
     entry = _ACTIONS.get(action) if isinstance(action, str) else None
     if entry is None:
-        return {"success": False, "error": "action must be one of: " + ", ".join(_ACTIONS)}
+        return {
+            "success": False,
+            "error": "action must be one of: " + ", ".join(_ACTIONS),
+        }
     missing = [name for name in entry["required"] if args.get(name) in (None, "")]
     if missing:
         return {"success": False, "error": f"{action}: missing {', '.join(missing)}"}
@@ -233,7 +316,8 @@ _FIELDS = {
     "action": {
         "type": "string",
         "enum": list(_ACTIONS),
-        "description": "Что сделать: " + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items()),
+        "description": "Что сделать: "
+        + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items()),
     },
     "conversation_id": {"type": "string", "minLength": 1, "maxLength": 128},
     "messages": {
@@ -243,9 +327,22 @@ _FIELDS = {
     },
     "decision": {"type": "string", "enum": list(DECISIONS)},
     "reason": {"type": "string", "minLength": 1},
-    "invocation_id": {"type": "string", "minLength": 1, "maxLength": 128, "description": "trace_get: вызов, чья трассировка нужна"},
-    "message_id": {"type": "integer", "minimum": 1, "description": "trace_get: сообщение диалога с трассировкой"},
-    "before_message_id": {"type": "integer", "minimum": 1, "description": "branch: ветка до этого сообщения (не включая его)"},
+    "invocation_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "trace_get: вызов, чья трассировка нужна",
+    },
+    "message_id": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "trace_get: сообщение диалога с трассировкой",
+    },
+    "before_message_id": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "branch: ветка до этого сообщения (не включая его)",
+    },
     "edits": {
         "type": "array",
         "description": "branch: правки сообщений ветки",
@@ -258,14 +355,39 @@ _FIELDS = {
             "required": ["message_id", "text"],
         },
     },
-    "drop_message_ids": {"type": "array", "description": "branch: сообщения, которых не будет в ветке", "items": {"type": "integer", "minimum": 1}},
-    "title": {"type": "string", "minLength": 1, "maxLength": 200, "description": "branch: название ветки"},
-    "operation": {"type": "string", "minLength": 1, "maxLength": 200, "description": "yandex_call: имя операции из yandex_operations"},
-    "path_params": {"type": "object", "description": "yandex_call: параметры пути из URL операции"},
+    "drop_message_ids": {
+        "type": "array",
+        "description": "branch: сообщения, которых не будет в ветке",
+        "items": {"type": "integer", "minimum": 1},
+    },
+    "title": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "description": "branch: название ветки",
+    },
+    "operation": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "description": "yandex_call: имя операции из yandex_operations",
+    },
+    "path_params": {
+        "type": "object",
+        "description": "yandex_call: параметры пути из URL операции",
+    },
     "query": {"type": "object", "description": "yandex_call: параметры строки запроса"},
     "body": {"description": "yandex_call: тело запроса (JSON) по контракту операции"},
-    "message": {"type": "string", "minLength": 1, "description": "interrogate: вопрос обвиняемому от лица пользователя"},
-    "text": {"type": "string", "minLength": 1, "description": "conclusion: текст заключения вины"},
+    "message": {
+        "type": "string",
+        "minLength": 1,
+        "description": "interrogate: вопрос обвиняемому от лица пользователя",
+    },
+    "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "conclusion: текст заключения вины",
+    },
     **_HEARING,
     **_CASE,
     **_CRISIS,
@@ -282,7 +404,9 @@ COURT_TOOLS = {
             schema=object_schema(_FIELDS, ["action"]),
             title="Court",
             description="Зал суда Логоса одной функцией: поле action выбирает действие. "
-            + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items())
+            + "; ".join(
+                f"{name} — {entry['about']}" for name, entry in _ACTIONS.items()
+            )
             + ". Действия, которые меняют зал, требуют подтверждения владельца.",
         ),
         "metadata": {"approval_actions": _WRITE_ACTIONS},

@@ -15,7 +15,9 @@ def _get(path: str, *, json: Any = None) -> tuple[Any, str | None]:
     url = settings.url().rstrip("/") + path
     try:
         resp = (
-            requests.post(url, json=json, timeout=5) if json is not None else requests.get(url, timeout=5)
+            requests.post(url, json=json, timeout=5)
+            if json is not None
+            else requests.get(url, timeout=5)
         )
         resp.raise_for_status()
         return resp.json(), None
@@ -27,7 +29,9 @@ def status() -> dict[str, Any]:
     """The settings, the server's version, the loaded models and each model's parameters."""
     result: dict[str, Any] = {"settings": settings.describe(), "errors": {}}
     version, error = _get("/api/version")
-    result["version"] = (version or {}).get("version") if isinstance(version, dict) else None
+    result["version"] = (
+        (version or {}).get("version") if isinstance(version, dict) else None
+    )
     if error:
         result["errors"]["version"] = error
     running, error = _get("/api/ps")
@@ -39,7 +43,9 @@ def status() -> dict[str, Any]:
             "context_length": model.get("context_length"),
             "expires_at": model.get("expires_at"),
         }
-        for model in ((running or {}).get("models") or [] if isinstance(running, dict) else [])
+        for model in (
+            (running or {}).get("models") or [] if isinstance(running, dict) else []
+        )
         if isinstance(model, dict)
     ]
     if error:

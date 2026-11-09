@@ -294,7 +294,11 @@ class YandexPollingMixin:
                 last_status = status
                 emit_event(
                     on_event,
-                    {"kind": "response_status", "status": status, "response_id": task_id},
+                    {
+                        "kind": "response_status",
+                        "status": status,
+                        "response_id": task_id,
+                    },
                 )
             if status in _TERMINAL_STATUSES or response.get("error") is not None:
                 return self._poll_terminal(

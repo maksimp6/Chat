@@ -128,7 +128,11 @@ def main():
         "TMPDIR": os.environ["RUNNER_TEMP"],
     }
     result = subprocess.run(
-        ["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=120
+        ["su", "-c", shlex.join(argv)],
+        env=safe_env,
+        capture_output=True,
+        timeout=120,
+        check=False,
     )
     if result.returncode:
         raise RuntimeError(

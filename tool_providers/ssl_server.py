@@ -146,7 +146,7 @@ def ssl_cert_check(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         return _fail(f"TLS connection to {host}:{port} failed: {exc}")
 
     cert = x509.load_der_x509_certificate(der)
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     not_after = cert.not_valid_after_utc
     return {
         "success": True,
@@ -192,7 +192,12 @@ def ssl_server_config_test(args: dict, cfg: dict | None = None) -> dict[str, Any
         timeout = _timeout(args.get("timeout_seconds"), 60)
     except ValueError as exc:
         return _fail(str(exc))
-    return _remote(args, cfg, f'S=""; [ "$(id -u)" = 0 ] || S="sudo -n"; $S {_CONFIG_TEST[service]}', timeout)
+    return _remote(
+        args,
+        cfg,
+        f'S=""; [ "$(id -u)" = 0 ] || S="sudo -n"; $S {_CONFIG_TEST[service]}',
+        timeout,
+    )
 
 
 def _domains(value: Any) -> list[str]:
@@ -212,7 +217,9 @@ def ssl_cert_issue(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         email = _text(args.get("email"))
         if not _EMAIL_RE.match(email):
             raise ValueError("email must be an address such as admin@example.com")
-        authenticator = _one_of(args.get("authenticator"), _AUTHENTICATORS, "authenticator")
+        authenticator = _one_of(
+            args.get("authenticator"), _AUTHENTICATORS, "authenticator"
+        )
         dry_run = args.get("dry_run")
         if not isinstance(dry_run, bool):
             raise ValueError("dry_run must be true or false")
@@ -221,7 +228,9 @@ def ssl_cert_issue(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         return _fail(str(exc))
     if any(name.startswith("*.") for name in domains):
         # A wildcard needs a DNS challenge, which none of these authenticators can answer.
-        return _fail("wildcard names need a DNS challenge; these authenticators cannot answer it")
+        return _fail(
+            "wildcard names need a DNS challenge; these authenticators cannot answer it"
+        )
     flags = [
         "certbot",
         "certonly" if authenticator == "standalone" else "",
@@ -237,7 +246,11 @@ def ssl_cert_issue(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         flags += ["-d", shlex.quote(name)]
     if dry_run:
         flags.append("--dry-run")
-    command = 'S=""; [ "$(id -u)" = 0 ] || S="sudo -n"; $S ' + " ".join(p for p in flags if p) + " 2>&1"
+    command = (
+        'S=""; [ "$(id -u)" = 0 ] || S="sudo -n"; $S '
+        + " ".join(p for p in flags if p)
+        + " 2>&1"
+    )
     return _remote(args, cfg, command, timeout)
 
 
@@ -250,7 +263,9 @@ def ssl_cert_renew(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         timeout = _timeout(args.get("timeout_seconds"), 240)
     except ValueError as exc:
         return _fail(str(exc))
-    command = 'S=""; [ "$(id -u)" = 0 ] || S="sudo -n"; $S certbot renew --non-interactive'
+    command = (
+        'S=""; [ "$(id -u)" = 0 ] || S="sudo -n"; $S certbot renew --non-interactive'
+    )
     if dry_run:
         command += " --dry-run"
     return _remote(args, cfg, command + " 2>&1", timeout)
@@ -265,7 +280,7 @@ def ssl_server_service(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         return _fail(str(exc))
     command = (
         'S=""; [ "$(id -u)" = 0 ] || S="sudo -n"; '
-        f"$S systemctl {action} {service} 2>&1; echo \"exit=$?\"; systemctl is-active {service} 2>&1"
+        f'$S systemctl {action} {service} 2>&1; echo "exit=$?"; systemctl is-active {service} 2>&1'
     )
     return _remote(args, cfg, command, timeout)
 
@@ -281,7 +296,12 @@ _TARGET = {
     "description": "Name of an SSH Runtime target (the server to look after)",
 }
 _TIMEOUT = _optional(
-    {"type": "integer", "minimum": 1, "maximum": 300, "description": "Seconds to wait for the command"}
+    {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 300,
+        "description": "Seconds to wait for the command",
+    }
 )
 _SERVICE = {"type": "string", "enum": list(_SERVICES), "description": "Web server unit"}
 _DRY_RUN = {
@@ -327,7 +347,12 @@ SSL_TOOLS: dict[str, dict[str, Any]] = {
                 "host": {"type": "string", "minLength": 1, "maxLength": 253},
                 "port": {"type": "integer", "minimum": 1, "maximum": 65535},
                 "server_name": _optional(
-                    {"type": "string", "minLength": 1, "maxLength": 253, "description": "SNI name; not given: host"}
+                    {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 253,
+                        "description": "SNI name; not given: host",
+                    }
                 ),
                 "timeout_seconds": _TIMEOUT,
             },
@@ -343,7 +368,9 @@ SSL_TOOLS: dict[str, dict[str, Any]] = {
             "Read-only report from an SSH Runtime target: running web servers (nginx, caddy, apache), "
             "what listens on ports 80 and 443, the certbot certificate list with expiry, uptime, disk."
         ),
-        parameters=object_schema({"target": _TARGET, "timeout_seconds": _TIMEOUT}, ["target"]),
+        parameters=object_schema(
+            {"target": _TARGET, "timeout_seconds": _TIMEOUT}, ["target"]
+        ),
         mutating=False,
         func=ssl_server_status,
     ),

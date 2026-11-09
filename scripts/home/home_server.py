@@ -48,8 +48,14 @@ CHAT_HOST = "chat." + ddns_regru.DOMAIN
 LOGOS = ("127.0.0.1", 8080)
 # Connection-level headers belong to one hop; the proxy never forwards them.
 _HOP_HEADERS = {
-    "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
-    "te", "trailer", "transfer-encoding", "upgrade",
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade",
 }
 
 
@@ -72,7 +78,7 @@ def _logos_online() -> bool:
 
 
 def _gib(value: float) -> str:
-    return f"{value / 1024 ** 3:.1f} ГиБ"
+    return f"{value / 1024**3:.1f} ГиБ"
 
 
 def _state() -> dict[str, object]:
@@ -257,10 +263,19 @@ def _refresh_russia() -> None:
                 RUSSIA_CACHE.write_text(
                     json.dumps({"at": time.time(), "ranges": ranges}), encoding="utf-8"
                 )
-                print(time.strftime("%Y-%m-%d %H:%M:%S"), f"Russia: {len(ranges)} IPv4 blocks", flush=True)
+                print(
+                    time.strftime("%Y-%m-%d %H:%M:%S"),
+                    f"Russia: {len(ranges)} IPv4 blocks",
+                    flush=True,
+                )
                 age = 0.0
             except (OSError, ValueError) as exc:
-                print(time.strftime("%Y-%m-%d %H:%M:%S"), "Russia list failed:", exc, flush=True)
+                print(
+                    time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "Russia list failed:",
+                    exc,
+                    flush=True,
+                )
         time.sleep(3600)
         age += 3600
 
@@ -301,7 +316,9 @@ def _ddns_page(message: str = "") -> bytes:
 class Handler(BaseHTTPRequestHandler):
     server_version = "home"
 
-    def _send(self, body: bytes, content_type: str = "text/html; charset=utf-8") -> None:
+    def _send(
+        self, body: bytes, content_type: str = "text/html; charset=utf-8"
+    ) -> None:
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
@@ -310,7 +327,13 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _for_chat(self) -> bool:
-        host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip().lower().rstrip(".")
+        host = (
+            (self.headers.get("Host") or "")
+            .rsplit(":", 1)[0]
+            .strip()
+            .lower()
+            .rstrip(".")
+        )
         return host == CHAT_HOST
 
     def _proxy(self) -> None:
@@ -325,10 +348,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length else None
-        headers = {k: v for k, v in self.headers.items() if k.lower() not in _HOP_HEADERS}
+        headers = {
+            k: v for k, v in self.headers.items() if k.lower() not in _HOP_HEADERS
+        }
         headers["X-Forwarded-For"] = self.client_address[0]
         headers["X-Forwarded-Host"] = CHAT_HOST
-        headers["X-Forwarded-Proto"] = "https" if isinstance(self.connection, ssl.SSLSocket) else "http"
+        headers["X-Forwarded-Proto"] = (
+            "https" if isinstance(self.connection, ssl.SSLSocket) else "http"
+        )
         # A chat turn can run for many minutes on the local model.
         upstream = http.client.HTTPConnection(*LOGOS, timeout=3600)
         try:
@@ -395,7 +422,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _challenge(self) -> None:
         """Let's Encrypt reads the HTTP-01 answer here from the internet, for every name."""
-        token = self.path[len(CHALLENGE_PREFIX):]
+        token = self.path[len(CHALLENGE_PREFIX) :]
         try:
             if not acme_cert.TOKEN.fullmatch(token):
                 raise OSError
@@ -473,7 +500,9 @@ def _serve_tls() -> None:
         context.load_cert_chain(str(acme_cert.CERT), str(acme_cert.KEY))
         server = ThreadingHTTPServer(("0.0.0.0", TLS_PORT), Handler)
     except (OSError, ssl.SSLError) as exc:
-        print(time.strftime("%Y-%m-%d %H:%M:%S"), "HTTPS did not start:", exc, flush=True)
+        print(
+            time.strftime("%Y-%m-%d %H:%M:%S"), "HTTPS did not start:", exc, flush=True
+        )
         return
     # The handshake runs on the first read, in the request's own thread, so one slow
     # client never holds up the others.
@@ -488,14 +517,22 @@ def _certificates(script: Path) -> None:
     time.sleep(5)  # port 80 is listening by then, for the challenge
     while True:
         if acme_cert.ensure():
-            print(time.strftime("%Y-%m-%d %H:%M:%S"), "new certificate, restarting", flush=True)
+            print(
+                time.strftime("%Y-%m-%d %H:%M:%S"),
+                "new certificate, restarting",
+                flush=True,
+            )
             os.execv(sys.executable, [sys.executable, str(script)])
         time.sleep(12 * 3600)
 
 
 def _restart_on_change(script: Path) -> None:
     """A deploy rewrites the scripts: the server restarts on the new code by itself."""
-    sources = [script, Path(ddns_regru.__file__).resolve(), Path(acme_cert.__file__).resolve()]
+    sources = [
+        script,
+        Path(ddns_regru.__file__).resolve(),
+        Path(acme_cert.__file__).resolve(),
+    ]
     loaded = [path.stat().st_mtime for path in sources]
     while True:
         time.sleep(30)
@@ -504,7 +541,11 @@ def _restart_on_change(script: Path) -> None:
         except OSError:
             continue
         if changed:
-            print(time.strftime("%Y-%m-%d %H:%M:%S"), "script changed, restarting", flush=True)
+            print(
+                time.strftime("%Y-%m-%d %H:%M:%S"),
+                "script changed, restarting",
+                flush=True,
+            )
             os.execv(sys.executable, [sys.executable, str(script)])
 
 

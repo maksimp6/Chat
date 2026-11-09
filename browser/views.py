@@ -15,7 +15,8 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Sequence
+from typing import Any
+from collections.abc import Callable, Iterable, Sequence
 
 from browser.dom import Element, normalize_space, parse_html, serialize
 from browser.engine import BinaryInfo, HeadersInfo, PageSnapshot, content_version
@@ -90,7 +91,17 @@ VIEWS = (
 )
 NAV_VIEWS = VIEWS + ("none",)
 DOM_VIEWS = frozenset(
-    {"content", "page", "text", "html", "links", "interactive", "forms", "tables", "images"}
+    {
+        "content",
+        "page",
+        "text",
+        "html",
+        "links",
+        "interactive",
+        "forms",
+        "tables",
+        "images",
+    }
 )
 FILTER_VIEWS = frozenset({"links", "images", "interactive", "network", "console"})
 SECTION_VIEWS = frozenset({"content", "page", "text"})
@@ -167,7 +178,9 @@ def _linkified_html(title: str, text: str) -> str:
             continue
         end = match.start() + len(url)
         parts.append(html.escape(text[last : match.start()], quote=False))
-        parts.append(f'<a href="{html.escape(url, quote=True)}">{html.escape(url, quote=False)}</a>')
+        parts.append(
+            f'<a href="{html.escape(url, quote=True)}">{html.escape(url, quote=False)}</a>'
+        )
         last = end
     parts.append(html.escape(text[last:], quote=False))
     parts.append("</pre></body></html>")
@@ -206,7 +219,9 @@ class ViewPage:
     @property
     def version(self) -> str:
         snapshot = self.snapshot
-        return snapshot.version or content_version(snapshot.html, snapshot.text, snapshot.url)
+        return snapshot.version or content_version(
+            snapshot.html, snapshot.text, snapshot.url
+        )
 
     @property
     def kind(self) -> str:
@@ -354,7 +369,10 @@ class ViewPage:
         model = self.model
         if self.kind == "feed" and model is not None:
             result = render_markdown(
-                model, model.body, inline_urls=inline_urls, include_hidden=include_hidden
+                model,
+                model.body,
+                inline_urls=inline_urls,
+                include_hidden=include_hidden,
             )
         elif self.kind == "html" and model is not None:
             result = self._main_content(model, inline_urls, include_hidden)
@@ -364,7 +382,9 @@ class ViewPage:
             self._rendered_content = result
         return result
 
-    def _main_content(self, model: PageModel, inline_urls: bool, include_hidden: bool) -> Rendered:
+    def _main_content(
+        self, model: PageModel, inline_urls: bool, include_hidden: bool
+    ) -> Rendered:
         main = model.main
         rendered = render_markdown(
             model,
@@ -376,7 +396,8 @@ class ViewPage:
         if main is model.body:
             return rendered
         if any(
-            element.tag == "h1" and not model.is_hidden(element) for element in main.iter()
+            element.tag == "h1" and not model.is_hidden(element)
+            for element in main.iter()
         ):
             return rendered
         inside = {element.index for element in main.iter()}
@@ -416,7 +437,9 @@ class ViewPage:
         if not parts:
             return []
         return [
-            "Вне основного текста: " + ", ".join(parts) + " — view=page, links или forms"
+            "Вне основного текста: "
+            + ", ".join(parts)
+            + " — view=page, links или forms"
         ]
 
     def rendered_text(self) -> Rendered:
@@ -441,7 +464,9 @@ def _check_params(
     json_path: str | None,
 ) -> None:
     if view not in VIEWS:
-        raise BrowserError(f"Неизвестный вид view='{view}'. Доступны: {', '.join(VIEWS)}")
+        raise BrowserError(
+            f"Неизвестный вид view='{view}'. Доступны: {', '.join(VIEWS)}"
+        )
     if scope is not None and view not in DOM_VIEWS:
         raise BrowserError(E_VIEW_PARAM.format(param="selector/ref", view=view))
     if section is not None and view not in SECTION_VIEWS:
@@ -469,7 +494,10 @@ def _join_rendered(parts: list[Rendered]) -> Rendered:
         if position:
             text_parts.append(SCOPE_SEPARATOR)
             offset += len(SCOPE_SEPARATOR)
-        headings.extend((start + offset, number, level, title) for start, number, level, title in part.headings)
+        headings.extend(
+            (start + offset, number, level, title)
+            for start, number, level, title in part.headings
+        )
         text_parts.append(part.text)
         offset += len(part.text)
     return Rendered("".join(text_parts), headings)
@@ -498,7 +526,9 @@ def render_section(page_render: Rendered, section: str) -> str:
     if not found:
         raise BrowserNotFound(E_SECTION.format(section=section))
     if len(found) > 1:
-        listing = ", ".join(f"{number or '•'} «{title}»" for _, number, _, title in found)
+        listing = ", ".join(
+            f"{number or '•'} «{title}»" for _, number, _, title in found
+        )
         raise BrowserError(E_SECTION_AMBIGUOUS.format(section=section, list=listing))
     offset, _, level, _ = found[0]
     end = len(page_render.text)
@@ -510,7 +540,7 @@ def render_section(page_render: Rendered, section: str) -> str:
 
 
 def render_outline(page_render: Rendered) -> str:
-    """"{indent}{number} {title} — {size} симв." for every heading."""
+    """ "{indent}{number} {title} — {size} симв." for every heading."""
     headings = page_render.headings
     if not headings:
         return "Заголовков на странице нет."
@@ -523,7 +553,9 @@ def render_outline(page_render: Rendered) -> str:
                 end = other_offset
                 break
         depth = number.count(".") + 1 if number else level
-        lines.append(f"{'  ' * (depth - 1)}{number or '•'} {title} — {end - offset} симв.")
+        lines.append(
+            f"{'  ' * (depth - 1)}{number or '•'} {title} — {end - offset} симв."
+        )
     return "\n".join(lines)
 
 
@@ -537,7 +569,7 @@ def _state_suffix(states: Iterable[str]) -> str:
 
 
 def _hidden_note(count: int, what: tuple[str, str, str]) -> list[str]:
-    """"Скрытых ссылок не показано: N — include_hidden=true" (genitive plural)."""
+    """ "Скрытых ссылок не показано: N — include_hidden=true" (genitive plural)."""
     if not count:
         return []
     return [f"Скрытых {what[2]} не показано: {count} — include_hidden=true"]
@@ -550,7 +582,7 @@ def render_links(
     match: str | Callable[[str], bool] | None = None,
     include_hidden: bool = False,
 ) -> tuple[str, list[str]]:
-    """"[L5] text → url" with (новая вкладка), (nofollow), (скачивание) flags."""
+    """ "[L5] text → url" with (новая вкладка), (nofollow), (скачивание) flags."""
     accept = _matcher(match)
     lines: list[str] = []
     skipped = 0
@@ -638,7 +670,9 @@ def render_interactive(
             if value:
                 parts.append(f"= {value}")
         states = model.element_states(element)
-        line = " ".join(parts) + _state_suffix(state for state in states if state != "hidden")
+        line = " ".join(parts) + _state_suffix(
+            state for state in states if state != "hidden"
+        )
         hidden = "hidden" in states
         if hidden:
             line += " (скрыт)"
@@ -670,7 +704,9 @@ def _field_line(model: PageModel, element: Element) -> list[str]:
         return [f"  скрытое {name or '(без имени)'} = {shown}"]
     label = model.accessible_name(element)
     states = model.element_states(element)
-    if element.tag == "button" or (element.tag == "input" and kind in BUTTON_INPUT_TYPES):
+    if element.tag == "button" or (
+        element.tag == "input" and kind in BUTTON_INPUT_TYPES
+    ):
         word = "отправка" if is_submit_button(model, element) else "кнопка"
         line = f"  [{ref or '—'}] {word} «{label}»" + (f" name={name}" if name else "")
         if "disabled" in states:
@@ -699,7 +735,11 @@ def _field_line(model: PageModel, element: Element) -> list[str]:
         variants = []
         for option in model.options(element):
             label_text, value_text = option_label(option), option_value(option)
-            item = label_text if value_text == label_text else f"{label_text} = {value_text}"
+            item = (
+                label_text
+                if value_text == label_text
+                else f"{label_text} = {value_text}"
+            )
             if option.index in chosen:
                 item += " (выбран)"
             variants.append(item)
@@ -766,7 +806,7 @@ def render_images(
     match: str | Callable[[str], bool] | None = None,
     include_hidden: bool = False,
 ) -> tuple[str, list[str]]:
-    """"[M1] «alt» url (WxH) подпись: … в ссылке L5"."""
+    """ "[M1] «alt» url (WxH) подпись: … в ссылке L5"."""
     accept = _matcher(match)
     lines: list[str] = []
     skipped = 0
@@ -793,15 +833,20 @@ def render_images(
         figure = element.closest(lambda node: node.tag == "figure")
         if figure is not None:
             caption = next(
-                (node for node in figure.descendants() if node.tag == "figcaption"), None
+                (node for node in figure.descendants() if node.tag == "figcaption"),
+                None,
             )
             if caption is not None:
                 text = normalize_space(caption.text())
                 if text:
                     parts.append(f"подпись: {text}")
-        anchor = element.parent.closest(
-            lambda node: node.tag == "a" and "href" in node.attrs
-        ) if element.parent is not None else None
+        anchor = (
+            element.parent.closest(
+                lambda node: node.tag == "a" and "href" in node.attrs
+            )
+            if element.parent is not None
+            else None
+        )
         if anchor is not None and model.ref_of(anchor):
             parts.append(f"в ссылке {model.ref_of(anchor)}")
         if hidden:
@@ -856,7 +901,9 @@ def render_meta(meta: dict[str, Any]) -> str:
     for key, label in labels:
         value = meta.get(key)
         if value:
-            lines.append(f"{label}: {display_url(value) if key in ('canonical', 'base_href', 'manifest', 'amphtml', 'prev', 'next') else value}")
+            lines.append(
+                f"{label}: {display_url(value) if key in ('canonical', 'base_href', 'manifest', 'amphtml', 'prev', 'next') else value}"
+            )
     for bucket in ("og", "twitter", "article"):
         for key, value in (meta.get(bucket) or {}).items():
             lines.append(f"{bucket}:{key}: {_meta_value(value)}")
@@ -877,19 +924,25 @@ def render_meta(meta: dict[str, Any]) -> str:
                 if part
             )
             title = f" «{item['title']}»" if item.get("title") else ""
-            lines.append(f"  {details or 'версия'}{title} → {display_url(item.get('href'))}")
+            lines.append(
+                f"  {details or 'версия'}{title} → {display_url(item.get('href'))}"
+            )
     feeds = meta.get("feeds") or []
     if feeds:
         lines.append("Ленты:")
         for item in feeds:
             title = f" «{item['title']}»" if item.get("title") else ""
-            lines.append(f"  лента {item.get('type')}{title}: {display_url(item.get('href'))}")
+            lines.append(
+                f"  лента {item.get('type')}{title}: {display_url(item.get('href'))}"
+            )
     icons = meta.get("icons") or []
     if icons:
         lines.append("Иконки:")
         for item in icons:
             sizes = f" {item['sizes']}" if item.get("sizes") else ""
-            lines.append(f"  {item.get('rel')}{sizes} → {display_url(item.get('href'))}")
+            lines.append(
+                f"  {item.get('rel')}{sizes} → {display_url(item.get('href'))}"
+            )
     return "\n".join(lines) if lines else "Метаданных нет"
 
 
@@ -926,17 +979,25 @@ def render_structured(model: PageModel) -> str:
             sections.append(f"## JSON-LD {index}: ошибка разбора — {block['error']}")
             continue
         types = _ld_types(block["data"])
-        title = f"## JSON-LD {index}" + (f" (@type {', '.join(types)})" if types else "")
-        sections.append(title + "\n" + json.dumps(block["data"], indent=2, ensure_ascii=False))
+        title = f"## JSON-LD {index}" + (
+            f" (@type {', '.join(types)})" if types else ""
+        )
+        sections.append(
+            title + "\n" + json.dumps(block["data"], indent=2, ensure_ascii=False)
+        )
     items = microdata(document, model.base_url)
     if items:
-        sections.append("## Микроданные\n" + json.dumps(items, indent=2, ensure_ascii=False))
+        sections.append(
+            "## Микроданные\n" + json.dumps(items, indent=2, ensure_ascii=False)
+        )
     scripts = inline_json_scripts(document)
     if scripts:
         lines = ["## JSON в скриптах"]
         for script in scripts:
             ident = script["id"]
-            selector = f"script#{ident}" if ident else f"script[type='{script['type']}']"
+            selector = (
+                f"script#{ident}" if ident else f"script[type='{script['type']}']"
+            )
             lines.append(
                 f"{ident or '(без id)'} ({script['type']}): {script['chars']} симв. — "
                 f"browser_extract(selector=\"{selector}\", output='html')"
@@ -948,7 +1009,9 @@ def render_structured(model: PageModel) -> str:
 def _enclosure_line(enclosure: tuple[str, str | None, int | None]) -> str:
     url, kind, length = enclosure
     details = ", ".join(
-        part for part in (kind, human_bytes(length) if length is not None else None) if part
+        part
+        for part in (kind, human_bytes(length) if length is not None else None)
+        if part
     )
     return f"{display_url(url)}" + (f" ({details})" if details else "")
 
@@ -971,7 +1034,10 @@ def render_feed(feed: Feed, model: PageModel | None = None) -> str:
             if position < len(item_refs):
                 ref = item_refs[position]
             position += 1
-        lines = [f"{number}. {item.title or '(без заголовка)'}" + (f" [{ref}]" if ref else "")]
+        lines = [
+            f"{number}. {item.title or '(без заголовка)'}"
+            + (f" [{ref}]" if ref else "")
+        ]
         if item.link:
             lines.append(f"   {display_url(item.link)}")
         facts = [part for part in (item.published or item.updated, item.author) if part]
@@ -1009,7 +1075,9 @@ def render_headers(info: HeadersInfo | None) -> str:
     lines.extend(f"{name}: {value}" for name, value in info.request_headers)
     lines.append("")
     if info.status is not None:
-        lines.append(f"{_http_version(info.http_version)} {info.status} {info.reason}".rstrip())
+        lines.append(
+            f"{_http_version(info.http_version)} {info.status} {info.reason}".rstrip()
+        )
     else:
         lines.append("Ответа нет")
     lines.extend(f"{name}: {value}" for name, value in info.response_headers)
@@ -1064,7 +1132,9 @@ def _parse_json_path(path: str) -> list[tuple[str, Any]]:
             name = text[start:position]
             if not name:
                 raise BrowserError(
-                    E_JSON_PATH.format(path=path, reason=f"пустое имя ключа (символ {start + 1})")
+                    E_JSON_PATH.format(
+                        path=path, reason=f"пустое имя ключа (символ {start + 1})"
+                    )
                 )
             segments.append(("key", name))
         elif char == "[":
@@ -1087,7 +1157,9 @@ def _parse_json_path(path: str) -> list[tuple[str, Any]]:
             else:
                 end = text.find("]", position)
                 if end < 0:
-                    raise BrowserError(E_JSON_PATH.format(path=path, reason="не закрыта скобка «[»"))
+                    raise BrowserError(
+                        E_JSON_PATH.format(path=path, reason="не закрыта скобка «[»")
+                    )
                 inner = text[position + 1 : end].strip()
                 if inner == "*":
                     segments.append(("wild", None))
@@ -1096,7 +1168,8 @@ def _parse_json_path(path: str) -> list[tuple[str, Any]]:
                 else:
                     raise BrowserError(
                         E_JSON_PATH.format(
-                            path=path, reason=f"в [] нужен номер, * или 'ключ' (получено «{inner}»)"
+                            path=path,
+                            reason=f"в [] нужен номер, * или 'ключ' (получено «{inner}»)",
                         )
                     )
                 position = end + 1
@@ -1107,7 +1180,10 @@ def _parse_json_path(path: str) -> list[tuple[str, Any]]:
             segments.append(("key", text[start:position]))
         else:
             raise BrowserError(
-                E_JSON_PATH.format(path=path, reason=f"неожиданный символ «{char}» (символ {position + 1})")
+                E_JSON_PATH.format(
+                    path=path,
+                    reason=f"неожиданный символ «{char}» (символ {position + 1})",
+                )
             )
         first = False
     return segments
@@ -1132,10 +1208,15 @@ def _step(value: Any, kind: str, key: Any, path: str, level: str) -> Any:
         if isinstance(value, list) and re.fullmatch(r"-?\d+", str(key)):
             kind, key = "index", int(key)
         else:
-            what = f"список из {len(value)} элементов" if isinstance(value, list) else type(value).__name__
+            what = (
+                f"список из {len(value)} элементов"
+                if isinstance(value, list)
+                else type(value).__name__
+            )
             raise BrowserError(
                 E_JSON_PATH.format(
-                    path=path, reason=f"на уровне «{level}» не объект, а {what}; ключа «{key}» нет"
+                    path=path,
+                    reason=f"на уровне «{level}» не объект, а {what}; ключа «{key}» нет",
                 )
             )
     if isinstance(value, list):
@@ -1150,7 +1231,9 @@ def _step(value: Any, kind: str, key: Any, path: str, level: str) -> Any:
     if isinstance(value, dict) and str(key) in value:
         return value[str(key)]
     raise BrowserError(
-        E_JSON_PATH.format(path=path, reason=f"на уровне «{level}» не список; индекса {key} нет")
+        E_JSON_PATH.format(
+            path=path, reason=f"на уровне «{level}» не список; индекса {key} нет"
+        )
     )
 
 
@@ -1162,7 +1245,10 @@ def _pointer(value: Any, path: str) -> Any:
         if isinstance(current, list):
             if not re.fullmatch(r"\d+", token):
                 raise BrowserError(
-                    E_JSON_PATH.format(path=path, reason=f"на уровне «{level}» список, нужен номер, а не «{token}»")
+                    E_JSON_PATH.format(
+                        path=path,
+                        reason=f"на уровне «{level}» список, нужен номер, а не «{token}»",
+                    )
                 )
             current = _step(current, "index", int(token), path, level)
         else:
@@ -1192,7 +1278,10 @@ def json_path_get(value: Any, path: str) -> Any:
                     expanded.extend(item.values())
                 elif not many:
                     raise BrowserError(
-                        E_JSON_PATH.format(path=path, reason=f"на уровне «{level}» нечего перебирать (*)")
+                        E_JSON_PATH.format(
+                            path=path,
+                            reason=f"на уровне «{level}» нечего перебирать (*)",
+                        )
                     )
             current = expanded
             many = True
@@ -1244,11 +1333,16 @@ def _network_line(entry: dict[str, Any]) -> str:
 
 
 def render_network(
-    entries: Sequence[dict[str, Any]] | None, match: str | Callable[[str], bool] | None = None
+    entries: Sequence[dict[str, Any]] | None,
+    match: str | Callable[[str], bool] | None = None,
 ) -> str:
-    """"N3 GET 200 xhr application/json 12 КБ https://…" per request."""
+    """ "N3 GET 200 xhr application/json 12 КБ https://…" per request."""
     accept = _matcher(match)
-    lines = [line for line in (_network_line(entry) for entry in entries or ()) if accept(line)]
+    lines = [
+        line
+        for line in (_network_line(entry) for entry in entries or ())
+        if accept(line)
+    ]
     if not lines:
         return "Запросов нет" if match is None else "Запросов по фильтру нет"
     return "\n".join(lines)
@@ -1272,9 +1366,10 @@ def render_network_entry(entry: dict[str, Any], body_text: str | None) -> str:
 
 
 def render_console(
-    entries: Sequence[dict[str, Any]] | None, match: str | Callable[[str], bool] | None = None
+    entries: Sequence[dict[str, Any]] | None,
+    match: str | Callable[[str], bool] | None = None,
 ) -> str:
-    """"[error] text (url:line)" per console message."""
+    """ "[error] text (url:line)" per console message."""
     accept = _matcher(match)
     lines = []
     for entry in entries or ():
@@ -1297,7 +1392,10 @@ def render_console(
 def _parse_notes(model: PageModel | None) -> list[str]:
     if model is None:
         return []
-    return [f"HTML разобран не полностью: {warning}" for warning in model.document.parse_warnings]
+    return [
+        f"HTML разобран не полностью: {warning}"
+        for warning in model.document.parse_warnings
+    ]
 
 
 def _scoped(
@@ -1335,7 +1433,8 @@ def render_view(
         raise BrowserError(
             E_BINARY_VIEW.format(
                 tab=snapshot.tab,
-                mime=(info.mime if info is not None else snapshot.mime) or "application/octet-stream",
+                mime=(info.mime if info is not None else snapshot.mime)
+                or "application/octet-stream",
                 size=human_bytes(info.length if info is not None else snapshot.bytes),
             )
         )
@@ -1347,23 +1446,35 @@ def render_view(
         if scope is not None:
             if view == "text":
                 rendered = _scoped(
-                    model, scope, lambda root: render_text(model, root, include_hidden=include_hidden)
+                    model,
+                    scope,
+                    lambda root: render_text(
+                        model, root, include_hidden=include_hidden
+                    ),
                 )
             else:
                 rendered = _scoped(
                     model,
                     scope,
                     lambda root: render_markdown(
-                        model, root, inline_urls=inline_urls, include_hidden=include_hidden
+                        model,
+                        root,
+                        inline_urls=inline_urls,
+                        include_hidden=include_hidden,
                     ),
                 )
         elif view == "content":
-            rendered = page.rendered_content(inline_urls=inline_urls, include_hidden=include_hidden)
+            rendered = page.rendered_content(
+                inline_urls=inline_urls, include_hidden=include_hidden
+            )
             notes.extend(page.content_notes())
         elif view == "page":
             if markup and (inline_urls or include_hidden):
                 rendered = render_markdown(
-                    model, model.body, inline_urls=inline_urls, include_hidden=include_hidden
+                    model,
+                    model.body,
+                    inline_urls=inline_urls,
+                    include_hidden=include_hidden,
                 )
             else:
                 rendered = page.rendered_page()
@@ -1374,7 +1485,9 @@ def render_view(
         if markup:
             notes.extend(_parse_notes(model))
         elif kind == "json" and page.json_error:
-            notes.append(f"JSON не разобран ({page.json_error}); показан исходный текст")
+            notes.append(
+                f"JSON не разобран ({page.json_error}); показан исходный текст"
+            )
         if kind == "empty":
             notes.append("Документ пустой: содержимого нет")
         if section is not None:
@@ -1391,7 +1504,9 @@ def render_view(
     if view == "outline":
         return render_outline(page.rendered_page()), notes
     if view == "links":
-        text, extra = render_links(model, scope=scope_set, match=filter, include_hidden=include_hidden)
+        text, extra = render_links(
+            model, scope=scope_set, match=filter, include_hidden=include_hidden
+        )
         return text, notes + extra
     if view == "interactive":
         text, extra = render_interactive(
@@ -1401,10 +1516,14 @@ def render_view(
     if view == "forms":
         return render_forms(model, scope=scope_set), notes
     if view == "tables":
-        text, extra = render_tables(model, scope=scope_set, include_hidden=include_hidden)
+        text, extra = render_tables(
+            model, scope=scope_set, include_hidden=include_hidden
+        )
         return text, notes + extra
     if view == "images":
-        text, extra = render_images(model, scope=scope_set, match=filter, include_hidden=include_hidden)
+        text, extra = render_images(
+            model, scope=scope_set, match=filter, include_hidden=include_hidden
+        )
         return text, notes + extra
     if view == "meta":
         if kind == "html":
@@ -1432,7 +1551,9 @@ def render_view(
             lines = ["Это HTML-страница; ленты сайта:"]
             for item in feeds:
                 title = f" «{item['title']}»" if item.get("title") else ""
-                lines.append(f"лента {item.get('type')}{title}: {display_url(item.get('href'))}")
+                lines.append(
+                    f"лента {item.get('type')}{title}: {display_url(item.get('href'))}"
+                )
             return "\n".join(lines), notes
         return "Это не лента (RSS, Atom или JSON Feed)", notes
     if view == "headers":
@@ -1444,7 +1565,9 @@ def render_view(
                 E_NOT_JSON.format(ct=content_type, reason=f"это документ {kind}")
             )
         if page.json_error is not None:
-            raise BrowserError(E_NOT_JSON.format(ct=content_type, reason=page.json_error))
+            raise BrowserError(
+                E_NOT_JSON.format(ct=content_type, reason=page.json_error)
+            )
         return render_json(page.json_value, json_path), notes
     if view == "network":
         return render_network(network, filter), notes
@@ -1507,7 +1630,13 @@ def find_matches(
             lead = "…" if begin > 0 else ""
             tail = "…" if finish < total else ""
         context = (
-            lead + text[begin:start] + "**" + text[start:end] + "**" + text[end:finish] + tail
+            lead
+            + text[begin:start]
+            + "**"
+            + text[start:end]
+            + "**"
+            + text[end:finish]
+            + tail
         )
         found.append(Match(start, number, section, ref, context))
     return found
@@ -1579,11 +1708,15 @@ def render_extract(
     attributes: Sequence[str] | None = None,
     include_hidden: bool = True,
 ) -> str:
-    """"Найдено N элементов по «sel»:" and each element as text, Markdown, HTML or attributes."""
+    """ "Найдено N элементов по «sel»:" and each element as text, Markdown, HTML or attributes."""
     model = page.model
     if model is None:
         return f"Найдено 0 элементов по «{selector}»: документ — файл"
-    chosen = [element for element in elements if include_hidden or not model.is_hidden(element)]
+    chosen = [
+        element
+        for element in elements
+        if include_hidden or not model.is_hidden(element)
+    ]
     skipped = len(elements) - len(chosen)
     count = len(chosen)
     head = f"Найдено {count} {plural(count, 'элемент', 'элемента', 'элементов')} по «{selector}»:"
@@ -1592,7 +1725,9 @@ def render_extract(
     blocks: list[str] = []
     for number, element in enumerate(chosen, 1):
         ref = model.ref_of(element)
-        title = f"{number}. " + (f"[{ref}] " if ref else "") + element_descriptor(element)
+        title = (
+            f"{number}. " + (f"[{ref}] " if ref else "") + element_descriptor(element)
+        )
         if model.is_hidden(element):
             title += " (скрыт)"
         if output == "html":
@@ -1600,7 +1735,9 @@ def render_extract(
         elif output == "markdown":
             blocks.append(title + "\n" + render_markdown(model, element).text)
         elif output == "attributes":
-            blocks.append(title + "\n" + "\n".join(_attribute_lines(model, element, attributes)))
+            blocks.append(
+                title + "\n" + "\n".join(_attribute_lines(model, element, attributes))
+            )
         else:
             if model.is_field(element):
                 text = model.display_value(element) or ""
@@ -1658,7 +1795,11 @@ def _node_line(sign: str, node: Any) -> tuple[str, bool]:
         cut = cut or _shortened(node.name, SEMANTIC_NAME_LIMIT)
     if node.value:
         value = node.value
-        shown = value if value.startswith(("(", "«")) else json.dumps(value, ensure_ascii=False)
+        shown = (
+            value
+            if value.startswith(("(", "«"))
+            else json.dumps(value, ensure_ascii=False)
+        )
         parts.append(f"= {shown}")
         cut = cut or _shortened(value, SEMANTIC_VALUE_LIMIT)
     states = [state for state in node.states if state != "hidden"]
@@ -1686,11 +1827,15 @@ def render_changes(
         lines.append(f"Заголовок: «{after.title or ''}»")
         title = after.title or ""
         cut = cut or _shortened(title, SEMANTIC_VALUE_LIMIT)
-    for node in sorted(diff.added_nodes, key=lambda item: _ref_key(item.node_id, order)):
+    for node in sorted(
+        diff.added_nodes, key=lambda item: _ref_key(item.node_id, order)
+    ):
         line, shortened = _node_line("+", node)
         lines.append(line)
         cut = cut or shortened
-    for node in sorted(diff.changed_nodes, key=lambda item: _ref_key(item.node_id, order)):
+    for node in sorted(
+        diff.changed_nodes, key=lambda item: _ref_key(item.node_id, order)
+    ):
         line, shortened = _node_line("~", node)
         lines.append(line)
         cut = cut or shortened
@@ -1701,13 +1846,18 @@ def render_changes(
     if isinstance(change, dict):
         old, new = change.get("before"), change.get("after")
         if isinstance(old, int) and isinstance(new, int):
-            lines.append(f"Текст страницы: было {old} симв., стало {new} ({new - old:+d})")
+            lines.append(
+                f"Текст страницы: было {old} симв., стало {new} ({new - old:+d})"
+            )
     if not lines:
         return "Видимых изменений нет"
     if cut:
         named = (
             (SEMANTIC_NAME_LIMIT, f"названия длиннее {SEMANTIC_NAME_LIMIT} симв."),
-            (SEMANTIC_VALUE_LIMIT, f"значения и заголовок длиннее {SEMANTIC_VALUE_LIMIT} симв."),
+            (
+                SEMANTIC_VALUE_LIMIT,
+                f"значения и заголовок длиннее {SEMANTIC_VALUE_LIMIT} симв.",
+            ),
             (SEMANTIC_URL_LIMIT, f"адрес длиннее {SEMANTIC_URL_LIMIT} симв."),
         )
         caps = ", ".join(text for limit, text in named if limit > 0)
@@ -1720,10 +1870,10 @@ __all__ = [
     "DOM_VIEWS",
     "FILTER_VIEWS",
     "JSON_PATH_VIEWS",
-    "Match",
     "NAV_VIEWS",
     "SECTION_VIEWS",
     "VIEWS",
+    "Match",
     "ViewPage",
     "find_matches",
     "json_path_get",

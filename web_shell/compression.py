@@ -11,7 +11,8 @@ from __future__ import annotations
 import gzip
 import re
 import zlib
-from typing import Any, Iterable, Iterator
+from typing import Any
+from collections.abc import Iterable, Iterator
 
 from webframe import Application, Response, request
 from webframe.json import JSONProvider

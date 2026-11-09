@@ -35,9 +35,7 @@ class UniversalToolDefinition:
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_mapping(
-        cls, name: str, cfg: Mapping[str, Any]
-    ) -> "UniversalToolDefinition":
+    def from_mapping(cls, name: str, cfg: Mapping[str, Any]) -> UniversalToolDefinition:
         return cls(
             name=name,
             title=str(cfg.get("title") or name),
@@ -194,7 +192,11 @@ def _schema_hint(error: Any) -> str:
     keyword = error.validator
     expected = error.validator_value
     if keyword == "required" and isinstance(error.instance, Mapping):
-        properties = error.schema.get("properties") if isinstance(error.schema, Mapping) else None
+        properties = (
+            error.schema.get("properties")
+            if isinstance(error.schema, Mapping)
+            else None
+        )
         properties = properties if isinstance(properties, Mapping) else {}
         missing = [
             str(name) + _type_hint(properties.get(name))
@@ -203,7 +205,11 @@ def _schema_hint(error: Any) -> str:
         ]
         return f" (missing: {', '.join(missing)})" if missing else ""
     if keyword == "enum" and isinstance(expected, list):
-        return " (allowed: " + ", ".join(json.dumps(item, ensure_ascii=False) for item in expected) + ")"
+        return (
+            " (allowed: "
+            + ", ".join(json.dumps(item, ensure_ascii=False) for item in expected)
+            + ")"
+        )
     if keyword == "type":
         return f" (expected: {expected})"
     return ""
@@ -213,7 +219,11 @@ def _type_hint(schema: Any) -> str:
     if not isinstance(schema, Mapping):
         return ""
     options = schema.get("anyOf") if isinstance(schema.get("anyOf"), list) else [schema]
-    types = [str(option.get("type")) for option in options if isinstance(option, Mapping) and option.get("type")]
+    types = [
+        str(option.get("type"))
+        for option in options
+        if isinstance(option, Mapping) and option.get("type")
+    ]
     return f" ({' or '.join(types)})" if types else ""
 
 
@@ -259,7 +269,9 @@ def validate_json_schema(
             error_path = _value_path(path, error.absolute_path)
             keyword = error.validator or "schema"
             # jsonschema's full messages can include repr(instance), including secrets.
-            errors.append(f"{error_path}: does not satisfy {keyword}{_schema_hint(error)}")
+            errors.append(
+                f"{error_path}: does not satisfy {keyword}{_schema_hint(error)}"
+            )
         return errors
     except SchemaError as exc:
         return [f"{_value_path(path, exc.absolute_path)}: invalid JSON Schema"]

@@ -14,7 +14,10 @@ _SOURCES = {"git": ("git",), "github": ("github",), "all": ("git", "github")}
 def _sync(args, cfg=None):
     sources = _SOURCES.get(str(args.get("sources") or "all"))
     if sources is None:
-        return {"success": False, "error": "sources must be one of: " + ", ".join(_SOURCES)}
+        return {
+            "success": False,
+            "error": "sources must be one of: " + ", ".join(_SOURCES),
+        }
     return {"success": True, **start(sources=sources)}
 
 
@@ -27,14 +30,23 @@ def _reset(args, cfg=None):
 
 
 _ACTIONS: dict[str, dict[str, Any]] = {
-    "sync": {"fn": _sync, "write": True,
-             "about": "дописать в базу знаний новые коммиты git и новое с GitHub (задачи, PR, комментарии, "
-                      "прогоны) новыми файлами; старые файлы не трогаются; идёт в фоне, ход — в status"},
-    "status": {"fn": _status, "write": False,
-               "about": "курсоры, число файлов и состояние текущей или последней синхронизации"},
-    "reset": {"fn": _reset, "write": True,
-              "about": "удалить из Files и хранилища все пакеты репозитория и забыть курсоры; "
-                       "следующий sync загрузит всю историю заново"},
+    "sync": {
+        "fn": _sync,
+        "write": True,
+        "about": "дописать в базу знаний новые коммиты git и новое с GitHub (задачи, PR, комментарии, "
+        "прогоны) новыми файлами; старые файлы не трогаются; идёт в фоне, ход — в status",
+    },
+    "status": {
+        "fn": _status,
+        "write": False,
+        "about": "курсоры, число файлов и состояние текущей или последней синхронизации",
+    },
+    "reset": {
+        "fn": _reset,
+        "write": True,
+        "about": "удалить из Files и хранилища все пакеты репозитория и забыть курсоры; "
+        "следующий sync загрузит всю историю заново",
+    },
 }
 
 
@@ -43,7 +55,10 @@ def rag(args, cfg=None):
     action = args.get("action")
     entry = _ACTIONS.get(action) if isinstance(action, str) else None
     if entry is None:
-        return {"success": False, "error": "action must be one of: " + ", ".join(_ACTIONS)}
+        return {
+            "success": False,
+            "error": "action must be one of: " + ", ".join(_ACTIONS),
+        }
     return entry["fn"](args, cfg)
 
 
@@ -72,6 +87,10 @@ RAG_TOOLS = {
         "supported_transports": ["responses_api", "local_agent"],
         "executor": {"type": "local"},
         "func": rag,
-        "metadata": {"approval_actions": [name for name, entry in _ACTIONS.items() if entry["write"]]},
+        "metadata": {
+            "approval_actions": [
+                name for name, entry in _ACTIONS.items() if entry["write"]
+            ]
+        },
     }
 }

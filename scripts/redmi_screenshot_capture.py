@@ -17,7 +17,7 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from urllib.request import urlopen
 
 
@@ -128,7 +128,7 @@ def remaining(limit, deadline=None):
 
 
 def command(*args):
-    p = subprocess.run(args, capture_output=True, timeout=remaining(20))
+    p = subprocess.run(args, capture_output=True, timeout=remaining(20), check=False)
     if p.returncode:
         raise RuntimeError("Android command failed: " + Path(args[0]).name)
     return p.stdout
@@ -1126,7 +1126,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
     def mark(name, browser=None):
         event = {
             "event": name,
-            "wall_utc": datetime.now(timezone.utc).isoformat(),
+            "wall_utc": datetime.now(UTC).isoformat(),
             "monotonic_ns": time.monotonic_ns(),
         }
         if browser is not None:
@@ -1909,7 +1909,7 @@ def capture(out, uid, gid, metadata):
                 "size": len(png),
                 "width": width,
                 "height": height,
-                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "captured_at": datetime.now(UTC).isoformat(),
                 "browser": state,
             }
         )
@@ -2432,7 +2432,11 @@ def main():
         "PYTHONDONTWRITEBYTECODE": "1",
     }
     result = subprocess.run(
-        ["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=300
+        ["su", "-c", shlex.join(argv)],
+        env=safe_env,
+        capture_output=True,
+        timeout=300,
+        check=False,
     )
     if result.returncode:
         # No job token is in the capture child's environment or argv.

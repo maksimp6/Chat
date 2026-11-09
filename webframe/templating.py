@@ -79,9 +79,7 @@ def escape(value: Any) -> Markup:
         return Markup(value.__html__())
     if value is None:
         return Markup("None")
-    return Markup(
-        html.escape(str(value), quote=True).replace("&#x27;", "&#39;")
-    )
+    return Markup(html.escape(str(value), quote=True).replace("&#x27;", "&#39;"))
 
 
 def _htmlsafe_json(value: Any, dumps: Callable[[Any], str]) -> Markup:
@@ -170,7 +168,9 @@ TESTS: dict[str, Callable[..., bool]] = {
     "undefined": lambda value: isinstance(value, Undefined),
     "none": lambda value: value is None,
     "string": lambda value: isinstance(value, str),
-    "number": lambda value: isinstance(value, (int, float)) and not isinstance(value, bool),
+    "number": lambda value: (
+        isinstance(value, (int, float)) and not isinstance(value, bool)
+    ),
     "mapping": lambda value: isinstance(value, dict),
     "iterable": lambda value: hasattr(value, "__iter__"),
     "true": lambda value: value is True,
@@ -238,7 +238,9 @@ def _tokenize(source: str) -> list[tuple[str, str]]:
     while position < len(source):
         match = _TOKEN_RE.match(source, position)
         if match is None:
-            raise TemplateError(f"unexpected character {source[position]!r} in {source!r}")
+            raise TemplateError(
+                f"unexpected character {source[position]!r} in {source!r}"
+            )
         position = match.end()
         kind = match.lastgroup or ""
         if kind == "ws":
@@ -317,7 +319,9 @@ class Item(Expr):
 
 
 class Slice(Expr):
-    def __init__(self, target: Expr, start: Expr | None, stop: Expr | None, step: Expr | None) -> None:
+    def __init__(
+        self, target: Expr, start: Expr | None, stop: Expr | None, step: Expr | None
+    ) -> None:
         self.target = target
         self.start, self.stop, self.step = start, stop, step
 
@@ -335,7 +339,9 @@ class Slice(Expr):
 
 
 class Call(Expr):
-    def __init__(self, target: Expr, args: list[Expr], kwargs: list[tuple[str, Expr]]) -> None:
+    def __init__(
+        self, target: Expr, args: list[Expr], kwargs: list[tuple[str, Expr]]
+    ) -> None:
         self.target, self.args, self.kwargs = target, args, kwargs
 
     def eval(self, ctx: Context) -> Any:
@@ -349,7 +355,9 @@ class Call(Expr):
 
 
 class Filter(Expr):
-    def __init__(self, target: Expr, name: str, args: list[Expr], kwargs: list[tuple[str, Expr]]) -> None:
+    def __init__(
+        self, target: Expr, name: str, args: list[Expr], kwargs: list[tuple[str, Expr]]
+    ) -> None:
         self.target, self.name, self.args, self.kwargs = target, name, args, kwargs
 
     def eval(self, ctx: Context) -> Any:
@@ -374,7 +382,9 @@ class Test(Expr):
             func = TESTS[self.name]
         except KeyError:
             raise TemplateError(f"no test named {self.name!r}") from None
-        result = bool(func(self.target.eval(ctx), *[arg.eval(ctx) for arg in self.args]))
+        result = bool(
+            func(self.target.eval(ctx), *[arg.eval(ctx) for arg in self.args])
+        )
         return not result if self.negate else result
 
 
@@ -461,7 +471,14 @@ class Conditional(Expr):
 # --------------------------------------------------------------------------- expression parser
 
 _COMPARE_OPS = {"==", "!=", "<", ">", "<=", ">="}
-_LITERALS = {"true": True, "True": True, "false": False, "False": False, "none": None, "None": None}
+_LITERALS = {
+    "true": True,
+    "True": True,
+    "false": False,
+    "False": False,
+    "none": None,
+    "None": None,
+}
 
 
 class ExpressionParser:
@@ -492,7 +509,9 @@ class ExpressionParser:
         token = self.next()
         if token[0] != kind or (value is not None and token[1] != value):
             wanted = value if value is not None else kind
-            raise TemplateError(f"expected {wanted!r}, got {token[1]!r} in {self.source!r}")
+            raise TemplateError(
+                f"expected {wanted!r}, got {token[1]!r} in {self.source!r}"
+            )
         return token[1]
 
     def parse(self) -> Expr:
@@ -560,9 +579,11 @@ class ExpressionParser:
                 if self.at("op", "("):
                     self.next()
                     args, _ = self.parse_arguments()
-                elif self.peek()[0] in ("name", "number", "string") and not self.at_name_in(
-                    "and", "or", "if", "else", "is", "in", "not"
-                ):
+                elif self.peek()[0] in (
+                    "name",
+                    "number",
+                    "string",
+                ) and not self.at_name_in("and", "or", "if", "else", "is", "in", "not"):
                     args = [self.parse_concat()]
                 left = Test(left, name, args, negate)
             else:
@@ -664,7 +685,11 @@ class ExpressionParser:
                 token = self.next()
                 if token[0] not in ("name", "number"):
                     raise TemplateError(f"expected a name after '.' in {self.source!r}")
-                expr = Attr(expr, token[1]) if token[0] == "name" else Item(expr, Const(int(token[1])))
+                expr = (
+                    Attr(expr, token[1])
+                    if token[0] == "name"
+                    else Item(expr, Const(int(token[1])))
+                )
             elif self.at("op", "["):
                 self.next()
                 expr = self.parse_subscript(expr)
@@ -722,7 +747,9 @@ def _unescape_string(token: str) -> str:
     body = token[1:-1]
     return re.sub(
         r"\\(.)",
-        lambda match: {"n": "\n", "t": "\t", "r": "\r"}.get(match.group(1), match.group(1)),
+        lambda match: {"n": "\n", "t": "\t", "r": "\r"}.get(
+            match.group(1), match.group(1)
+        ),
         body,
     )
 
@@ -755,7 +782,9 @@ class Output(Node):
         value = self.expr.eval(ctx)
         if isinstance(value, Undefined):
             return
-        out.append(str(escape(value)) if ctx.get("__autoescape__", True) else str(value))
+        out.append(
+            str(escape(value)) if ctx.get("__autoescape__", True) else str(value)
+        )
 
 
 class Set(Node):
@@ -827,7 +856,7 @@ _TAG_RE = re.compile(
     r"(?P<var>\{\{-?\s*(?P<var_body>.*?)\s*-?\}\})"
     r"|(?P<block>\{%-?\s*(?P<block_body>.*?)\s*-?%\})"
     r"|(?P<comment>\{#.*?#\})",
-    re.S,
+    re.DOTALL,
 )
 
 
@@ -925,9 +954,10 @@ class TemplateParser:
 class Template:
     """A parsed template; ``render(**context)`` produces the page."""
 
-    def __init__(self, source: str, name: str = "<template>", autoescape: bool = True) -> None:
-        if source.endswith("\n"):
-            source = source[:-1]
+    def __init__(
+        self, source: str, name: str = "<template>", autoescape: bool = True
+    ) -> None:
+        source = source.removesuffix("\n")
         self.name = name
         self.autoescape = autoescape
         self.nodes = TemplateParser(source, name).parse()
@@ -938,14 +968,18 @@ class Template:
             ctx.update(mapping)
         ctx.update(context)
         ctx.setdefault("__autoescape__", self.autoescape)
-        ctx.setdefault("__filters__", _filters_with_json(ctx.pop("__json_dumps__", None)))
+        ctx.setdefault(
+            "__filters__", _filters_with_json(ctx.pop("__json_dumps__", None))
+        )
         ctx.setdefault("range", range)
         out: list[str] = []
         _render_all(self.nodes, ctx, out)
         return "".join(out)
 
 
-def _filters_with_json(dumps: Callable[[Any], str] | None) -> dict[str, Callable[..., Any]]:
+def _filters_with_json(
+    dumps: Callable[[Any], str] | None,
+) -> dict[str, Callable[..., Any]]:
     serializer = dumps or (lambda value: _json.dumps(value, ensure_ascii=False))
     filters = dict(FILTERS)
     filters["tojson"] = lambda value: _htmlsafe_json(value, serializer)
@@ -976,14 +1010,19 @@ class TemplateLoader:
         self._cache[name] = (key, template)
         return template
 
-    def render(self, name: str, context: dict[str, Any], json_dumps: Callable[[Any], str] | None = None) -> str:
+    def render(
+        self,
+        name: str,
+        context: dict[str, Any],
+        json_dumps: Callable[[Any], str] | None = None,
+    ) -> str:
         return self.get_template(name).render(context, __json_dumps__=json_dumps)
 
 
 __all__ = [
     "FILTERS",
-    "Markup",
     "TESTS",
+    "Markup",
     "Template",
     "TemplateError",
     "TemplateLoader",

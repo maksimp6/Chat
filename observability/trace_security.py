@@ -44,6 +44,8 @@ def _cut(length: int) -> bool:
 
 def _kept(items: list) -> list:
     return items if MAX_ITEMS <= 0 else items[:MAX_ITEMS]
+
+
 # Matches credential words as whole underscore-separated parts, so "input_tokens" is not a secret.
 _SENSITIVE_KEY_RE = re.compile(
     r"(?:^|_)(?:token|secret|password|passwd|api_?key|authorization|cookie|credentials?|private_?key)(?:_|$)"
@@ -157,9 +159,7 @@ def sanitize_trace_value(value: Any, depth: int = 0) -> Any:
         return result
     if isinstance(value, (list, tuple, set)):
         items = list(value)
-        sanitized = [
-            sanitize_trace_value(item, depth + 1) for item in _kept(items)
-        ]
+        sanitized = [sanitize_trace_value(item, depth + 1) for item in _kept(items)]
         if _cut(len(items)):
             sanitized.append(
                 f"<truncated: {len(items) - _kept_count(len(items))} more items>"

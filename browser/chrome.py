@@ -42,11 +42,18 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
 
 from browser import chrome_launch, guard
 from browser.cdp import CdpConnection, CdpError, ChromeClosed
-from browser.charsets import GENERIC_MIMES, classify, decode_body, normalize_charset, parse_content_type
+from browser.charsets import (
+    GENERIC_MIMES,
+    classify,
+    decode_body,
+    normalize_charset,
+    parse_content_type,
+)
 from browser.engine import (
     Action,
     ActionOutcome,
@@ -158,7 +165,9 @@ _LIFECYCLE_NAMES = {
     "networkidle": "networkIdle",
     "networkidle2": "networkAlmostIdle",
 }
-_ALL_LIFECYCLE = frozenset({"init", "commit", "DOMContentLoaded", "load", "networkAlmostIdle", "networkIdle"})
+_ALL_LIFECYCLE = frozenset(
+    {"init", "commit", "DOMContentLoaded", "load", "networkAlmostIdle", "networkIdle"}
+)
 _TRANSITIONS = {
     "typed": "typed",
     "link": "link",
@@ -233,7 +242,10 @@ def _helper_sources() -> tuple[str, str]:
             f"Не найден файл помощника страницы {path}: {type(exc).__name__}. Переустановите Logos"
         ) from None
     source = (
-        raw.replace("__LOGOS_REF_KINDS__", json.dumps([[prefix, selector] for prefix, selector in REF_KINDS]))
+        raw.replace(
+            "__LOGOS_REF_KINDS__",
+            json.dumps([[prefix, selector] for prefix, selector in REF_KINDS]),
+        )
         .replace("__LOGOS_ATTRS__", json.dumps(_ATTRS))
         .replace("__LOGOS_REF_ATTR__", json.dumps(REF_ATTR))
     )
@@ -369,7 +381,9 @@ def _remote_text(item: Any) -> str:
         return str(item)
     if "value" in item:
         value = item["value"]
-        return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+        return (
+            value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+        )
     if "unserializableValue" in item:
         return str(item["unserializableValue"])
     preview = item.get("preview")
@@ -377,8 +391,15 @@ def _remote_text(item: Any) -> str:
         properties = [prop for prop in preview["properties"] if isinstance(prop, dict)]
         tail = ", …" if preview.get("overflow") else ""
         if preview.get("subtype") == "array":
-            return "[" + ", ".join(_preview_value(prop) for prop in properties) + tail + "]"
-        inner = ", ".join(f"{prop.get('name')}: {_preview_value(prop)}" for prop in properties)
+            return (
+                "["
+                + ", ".join(_preview_value(prop) for prop in properties)
+                + tail
+                + "]"
+            )
+        inner = ", ".join(
+            f"{prop.get('name')}: {_preview_value(prop)}" for prop in properties
+        )
         return "{" + inner + tail + "}"
     return str(item.get("description") or item.get("type") or "")
 
@@ -437,9 +458,13 @@ def _pause(seconds: float, deadline: Deadline | None = None) -> None:
         time.sleep(wait)
 
 
-def _ua_metadata(user_agent: str, *, branded: bool) -> tuple[dict[str, Any] | None, str | None]:
+def _ua_metadata(
+    user_agent: str, *, branded: bool
+) -> tuple[dict[str, Any] | None, str | None]:
     """Client hints matching a Chrome User-Agent (no "HeadlessChrome" brand); and navigator.platform."""
-    match = re.search(r"(?:HeadlessChrome|Chrome|CriOS)/(\d+)((?:\.\d+)*)", user_agent or "")
+    match = re.search(
+        r"(?:HeadlessChrome|Chrome|CriOS)/(\d+)((?:\.\d+)*)", user_agent or ""
+    )
     if match is None:
         return None, None
     major = match.group(1)
@@ -461,7 +486,12 @@ def _ua_metadata(user_agent: str, *, branded: bool) -> tuple[dict[str, Any] | No
     model = ""
     lowered = user_agent.lower()
     if "windows" in lowered:
-        platform, navigator_platform, platform_version, architecture = "Windows", "Win32", "10.0.0", "x86"
+        platform, navigator_platform, platform_version, architecture = (
+            "Windows",
+            "Win32",
+            "10.0.0",
+            "x86",
+        )
     elif "android" in lowered:
         platform, navigator_platform = "Android", "Linux armv8l"
         version_match = re.search(r"Android (\d+(?:\.\d+)*)", user_agent)
@@ -540,7 +570,10 @@ _NAMED_KEYS = {
     "pagedown": _Key("PageDown", "PageDown", 34),
     "space": _Key(" ", "Space", 32, " "),
     "insert": _Key("Insert", "Insert", 45),
-    **{f"f{number}": _Key(f"F{number}", f"F{number}", 111 + number) for number in range(1, 13)},
+    **{
+        f"f{number}": _Key(f"F{number}", f"F{number}", 111 + number)
+        for number in range(1, 13)
+    },
 }
 
 
@@ -818,8 +851,12 @@ class ChromeTabEngine:
         self._inflight = set()
         self._net_document = loader
         self._console = []
-        self._extra_request = {key: value for key, value in self._extra_request.items() if key == loader}
-        self._extra_response = {key: value for key, value in self._extra_response.items() if key == loader}
+        self._extra_request = {
+            key: value for key, value in self._extra_request.items() if key == loader
+        }
+        self._extra_response = {
+            key: value for key, value in self._extra_response.items() if key == loader
+        }
         keep = {loader, self._loader}
         for key in [key for key in self._docs if key not in keep]:
             del self._docs[key]
@@ -846,7 +883,10 @@ class ChromeTabEngine:
                 self._url = str(params.get("url") or self._url)
                 self._samedoc_seq += 1
         elif method == "Page.frameRequestedNavigation":
-            if params.get("frameId") == self._frame_id and params.get("disposition", "currentTab") == "currentTab":
+            if (
+                params.get("frameId") == self._frame_id
+                and params.get("disposition", "currentTab") == "currentTab"
+            ):
                 self._request_seq += 1
         elif method == "Page.frameStartedLoading":
             if params.get("frameId") == self._frame_id:
@@ -864,12 +904,17 @@ class ChromeTabEngine:
             frames = (params.get("stackTrace") or {}).get("callFrames") or []
             top = frames[0] if frames and isinstance(frames[0], dict) else {}
             line = _int(top.get("lineNumber"))
-            self._add_console(level, text, top.get("url"), line + 1 if line is not None else None)
+            self._add_console(
+                level, text, top.get("url"), line + 1 if line is not None else None
+            )
         elif method == "Runtime.exceptionThrown":
             details = params.get("exceptionDetails") or {}
             line = _int(details.get("lineNumber"))
             self._add_console(
-                "error", _exception_text(details), details.get("url"), line + 1 if line is not None else None
+                "error",
+                _exception_text(details),
+                details.get("url"),
+                line + 1 if line is not None else None,
             )
         elif method == "Log.entryAdded":
             entry = params.get("entry") or {}
@@ -879,7 +924,10 @@ class ChromeTabEngine:
                 text = f"{source}: {text}"
             line = _int(entry.get("lineNumber"))
             self._add_console(
-                str(entry.get("level") or "info"), text, entry.get("url"), line + 1 if line is not None else None
+                str(entry.get("level") or "info"),
+                text,
+                entry.get("url"),
+                line + 1 if line is not None else None,
             )
         elif method == "Runtime.executionContextDestroyed":
             if params.get("executionContextId") == self._world_context:
@@ -912,7 +960,9 @@ class ChromeTabEngine:
             self._loader = loader
             self._nav_seq += 1
             self._commits[loader] = self._nav_seq
-            for old in [key for key, seq in self._commits.items() if seq < self._nav_seq - 16]:
+            for old in [
+                key for key, seq in self._commits.items() if seq < self._nav_seq - 16
+            ]:
                 del self._commits[old]
             if loader != self._net_document:
                 # A document without a request of its own (back/forward cache, about:blank).
@@ -945,7 +995,9 @@ class ChromeTabEngine:
                 doc = self._docs.get(request_id)
                 if doc is not None and headers:
                     doc.response_headers = headers
-                    doc.content_type = _header(headers, "content-type") or doc.content_type
+                    doc.content_type = (
+                        _header(headers, "content-type") or doc.content_type
+                    )
         elif method == "Network.loadingFinished":
             entry = self._net_by_request.get(request_id)
             size = _int(params.get("encodedDataLength"))
@@ -990,7 +1042,11 @@ class ChromeTabEngine:
         url = str(request.get("url") or "") + str(request.get("urlFragment") or "")
         method = str(request.get("method") or "GET")
         kind = str(params.get("type") or "Other").lower()
-        main = kind == "document" and params.get("frameId") == self._frame_id and request_id == params.get("loaderId")
+        main = (
+            kind == "document"
+            and params.get("frameId") == self._frame_id
+            and request_id == params.get("loaderId")
+        )
         redirect = params.get("redirectResponse")
         if main and not isinstance(redirect, dict) and request_id != self._net_document:
             self._reset_document(request_id)
@@ -1031,7 +1087,8 @@ class ChromeTabEngine:
                 url=url,
                 method=method,
                 started=_float(params.get("timestamp")),
-                request_headers=self._extra_request.get(request_id) or _header_pairs(request.get("headers")),
+                request_headers=self._extra_request.get(request_id)
+                or _header_pairs(request.get("headers")),
             )
             self._docs[request_id] = doc
 
@@ -1043,8 +1100,14 @@ class ChromeTabEngine:
         if entry is not None:
             entry.status = _int(response.get("status"))
             entry.mime = mime
-            entry.charset = normalize_charset(response.get("charset")) if response.get("charset") else None
-            entry.charset = entry.charset or _charset_of(_header(headers, "content-type"))
+            entry.charset = (
+                normalize_charset(response.get("charset"))
+                if response.get("charset")
+                else None
+            )
+            entry.charset = entry.charset or _charset_of(
+                _header(headers, "content-type")
+            )
         self._last_activity = time.monotonic()
         doc = self._docs.get(request_id)
         if doc is None:
@@ -1089,7 +1152,9 @@ class ChromeTabEngine:
             return "generic"
         return classify(base, None)
 
-    def _doc_charset(self, doc: _MainDoc | None, fallback: str | None) -> tuple[str, str]:
+    def _doc_charset(
+        self, doc: _MainDoc | None, fallback: str | None
+    ) -> tuple[str, str]:
         if doc is not None:
             charset = _charset_of(doc.content_type)
             if charset:
@@ -1097,9 +1162,15 @@ class ChromeTabEngine:
         label = normalize_charset(fallback) if fallback else None
         return (label or "utf-8"), "chrome"
 
-    def _headers_info(self, doc: _MainDoc, charset: str | None, source: str | None) -> HeadersInfo:
+    def _headers_info(
+        self, doc: _MainDoc, charset: str | None, source: str | None
+    ) -> HeadersInfo:
         elapsed = None
-        if doc.started is not None and doc.finished is not None and doc.finished >= doc.started:
+        if (
+            doc.started is not None
+            and doc.finished is not None
+            and doc.finished >= doc.started
+        ):
             elapsed = int(round((doc.finished - doc.started) * 1000))
         return HeadersInfo(
             method=doc.method,
@@ -1123,7 +1194,9 @@ class ChromeTabEngine:
         try:
             result = self._call("Network.getResponseBody", {"requestId": doc.loader_id})
         except CdpError as exc:
-            logger.debug("main body of tab %s unavailable: %s", self.tab_id, type(exc).__name__)
+            logger.debug(
+                "main body of tab %s unavailable: %s", self.tab_id, type(exc).__name__
+            )
             doc.body_state = "failed"
             return
         body = result.get("body") or ""
@@ -1139,7 +1212,9 @@ class ChromeTabEngine:
                 doc.kind = "binary"
                 doc.body_state = "loaded"
                 return
-            text, charset, source, _had_errors = decode_body(raw, doc.content_type, kind)
+            text, charset, source, _had_errors = decode_body(
+                raw, doc.content_type, kind
+            )
         else:
             text = str(body)
             if kind == "generic":
@@ -1159,7 +1234,9 @@ class ChromeTabEngine:
             kind = doc.kind or kind
         if kind == "binary" or doc.kind == "binary":
             disposition = _header(doc.response_headers, "content-disposition")
-            name, _source = filename_from_response(disposition, doc.url, doc.content_type)
+            name, _source = filename_from_response(
+                disposition, doc.url, doc.content_type
+            )
             length = _int(_header(doc.response_headers, "content-length"))
             info = BinaryInfo(
                 mime=doc.mime or "application/octet-stream",
@@ -1237,12 +1314,18 @@ class ChromeTabEngine:
             reason=_reason(doc.status, doc.status_text) if doc is not None else "",
             method=doc.method if doc is not None else "GET",
             mime=(doc.mime if doc is not None and doc.mime else "text/html"),
-            content_type=(doc.content_type if doc is not None and doc.content_type else "text/html"),
+            content_type=(
+                doc.content_type
+                if doc is not None and doc.content_type
+                else "text/html"
+            ),
             kind="html",
             charset=charset,
             charset_source=source,
             html=html,
-            headers=self._headers_info(doc, charset, source) if doc is not None else None,
+            headers=self._headers_info(doc, charset, source)
+            if doc is not None
+            else None,
             stamped=True,
             focused_ref=str(data.get("focused")) if data.get("focused") else None,
             version=content_version(html, None, final_url),
@@ -1261,22 +1344,36 @@ class ChromeTabEngine:
             frame = self._frame_id
         helper, _serializer = _helper_sources()
         created = self._call(
-            "Page.createIsolatedWorld", {"frameId": frame, "worldName": _WORLD_NAME}, deadline
+            "Page.createIsolatedWorld",
+            {"frameId": frame, "worldName": _WORLD_NAME},
+            deadline,
         )
         context = created.get("executionContextId")
         if not isinstance(context, int):
-            raise CdpError("Chrome не создал изолированный мир для помощника страницы", method="Page.createIsolatedWorld")
+            raise CdpError(
+                "Chrome не создал изолированный мир для помощника страницы",
+                method="Page.createIsolatedWorld",
+            )
         installed = self._call(
             "Runtime.evaluate",
-            {"expression": helper, "contextId": context, "returnByValue": True, "silent": True},
+            {
+                "expression": helper,
+                "contextId": context,
+                "returnByValue": True,
+                "silent": True,
+            },
             deadline,
         )
         details = installed.get("exceptionDetails")
         if details:
             text = _exception_text(details)
             if _context_gone(text):
-                raise CdpError(f"Chrome: {text}", method="Runtime.evaluate", cdp_message=text)
-            raise BrowserError(f"Не удалось подготовить помощник страницы Logos: {text}")
+                raise CdpError(
+                    f"Chrome: {text}", method="Runtime.evaluate", cdp_message=text
+                )
+            raise BrowserError(
+                f"Не удалось подготовить помощник страницы Logos: {text}"
+            )
         with self._cond:
             self._world_context = context
             self._world_loader = loader
@@ -1325,7 +1422,9 @@ class ChromeTabEngine:
                 raise BrowserError(f"Помощник страницы Logos не сработал: {text}")
             remote = result.get("result")
             return remote if isinstance(remote, dict) else {}
-        raise BrowserError("Страница сменилась во время действия; повторите его (метки обновились)")
+        raise BrowserError(
+            "Страница сменилась во время действия; повторите его (метки обновились)"
+        )
 
     def _isolated_value(self, expression: str, **kwargs: Any) -> Any:
         return self._isolated(expression, by_value=True, **kwargs).get("value")
@@ -1360,12 +1459,22 @@ class ChromeTabEngine:
             raise
         details = result.get("exceptionDetails")
         if details:
-            raise BrowserError(f"Помощник страницы Logos не сработал: {_exception_text(details)}")
+            raise BrowserError(
+                f"Помощник страницы Logos не сработал: {_exception_text(details)}"
+            )
         remote = result.get("result")
         return remote if isinstance(remote, dict) else {}
 
-    def _element_value(self, object_id: str, declaration: str, *args: Any, deadline: Deadline | None = None) -> Any:
-        return self._on_element(object_id, declaration, *args, by_value=True, deadline=deadline).get("value")
+    def _element_value(
+        self,
+        object_id: str,
+        declaration: str,
+        *args: Any,
+        deadline: Deadline | None = None,
+    ) -> Any:
+        return self._on_element(
+            object_id, declaration, *args, by_value=True, deadline=deadline
+        ).get("value")
 
     @staticmethod
     def _object_id(remote: dict[str, Any]) -> str | None:
@@ -1375,10 +1484,14 @@ class ChromeTabEngine:
         return str(object_id) if object_id else None
 
     def _find(self, ref: str, deadline: Deadline | None) -> str | None:
-        remote = self._isolated(f"window.__logos.find({json.dumps(ref)})", by_value=False, deadline=deadline)
+        remote = self._isolated(
+            f"window.__logos.find({json.dumps(ref)})", by_value=False, deadline=deadline
+        )
         return self._object_id(remote)
 
-    def _resolve(self, target: ElementTarget | None, prefixes: str, deadline: Deadline | None) -> _Handle:
+    def _resolve(
+        self, target: ElementTarget | None, prefixes: str, deadline: Deadline | None
+    ) -> _Handle:
         """The element (or point) a target names in the live page."""
         if target is None or target.is_empty():
             raise BrowserError(E_TARGET_REQUIRED)
@@ -1387,21 +1500,31 @@ class ChromeTabEngine:
             ref = normalize_ref(target.ref)
             object_id = self._find(ref, deadline)
             if object_id is None:
-                raise BrowserNotFound(E_REF_NOT_FOUND.format(ref=ref, url=self._display_url()))
+                raise BrowserNotFound(
+                    E_REF_NOT_FOUND.format(ref=ref, url=self._display_url())
+                )
             return _Handle(object_id, ref, notes)
         if target.selector:
             selector = target.selector
-            info = self._isolated_value(f"window.__logos.count({json.dumps(selector)})", deadline=deadline)
+            info = self._isolated_value(
+                f"window.__logos.count({json.dumps(selector)})", deadline=deadline
+            )
             info = info if isinstance(info, dict) else {}
             if info.get("error") is not None:
-                raise BrowserError(E_SELECTOR_SYNTAX.format(sel=selector, reason=info["error"], pos="—"))
+                raise BrowserError(
+                    E_SELECTOR_SYNTAX.format(
+                        sel=selector, reason=info["error"], pos="—"
+                    )
+                )
             count = _int(info.get("count")) or 0
             if count == 0:
                 raise BrowserNotFound(E_SELECTOR_NONE.format(sel=selector))
             nth = target.nth
             if nth is not None and not 1 <= nth <= count:
                 raise BrowserNotFound(
-                    E_NTH_RANGE.format(nth=nth, target=f"селектор «{selector}»", count=count)
+                    E_NTH_RANGE.format(
+                        nth=nth, target=f"селектор «{selector}»", count=count
+                    )
                 )
             if nth is None and count > 1:
                 notes.append(
@@ -1410,7 +1533,9 @@ class ChromeTabEngine:
                 )
             index = (nth or 1) - 1
             remote = self._isolated(
-                f"window.__logos.nth({json.dumps(selector)}, {index})", by_value=False, deadline=deadline
+                f"window.__logos.nth({json.dumps(selector)}, {index})",
+                by_value=False,
+                deadline=deadline,
             )
             object_id = self._object_id(remote)
             if object_id is None:
@@ -1424,14 +1549,18 @@ class ChromeTabEngine:
                 raise BrowserError(
                     f"Во вкладке {self.tab_id or '?'} открыт файл, а не страница: элементов в нём нет"
                 )
-            element, found_notes = model.resolve_target(ElementTarget(text=target.text, nth=target.nth), prefixes)
+            element, found_notes = model.resolve_target(
+                ElementTarget(text=target.text, nth=target.nth), prefixes
+            )
             ref = model.ref_of(element)
             object_id = self._find(ref, deadline) if ref else None
             if object_id is None:
                 raise BrowserNotFound(E_TEXT_NOT_FOUND.format(text=target.text))
             return _Handle(object_id, str(ref), list(found_notes))
         if target.x is not None and target.y is not None:
-            return _Handle(None, target.describe(), notes, x=float(target.x), y=float(target.y))
+            return _Handle(
+                None, target.describe(), notes, x=float(target.x), y=float(target.y)
+            )
         raise BrowserError(E_TARGET_REQUIRED)
 
     def _main_world_object(self, object_id: str, deadline: Deadline | None) -> str:
@@ -1439,28 +1568,52 @@ class ChromeTabEngine:
         described = self._call("DOM.describeNode", {"objectId": object_id}, deadline)
         backend = (described.get("node") or {}).get("backendNodeId")
         if backend is None:
-            raise BrowserError("Chrome не описал элемент; посмотрите страницу заново (browser_read)")
+            raise BrowserError(
+                "Chrome не описал элемент; посмотрите страницу заново (browser_read)"
+            )
         resolved = self._call(
-            "DOM.resolveNode", {"backendNodeId": backend, "objectGroup": _EVAL_GROUP}, deadline
+            "DOM.resolveNode",
+            {"backendNodeId": backend, "objectGroup": _EVAL_GROUP},
+            deadline,
         )
         main_id = (resolved.get("object") or {}).get("objectId")
         if not main_id:
-            raise BrowserError("Chrome не передал элемент странице; посмотрите её заново (browser_read)")
+            raise BrowserError(
+                "Chrome не передал элемент странице; посмотрите её заново (browser_read)"
+            )
         return str(main_id)
 
     # -- input
 
-    def _mouse_click(self, x: float, y: float, deadline: Deadline | None, modifiers: int = 0) -> None:
+    def _mouse_click(
+        self, x: float, y: float, deadline: Deadline | None, modifiers: int = 0
+    ) -> None:
         base = {"x": float(x), "y": float(y), "modifiers": modifiers}
-        self._call("Input.dispatchMouseEvent", {**base, "type": "mouseMoved", "button": "none", "buttons": 0}, deadline)
         self._call(
             "Input.dispatchMouseEvent",
-            {**base, "type": "mousePressed", "button": "left", "buttons": 1, "clickCount": 1},
+            {**base, "type": "mouseMoved", "button": "none", "buttons": 0},
             deadline,
         )
         self._call(
             "Input.dispatchMouseEvent",
-            {**base, "type": "mouseReleased", "button": "left", "buttons": 0, "clickCount": 1},
+            {
+                **base,
+                "type": "mousePressed",
+                "button": "left",
+                "buttons": 1,
+                "clickCount": 1,
+            },
+            deadline,
+        )
+        self._call(
+            "Input.dispatchMouseEvent",
+            {
+                **base,
+                "type": "mouseReleased",
+                "button": "left",
+                "buttons": 0,
+                "clickCount": 1,
+            },
             deadline,
         )
 
@@ -1480,13 +1633,19 @@ class ChromeTabEngine:
             )
         raise BrowserError(E_NOT_VISIBLE.format(ref=handle.label))
 
-    def _click_element(self, handle: _Handle, force: bool, deadline: Deadline | None) -> None:
+    def _click_element(
+        self, handle: _Handle, force: bool, deadline: Deadline | None
+    ) -> None:
         if handle.object_id is None:
             assert handle.x is not None and handle.y is not None
             self._mouse_click(handle.x, handle.y, deadline)
             return
         if force:
-            self._on_element(handle.object_id, "function () { this.click(); return true; }", deadline=deadline)
+            self._on_element(
+                handle.object_id,
+                "function () { this.click(); return true; }",
+                deadline=deadline,
+            )
             return
         where = self._point(handle, deadline)
         if not where.get("ok"):
@@ -1496,7 +1655,9 @@ class ChromeTabEngine:
     def _key_event(self, params: dict[str, Any], deadline: Deadline | None) -> None:
         self._call("Input.dispatchKeyEvent", params, deadline)
 
-    def _press_combo(self, modifiers: list[_Key], key: _Key, deadline: Deadline | None) -> None:
+    def _press_combo(
+        self, modifiers: list[_Key], key: _Key, deadline: Deadline | None
+    ) -> None:
         mask = 0
         for modifier in modifiers:
             mask |= modifier.bit
@@ -1554,7 +1715,14 @@ class ChromeTabEngine:
                 deadline,
             )
 
-    def _type(self, handle: _Handle, value: str, replace: bool, notes: list[str], deadline: Deadline | None) -> list[str]:
+    def _type(
+        self,
+        handle: _Handle,
+        value: str,
+        replace: bool,
+        notes: list[str],
+        deadline: Deadline | None,
+    ) -> list[str]:
         object_id = handle.object_id
         if object_id is None:
             raise BrowserError(E_TARGET_REQUIRED)
@@ -1580,7 +1748,10 @@ class ChromeTabEngine:
                     "значение всё равно записано"
                 )
             self._element_value(
-                object_id, "function (value) { return window.__logos.setValue(this, value); }", value, deadline=deadline
+                object_id,
+                "function (value) { return window.__logos.setValue(this, value); }",
+                value,
+                deadline=deadline,
             )
             return []
         if value:
@@ -1589,7 +1760,11 @@ class ChromeTabEngine:
             self._press_combo([], _NAMED_KEYS["backspace"], deadline)
         if prepared.get("type") == "contenteditable":
             return []
-        current = self._element_value(object_id, "function () { return window.__logos.valueOf(this); }", deadline=deadline)
+        current = self._element_value(
+            object_id,
+            "function () { return window.__logos.valueOf(this); }",
+            deadline=deadline,
+        )
         current = "" if current is None else str(current)
         if replace and current != value:
             if current == "" or prepared.get("type") in ("email", "number"):
@@ -1599,7 +1774,9 @@ class ChromeTabEngine:
                     value,
                     deadline=deadline,
                 )
-                notes.append(f"поле {handle.label} не приняло ввод с клавиатуры — значение записано напрямую")
+                notes.append(
+                    f"поле {handle.label} не приняло ввод с клавиатуры — значение записано напрямую"
+                )
             else:
                 notes.append(
                     f"поле {handle.label} приняло не весь текст: в нём {len(current)} симв. из {len(value)} "
@@ -1607,7 +1784,13 @@ class ChromeTabEngine:
                 )
         return []
 
-    def _select(self, handle: _Handle, values: list[str], notes: list[str], deadline: Deadline | None) -> list[str]:
+    def _select(
+        self,
+        handle: _Handle,
+        values: list[str],
+        notes: list[str],
+        deadline: Deadline | None,
+    ) -> list[str]:
         object_id = handle.object_id
         if object_id is None:
             raise BrowserError(E_TARGET_REQUIRED)
@@ -1629,7 +1812,8 @@ class ChromeTabEngine:
                 E_OPTION_NOT_FOUND.format(
                     ref=handle.label,
                     value=result.get("missing") or "",
-                    options=", ".join(str(option) for option in options) or "нет вариантов",
+                    options=", ".join(str(option) for option in options)
+                    or "нет вариантов",
                 )
             )
         if result.get("disabled"):
@@ -1639,12 +1823,23 @@ class ChromeTabEngine:
             )
         return [str(item) for item in result.get("selected") or []]
 
-    def _toggle(self, handle: _Handle, want: bool, force: bool, notes: list[str], deadline: Deadline | None) -> bool:
+    def _toggle(
+        self,
+        handle: _Handle,
+        want: bool,
+        force: bool,
+        notes: list[str],
+        deadline: Deadline | None,
+    ) -> bool:
         """Check or uncheck; returns whether something was clicked."""
         object_id = handle.object_id
         if object_id is None:
             raise BrowserError(E_TARGET_REQUIRED)
-        state = self._element_value(object_id, "function () { return window.__logos.checkState(this); }", deadline=deadline)
+        state = self._element_value(
+            object_id,
+            "function () { return window.__logos.checkState(this); }",
+            deadline=deadline,
+        )
         state = state if isinstance(state, dict) else {}
         kind = state.get("kind")
         if kind == "none":
@@ -1653,10 +1848,16 @@ class ChromeTabEngine:
             notes.append(f"{handle.label} уже {'отмечен' if want else 'снят'}")
             return False
         if not want and kind in ("radio", "menuitemradio"):
-            notes.append(f"Переключатель {handle.label} нельзя снять щелчком — выберите другой вариант группы")
+            notes.append(
+                f"Переключатель {handle.label} нельзя снять щелчком — выберите другой вариант группы"
+            )
             return False
         if force:
-            self._on_element(object_id, "function () { this.click(); return true; }", deadline=deadline)
+            self._on_element(
+                object_id,
+                "function () { this.click(); return true; }",
+                deadline=deadline,
+            )
         else:
             where = self._point(handle, deadline)
             if where.get("ok"):
@@ -1674,17 +1875,33 @@ class ChromeTabEngine:
                 if label is not None:
                     label_where = self._point(_Handle(label, handle.label), deadline)
                     if label_where.get("ok"):
-                        self._mouse_click(float(label_where["x"]), float(label_where["y"]), deadline)
+                        self._mouse_click(
+                            float(label_where["x"]), float(label_where["y"]), deadline
+                        )
                         clicked = True
                 if not clicked:
-                    self._on_element(object_id, "function () { this.click(); return true; }", deadline=deadline)
-                    notes.append(f"{handle.label} скрыт или перекрыт — нажат через JavaScript")
-        after = self._element_value(object_id, "function () { return window.__logos.checkState(this); }", deadline=deadline)
+                    self._on_element(
+                        object_id,
+                        "function () { this.click(); return true; }",
+                        deadline=deadline,
+                    )
+                    notes.append(
+                        f"{handle.label} скрыт или перекрыт — нажат через JavaScript"
+                    )
+        after = self._element_value(
+            object_id,
+            "function () { return window.__logos.checkState(this); }",
+            deadline=deadline,
+        )
         if isinstance(after, dict) and bool(after.get("checked")) != want:
-            notes.append(f"{handle.label}: состояние не изменилось — страница не приняла нажатие")
+            notes.append(
+                f"{handle.label}: состояние не изменилось — страница не приняла нажатие"
+            )
         return True
 
-    def _submit(self, action: Action, notes: list[str], deadline: Deadline | None) -> None:
+    def _submit(
+        self, action: Action, notes: list[str], deadline: Deadline | None
+    ) -> None:
         form_handle = self._resolve(action.target, "F", deadline)
         notes.extend(form_handle.notes)
         if form_handle.object_id is None:
@@ -1701,7 +1918,11 @@ class ChromeTabEngine:
             raise BrowserError(
                 f"{form_handle.label} не форма и не находится в форме; формы страницы: browser_read(view='forms')"
             )
-        invalid = self._element_value(form_id, "function () { return window.__logos.invalidFields(this); }", deadline=deadline)
+        invalid = self._element_value(
+            form_id,
+            "function () { return window.__logos.invalidFields(this); }",
+            deadline=deadline,
+        )
         if isinstance(invalid, list) and invalid:
             parts = []
             for item in invalid:
@@ -1709,7 +1930,10 @@ class ChromeTabEngine:
                     continue
                 name = item.get("ref") or item.get("name") or "поле"
                 parts.append(f"{name}: {item.get('message') or 'значение не подходит'}")
-            notes.append("Браузер не отправит форму, пока поля заполнены неверно: " + "; ".join(parts))
+            notes.append(
+                "Браузер не отправит форму, пока поля заполнены неверно: "
+                + "; ".join(parts)
+            )
         if action.submitter is not None and not action.submitter.is_empty():
             submitter = self._resolve(action.submitter, "B", deadline)
             notes.extend(submitter.notes)
@@ -1737,15 +1961,29 @@ class ChromeTabEngine:
                 deadline=deadline,
             )
             return
-        self._on_element(form_id, "function () { return window.__logos.requestSubmit(this, null); }", deadline=deadline)
+        self._on_element(
+            form_id,
+            "function () { return window.__logos.requestSubmit(this, null); }",
+            deadline=deadline,
+        )
 
-    def _perform_click(self, action: Action, notes: list[str], deadline: Deadline | None) -> Navigation | None:
+    def _perform_click(
+        self, action: Action, notes: list[str], deadline: Deadline | None
+    ) -> Navigation | None:
         handle = self._resolve(action.target, "LBI", deadline)
         notes.extend(handle.notes)
         object_id = handle.object_id
         if object_id is not None and action.new_tab:
-            link = self._element_value(object_id, "function () { return window.__logos.linkOf(this); }", deadline=deadline)
-            if isinstance(link, str) and link and not link.lower().startswith("javascript:"):
+            link = self._element_value(
+                object_id,
+                "function () { return window.__logos.linkOf(this); }",
+                deadline=deadline,
+            )
+            if (
+                isinstance(link, str)
+                and link
+                and not link.lower().startswith("javascript:")
+            ):
                 with self._cond:
                     referrer = self._url
                 return Navigation(
@@ -1757,9 +1995,15 @@ class ChromeTabEngine:
                     max_redirects=action.max_redirects,
                     max_bytes=action.max_bytes,
                 )
-            if self._element_value(object_id, "function () { return window.__logos.isSubmitter(this); }", deadline=deadline):
+            if self._element_value(
+                object_id,
+                "function () { return window.__logos.isSubmitter(this); }",
+                deadline=deadline,
+            ):
                 previous = self._element_value(
-                    object_id, "function () { return window.__logos.withTarget(this, '_blank'); }", deadline=deadline
+                    object_id,
+                    "function () { return window.__logos.withTarget(this, '_blank'); }",
+                    deadline=deadline,
                 )
                 try:
                     self._click_element(handle, action.force, deadline)
@@ -1774,7 +2018,9 @@ class ChromeTabEngine:
                     except BrowserError:
                         pass
                 return None
-            notes.append("new_tab действует на ссылки и кнопки отправки форм; выполнено обычное нажатие")
+            notes.append(
+                "new_tab действует на ссылки и кнопки отправки форм; выполнено обычное нажатие"
+            )
         self._click_element(handle, action.force, deadline)
         return None
 
@@ -1806,7 +2052,13 @@ class ChromeTabEngine:
                 handle = self._resolve(action.target, "I", deadline)
                 notes.extend(handle.notes)
                 value = "" if kind == "clear" else (action.value or "")
-                selected = self._type(handle, value, True if kind == "clear" else action.replace, notes, deadline)
+                selected = self._type(
+                    handle,
+                    value,
+                    True if kind == "clear" else action.replace,
+                    notes,
+                    deadline,
+                )
             elif kind == "press":
                 combos = _parse_keys(action.value or "")
                 if action.target is not None and not action.target.is_empty():
@@ -1814,10 +2066,14 @@ class ChromeTabEngine:
                     notes.extend(handle.notes)
                     if handle.object_id is not None:
                         focused = self._element_value(
-                            handle.object_id, "function () { return window.__logos.focus(this); }", deadline=deadline
+                            handle.object_id,
+                            "function () { return window.__logos.focus(this); }",
+                            deadline=deadline,
                         )
                         if not focused:
-                            notes.append(f"{handle.label} не принял фокус — клавиши отправлены активному элементу")
+                            notes.append(
+                                f"{handle.label} не принял фокус — клавиши отправлены активному элементу"
+                            )
                 for modifiers, key in combos:
                     self._press_combo(modifiers, key, deadline)
             elif kind == "hover":
@@ -1827,11 +2083,21 @@ class ChromeTabEngine:
                     assert handle.x is not None and handle.y is not None
                     self._call(
                         "Input.dispatchMouseEvent",
-                        {"type": "mouseMoved", "x": handle.x, "y": handle.y, "button": "none", "buttons": 0},
+                        {
+                            "type": "mouseMoved",
+                            "x": handle.x,
+                            "y": handle.y,
+                            "button": "none",
+                            "buttons": 0,
+                        },
                         deadline,
                     )
                 elif action.force:
-                    self._element_value(handle.object_id, "function () { return window.__logos.hover(this); }", deadline=deadline)
+                    self._element_value(
+                        handle.object_id,
+                        "function () { return window.__logos.hover(this); }",
+                        deadline=deadline,
+                    )
                 else:
                     where = self._point(handle, deadline)
                     if not where.get("ok"):
@@ -1861,7 +2127,10 @@ class ChromeTabEngine:
                         deadline=deadline,
                     )
                 else:
-                    result = self._isolated_value(f"window.__logos.scroll(null, {json.dumps(value)})", deadline=deadline)
+                    result = self._isolated_value(
+                        f"window.__logos.scroll(null, {json.dumps(value)})",
+                        deadline=deadline,
+                    )
                 result = result if isinstance(result, dict) else {}
                 if result.get("error"):
                     raise BrowserError(
@@ -1875,18 +2144,28 @@ class ChromeTabEngine:
             elif kind == "select":
                 handle = self._resolve(action.target, "I", deadline)
                 notes.extend(handle.notes)
-                values = list(action.values) if action.values else ([action.value] if action.value is not None else [])
+                values = (
+                    list(action.values)
+                    if action.values
+                    else ([action.value] if action.value is not None else [])
+                )
                 selected = self._select(handle, values, notes, deadline)
             elif kind in ("check", "uncheck"):
                 handle = self._resolve(action.target, "I", deadline)
                 notes.extend(handle.notes)
-                detect = self._toggle(handle, kind == "check", action.force, notes, deadline)
+                detect = self._toggle(
+                    handle, kind == "check", action.force, notes, deadline
+                )
             elif kind == "focus":
                 handle = self._resolve(action.target, "LBIFTM", deadline)
                 notes.extend(handle.notes)
                 if handle.object_id is None:
                     raise BrowserError(E_TARGET_REQUIRED)
-                if not self._element_value(handle.object_id, "function () { return window.__logos.focus(this); }", deadline=deadline):
+                if not self._element_value(
+                    handle.object_id,
+                    "function () { return window.__logos.focus(this); }",
+                    deadline=deadline,
+                ):
                     notes.append(f"{handle.label} не принимает фокус")
             elif kind == "set_files":
                 handle = self._resolve(action.target, "I", deadline)
@@ -1900,10 +2179,15 @@ class ChromeTabEngine:
                 )
                 info = info if isinstance(info, dict) else {}
                 if info.get("tag") != "input" or info.get("type") != "file":
-                    raise BrowserError(f"Элемент {handle.label} не поле выбора файлов (input type=file)")
+                    raise BrowserError(
+                        f"Элемент {handle.label} не поле выбора файлов (input type=file)"
+                    )
                 self._call(
                     "DOM.setFileInputFiles",
-                    {"files": [str(path) for path in action.values], "objectId": handle.object_id},
+                    {
+                        "files": [str(path) for path in action.values],
+                        "objectId": handle.object_id,
+                    },
                     deadline,
                 )
             elif kind == "submit":
@@ -1951,7 +2235,12 @@ class ChromeTabEngine:
         )
 
     def _settle(
-        self, marks: _Marks, *, detect: bool, wait_until: str | None, deadline: Deadline | None
+        self,
+        marks: _Marks,
+        *,
+        detect: bool,
+        wait_until: str | None,
+        deadline: Deadline | None,
     ) -> tuple[bool, list[ChromeTabEngine], list[str]]:
         """After an action: wait for a navigation it started, or let the page settle."""
         notes: list[str] = []
@@ -1970,7 +2259,9 @@ class ChromeTabEngine:
             started = self._navigation_since(marks)
         navigated = False
         if started:
-            navigated = self._wait_navigation(marks, wait_until, deadline, "переход после действия")
+            navigated = self._wait_navigation(
+                marks, wait_until, deadline, "переход после действия"
+            )
         else:
             _pause(_SETTLE_DELAY, deadline)
         with self._cond:
@@ -1982,7 +2273,11 @@ class ChromeTabEngine:
         return navigated, popups, notes
 
     def _wait_navigation(
-        self, marks: _Marks, wait_until: str | None, deadline: Deadline | None, what: str
+        self,
+        marks: _Marks,
+        wait_until: str | None,
+        deadline: Deadline | None,
+        what: str,
     ) -> bool:
         """Wait for the new document a navigation commits; False when none came."""
         began = time.monotonic()
@@ -1995,7 +2290,11 @@ class ChromeTabEngine:
                 if self._download_seq > marks.downloads:
                     return False
                 started = self._started_seq > marks.started
-                if started and self._stopped_after > marks.started and not self._loading:
+                if (
+                    started
+                    and self._stopped_after > marks.started
+                    and not self._loading
+                ):
                     return False
                 if self._dead():
                     raise self._lost_error()
@@ -2007,22 +2306,30 @@ class ChromeTabEngine:
                         return False
                     timeout = window if timeout is None else min(timeout, window)
                 if remaining is not None and remaining <= 0:
-                    raise BrowserTimeout(timeout_message(deadline.seconds if deadline else None, what))
+                    raise BrowserTimeout(
+                        timeout_message(deadline.seconds if deadline else None, what)
+                    )
                 self._cond.wait(timeout)
         self._wait_lifecycle(wait_until, deadline, what)
         return True
 
-    def _wait_commit(self, loader: str, marks: _Marks, deadline: Deadline | None, what: str) -> None:
+    def _wait_commit(
+        self, loader: str, marks: _Marks, deadline: Deadline | None, what: str
+    ) -> None:
         with self._cond:
             while loader not in self._commits and self._nav_seq <= marks.nav:
                 if self._dead():
                     raise self._lost_error()
                 remaining = deadline.remaining() if deadline is not None else None
                 if remaining is not None and remaining <= 0:
-                    raise BrowserTimeout(timeout_message(deadline.seconds if deadline else None, what))
+                    raise BrowserTimeout(
+                        timeout_message(deadline.seconds if deadline else None, what)
+                    )
                 self._cond.wait(remaining)
 
-    def _wait_lifecycle(self, wait_until: str | None, deadline: Deadline | None, what: str) -> None:
+    def _wait_lifecycle(
+        self, wait_until: str | None, deadline: Deadline | None, what: str
+    ) -> None:
         """Wait for the lifecycle event of the current document (following newer documents)."""
         name = _LIFECYCLE_NAMES.get(wait_until or "load")
         if name is None:
@@ -2039,10 +2346,14 @@ class ChromeTabEngine:
                     raise self._lost_error()
                 remaining = deadline.remaining() if deadline is not None else None
                 if remaining is not None and remaining <= 0:
-                    raise BrowserTimeout(timeout_message(deadline.seconds if deadline else None, what))
+                    raise BrowserTimeout(
+                        timeout_message(deadline.seconds if deadline else None, what)
+                    )
                 self._cond.wait(remaining)
 
-    def _wait_first_load(self, wait_until: str | None, deadline: Deadline | None) -> None:
+    def _wait_first_load(
+        self, wait_until: str | None, deadline: Deadline | None
+    ) -> None:
         """A popup: wait for its first document when it starts loading one."""
         end = time.monotonic() + _NAVIGATION_START_WINDOW
         what = "загрузка новой вкладки"
@@ -2058,18 +2369,28 @@ class ChromeTabEngine:
                     return
                 self._cond.wait(left)
             while not (self._nav_seq > 0 and self._url not in ("", "about:blank")):
-                if self._stop_seq > 0 and not self._loading and self._stopped_after >= self._started_seq:
+                if (
+                    self._stop_seq > 0
+                    and not self._loading
+                    and self._stopped_after >= self._started_seq
+                ):
                     break
                 if self._dead():
                     raise self._lost_error()
                 remaining = deadline.remaining() if deadline is not None else None
                 if remaining is not None and remaining <= 0:
-                    raise BrowserTimeout(timeout_message(deadline.seconds if deadline else None, what))
+                    raise BrowserTimeout(
+                        timeout_message(deadline.seconds if deadline else None, what)
+                    )
                 self._cond.wait(remaining)
         self._wait_lifecycle(wait_until, deadline, what)
 
     def _collect_popups(
-        self, marks: _Marks, wait_until: str | None, deadline: Deadline | None, notes: list[str]
+        self,
+        marks: _Marks,
+        wait_until: str | None,
+        deadline: Deadline | None,
+        notes: list[str],
     ) -> list[ChromeTabEngine]:
         browser = self._browser
         with self._cond:
@@ -2085,12 +2406,16 @@ class ChromeTabEngine:
             try:
                 popup._wait_first_load(wait_until, deadline)
             except BrowserTimeout:
-                notes.append(f"Новая вкладка ещё загружается: {popup._display_url() or 'about:blank'}")
+                notes.append(
+                    f"Новая вкладка ещё загружается: {popup._display_url() or 'about:blank'}"
+                )
             except BrowserError as exc:
                 notes.append(f"Новая вкладка: {exc}")
         return popups
 
-    def _wait_download(self, marks: _Marks, deadline: Deadline | None, notes: list[str]) -> bool:
+    def _wait_download(
+        self, marks: _Marks, deadline: Deadline | None, notes: list[str]
+    ) -> bool:
         """After ERR_ABORTED: did the navigation become a download? Waits for it to finish."""
         end = time.monotonic() + _NAVIGATION_START_WINDOW
         with self._cond:
@@ -2103,7 +2428,10 @@ class ChromeTabEngine:
                 remaining = deadline.remaining() if deadline is not None else None
                 if remaining is not None and remaining <= 0:
                     names = [
-                        str((self._browser._downloads.get(guid) or {}).get("suggested") or guid)
+                        str(
+                            (self._browser._downloads.get(guid) or {}).get("suggested")
+                            or guid
+                        )
                         for guid in self._active_downloads
                     ]
                     notes.append(
@@ -2169,26 +2497,44 @@ class ChromeTabEngine:
 
     # -- navigation
 
-    def _push_headers(self, headers: list[tuple[str, str]], deadline: Deadline | None) -> bool:
+    def _push_headers(
+        self, headers: list[tuple[str, str]], deadline: Deadline | None
+    ) -> bool:
         if not headers:
             return False
-        merged = list(self._browser.options.extra_headers) + [(str(name), str(value)) for name, value in headers]
-        self._call("Network.setExtraHTTPHeaders", {"headers": _headers_dict(merged)}, deadline)
+        merged = list(self._browser.options.extra_headers) + [
+            (str(name), str(value)) for name, value in headers
+        ]
+        self._call(
+            "Network.setExtraHTTPHeaders", {"headers": _headers_dict(merged)}, deadline
+        )
         return True
 
     def _restore_headers(self) -> None:
         self._send(
-            "Network.setExtraHTTPHeaders", {"headers": _headers_dict(self._browser.options.extra_headers)}
+            "Network.setExtraHTTPHeaders",
+            {"headers": _headers_dict(self._browser.options.extra_headers)},
         )
 
-    def _blocked_error(self, url: str, requested: str, ctx: EventSink) -> BrowserBlocked:
+    def _blocked_error(
+        self, url: str, requested: str, ctx: EventSink
+    ) -> BrowserBlocked:
         host = guard.blocked_host(url)
-        stage = "request" if _strip_fragment(url) == _strip_fragment(requested) else "redirect"
-        ctx.event("browser_blocked", {"tab": self.tab_id, "host": host, "stage": stage, "count": 1})
+        stage = (
+            "request"
+            if _strip_fragment(url) == _strip_fragment(requested)
+            else "redirect"
+        )
+        ctx.event(
+            "browser_blocked",
+            {"tab": self.tab_id, "host": host, "stage": stage, "count": 1},
+        )
         details = {"blocked_host": host, "blocked_stage": stage}
         if stage == "request":
             return BrowserBlocked(f"{LINK_LOCAL_MESSAGE}: {host}", details=details)
-        return BrowserBlocked(E_REDIRECT_LINK_LOCAL.format(url=display_url(url)), details=details)
+        return BrowserBlocked(
+            E_REDIRECT_LINK_LOCAL.format(url=display_url(url)), details=details
+        )
 
     def _navigation_error(self, url: str, error: str, ctx: EventSink) -> BrowserError:
         upper = error.upper()
@@ -2214,11 +2560,17 @@ class ChromeTabEngine:
             or "ERR_EMPTY_RESPONSE" in upper
         ):
             return BrowserNetworkError(E_CONNECT.format(host=host, reason=error))
-        return BrowserNetworkError(E_CHROME_NAV.format(url=display_url(url), errorText=error))
+        return BrowserNetworkError(
+            E_CHROME_NAV.format(url=display_url(url), errorText=error)
+        )
 
     def load(self, nav: Navigation, ctx: EventSink) -> NavOutcome:
         self._ensure_usable()
-        if nav.submission is not None or nav.body is not None or (nav.method or "GET").upper() != "GET":
+        if (
+            nav.submission is not None
+            or nav.body is not None
+            or (nav.method or "GET").upper() != "GET"
+        ):
             # Page.navigate has no method or body: a POST must not silently become a GET.
             raise BrowserError(
                 "Движок chrome открывает адреса только запросом GET. Форму в этой вкладке отправьте "
@@ -2258,12 +2610,16 @@ class ChromeTabEngine:
         try:
             pushed = self._push_headers(list(nav.headers or []), deadline)
             if pushed:
-                notes.append("Дополнительные заголовки отправлены и с запросами, которые страница сделала при загрузке")
+                notes.append(
+                    "Дополнительные заголовки отправлены и с запросами, которые страница сделала при загрузке"
+                )
             result = self._call("Page.navigate", params, deadline, what=what)
             error = str(result.get("errorText") or "")
             loader = result.get("loaderId")
             if error and "ERR_HTTP_RESPONSE_CODE_FAILURE" not in error.upper():
-                if "ERR_ABORTED" in error.upper() and self._wait_download(marks, deadline, notes):
+                if "ERR_ABORTED" in error.upper() and self._wait_download(
+                    marks, deadline, notes
+                ):
                     navigated = False
                 else:
                     raise self._navigation_error(nav.url, error, ctx)
@@ -2279,7 +2635,9 @@ class ChromeTabEngine:
                 self._restore_headers()
         with self._cond:
             if navigated:
-                self._initial_blank = self._initial_blank and nav.url.strip().lower() != "about:blank"
+                self._initial_blank = (
+                    self._initial_blank and nav.url.strip().lower() != "about:blank"
+                )
         return self._nav_outcome(
             ctx,
             from_url=before_url,
@@ -2291,9 +2649,13 @@ class ChromeTabEngine:
             notes=notes,
         )
 
-    def _history_entries(self, deadline: Deadline | None) -> tuple[list[dict[str, Any]], int]:
+    def _history_entries(
+        self, deadline: Deadline | None
+    ) -> tuple[list[dict[str, Any]], int]:
         result = self._call("Page.getNavigationHistory", {}, deadline)
-        entries = [entry for entry in result.get("entries") or [] if isinstance(entry, dict)]
+        entries = [
+            entry for entry in result.get("entries") or [] if isinstance(entry, dict)
+        ]
         current = _int(result.get("currentIndex"))
         if current is None:
             current = len(entries) - 1
@@ -2357,7 +2719,12 @@ class ChromeTabEngine:
         what = "переход по истории вкладки"
         self.own_navigation = True
         try:
-            self._call("Page.navigateToHistoryEntry", {"entryId": entries[target].get("id")}, deadline, what=what)
+            self._call(
+                "Page.navigateToHistoryEntry",
+                {"entryId": entries[target].get("id")},
+                deadline,
+                what=what,
+            )
             navigated = self._wait_navigation(marks, wait_until, deadline, what)
         except BrowserTimeout:
             self._send("Page.stopLoading")
@@ -2375,7 +2742,9 @@ class ChromeTabEngine:
             notes=[],
         )
 
-    def reload(self, *, wait_until: str | None = None, deadline: Deadline, ctx: EventSink) -> NavOutcome:
+    def reload(
+        self, *, wait_until: str | None = None, deadline: Deadline, ctx: EventSink
+    ) -> NavOutcome:
         self._ensure_usable()
         if not self._has_page:
             raise BrowserError(E_TAB_EMPTY.format(tab=self.tab_id or "?"))
@@ -2411,10 +2780,14 @@ class ChromeTabEngine:
 
     def mark_matches(self, selector: str) -> ViewPage:
         self._ensure_usable()
-        result = self._isolated_value(f"window.__logos.markMatches({json.dumps(selector)})")
+        result = self._isolated_value(
+            f"window.__logos.markMatches({json.dumps(selector)})"
+        )
         result = result if isinstance(result, dict) else {}
         if result.get("error") is not None:
-            raise BrowserError(E_SELECTOR_SYNTAX.format(sel=selector, reason=result["error"], pos="—"))
+            raise BrowserError(
+                E_SELECTOR_SYNTAX.format(sel=selector, reason=result["error"], pos="—")
+            )
         return self.page()
 
     def _wait_url(self, value: str, deadline: Deadline) -> None:
@@ -2436,14 +2809,24 @@ class ChromeTabEngine:
                 raise BrowserTimeout("")
             if not javascript:
                 # Without page scripts the helper's timers may not run: poll from here.
-                result = self._isolated_value(f"window.__logos.check({json.dumps(spec)})", deadline=deadline)
+                result = self._isolated_value(
+                    f"window.__logos.check({json.dumps(spec)})", deadline=deadline
+                )
             else:
                 payload = dict(spec)
-                payload["timeout"] = int(remaining * 1000) if remaining is not None else None
-                backstop = Deadline(remaining + _WAIT_REPLY_GRACE) if remaining is not None else Deadline(None)
+                payload["timeout"] = (
+                    int(remaining * 1000) if remaining is not None else None
+                )
+                backstop = (
+                    Deadline(remaining + _WAIT_REPLY_GRACE)
+                    if remaining is not None
+                    else Deadline(None)
+                )
                 try:
                     result = self._isolated_value(
-                        f"window.__logos.waitFor({json.dumps(payload)})", await_promise=True, deadline=backstop
+                        f"window.__logos.waitFor({json.dumps(payload)})",
+                        await_promise=True,
+                        deadline=backstop,
                     )
                 except CdpError as exc:
                     if _context_gone(_cdp_text(exc)):
@@ -2454,7 +2837,9 @@ class ChromeTabEngine:
                 return
             if result.get("error"):
                 raise BrowserError(
-                    E_SELECTOR_SYNTAX.format(sel=spec.get("value") or "", reason=result["error"], pos="—")
+                    E_SELECTOR_SYNTAX.format(
+                        sel=spec.get("value") or "", reason=result["error"], pos="—"
+                    )
                 )
             if result.get("timeout"):
                 raise BrowserTimeout("")
@@ -2521,23 +2906,57 @@ class ChromeTabEngine:
         began = time.monotonic()
         steps: list[tuple[str, Any, str]] = []
         if request.url_contains:
-            steps.append(("url", request.url_contains, f"адрес содержит «{request.url_contains}»"))
+            steps.append(
+                (
+                    "url",
+                    request.url_contains,
+                    f"адрес содержит «{request.url_contains}»",
+                )
+            )
         if request.selector:
             state = request.selector_state or "visible"
             word = _SELECTOR_STATES.get(state, state)
             steps.append(
-                ("dom", {"kind": "selector", "value": request.selector, "state": state}, f"элемент «{request.selector}» {word}")
+                (
+                    "dom",
+                    {"kind": "selector", "value": request.selector, "state": state},
+                    f"элемент «{request.selector}» {word}",
+                )
             )
         if request.text:
-            steps.append(("dom", {"kind": "text", "value": request.text}, f"текст «{request.text}» на странице"))
+            steps.append(
+                (
+                    "dom",
+                    {"kind": "text", "value": request.text},
+                    f"текст «{request.text}» на странице",
+                )
+            )
         if request.text_gone:
-            steps.append(("dom", {"kind": "text_gone", "value": request.text_gone}, f"текст «{request.text_gone}» исчез"))
+            steps.append(
+                (
+                    "dom",
+                    {"kind": "text_gone", "value": request.text_gone},
+                    f"текст «{request.text_gone}» исчез",
+                )
+            )
         if request.expression:
-            steps.append(("expression", request.expression, f"выражение «{request.expression}» истинно"))
+            steps.append(
+                (
+                    "expression",
+                    request.expression,
+                    f"выражение «{request.expression}» истинно",
+                )
+            )
         if request.network_idle:
             steps.append(("network", None, f"затишье сети {_NETWORK_IDLE_WINDOW:g} с"))
         if request.seconds:
-            steps.append(("seconds", float(request.seconds), f"пауза {float(request.seconds):g} с"))
+            steps.append(
+                (
+                    "seconds",
+                    float(request.seconds),
+                    f"пауза {float(request.seconds):g} с",
+                )
+            )
         satisfied: list[str] = []
         for position, (kind, value, label) in enumerate(steps):
             try:
@@ -2561,7 +2980,9 @@ class ChromeTabEngine:
                 if detail:
                     unmet[0] = f"{unmet[0]} (последняя ошибка: {detail})"
                 seconds = deadline.seconds if deadline.seconds is not None else 0.0
-                raise BrowserTimeout(E_WAIT_TIMEOUT.format(t=f"{seconds:g}", conditions="; ".join(unmet))) from None
+                raise BrowserTimeout(
+                    E_WAIT_TIMEOUT.format(t=f"{seconds:g}", conditions="; ".join(unmet))
+                ) from None
             satisfied.append(label)
         try:
             title = str(self._isolated_value("document.title") or "")
@@ -2592,11 +3013,17 @@ class ChromeTabEngine:
             return (result.get("result") or {}).get("value")
         # Very deep values exceed Chrome's own transfer depth: send them as JSON text.
         text_params = dict(params)
-        text_params["functionDeclaration"] = f"function () {{ return JSON.stringify(({serializer}).call(this)); }}"
+        text_params["functionDeclaration"] = (
+            f"function () {{ return JSON.stringify(({serializer}).call(this)); }}"
+        )
         result = self._call("Runtime.callFunctionOn", text_params, deadline)
         details = result.get("exceptionDetails")
         if details:
-            raise BrowserError(E_EVAL.format(text=f"результат не удалось преобразовать в JSON: {_exception_text(details)}"))
+            raise BrowserError(
+                E_EVAL.format(
+                    text=f"результат не удалось преобразовать в JSON: {_exception_text(details)}"
+                )
+            )
         text = (result.get("result") or {}).get("value")
         if not isinstance(text, str):
             return None
@@ -2660,7 +3087,9 @@ class ChromeTabEngine:
                     "objectGroup": _EVAL_GROUP,
                 }
             try:
-                result = self._call(method, params, deadline, what="выполнение JavaScript")
+                result = self._call(
+                    method, params, deadline, what="выполнение JavaScript"
+                )
             except BrowserTimeout:
                 self._send("Runtime.terminateExecution")
                 raise
@@ -2670,7 +3099,11 @@ class ChromeTabEngine:
             remote = result.get("result") or {}
             kind = str(remote.get("type") or "undefined")
             subtype = remote.get("subtype")
-            type_name = "null" if subtype == "null" else (f"{kind}/{subtype}" if subtype else kind)
+            type_name = (
+                "null"
+                if subtype == "null"
+                else (f"{kind}/{subtype}" if subtype else kind)
+            )
             if "unserializableValue" in remote:
                 value: Any = str(remote["unserializableValue"])
             elif kind == "undefined" or subtype == "null":
@@ -2686,7 +3119,9 @@ class ChromeTabEngine:
             self._send("Runtime.releaseObjectGroup", {"objectGroup": _ACTION_GROUP})
         with self._cond:
             lines = [
-                f"[{entry['level']}] {entry['text']}" for entry in self._console if entry.get("seq", 0) > mark
+                f"[{entry['level']}] {entry['text']}"
+                for entry in self._console
+                if entry.get("seq", 0) > mark
             ]
         return EvalOutcome(value=value, type=type_name, console=lines)
 
@@ -2697,7 +3132,10 @@ class ChromeTabEngine:
         deadline = request.deadline
         if request.format == "pdf":
             return self._print_pdf(request, sink, deadline)
-        params: dict[str, Any] = {"format": "jpeg" if request.format == "jpeg" else "png", "fromSurface": True}
+        params: dict[str, Any] = {
+            "format": "jpeg" if request.format == "jpeg" else "png",
+            "fromSurface": True,
+        }
         if request.format == "jpeg" and request.quality is not None:
             params["quality"] = int(request.quality)
         clip: dict[str, Any] | None = None
@@ -2706,7 +3144,11 @@ class ChromeTabEngine:
                 handle = self._resolve(request.target, "LBIFTM", deadline)
                 if handle.object_id is None:
                     raise BrowserError(E_TARGET_REQUIRED)
-                box = self._element_value(handle.object_id, "function () { return window.__logos.rect(this); }", deadline=deadline)
+                box = self._element_value(
+                    handle.object_id,
+                    "function () { return window.__logos.rect(this); }",
+                    deadline=deadline,
+                )
                 box = box if isinstance(box, dict) else {}
                 width = _float(box.get("width")) or 0.0
                 height = _float(box.get("height")) or 0.0
@@ -2725,13 +3167,21 @@ class ChromeTabEngine:
                 width = math.ceil(_float(size.get("width")) or 0)
                 height = math.ceil(_float(size.get("height")) or 0)
                 if width > 0 and height > 0:
-                    clip = {"x": 0, "y": 0, "width": width, "height": height, "scale": 1}
+                    clip = {
+                        "x": 0,
+                        "y": 0,
+                        "width": width,
+                        "height": height,
+                        "scale": 1,
+                    }
         finally:
             self._send("Runtime.releaseObjectGroup", {"objectGroup": _ACTION_GROUP})
         if clip is not None:
             params["clip"] = clip
             params["captureBeyondViewport"] = True
-        result = self._call("Page.captureScreenshot", params, deadline, what="снимок страницы")
+        result = self._call(
+            "Page.captureScreenshot", params, deadline, what="снимок страницы"
+        )
         try:
             data = base64.b64decode(result.get("data") or "")
         except (binascii.Error, ValueError):
@@ -2744,7 +3194,9 @@ class ChromeTabEngine:
             height_px = int(round(float(clip["height"]) * scale))
         return CaptureOutcome(bytes=len(data), width=width_px, height=height_px)
 
-    def _print_pdf(self, request: CaptureRequest, sink: BinarySink, deadline: Deadline) -> CaptureOutcome:
+    def _print_pdf(
+        self, request: CaptureRequest, sink: BinarySink, deadline: Deadline
+    ) -> CaptureOutcome:
         params: dict[str, Any] = {
             "landscape": bool(request.landscape),
             "printBackground": bool(request.print_background),
@@ -2766,18 +3218,27 @@ class ChromeTabEngine:
             try:
                 data = base64.b64decode(result.get("data") or "")
             except (binascii.Error, ValueError):
-                raise BrowserError("Chrome вернул повреждённый PDF; повторите") from None
+                raise BrowserError(
+                    "Chrome вернул повреждённый PDF; повторите"
+                ) from None
             sink.write(data)
             return CaptureOutcome(bytes=len(data), width=None, height=None)
         try:
             while True:
-                chunk = self._call("IO.read", {"handle": stream, "size": _IO_CHUNK}, deadline, what="чтение PDF")
+                chunk = self._call(
+                    "IO.read",
+                    {"handle": stream, "size": _IO_CHUNK},
+                    deadline,
+                    what="чтение PDF",
+                )
                 data_text = chunk.get("data") or ""
                 if chunk.get("base64Encoded"):
                     try:
                         raw = base64.b64decode(data_text)
                     except (binascii.Error, ValueError):
-                        raise BrowserError("Chrome вернул повреждённый PDF; повторите") from None
+                        raise BrowserError(
+                            "Chrome вернул повреждённый PDF; повторите"
+                        ) from None
                 else:
                     raw = str(data_text).encode("utf-8", "surrogatepass")
                 if raw:
@@ -2798,7 +3259,12 @@ class ChromeTabEngine:
     def console(self) -> list[dict[str, Any]]:
         with self._cond:
             return [
-                {"level": entry["level"], "text": entry["text"], "url": entry["url"], "line": entry["line"]}
+                {
+                    "level": entry["level"],
+                    "text": entry["text"],
+                    "url": entry["url"],
+                    "line": entry["line"],
+                }
                 for entry in self._console
             ]
 
@@ -2808,9 +3274,13 @@ class ChromeTabEngine:
         with self._cond:
             entry = next((item for item in self._net if item.id == wanted), None)
         if entry is None:
-            raise BrowserNotFound(f"Запрос {wanted} не найден; список запросов: browser_read(view='network')")
+            raise BrowserNotFound(
+                f"Запрос {wanted} не найден; список запросов: browser_read(view='network')"
+            )
         try:
-            result = self._call("Network.getResponseBody", {"requestId": entry.request_id})
+            result = self._call(
+                "Network.getResponseBody", {"requestId": entry.request_id}
+            )
         except CdpError:
             raise BrowserNotFound(E_BODY_GONE.format(id=wanted)) from None
         body = result.get("body") or ""
@@ -2833,7 +3303,6 @@ class ChromeTabEngine:
             browser.conn.send_nowait("Target.closeTarget", {"targetId": self.target_id})
 
 
-
 # ---------------------------------------------------------------------------
 # Browser
 
@@ -2841,7 +3310,12 @@ class ChromeTabEngine:
 class ChromeBrowser:
     """The Chrome process of one browser session: targets, guard, downloads, cookies."""
 
-    def __init__(self, launched: chrome_launch.LaunchedChrome, conn: CdpConnection, options: ChromeOptions) -> None:
+    def __init__(
+        self,
+        launched: chrome_launch.LaunchedChrome,
+        conn: CdpConnection,
+        options: ChromeOptions,
+    ) -> None:
         self._launched = launched
         self.conn = conn
         self.options = options
@@ -2873,8 +3347,12 @@ class ChromeBrowser:
         self._auth_seen: set[str] = set()
         self._proxy_auth = chrome_launch.proxy_credentials(str(options.proxy or ""))
         self._queue: queue.Queue = queue.Queue()
-        self._pool = ThreadPoolExecutor(max_workers=_GUARD_WORKERS, thread_name_prefix="logos-browser-guard")
-        self._worker = threading.Thread(target=self._attach_loop, name="logos-browser-attach", daemon=True)
+        self._pool = ThreadPoolExecutor(
+            max_workers=_GUARD_WORKERS, thread_name_prefix="logos-browser-guard"
+        )
+        self._worker = threading.Thread(
+            target=self._attach_loop, name="logos-browser-attach", daemon=True
+        )
         self._worker.start()
 
     # -- lifecycle
@@ -2897,27 +3375,53 @@ class ChromeBrowser:
             browser = cls(launched, conn, options)
             conn.subscribe(browser._on_event)
             conn.on_lost = browser._on_connection_lost
-            version = conn.call("Browser.getVersion", {}, deadline=deadline, what="запуск Chrome")
+            version = conn.call(
+                "Browser.getVersion", {}, deadline=deadline, what="запуск Chrome"
+            )
             product = str(version.get("product") or "")
             browser.version = product.split("/", 1)[1] if "/" in product else product
-            browser.user_agent = str(version.get("userAgent") or "").replace("HeadlessChrome", "Chrome")
-            conn.call("Target.setDiscoverTargets", {"discover": True}, deadline=deadline, what="запуск Chrome")
-            conn.call("Target.setAutoAttach", dict(_AUTO_ATTACH), deadline=deadline, what="запуск Chrome")
+            browser.user_agent = str(version.get("userAgent") or "").replace(
+                "HeadlessChrome", "Chrome"
+            )
+            conn.call(
+                "Target.setDiscoverTargets",
+                {"discover": True},
+                deadline=deadline,
+                what="запуск Chrome",
+            )
+            conn.call(
+                "Target.setAutoAttach",
+                dict(_AUTO_ATTACH),
+                deadline=deadline,
+                what="запуск Chrome",
+            )
             conn.call(
                 "Browser.setDownloadBehavior",
-                {"behavior": "allowAndName", "downloadPath": launched.downloads_dir, "eventsEnabled": True},
+                {
+                    "behavior": "allowAndName",
+                    "downloadPath": launched.downloads_dir,
+                    "eventsEnabled": True,
+                },
                 deadline=deadline,
                 what="запуск Chrome",
             )
             if options.ignore_tls_errors:
                 try:
                     conn.call(
-                        "Security.setIgnoreCertificateErrors", {"ignore": True}, deadline=deadline, what="запуск Chrome"
+                        "Security.setIgnoreCertificateErrors",
+                        {"ignore": True},
+                        deadline=deadline,
+                        what="запуск Chrome",
                     )
                 except CdpError as exc:
                     # --ignore-certificate-errors is on the command line as well.
-                    logger.debug("Security.setIgnoreCertificateErrors failed: %s", type(exc).__name__)
-            targets = conn.call("Target.getTargets", {}, deadline=deadline, what="запуск Chrome")
+                    logger.debug(
+                        "Security.setIgnoreCertificateErrors failed: %s",
+                        type(exc).__name__,
+                    )
+            targets = conn.call(
+                "Target.getTargets", {}, deadline=deadline, what="запуск Chrome"
+            )
             for info in targets.get("targetInfos") or []:
                 if not isinstance(info, dict) or info.get("type") != "page":
                     continue
@@ -2933,7 +3437,9 @@ class ChromeBrowser:
                             what="запуск Chrome",
                         )
                     except CdpError as exc:
-                        logger.debug("initial page not attached: %s", type(exc).__name__)
+                        logger.debug(
+                            "initial page not attached: %s", type(exc).__name__
+                        )
         except BaseException:
             if browser is not None:
                 browser.close("запуск Chrome не удался")
@@ -3034,7 +3540,12 @@ class ChromeBrowser:
                     engine = candidate
                     break
         if engine is None:
-            created = self.conn.call("Target.createTarget", {"url": "about:blank"}, deadline=deadline, what=what)
+            created = self.conn.call(
+                "Target.createTarget",
+                {"url": "about:blank"},
+                deadline=deadline,
+                what=what,
+            )
             target_id = str(created.get("targetId") or "")
             with self._cond:
                 self._awaiting.add(target_id)
@@ -3044,10 +3555,14 @@ class ChromeBrowser:
                         if failure:
                             raise BrowserError(failure)
                         if not self.alive():
-                            raise ChromeClosed(E_CHROME_DIED.format(exit=self.exit_info()))
+                            raise ChromeClosed(
+                                E_CHROME_DIED.format(exit=self.exit_info())
+                            )
                         remaining = deadline.remaining()
                         if remaining is not None and remaining <= 0:
-                            raise BrowserTimeout(timeout_message(deadline.seconds, what))
+                            raise BrowserTimeout(
+                                timeout_message(deadline.seconds, what)
+                            )
                         self._cond.wait(remaining)
                     engine = self._unclaimed.pop(target_id)
                 finally:
@@ -3062,7 +3577,11 @@ class ChromeBrowser:
     def take_popups(self) -> list[ChromeTabEngine]:
         """Pages the tabs opened (window.open, target=_blank) since the last call."""
         with self._cond:
-            popups = [engine for engine in self._popups if not engine.lost and not engine._closed]
+            popups = [
+                engine
+                for engine in self._popups
+                if not engine.lost and not engine._closed
+            ]
             self._popups = []
         return popups
 
@@ -3077,10 +3596,15 @@ class ChromeBrowser:
             return
         if session_id is None:
             if method == "Target.targetDestroyed":
-                self._on_target_gone(params.get("targetId"), "вкладка закрыта (страница закрыла окно)")
+                self._on_target_gone(
+                    params.get("targetId"), "вкладка закрыта (страница закрыла окно)"
+                )
             elif method == "Target.targetCrashed":
                 status = params.get("status") or "?"
-                self._on_target_gone(params.get("targetId"), f"вкладка Chrome аварийно завершилась ({status})")
+                self._on_target_gone(
+                    params.get("targetId"),
+                    f"вкладка Chrome аварийно завершилась ({status})",
+                )
             elif method == "Browser.downloadWillBegin":
                 self._download_begin(params)
             elif method == "Browser.downloadProgress":
@@ -3100,7 +3624,9 @@ class ChromeBrowser:
             self._submit(self._handle_dialog, engine, params)
             return
         if method == "Inspector.targetCrashed":
-            self._on_target_gone(engine.target_id, "вкладка Chrome аварийно завершилась")
+            self._on_target_gone(
+                engine.target_id, "вкладка Chrome аварийно завершилась"
+            )
             return
         if method == "Network.webSocketCreated":
             self._submit(self._check_websocket, engine, str(params.get("url") or ""))
@@ -3147,7 +3673,11 @@ class ChromeBrowser:
             if session in self._children:
                 del self._children[session]
                 return
-            engine = self._engines_by_session.get(session) if isinstance(session, str) else None
+            engine = (
+                self._engines_by_session.get(session)
+                if isinstance(session, str)
+                else None
+            )
         if engine is not None:
             self._on_target_gone(engine.target_id, "вкладка Chrome отсоединилась")
 
@@ -3160,7 +3690,9 @@ class ChromeBrowser:
                 engine.lost = True
                 engine.lost_reason = reason
             if engine.target_id in self._awaiting:
-                self._failed[engine.target_id] = f"Вкладка Chrome закрылась при открытии: {reason}"
+                self._failed[engine.target_id] = (
+                    f"Вкладка Chrome закрылась при открытии: {reason}"
+                )
             self._forget(engine)
             self._cond.notify_all()
 
@@ -3176,7 +3708,11 @@ class ChromeBrowser:
         try:
             function(*args)
         except Exception as exc:
-            logger.debug("chrome task %s failed: %s", getattr(function, "__name__", "?"), type(exc).__name__)
+            logger.debug(
+                "chrome task %s failed: %s",
+                getattr(function, "__name__", "?"),
+                type(exc).__name__,
+            )
 
     # -- target preparation (attach worker)
 
@@ -3190,14 +3726,20 @@ class ChromeBrowser:
                 if kind == "attach":
                     self._setup(*payload)
                 elif kind == "detach":
-                    self.conn.send_nowait("Target.detachFromTarget", {"sessionId": payload})
+                    self.conn.send_nowait(
+                        "Target.detachFromTarget", {"sessionId": payload}
+                    )
                 elif kind == "download":
                     self._finish_download(payload)
             except Exception as exc:
-                logger.debug("chrome worker step %s failed: %s", kind, type(exc).__name__)
+                logger.debug(
+                    "chrome worker step %s failed: %s", kind, type(exc).__name__
+                )
 
     def _fetch_params(self) -> dict[str, Any]:
-        params: dict[str, Any] = {"patterns": [{"urlPattern": "*", "requestStage": "Request"}]}
+        params: dict[str, Any] = {
+            "patterns": [{"urlPattern": "*", "requestStage": "Request"}]
+        }
         if self._proxy_auth:
             params["handleAuthRequests"] = True
         return params
@@ -3209,7 +3751,9 @@ class ChromeBrowser:
         if engine is not None:
             self._setup_page(engine)
         elif kind == "tab":
-            self.conn.send_nowait("Runtime.runIfWaitingForDebugger", {}, session_id=session)
+            self.conn.send_nowait(
+                "Runtime.runIfWaitingForDebugger", {}, session_id=session
+            )
         else:
             self._setup_child(session, kind)
 
@@ -3221,11 +3765,19 @@ class ChromeBrowser:
         height = max(1, int(options.viewport_height or 1))
         scale = float(options.device_scale_factor or 1)
         steps: list[tuple[str, dict[str, Any]]] = [
-            ("Network.setExtraHTTPHeaders", {"headers": _headers_dict(options.extra_headers)}),
+            (
+                "Network.setExtraHTTPHeaders",
+                {"headers": _headers_dict(options.extra_headers)},
+            ),
         ]
         if user_agent:
-            metadata, platform = _ua_metadata(user_agent, branded=bool(options.user_agent))
-            agent: dict[str, Any] = {"userAgent": user_agent, "acceptLanguage": options.accept_language}
+            metadata, platform = _ua_metadata(
+                user_agent, branded=bool(options.user_agent)
+            )
+            agent: dict[str, Any] = {
+                "userAgent": user_agent,
+                "acceptLanguage": options.accept_language,
+            }
             if platform:
                 agent["platform"] = platform
             if metadata:
@@ -3246,9 +3798,14 @@ class ChromeBrowser:
                 ),
                 (
                     "Emulation.setTouchEmulationEnabled",
-                    {"enabled": True, "maxTouchPoints": 5} if options.mobile else {"enabled": False},
+                    {"enabled": True, "maxTouchPoints": 5}
+                    if options.mobile
+                    else {"enabled": False},
                 ),
-                ("Emulation.setScriptExecutionDisabled", {"value": not options.javascript}),
+                (
+                    "Emulation.setScriptExecutionDisabled",
+                    {"value": not options.javascript},
+                ),
                 ("Emulation.setFocusEmulationEnabled", {"enabled": True}),
             ]
         )
@@ -3265,7 +3822,10 @@ class ChromeBrowser:
                     try:
                         self.conn.call(
                             method,
-                            {"userAgent": params["userAgent"], "acceptLanguage": params["acceptLanguage"]},
+                            {
+                                "userAgent": params["userAgent"],
+                                "acceptLanguage": params["acceptLanguage"],
+                            },
                             session_id=session,
                         )
                         continue
@@ -3273,7 +3833,9 @@ class ChromeBrowser:
                         raise
                     except BrowserError as retry:
                         failure = retry
-                problems.append(f"Chrome не применил настройку «{_EMULATION_WORDS.get(method, method)}»: {failure}")
+                problems.append(
+                    f"Chrome не применил настройку «{_EMULATION_WORDS.get(method, method)}»: {failure}"
+                )
         return problems
 
     def _setup_page(self, engine: ChromeTabEngine) -> None:
@@ -3285,20 +3847,31 @@ class ChromeBrowser:
             try:
                 conn.call("Fetch.enable", self._fetch_params(), session_id=session)
             except BrowserError as exc:
-                logger.debug("fetch interception not enabled for a page: %s", type(exc).__name__)
+                logger.debug(
+                    "fetch interception not enabled for a page: %s", type(exc).__name__
+                )
                 error = str(E_GUARD_SETUP)
             if error is None:
                 for method, params in (
                     ("Network.enable", {}),
-                    ("Network.setBlockedURLs", {"urls": list(guard.LITERAL_LINK_LOCAL_PATTERNS)}),
+                    (
+                        "Network.setBlockedURLs",
+                        {"urls": list(guard.LITERAL_LINK_LOCAL_PATTERNS)},
+                    ),
                 ):
                     try:
                         conn.call(method, params, session_id=session)
                     except BrowserError as exc:
-                        logger.debug("%s failed for a page: %s", method, type(exc).__name__)
+                        logger.debug(
+                            "%s failed for a page: %s", method, type(exc).__name__
+                        )
                 try:
                     conn.call("Page.enable", {}, session_id=session)
-                    conn.call("Page.setLifecycleEventsEnabled", {"enabled": True}, session_id=session)
+                    conn.call(
+                        "Page.setLifecycleEventsEnabled",
+                        {"enabled": True},
+                        session_id=session,
+                    )
                 except BrowserError as exc:
                     error = f"Не удалось подготовить вкладку Chrome: {exc}"
             if error is None:
@@ -3306,7 +3879,9 @@ class ChromeBrowser:
                     try:
                         conn.call(method, {}, session_id=session)
                     except BrowserError as exc:
-                        logger.debug("%s failed for a page: %s", method, type(exc).__name__)
+                        logger.debug(
+                            "%s failed for a page: %s", method, type(exc).__name__
+                        )
                 try:
                     tree = conn.call("Page.getFrameTree", {}, session_id=session)
                     frame = (tree.get("frameTree") or {}).get("frame") or {}
@@ -3324,9 +3899,13 @@ class ChromeBrowser:
                 problems = self._emulation(engine, self.options)
                 try:
                     # Frames in other processes and workers must be guarded too: required.
-                    conn.call("Target.setAutoAttach", dict(_AUTO_ATTACH), session_id=session)
+                    conn.call(
+                        "Target.setAutoAttach", dict(_AUTO_ATTACH), session_id=session
+                    )
                 except BrowserError as exc:
-                    logger.debug("auto-attach not enabled for a page: %s", type(exc).__name__)
+                    logger.debug(
+                        "auto-attach not enabled for a page: %s", type(exc).__name__
+                    )
                     error = str(E_GUARD_SETUP)
             if error is None:
                 conn.call("Runtime.runIfWaitingForDebugger", {}, session_id=session)
@@ -3347,7 +3926,9 @@ class ChromeBrowser:
                 else:
                     self._unclaimed[engine.target_id] = engine
             else:
-                engine.setup_error = error or engine.lost_reason or "вкладка Chrome закрылась"
+                engine.setup_error = (
+                    error or engine.lost_reason or "вкладка Chrome закрылась"
+                )
                 if not engine.opener_id:
                     self._failed[engine.target_id] = engine.setup_error
                 self._forget(engine)
@@ -3359,7 +3940,11 @@ class ChromeBrowser:
             conn.call("Fetch.enable", self._fetch_params(), session_id=session)
         except BrowserError as exc:
             # Fail closed: the frame or worker stays paused, so it sends no request unchecked.
-            logger.debug("fetch interception not enabled for a %s target: %s", kind, type(exc).__name__)
+            logger.debug(
+                "fetch interception not enabled for a %s target: %s",
+                kind,
+                type(exc).__name__,
+            )
             root = self._root_engine(session)
             if root is not None:
                 with self._cond:
@@ -3371,13 +3956,18 @@ class ChromeBrowser:
                         root._notes.append(note)
             return
         for method, params in (
-            ("Network.setBlockedURLs", {"urls": list(guard.LITERAL_LINK_LOCAL_PATTERNS)}),
+            (
+                "Network.setBlockedURLs",
+                {"urls": list(guard.LITERAL_LINK_LOCAL_PATTERNS)},
+            ),
             ("Target.setAutoAttach", dict(_AUTO_ATTACH)),
         ):
             try:
                 conn.call(method, params, session_id=session)
             except BrowserError as exc:
-                logger.debug("%s failed for a %s target: %s", method, kind, type(exc).__name__)
+                logger.debug(
+                    "%s failed for a %s target: %s", method, kind, type(exc).__name__
+                )
         conn.send_nowait("Runtime.runIfWaitingForDebugger", {}, session_id=session)
 
     def _root_engine(self, session: str | None) -> ChromeTabEngine | None:
@@ -3408,20 +3998,28 @@ class ChromeBrowser:
                 # Recorded first: Chrome answers the navigation as soon as the request fails.
                 self._record_block(session, url, params)
                 self.conn.send_nowait(
-                    "Fetch.failRequest", {"requestId": request_id, "errorReason": "BlockedByClient"}, session_id=session
+                    "Fetch.failRequest",
+                    {"requestId": request_id, "errorReason": "BlockedByClient"},
+                    session_id=session,
                 )
                 return
             if not self.options.load_images and params.get("resourceType") == "Image":
                 self.conn.send_nowait(
-                    "Fetch.failRequest", {"requestId": request_id, "errorReason": "BlockedByClient"}, session_id=session
+                    "Fetch.failRequest",
+                    {"requestId": request_id, "errorReason": "BlockedByClient"},
+                    session_id=session,
                 )
                 return
-            self.conn.send_nowait("Fetch.continueRequest", {"requestId": request_id}, session_id=session)
+            self.conn.send_nowait(
+                "Fetch.continueRequest", {"requestId": request_id}, session_id=session
+            )
         except Exception as exc:
             # Fail closed: a request that could not be decided is not sent.
             logger.debug("request decision failed: %s", type(exc).__name__)
             self.conn.send_nowait(
-                "Fetch.failRequest", {"requestId": request_id, "errorReason": "BlockedByClient"}, session_id=session
+                "Fetch.failRequest",
+                {"requestId": request_id, "errorReason": "BlockedByClient"},
+                session_id=session,
             )
 
     def _record_block(self, session: str, url: str, params: dict) -> None:
@@ -3431,7 +4029,10 @@ class ChromeBrowser:
         with self._cond:
             if engine is None:
                 self._events.append(
-                    ("browser_blocked", {"tab": "", "host": host, "stage": "subresource", "count": 1})
+                    (
+                        "browser_blocked",
+                        {"tab": "", "host": host, "stage": "subresource", "count": 1},
+                    )
                 )
             else:
                 plain = _strip_fragment(url)
@@ -3464,9 +4065,15 @@ class ChromeBrowser:
                 response = {"response": "CancelAuth"}
             else:
                 user, password = self._proxy_auth
-                response = {"response": "ProvideCredentials", "username": user, "password": password}
+                response = {
+                    "response": "ProvideCredentials",
+                    "username": user,
+                    "password": password,
+                }
         self.conn.send_nowait(
-            "Fetch.continueWithAuth", {"requestId": request_id, "authChallengeResponse": response}, session_id=session
+            "Fetch.continueWithAuth",
+            {"requestId": request_id, "authChallengeResponse": response},
+            session_id=session,
         )
 
     def _handle_dialog(self, engine: ChromeTabEngine, params: dict) -> None:
@@ -3480,9 +4087,15 @@ class ChromeBrowser:
         payload: dict[str, Any] = {"accept": accept}
         answer = None
         if kind == "prompt" and accept:
-            answer = options.dialog_prompt_text if options.dialog_prompt_text is not None else str(params.get("defaultPrompt") or "")
+            answer = (
+                options.dialog_prompt_text
+                if options.dialog_prompt_text is not None
+                else str(params.get("defaultPrompt") or "")
+            )
             payload["promptText"] = answer
-        self.conn.send_nowait("Page.handleJavaScriptDialog", payload, session_id=engine.session_id)
+        self.conn.send_nowait(
+            "Page.handleJavaScriptDialog", payload, session_id=engine.session_id
+        )
         text = f"Страница показала {_DIALOG_WORDS.get(kind, kind)} «{message}» — {'принят' if accept else 'отклонён'}"
         if answer is not None:
             text += f", ответ «{answer}»"
@@ -3553,7 +4166,11 @@ class ChromeBrowser:
         name = guid
         size: int | None = received
         if state == "completed":
-            name = sanitize_filename(suggested) if suggested else filename_from_response(None, url, None)[0]
+            name = (
+                sanitize_filename(suggested)
+                if suggested
+                else filename_from_response(None, url, None)[0]
+            )
             try:
                 target = unique_name(self.downloads_dir, name)
                 os.replace(source, target)
@@ -3613,7 +4230,10 @@ class ChromeBrowser:
             )
         if bool(old.ignore_tls_errors) != bool(options.ignore_tls_errors):
             try:
-                self.conn.call("Security.setIgnoreCertificateErrors", {"ignore": bool(options.ignore_tls_errors)})
+                self.conn.call(
+                    "Security.setIgnoreCertificateErrors",
+                    {"ignore": bool(options.ignore_tls_errors)},
+                )
             except BrowserError as exc:
                 notes.append(f"Chrome не применил настройку проверки TLS: {exc}")
         with self._cond:
@@ -3631,14 +4251,20 @@ class ChromeBrowser:
     def get_cookies(self) -> list[dict[str, Any]]:
         result = self.conn.call("Storage.getCookies", {}, what="чтение cookies Chrome")
         cookies = result.get("cookies")
-        return [cookie for cookie in cookies if isinstance(cookie, dict)] if isinstance(cookies, list) else []
+        return (
+            [cookie for cookie in cookies if isinstance(cookie, dict)]
+            if isinstance(cookies, list)
+            else []
+        )
 
     def set_cookies(self, cookies: list[dict[str, Any]]) -> None:
         """Replace Chrome's cookies with ``cookies``."""
         self.conn.call("Storage.clearCookies", {}, what="запись cookies в Chrome")
         items = [cookie for cookie in cookies or [] if isinstance(cookie, dict)]
         if items:
-            self.conn.call("Storage.setCookies", {"cookies": items}, what="запись cookies в Chrome")
+            self.conn.call(
+                "Storage.setCookies", {"cookies": items}, what="запись cookies в Chrome"
+            )
 
     def info(self) -> dict[str, Any]:
         with self._cond:

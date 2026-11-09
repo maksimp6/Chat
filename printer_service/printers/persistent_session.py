@@ -40,7 +40,7 @@ class PrinterSession:
         self.tcp_nodelay = tcp_nodelay
         self.keepalive = keepalive
 
-    def __enter__(self) -> "PrinterSession":
+    def __enter__(self) -> PrinterSession:
         with self._lock:
             if self._sock is not None:
                 raise RuntimeError("session already open")

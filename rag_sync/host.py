@@ -19,7 +19,9 @@ class Host:
     YandexClientError: Any  # yandex_client_modules.errors.YandexClientError
     YandexResponsesClient: Any  # yandex_client_modules.client.YandexResponsesClient
     get_store: Any  # storage.records.get_store
-    knowledge_vector_store_ids: Any  # yandex_client_modules.tool_config.knowledge_vector_store_ids
+    knowledge_vector_store_ids: (
+        Any  # yandex_client_modules.tool_config.knowledge_vector_store_ids
+    )
     vector_add: Any  # vector_db.store.add
 
 
@@ -35,9 +37,9 @@ __all__ = [
     "bind",
     "bound",
     "current",
-    "provide",
     "get_store",
     "knowledge_vector_store_ids",
+    "provide",
     "vector_add",
 ]
 

@@ -445,7 +445,9 @@ def _process(session: VoiceSession) -> None:
         if result.reply:
             # The Court judges the spoken reply's text like any other reply; the audio is already played.
             judged = _court_censor(
-                session.conversation_id, result.reply, voice_session_id=session.session_id
+                session.conversation_id,
+                result.reply,
+                voice_session_id=session.session_id,
             )
             reply_text = judged["text"] if judged is not None else result.reply
             voice_message_id = add_message(
@@ -473,7 +475,10 @@ def _process(session: VoiceSession) -> None:
             )
             if voice_message_id is not None and reply_text:
                 _start_embed_turn(
-                    session.conversation_id, input_message_id, voice_message_id, reply_text
+                    session.conversation_id,
+                    input_message_id,
+                    voice_message_id,
+                    reply_text,
                 )
             _emit(
                 session,

@@ -95,4 +95,6 @@ def install(app: Application) -> None:
     )
     # Settings are global and read-only: shown, never saved through the API.
     app.add_url_rule("/api/settings", view_func=get_settings, methods=["GET"])
-    app.add_url_rule("/api/ollama/settings", view_func=get_ollama_settings, methods=["GET"])
+    app.add_url_rule(
+        "/api/ollama/settings", view_func=get_ollama_settings, methods=["GET"]
+    )

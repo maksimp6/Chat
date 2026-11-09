@@ -189,7 +189,7 @@ def remove_entity_headers(
 _OPTION_RE = re.compile(
     r"""\s*;\s*(?P<name>[^\s=;]+)\s*"""
     r"""(?:=\s*(?:"(?P<quoted>(?:[^"\\]|\\.)*)"|(?P<plain>[^;]*)))?""",
-    re.S,
+    re.DOTALL,
 )
 
 

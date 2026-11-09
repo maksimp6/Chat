@@ -73,7 +73,13 @@ def upgrade_dialog_settings(settings: Any) -> Any:
         upgraded.pop("active_tool_categories", None)
         if upgraded.get("reasoning_effort") in (None, "low", "medium"):
             upgraded["reasoning_effort"] = "high"
-        if upgraded.get("text_verbosity") in (None, "low", "medium", "concise", "verbose"):
+        if upgraded.get("text_verbosity") in (
+            None,
+            "low",
+            "medium",
+            "concise",
+            "verbose",
+        ):
             upgraded["text_verbosity"] = "high"
         if upgraded.get("truncation") == "auto":
             upgraded["truncation"] = "disabled"
@@ -89,7 +95,10 @@ def upgrade_dialog_settings(settings: Any) -> Any:
         web["enabled"] = True
         web["context_size"] = "high"
         tools["web_search"] = web
-        tools["code_interpreter"] = {**dict(tools.get("code_interpreter") or {}), "enabled": True}
+        tools["code_interpreter"] = {
+            **dict(tools.get("code_interpreter") or {}),
+            "enabled": True,
+        }
         files = dict(tools.get("file_search") or {})
         files["enabled"] = True
         files["max_results"] = FILE_SEARCH_MAX_RESULTS
@@ -223,6 +232,8 @@ def deferred_tool_categories(tools_config: Any) -> tuple[bool, set[str]]:
     only after its tool search finds it. The only knob is the eager-category
     list, which keeps a few categories loaded eagerly.
     """
-    config = tools_config.get("defer_loading") if isinstance(tools_config, dict) else None
+    config = (
+        tools_config.get("defer_loading") if isinstance(tools_config, dict) else None
+    )
     eager = config.get("eager_categories") if isinstance(config, dict) else None
     return True, set(eager) if isinstance(eager, list) else set()

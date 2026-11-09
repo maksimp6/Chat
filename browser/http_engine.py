@@ -34,8 +34,9 @@ import threading
 import time
 import warnings
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from datetime import datetime, UTC
+from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Iterator
 from urllib.parse import (
     quote,
     unquote,
@@ -104,22 +105,27 @@ HTML_MIMES = frozenset({"text/html", "application/xhtml+xml"})
 _CHUNK = 65536
 _REFRESH_PEEK = 8192
 _REFRESH_SCAN = 65536
-_CONTENT_HEADERS = ("content-type", "content-length", "content-encoding", "transfer-encoding")
+_CONTENT_HEADERS = (
+    "content-type",
+    "content-length",
+    "content-encoding",
+    "transfer-encoding",
+)
 _SKIPPABLE_REMOVALS = {"user-agent": "User-Agent", "accept-encoding": "Accept-Encoding"}
 _DNS_MARKERS = re.compile(
     r"NameResolution|getaddrinfo|Name or service not known|nodename nor servname|"
     r"Temporary failure in name resolution|No address associated with hostname|"
     r"Failed to resolve|Name does not resolve",
-    re.I,
+    re.IGNORECASE,
 )
 _OBJECT_REPR = re.compile(r"<[^<>]*? object at 0x[0-9a-fA-F]+>:?\s*")
 _POOL_WRAPPER = re.compile(
     r"^\w*ConnectionPool\(host=[^)]*\): Max retries exceeded with url: \S+ \(Caused by \w+\((.*)\)\)$",
-    re.S,
+    re.DOTALL,
 )
-_META_TAG = re.compile(r"<meta\b[^>]*>", re.I)
+_META_TAG = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
 _ATTRIBUTE = re.compile(
-    r"""([^\s"'>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?""", re.S
+    r"""([^\s"'>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?""", re.DOTALL
 )
 _COOKIE_PLACEHOLDER = re.compile(r"\{\{\s*cookie\s*:\s*([^{}]+?)\s*\}\}")
 _REFERRER_POLICIES = {
@@ -142,7 +148,24 @@ _DEFAULT_POLICY = "strict-origin-when-cross-origin"
 # Second-level labels under which registrations happen (co.uk, com.ru…): a small
 # approximation of the public suffix list, enough for Sec-Fetch-Site.
 _SECOND_LEVEL_LABELS = frozenset(
-    {"co", "com", "net", "org", "gov", "edu", "ac", "or", "ne", "go", "mil", "msk", "spb", "nom", "ltd", "plc"}
+    {
+        "co",
+        "com",
+        "net",
+        "org",
+        "gov",
+        "edu",
+        "ac",
+        "or",
+        "ne",
+        "go",
+        "mil",
+        "msk",
+        "spb",
+        "nom",
+        "ltd",
+        "plc",
+    }
 )
 
 
@@ -172,7 +195,7 @@ class RequestSpec:
     max_redirects: int = 0
     max_bytes: int = 0
     deadline: Deadline = field(default_factory=lambda: Deadline(None))
-    rebuild: Callable[[], "RequestSpec"] | None = None
+    rebuild: Callable[[], RequestSpec] | None = None
 
 
 @dataclass
@@ -277,7 +300,7 @@ class _HeaderSet:
     def discard(self, name: str) -> None:
         self._items.pop(name.lower(), None)
 
-    def copy(self) -> "_HeaderSet":
+    def copy(self) -> _HeaderSet:
         other = _HeaderSet()
         other._items = dict(self._items)
         other.removed = set(self.removed)
@@ -320,7 +343,13 @@ def _http_version(raw: Any) -> str | None:
     if isinstance(text, str) and text and text != "HTTP/?":
         return text
     number = getattr(raw, "version", None)
-    return {9: "HTTP/0.9", 10: "HTTP/1.0", 11: "HTTP/1.1", 20: "HTTP/2", 30: "HTTP/3"}.get(number)
+    return {
+        9: "HTTP/0.9",
+        10: "HTTP/1.0",
+        11: "HTTP/1.1",
+        20: "HTTP/2",
+        30: "HTTP/3",
+    }.get(number)
 
 
 def _clean_reason(text: str) -> str:
@@ -387,7 +416,7 @@ def parse_refresh(value: str | None) -> tuple[float, str | None] | None:
     if value is None:
         return None
     text = html_lib.unescape(str(value)).strip()
-    match = re.match(r"\s*(\d*(?:\.\d*)?)\s*(.*)$", text, re.S)
+    match = re.match(r"\s*(\d*(?:\.\d*)?)\s*(.*)$", text, re.DOTALL)
     if not match:
         return None
     number, rest = match.group(1), match.group(2).strip()
@@ -400,7 +429,7 @@ def parse_refresh(value: str | None) -> tuple[float, str | None] | None:
     rest = rest.lstrip(";,").strip()
     if not rest:
         return delay, None
-    url_match = re.match(r"(?i)url\s*=\s*(.*)$", rest, re.S)
+    url_match = re.match(r"(?i)url\s*=\s*(.*)$", rest, re.DOTALL)
     target = url_match.group(1) if url_match else rest
     target = target.strip()
     if len(target) >= 1 and target[0] in "'\"":
@@ -419,7 +448,10 @@ def meta_refresh(html_text: str) -> tuple[float, str | None] | None:
             name = match.group(1).lower()
             value = next((g for g in match.group(2, 3, 4) if g is not None), "")
             attrs.setdefault(name, value)
-        if attrs.get("http-equiv", "").strip().lower() == "refresh" and "content" in attrs:
+        if (
+            attrs.get("http-equiv", "").strip().lower() == "refresh"
+            and "content" in attrs
+        ):
             parsed = parse_refresh(attrs["content"])
             if parsed is not None:
                 return parsed
@@ -430,7 +462,9 @@ def hop_lines(hops: list[Hop], final_url: str) -> list[str]:
     """Redirect chain as "301 → <next address>" lines (display URLs)."""
     lines: list[str] = []
     for index, hop in enumerate(hops):
-        target = hops[index + 1].url if index + 1 < len(hops) else display_url(final_url)
+        target = (
+            hops[index + 1].url if index + 1 < len(hops) else display_url(final_url)
+        )
         lines.append(f"{hop.status} → {target}")
     return lines
 
@@ -572,7 +606,7 @@ class HttpResponse:
     def __init__(
         self,
         *,
-        client: "HttpClient",
+        client: HttpClient,
         response: requests.Response,
         method: str,
         request_headers: list[tuple[str, str]],
@@ -629,7 +663,9 @@ class HttpResponse:
 
     def header_values(self, name: str) -> list[str]:
         key = name.lower()
-        return [value for header_name, value in self.headers if header_name.lower() == key]
+        return [
+            value for header_name, value in self.headers if header_name.lower() == key
+        ]
 
     @property
     def content_length(self) -> int | None:
@@ -673,7 +709,9 @@ class HttpResponse:
 
     def _socket(self) -> Any:
         raw = getattr(self.raw, "raw", None)
-        connection = getattr(raw, "connection", None) or getattr(raw, "_connection", None)
+        connection = getattr(raw, "connection", None) or getattr(
+            raw, "_connection", None
+        )
         return getattr(connection, "sock", None)
 
     def _peer(self) -> str | None:
@@ -706,12 +744,18 @@ class HttpResponse:
 
     def _read_error(self, exc: BaseException) -> BrowserError:
         if self.timed_out:
-            return _timeout_error(self.deadline, self._what(), time.monotonic() - self._started)
+            return _timeout_error(
+                self.deadline, self._what(), time.monotonic() - self._started
+            )
         if isinstance(exc, BrowserError):
             return exc
         if isinstance(exc, requests.exceptions.Timeout):
-            return _timeout_error(self.deadline, self._what(), time.monotonic() - self._started)
-        logger.debug("body read of %s failed: %s", display_url(self.url), type(exc).__name__)
+            return _timeout_error(
+                self.deadline, self._what(), time.monotonic() - self._started
+            )
+        logger.debug(
+            "body read of %s failed: %s", display_url(self.url), type(exc).__name__
+        )
         return BrowserNetworkError(
             E_BROKEN_READ.format(url=display_url(self.url), n=self.bytes_read)
         )
@@ -739,7 +783,9 @@ class HttpResponse:
             raise error from None
         if self.timed_out:
             self.close()
-            raise _timeout_error(self.deadline, self._what(), time.monotonic() - self._started)
+            raise _timeout_error(
+                self.deadline, self._what(), time.monotonic() - self._started
+            )
         self.bytes_read += len(data)
         return data
 
@@ -851,18 +897,25 @@ class HttpClient:
 
     def _check_open(self) -> None:
         if self.closed:
-            raise BrowserNetworkError("HTTP-клиент браузерной сессии закрыт; повторите действие")
+            raise BrowserNetworkError(
+                "HTTP-клиент браузерной сессии закрыт; повторите действие"
+            )
 
     # -- headers
 
-    def _base_headers(self, spec: RequestSpec, settings: SessionSettings, url: str) -> _HeaderSet:
+    def _base_headers(
+        self, spec: RequestSpec, settings: SessionSettings, url: str
+    ) -> _HeaderSet:
         headers = _HeaderSet()
         headers.set("User-Agent", settings.http_user_agent())
         for name, value in settings.client_hints():
             headers.set(name, value)
         headers.set("Accept", "*/*" if spec.mode == "api" else DOCUMENT_ACCEPT)
         headers.set("Accept-Language", settings.accept_language)
-        headers.set("Accept-Encoding", "identity" if spec.mode == "download" else ACCEPT_ENCODING)
+        headers.set(
+            "Accept-Encoding",
+            "identity" if spec.mode == "download" else ACCEPT_ENCODING,
+        )
         if spec.mode == "navigate":
             headers.set("Upgrade-Insecure-Requests", "1")
             headers.set("Sec-Fetch-Dest", "document")
@@ -919,7 +972,12 @@ class HttpClient:
         return prepared
 
     def _map_error(
-        self, exc: BaseException, url: str, deadline: Deadline, proxy: str | None, elapsed: float
+        self,
+        exc: BaseException,
+        url: str,
+        deadline: Deadline,
+        proxy: str | None,
+        elapsed: float,
     ) -> BaseException:
         if isinstance(exc, BrowserError):
             return exc
@@ -929,17 +987,24 @@ class HttpClient:
             return BrowserNetworkError(E_TLS.format(host=host, reason=_reason(exc)))
         if isinstance(exc, errors.ProxyError):
             return BrowserNetworkError(
-                E_PROXY.format(proxy=display_url(proxy or "из окружения"), reason=_reason(exc))
+                E_PROXY.format(
+                    proxy=display_url(proxy or "из окружения"), reason=_reason(exc)
+                )
             )
         if isinstance(exc, errors.Timeout):
             return _timeout_error(deadline, f"запрос {display_url(url)}", elapsed)
         if isinstance(exc, errors.ConnectionError):
             if self.closed:
-                return BrowserNetworkError(E_CONNECT.format(host=host, reason="сессия прервана"))
+                return BrowserNetworkError(
+                    E_CONNECT.format(host=host, reason="сессия прервана")
+                )
             if _DNS_MARKERS.search(_chain_text(exc)):
                 return BrowserNetworkError(E_DNS.format(host=host))
             return BrowserNetworkError(E_CONNECT.format(host=host, reason=_reason(exc)))
-        if isinstance(exc, (errors.ChunkedEncodingError, errors.ContentDecodingError, ProtocolError)):
+        if isinstance(
+            exc,
+            (errors.ChunkedEncodingError, errors.ContentDecodingError, ProtocolError),
+        ):
             return BrowserNetworkError(E_BROKEN_READ.format(url=display_url(url), n=0))
         if isinstance(exc, errors.InvalidSchema) and "socks" in str(exc).lower():
             return BrowserError(E_SOCKS)
@@ -955,7 +1020,9 @@ class HttpClient:
         ):
             return BrowserError(E_BAD_REQUEST.format(reason=_reason(exc)))
         if isinstance(exc, OSError) and self.closed:
-            return BrowserNetworkError(E_CONNECT.format(host=host, reason="сессия прервана"))
+            return BrowserNetworkError(
+                E_CONNECT.format(host=host, reason="сессия прервана")
+            )
         return exc
 
     def _transmit(
@@ -974,7 +1041,9 @@ class HttpClient:
         timeout = None if remaining is None else (remaining, remaining)
         proxies = self._proxies(settings)
         verify_option = False if settings.ignore_tls_errors else None
-        env = self.session.merge_environment_settings(url, dict(proxies), True, verify_option, None)
+        env = self.session.merge_environment_settings(
+            url, dict(proxies), True, verify_option, None
+        )
         proxy_used = None
         try:
             proxy_used = select_proxy(url, env.get("proxies") or {})
@@ -1002,7 +1071,9 @@ class HttpClient:
                 proxies=env.get("proxies"),
             )
         except Exception as exc:
-            mapped = self._map_error(exc, url, deadline, proxy_used, time.monotonic() - started)
+            mapped = self._map_error(
+                exc, url, deadline, proxy_used, time.monotonic() - started
+            )
             if mapped is exc:
                 raise
             raise mapped from None
@@ -1033,7 +1104,11 @@ class HttpClient:
         method = (spec.method or "GET").strip().upper() or "GET"
         headers = self._base_headers(spec, settings, url)
         body: Any = spec.body
-        stream = _BodyStream(spec.body_file, spec.body_length) if spec.body_file is not None else None
+        stream = (
+            _BodyStream(spec.body_file, spec.body_length)
+            if spec.body_file is not None
+            else None
+        )
         jar = self.cookies if spec.use_cookies else requests_cookies.RequestsCookieJar()
         hops: list[Hop] = []
         notes: list[str] = []
@@ -1045,7 +1120,9 @@ class HttpClient:
         while True:
             if stream is not None:
                 stream.seek(0)
-            prepared = self._prepare(method, url, headers, stream if stream is not None else body, jar)
+            prepared = self._prepare(
+                method, url, headers, stream if stream is not None else body, jar
+            )
             guard.ensure_allowed(str(prepared.url), hop=len(hops) or None)
             response = self._transmit(prepared, settings, deadline, started)
             try:
@@ -1078,7 +1155,9 @@ class HttpClient:
                     notes.append(
                         f"Перенаправление на {scheme or '?'}: не выполняется (поддерживаются http и https)"
                     )
-                    return self._wrap(response, prepared, method, hops, notes, deadline, started)
+                    return self._wrap(
+                        response, prepared, method, hops, notes, deadline, started
+                    )
                 new_method = method
                 if status == 303 and method != "HEAD":
                     new_method = "GET"
@@ -1088,7 +1167,9 @@ class HttpClient:
                 if spec.max_redirects and next_hops > spec.max_redirects:
                     response.close()
                     raise BrowserNetworkError(
-                        E_TOO_MANY_REDIRECTS.format(n=spec.max_redirects, url=display_url(target))
+                        E_TOO_MANY_REDIRECTS.format(
+                            n=spec.max_redirects, url=display_url(target)
+                        )
                     )
                 state = self._state(new_method, target, jar)
                 if state in seen:
@@ -1111,7 +1192,9 @@ class HttpClient:
                 method = new_method
                 url = target
                 continue
-            result = self._wrap(response, prepared, method, hops, notes, deadline, started)
+            result = self._wrap(
+                response, prepared, method, hops, notes, deadline, started
+            )
             if spec.follow_refresh and spec.mode == "navigate" and 200 <= status < 300:
                 target = self._refresh_target(result)
                 if target:
@@ -1119,16 +1202,26 @@ class HttpClient:
                     if spec.max_redirects and next_hops > spec.max_redirects:
                         result.close()
                         raise BrowserNetworkError(
-                            E_TOO_MANY_REDIRECTS.format(n=spec.max_redirects, url=display_url(target[0]))
+                            E_TOO_MANY_REDIRECTS.format(
+                                n=spec.max_redirects, url=display_url(target[0])
+                            )
                         )
                     state = self._state("GET", target[0], jar)
                     if state in seen:
                         result.close()
                         raise BrowserNetworkError(
-                            E_REDIRECT_CYCLE.format(url=display_url(target[0]), n=next_hops)
+                            E_REDIRECT_CYCLE.format(
+                                url=display_url(target[0]), n=next_hops
+                            )
                         )
                     seen.add(state)
-                    hops.append(Hop(status="refresh", url=display_url(str(prepared.url)), method=method))
+                    hops.append(
+                        Hop(
+                            status="refresh",
+                            url=display_url(str(prepared.url)),
+                            method=method,
+                        )
+                    )
                     delay = target[1]
                     notes.append(
                         f"Выполнено обновление Refresh (задержка {delay:g} с) → {display_url(target[0])}"
@@ -1170,7 +1263,11 @@ class HttpClient:
             started=started,
         )
         logger.debug(
-            "%s %s -> %s (%d hops)", method, display_url(result.url), result.status, len(hops)
+            "%s %s -> %s (%d hops)",
+            method,
+            display_url(result.url),
+            result.status,
+            len(hops),
         )
         return result
 
@@ -1222,7 +1319,11 @@ class HttpClient:
             response.close()
 
     def _document(
-        self, response: HttpResponse, spec: RequestSpec, started: float, fetched_at: float
+        self,
+        response: HttpResponse,
+        spec: RequestSpec,
+        started: float,
+        fetched_at: float,
     ) -> LoadedDocument:
         content_type = response.content_type
         mime = response.mime
@@ -1245,7 +1346,9 @@ class HttpClient:
             head = response.peek(512) if mime in GENERIC_MIMES else None
             kind = classify(mime, head)
             if kind == "binary" or (attachment and kind != "empty"):
-                name, _source = filename_from_response(disposition, response.url, content_type)
+                name, _source = filename_from_response(
+                    disposition, response.url, content_type
+                )
                 binary = BinaryInfo(
                     mime=mime or "application/octet-stream",
                     length=response.content_length,
@@ -1265,7 +1368,9 @@ class HttpClient:
                     kind = "empty"
                     text = ""
                 else:
-                    text, charset, charset_source, had_errors = decode_body(raw, content_type, kind)
+                    text, charset, charset_source, had_errors = decode_body(
+                        raw, content_type, kind
+                    )
                     if had_errors:
                         notes.append(f"в тексте есть неразборчивые байты ({charset})")
                 if cut:
@@ -1294,12 +1399,18 @@ class HttpClient:
         if response.status in (429, 503):
             retry_after = response.header("retry-after")
             if retry_after:
-                notes.append(f"Сервер просит повторить позже: Retry-After {retry_after.strip()}")
+                notes.append(
+                    f"Сервер просит повторить позже: Retry-After {retry_after.strip()}"
+                )
         headers = response.headers_info(
             charset=charset or None, charset_source=charset_source or None, size=size
         )
         logger.debug(
-            "loaded %s: %s %s, %s bytes", display_url(response.url), response.status, kind, size
+            "loaded %s: %s %s, %s bytes",
+            display_url(response.url),
+            response.status,
+            kind,
+            size,
         )
         return LoadedDocument(
             url=response.url,
@@ -1331,7 +1442,11 @@ class HttpClient:
         response = self.send(spec)
         try:
             if response.status >= 400:
-                error_type = BrowserNotFound if response.status in (404, 410) else BrowserNetworkError
+                error_type = (
+                    BrowserNotFound
+                    if response.status in (404, 410)
+                    else BrowserNetworkError
+                )
                 raise error_type(
                     E_DOWNLOAD_STATUS.format(
                         status=response.status,
@@ -1341,11 +1456,18 @@ class HttpClient:
                 )
             length = None if response.encoded else response.content_length
             if spec.max_bytes and length is not None and length > spec.max_bytes:
-                raise BrowserError(E_MAX_BYTES.format(n=spec.max_bytes, got=human_bytes(length)))
+                raise BrowserError(
+                    E_MAX_BYTES.format(n=spec.max_bytes, got=human_bytes(length))
+                )
             disposition = response.header("content-disposition")
-            name, source = filename_from_response(disposition, response.url, response.content_type)
+            name, source = filename_from_response(
+                disposition, response.url, response.content_type
+            )
             final = resolve_target(
-                path, suggested_name=name, content_type=response.content_type, overwrite=overwrite
+                path,
+                suggested_name=name,
+                content_type=response.content_type,
+                overwrite=overwrite,
             )
             free = disk_free(os.path.dirname(final))
             if length is not None and free is not None and length > free:
@@ -1363,7 +1485,9 @@ class HttpClient:
                 size, sha256 = writer.commit()
         finally:
             response.close()
-        logger.debug("downloaded %s -> %s (%d bytes)", display_url(response.url), final, size)
+        logger.debug(
+            "downloaded %s -> %s (%d bytes)", display_url(response.url), final, size
+        )
         return {
             "path": final,
             "bytes": size,
@@ -1446,7 +1570,9 @@ def _listing_html(directory: str) -> str:
     rows: list[str] = []
     parent = os.path.dirname(directory.rstrip(os.sep)) or os.sep
     if parent != directory:
-        rows.append(f'<li><a href="{html_lib.escape(file_url(parent))}">../</a> — на уровень выше</li>')
+        rows.append(
+            f'<li><a href="{html_lib.escape(file_url(parent))}">../</a> — на уровень выше</li>'
+        )
     entries: list[tuple[int, str, str]] = []
     try:
         with os.scandir(directory) as iterator:
@@ -1455,14 +1581,16 @@ def _listing_html(directory: str) -> str:
                     info = entry.stat(follow_symlinks=True)
                     is_dir = stat.S_ISDIR(info.st_mode)
                     size = info.st_size
-                    modified = datetime.fromtimestamp(info.st_mtime, timezone.utc).strftime(
+                    modified = datetime.fromtimestamp(info.st_mtime, UTC).strftime(
                         "%Y-%m-%d %H:%M UTC"
                     )
                 except OSError:
                     is_dir, size, modified = False, 0, "?"
                 label = entry.name + ("/" if is_dir else "")
                 detail = (
-                    f"папка, изменена {modified}" if is_dir else f"{size} байт, изменён {modified}"
+                    f"папка, изменена {modified}"
+                    if is_dir
+                    else f"{size} байт, изменён {modified}"
                 )
                 row = (
                     f'<li><a href="{html_lib.escape(file_url(entry.path))}">'
@@ -1474,7 +1602,7 @@ def _listing_html(directory: str) -> str:
     entries.sort(key=lambda item: (item[0], item[1]))
     rows.extend(item[2] for item in entries)
     return (
-        "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+        '<!DOCTYPE html><html><head><meta charset="utf-8">'
         f"<title>{html_lib.escape(title)}</title></head><body>"
         f"<h1>{html_lib.escape(title)}</h1><ul>{''.join(rows)}</ul></body></html>"
     )
@@ -1589,12 +1717,14 @@ def decode_data_url(url: str) -> tuple[bytes, str]:
     rest = rest.split("#", 1)[0]
     if "," not in rest:
         raise BrowserError(
-            E_BAD_REQUEST.format(reason="в адресе data: нет запятой между типом и данными")
+            E_BAD_REQUEST.format(
+                reason="в адресе data: нет запятой между типом и данными"
+            )
         )
     meta, data = rest.split(",", 1)
     meta = meta.strip()
     is_base64 = False
-    match = re.search(r";\s*base64\s*$", meta, re.I)
+    match = re.search(r";\s*base64\s*$", meta, re.IGNORECASE)
     if match:
         is_base64 = True
         meta = meta[: match.start()]
@@ -1611,7 +1741,9 @@ def decode_data_url(url: str) -> tuple[bytes, str]:
             payload = base64.b64decode(compact, altchars=None, validate=False)
         except (binascii.Error, ValueError) as exc:
             raise BrowserError(
-                E_BAD_REQUEST.format(reason=f"данные base64 в адресе data: повреждены ({exc})")
+                E_BAD_REQUEST.format(
+                    reason=f"данные base64 в адресе data: повреждены ({exc})"
+                )
             ) from None
     return payload, media_type
 
@@ -1786,7 +1918,9 @@ def encode_submission(
     }
     if method != "POST":
         parts = urlsplit(sub.url)
-        query = urlencode(_submission_pairs(sub), encoding=charset, errors="xmlcharrefreplace")
+        query = urlencode(
+            _submission_pairs(sub), encoding=charset, errors="xmlcharrefreplace"
+        )
         url = urlunsplit((parts.scheme, parts.netloc, parts.path, query, ""))
         return RequestSpec(url=url, method="GET", origin=None, **common)
     enctype = (sub.enctype or "application/x-www-form-urlencoded").strip().lower()
@@ -1802,7 +1936,9 @@ def encode_submission(
                 max_bytes=max_bytes,
             )
 
-        body_file, content_type, length = encode_multipart(list(sub.fields), list(sub.files), charset)
+        body_file, content_type, length = encode_multipart(
+            list(sub.fields), list(sub.files), charset
+        )
         return RequestSpec(
             url=sub.url,
             method="POST",
@@ -1823,7 +1959,9 @@ def encode_submission(
             content_type="text/plain",
             **common,
         )
-    body = urlencode(_submission_pairs(sub), encoding=charset, errors="xmlcharrefreplace")
+    body = urlencode(
+        _submission_pairs(sub), encoding=charset, errors="xmlcharrefreplace"
+    )
     return RequestSpec(
         url=sub.url,
         method="POST",
@@ -1834,7 +1972,9 @@ def encode_submission(
     )
 
 
-def replay_spec(spec: RequestSpec, *, deadline: Deadline, **changes: Any) -> RequestSpec:
+def replay_spec(
+    spec: RequestSpec, *, deadline: Deadline, **changes: Any
+) -> RequestSpec:
     """The same request again with a fresh deadline (multipart bodies re-encoded)."""
     fresh = spec.rebuild() if spec.rebuild is not None else spec
     if fresh.body_file is not None and fresh is spec:
@@ -1892,7 +2032,10 @@ def _cookie_matches_url(cookie: Any, url: str) -> bool:
     cookie_path = cookie.path or "/"
     if not (
         path == cookie_path
-        or (path.startswith(cookie_path) and (cookie_path.endswith("/") or path[len(cookie_path)] == "/"))
+        or (
+            path.startswith(cookie_path)
+            and (cookie_path.endswith("/") or path[len(cookie_path)] == "/")
+        )
     ):
         return False
     if cookie.secure and (parts.scheme or "").lower() != "https":
@@ -1905,7 +2048,9 @@ def _cookie_matches_url(cookie: Any, url: str) -> bool:
     return True
 
 
-def cookie_rows(jar: Any, *, domain: str | None = None, url: str | None = None) -> list[dict]:
+def cookie_rows(
+    jar: Any, *, domain: str | None = None, url: str | None = None
+) -> list[dict]:
     """Cookie descriptions without values: length and a sha256 fingerprint only."""
     rows: list[dict] = []
     for cookie in list(jar):
@@ -1928,7 +2073,13 @@ def cookie_rows(jar: Any, *, domain: str | None = None, url: str | None = None) 
                 "fp": fingerprint(value),
             }
         )
-    rows.sort(key=lambda row: (str(row["domain"]).lstrip("."), row["path"] or "", row["name"] or ""))
+    rows.sort(
+        key=lambda row: (
+            str(row["domain"]).lstrip("."),
+            row["path"] or "",
+            row["name"] or "",
+        )
+    )
     return rows
 
 
@@ -1952,12 +2103,18 @@ def set_cookie(
         except ValueError:
             host = ""
         if not host:
-            raise BrowserError(E_BAD_REQUEST.format(reason=f"в адресе cookie нет имени сервера: {display_url(url)}"))
+            raise BrowserError(
+                E_BAD_REQUEST.format(
+                    reason=f"в адресе cookie нет имени сервера: {display_url(url)}"
+                )
+            )
         cookie_domain = host
     else:
         bare = str(domain or "").strip().lower().lstrip(".")
         if not bare:
-            raise BrowserError(E_BAD_REQUEST.format(reason="для cookie нужен domain или url"))
+            raise BrowserError(
+                E_BAD_REQUEST.format(reason="для cookie нужен domain или url")
+            )
         cookie_domain = "." + bare
     rest: dict[str, Any] = {}
     if http_only:
@@ -1979,7 +2136,11 @@ def set_cookie(
 
 
 def delete_cookies(
-    jar: Any, *, name: str | None = None, domain: str | None = None, path: str | None = None
+    jar: Any,
+    *,
+    name: str | None = None,
+    domain: str | None = None,
+    path: str | None = None,
 ) -> int:
     count = 0
     for cookie in list(jar):
@@ -2027,7 +2188,9 @@ def substitute_cookie_placeholders(
         name = match.group(1).strip()
         value = cookie_value(jar, name, url)
         if value is None:
-            raise BrowserNotFound(E_COOKIE_PLACEHOLDER.format(name=name, host=_host(url)))
+            raise BrowserNotFound(
+                E_COOKIE_PLACEHOLDER.format(name=name, host=_host(url))
+            )
         if on_value is not None:
             on_value(value)
         return value

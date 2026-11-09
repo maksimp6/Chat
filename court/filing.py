@@ -204,6 +204,7 @@ def _publish(files: list[tuple[Path, str]], token: str, message: str) -> dict[st
             cwd=work,
             env=env,
             capture_output=True,
+            check=False,
         )
         if heads.returncode == 0:
             _git(["fetch", "--quiet", "origin", "refs/heads/" + branch], work, env)
@@ -470,7 +471,11 @@ def _pending_path() -> Path:
 
 def _queue(report: dict[str, Any], reason: str) -> None:
     path = _pending_path()
-    entry = {"queued_at": datetime.now(UTC).isoformat(), "reason": reason, "report": report}
+    entry = {
+        "queued_at": datetime.now(UTC).isoformat(),
+        "reason": reason,
+        "report": report,
+    }
     with _queue_lock:
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as f:
@@ -490,14 +495,20 @@ def _file_pending(token: str) -> None:
     with _queue_lock:
         if not path.exists():
             return
-        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        lines = [
+            line
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
         while lines:
             try:
                 report = json.loads(lines[0])["report"]
             except (ValueError, KeyError, TypeError):
                 log.error("court queue: unreadable entry dropped: %s", lines[0][:200])
                 lines.pop(0)
-                path.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+                path.write_text(
+                    "".join(line + "\n" for line in lines), encoding="utf-8"
+                )
                 continue
             _file_one(report, token)
             lines.pop(0)

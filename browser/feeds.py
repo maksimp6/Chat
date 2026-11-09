@@ -175,7 +175,11 @@ def _rss_link(element: Element, base_url: str) -> str | None:
 
 
 def _atom_link(element: Element, base_url: str) -> str | None:
-    links = [link for link in _kids(element, "link") if (link.attrs.get("href") or "").strip()]
+    links = [
+        link
+        for link in _kids(element, "link")
+        if (link.attrs.get("href") or "").strip()
+    ]
     for link in links:
         rel = (link.attrs.get("rel") or "alternate").strip().lower()
         kind = (link.attrs.get("type") or "").strip().lower()
@@ -187,7 +191,9 @@ def _atom_link(element: Element, base_url: str) -> str | None:
     return _absolute(base_url, links[0].attrs["href"]) if links else None
 
 
-def _media_enclosures(element: Element, base_url: str) -> list[tuple[str, str | None, int | None]]:
+def _media_enclosures(
+    element: Element, base_url: str
+) -> list[tuple[str, str | None, int | None]]:
     found: list[tuple[str, str | None, int | None]] = []
     holders = [element] + _kids(element, "group")
     for holder in holders:
@@ -202,7 +208,9 @@ def _media_enclosures(element: Element, base_url: str) -> list[tuple[str, str | 
             else:
                 continue
             if url:
-                found.append((url, (kid.attrs.get("type") or "").strip() or None, length))
+                found.append(
+                    (url, (kid.attrs.get("type") or "").strip() or None, length)
+                )
     return found
 
 
@@ -215,7 +223,9 @@ def _rss_item(item: Element, base_url: str) -> FeedItem:
         if permalink and guid_text.startswith(("http://", "https://")):
             link = guid_text
     summary_element = _kid(item, "encoded") or _kid(item, "description", "summary")
-    categories = [_plain(kid) for kid in _kids(item, "category") + _kids(item, "subject")]
+    categories = [
+        _plain(kid) for kid in _kids(item, "category") + _kids(item, "subject")
+    ]
     return FeedItem(
         title=_content_text(_kid(item, "title")),
         link=link,
@@ -234,7 +244,9 @@ def _atom_entry(entry: Element, base_url: str) -> FeedItem:
     author_name = _plain(_kid(author, "name")) if author is not None else ""
     categories = []
     for category in _kids(entry, "category"):
-        label = normalize_space(category.attrs.get("label") or category.attrs.get("term"))
+        label = normalize_space(
+            category.attrs.get("label") or category.attrs.get("term")
+        )
         if label:
             categories.append(label)
     enclosures: list[tuple[str, str | None, int | None]] = []
@@ -243,7 +255,11 @@ def _atom_entry(entry: Element, base_url: str) -> FeedItem:
             url = _absolute(base_url, link.attrs.get("href"))
             if url:
                 enclosures.append(
-                    (url, (link.attrs.get("type") or "").strip() or None, _int(link.attrs.get("length")))
+                    (
+                        url,
+                        (link.attrs.get("type") or "").strip() or None,
+                        _int(link.attrs.get("length")),
+                    )
                 )
     enclosures.extend(_media_enclosures(entry, base_url))
     # media:content shares the local name "content"; the text construct has no url.
@@ -257,7 +273,9 @@ def _atom_entry(entry: Element, base_url: str) -> FeedItem:
         published=_optional(_kid(entry, "published", "issued")),
         updated=_optional(_kid(entry, "updated", "modified")),
         author=author_name or (_plain(author) if author is not None else None) or None,
-        summary=_content_text(content if content is not None else _kid(entry, "summary")),
+        summary=_content_text(
+            content if content is not None else _kid(entry, "summary")
+        ),
         categories=categories,
         enclosures=enclosures,
     )
@@ -268,7 +286,7 @@ def _top(doc: Document) -> Element | None:
 
 
 def detect_feed(doc: Document) -> str | None:
-    """"rss", "atom" or "rdf" by the document element's local name, else None."""
+    """ "rss", "atom" or "rdf" by the document element's local name, else None."""
     top = _top(doc)
     if top is None:
         return None
@@ -329,7 +347,12 @@ def parse_json_feed(obj: Any, base_url: str) -> Feed | None:
     feed = Feed(
         kind="json",
         title=_json_text(obj.get("title")),
-        link=_absolute(base_url, obj.get("home_page_url") if isinstance(obj.get("home_page_url"), str) else None),
+        link=_absolute(
+            base_url,
+            obj.get("home_page_url")
+            if isinstance(obj.get("home_page_url"), str)
+            else None,
+        ),
         description=_json_text(obj.get("description")),
         language=_json_text(obj.get("language")) or None,
     )
@@ -349,7 +372,11 @@ def parse_json_feed(obj: Any, base_url: str) -> Feed | None:
             summary = normalize_space(raw["content_text"])
         else:
             summary = _json_text(raw.get("summary"))
-        link_value = raw.get("url") if isinstance(raw.get("url"), str) else raw.get("external_url")
+        link_value = (
+            raw.get("url")
+            if isinstance(raw.get("url"), str)
+            else raw.get("external_url")
+        )
         enclosures: list[tuple[str, str | None, int | None]] = []
         attachments = raw.get("attachments")
         for attachment in attachments if isinstance(attachments, list) else []:
@@ -358,13 +385,19 @@ def parse_json_feed(obj: Any, base_url: str) -> Feed | None:
                 if url:
                     mime = attachment.get("mime_type")
                     enclosures.append(
-                        (url, mime if isinstance(mime, str) else None, _int(attachment.get("size_in_bytes")))
+                        (
+                            url,
+                            mime if isinstance(mime, str) else None,
+                            _int(attachment.get("size_in_bytes")),
+                        )
                     )
         tags = raw.get("tags")
         feed.items.append(
             FeedItem(
                 title=_json_text(raw.get("title")),
-                link=_absolute(base_url, link_value) if isinstance(link_value, str) else None,
+                link=_absolute(base_url, link_value)
+                if isinstance(link_value, str)
+                else None,
                 id=str(raw["id"]) if raw.get("id") is not None else None,
                 published=_json_text(raw.get("date_published")) or None,
                 updated=_json_text(raw.get("date_modified")) or None,
@@ -381,7 +414,11 @@ def parse_json_feed(obj: Any, base_url: str) -> Feed | None:
 
 def _enclosure_text(enclosure: tuple[str, str | None, int | None]) -> str:
     url, kind, length = enclosure
-    details = ", ".join(part for part in (kind, f"{length} байт" if length is not None else None) if part)
+    details = ", ".join(
+        part
+        for part in (kind, f"{length} байт" if length is not None else None)
+        if part
+    )
     return f"{url} ({details})" if details else url
 
 
@@ -407,7 +444,9 @@ def feed_to_html(feed: Feed) -> str:
         title = escape(item.title or item.link or item.id or "(без заголовка)")
         parts.append("<article>")
         if item.link:
-            parts.append(f'<h2><a href="{escape(item.link, quote=True)}">{title}</a></h2>')
+            parts.append(
+                f'<h2><a href="{escape(item.link, quote=True)}">{title}</a></h2>'
+            )
         else:
             parts.append(f"<h2>{title}</h2>")
         facts = [part for part in (item.published or item.updated, item.author) if part]
@@ -421,7 +460,9 @@ def feed_to_html(feed: Feed) -> str:
             parts.append(f"<p>Вложение: {escape(_enclosure_text(enclosure))}</p>")
         parts.append("</article>")
     if feed.link:
-        parts.append(f'<p>Сайт: <a href="{escape(feed.link, quote=True)}">{escape(feed.link)}</a></p>')
+        parts.append(
+            f'<p>Сайт: <a href="{escape(feed.link, quote=True)}">{escape(feed.link)}</a></p>'
+        )
     parts.append("</body></html>")
     return "".join(parts)
 

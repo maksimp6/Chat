@@ -41,7 +41,9 @@ def url() -> str:
     if _url is None:
         for candidate in URLS:
             try:
-                requests.get(candidate.rstrip("/") + "/api/version", timeout=2).raise_for_status()
+                requests.get(
+                    candidate.rstrip("/") + "/api/version", timeout=2
+                ).raise_for_status()
             except requests.RequestException:
                 continue
             _url = candidate
@@ -55,6 +57,7 @@ def forget() -> None:
     """The remembered address is dropped: the next url() probes again (after an unreachable server)."""
     global _url
     _url = None
+
 
 # The models Logos serves through asmrun: the key Logos uses -> its catalog entry. The
 # runner serves the one model it was started with and answers under any name; the
@@ -96,6 +99,7 @@ def think(upstream_or_key: str) -> bool:
             return bool(info.get("think", THINK))
     return THINK
 
+
 # The tool categories the local model is given. All tool schemas together are ~33,000
 # tokens: they do not fit its context, and the N100 reads a prompt at a few dozen
 # tokens/s. python (owner, 05.11.2026) runs code in the Logos interpreter on the phone;
@@ -120,7 +124,9 @@ INSTRUCTIONS = (
     "5. Блокер сообщай честно и сразу."
 )
 
-USER_TEXT_UNREACHABLE = "Локальная модель не ответила: проверьте, что asmrun запущен на ПК."
+USER_TEXT_UNREACHABLE = (
+    "Локальная модель не ответила: проверьте, что asmrun запущен на ПК."
+)
 
 
 def options() -> dict[str, Any]:

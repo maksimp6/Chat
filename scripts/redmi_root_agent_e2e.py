@@ -135,6 +135,7 @@ def run_cli(helper, *args):
         capture_output=True,
         text=True,
         timeout=30,
+        check=False,
     )
     try:
         data = json.loads(result.stdout)
@@ -318,7 +319,9 @@ def main():
                 args.package,
             ]
         )
-        opened = subprocess.run(["su", "-c", command], capture_output=True, timeout=15)
+        opened = subprocess.run(
+            ["su", "-c", command], capture_output=True, timeout=15, check=False
+        )
         if (
             opened.returncode
             or b"Error:" in opened.stdout

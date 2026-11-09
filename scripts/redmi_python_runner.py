@@ -142,6 +142,7 @@ def publish_files(files, repo, branch, token, message):
             cwd=work,
             env=env,
             capture_output=True,
+            check=False,
         )
         if heads.returncode == 0:
             _git(["fetch", "--quiet", "origin", "refs/heads/" + branch], work, env)
@@ -353,7 +354,9 @@ def secure_json(path, value):
 
 
 def openssl(*args, input=None):
-    proc = subprocess.run(["openssl", *args], input=input, capture_output=True)
+    proc = subprocess.run(
+        ["openssl", *args], input=input, capture_output=True, check=False
+    )
     if proc.returncode:
         raise RuntimeError("OpenSSL operation failed")
     return proc.stdout

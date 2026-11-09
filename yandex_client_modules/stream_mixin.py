@@ -75,6 +75,7 @@ _TOOL_EVENTS = {
     "response.image_generation_call.completed": ("image_generation", "done"),
 }
 
+
 def emit_event(on_event, event):
     """Deliver one normalized event; a failing receiver never breaks the request."""
     if on_event is None:
@@ -380,7 +381,9 @@ class YandexStreamMixin:
                 "request_start_timestamp": request_start_timestamp,
                 "request_start_perf": request_start_perf,
             }
-            status_code = getattr(resp, "status_code", None) if resp is not None else None
+            status_code = (
+                getattr(resp, "status_code", None) if resp is not None else None
+            )
             if outcome in ("not_sent", "transient"):
                 retries += 1
                 reason = (
@@ -964,7 +967,8 @@ class YandexStreamMixin:
                         provider_key_id=live.provider_key_id,
                     )
                 if (
-                    data.get("status") in ("completed", "incomplete", "failed", "cancelled")
+                    data.get("status")
+                    in ("completed", "incomplete", "failed", "cancelled")
                     or data.get("error") is not None
                 ):
                     return data
@@ -979,8 +983,10 @@ class YandexStreamMixin:
                 return None
             if exc is None and status in RESUME_UNSUPPORTED_STATUSES:
                 self._resume_refused(live, resp, status)
-            if exc is not None or status in (408, 425, 429) or (
-                isinstance(status, int) and status >= 500
+            if (
+                exc is not None
+                or status in (408, 425, 429)
+                or (isinstance(status, int) and status >= 500)
             ):
                 retries += 1
                 reason = failure_reason(exc, resp)

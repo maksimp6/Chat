@@ -11,7 +11,8 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Mapping, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+from collections.abc import Mapping
 
 from browser.errors import Deadline
 
@@ -105,7 +106,7 @@ class ElementTarget:
     nth: int | None = None
 
     def describe(self) -> str:
-        """"L5" / "селектор «…»" / "текст «…»" / "точка (x, y)"."""
+        """ "L5" / "селектор «…»" / "текст «…»" / "точка (x, y)"."""
         if self.ref:
             return self.ref
         suffix = f" №{self.nth}" if self.nth else ""
@@ -136,7 +137,9 @@ class Navigation:
     submission: FormSubmission | None = None  # http only
     body: bytes | None = None  # http only (browser_request tab mode)
     content_type: str | None = None  # http only
-    wait_until: str | None = None  # chrome: commit|domcontentloaded|load|networkidle|networkidle2
+    wait_until: str | None = (
+        None  # chrome: commit|domcontentloaded|load|networkidle|networkidle2
+    )
     deadline: Deadline = field(default_factory=_no_deadline)
     max_redirects: int = 0
     max_bytes: int = 0

@@ -90,7 +90,9 @@ def tool_text(kind: str, phase: str, name: Any, server_label: Any) -> str:
         if phase == "done":
             return _named("Список инструментов MCP-сервера", server_label) + " получен"
         if phase == "failed":
-            return _named("Список инструментов MCP-сервера", server_label) + " не получен"
+            return (
+                _named("Список инструментов MCP-сервера", server_label) + " не получен"
+            )
         return _named("Получаю список инструментов MCP-сервера", server_label)
     # function, custom and anything the provider adds later
     if phase == "requested":
@@ -198,7 +200,9 @@ class LiveTurn:
         self._phase = phase
         self.emit({"type": "status", "phase": phase, "text": text})
 
-    def accept(self, *, user_message_id: Any, invocation: Any, title: Any, model: Any) -> None:
+    def accept(
+        self, *, user_message_id: Any, invocation: Any, title: Any, model: Any
+    ) -> None:
         """The question is stored: from here on the browser never posts this turn again."""
         with self.condition:
             self.user_message_id = user_message_id
@@ -235,7 +239,9 @@ class LiveTurn:
         kind = event.get("kind")
         if kind == "round":
             round_kind = event.get("round_kind") or "initial"
-            part = int(_number(event.get("part"))) if round_kind == "output_limit" else 0
+            part = (
+                int(_number(event.get("part"))) if round_kind == "output_limit" else 0
+            )
             self._round_text = ""
             self._round_reasoning = ""
             self._reasoning_part = None
@@ -251,7 +257,9 @@ class LiveTurn:
                 self._status("sending", _STATUS_TEXTS["tool_round"], force=True)
             elif round_kind == "output_limit":
                 self._status(
-                    "continuation", f"Ответ длинный: продолжаю, часть {part}", force=True
+                    "continuation",
+                    f"Ответ длинный: продолжаю, часть {part}",
+                    force=True,
                 )
             return
         if kind == "round_result":
@@ -282,7 +290,11 @@ class LiveTurn:
                 self._reasoning_part = part
             self._round_reasoning += text
             self.emit(
-                {"type": "reasoning", "text": text, "summary": bool(event.get("summary"))}
+                {
+                    "type": "reasoning",
+                    "text": text,
+                    "summary": bool(event.get("summary")),
+                }
             )
             return
         if kind == "response_status":
@@ -293,7 +305,11 @@ class LiveTurn:
                 self._status("generating", _STATUS_TEXTS["generating"])
             return
         if kind in ("tool_progress", "tool_call"):
-            tool = (event.get("tool") or "custom") if kind == "tool_progress" else "function"
+            tool = (
+                (event.get("tool") or "custom")
+                if kind == "tool_progress"
+                else "function"
+            )
             phase = event.get("phase") or "start"
             name = event.get("name")
             server_label = event.get("server_label")
@@ -329,7 +345,8 @@ class LiveTurn:
                     "attempt": attempt,
                     "reason": event.get("reason"),
                     "status_code": status_code
-                    if isinstance(status_code, int) and not isinstance(status_code, bool)
+                    if isinstance(status_code, int)
+                    and not isinstance(status_code, bool)
                     else None,
                     "delay_ms": int(round(delay_s * 1000)),
                     "text": retry_text(
@@ -470,7 +487,9 @@ def _message_id(value: Any) -> int | None:
 
 def _stored_message_id(conversation_id: str, role: str, request_id: str) -> int | None:
     """The id of the message of ``role`` that this turn request stored, or None."""
-    return _message_id(get_store().get(_request_message_key(conversation_id, role, request_id)))
+    return _message_id(
+        get_store().get(_request_message_key(conversation_id, role, request_id))
+    )
 
 
 def fingerprint(data: dict[str, Any]) -> str:
@@ -490,7 +509,9 @@ def fingerprint(data: dict[str, Any]) -> str:
     ).hexdigest()
 
 
-def _running_body(conversation_id: str, request_id: str, user_message_id: Any, invocation_id: Any) -> dict[str, Any]:
+def _running_body(
+    conversation_id: str, request_id: str, user_message_id: Any, invocation_id: Any
+) -> dict[str, Any]:
     return {
         "status": "running",
         "request_id": request_id,
@@ -518,7 +539,9 @@ def _ended_unsettled(conversation_id: str, request_id: str) -> bool:
         )
 
 
-def _receipt_answer(conversation_id: str, request_id: str, record: dict[str, Any]) -> Any:
+def _receipt_answer(
+    conversation_id: str, request_id: str, record: dict[str, Any]
+) -> Any:
     """The answer for a turn known only by its receipt: stored, failed, running here, or lost.
 
     A reply is stored exactly when the index that add_message commits with it names one,
@@ -750,7 +773,9 @@ class Admission:
                 _unsettled.add(self._key)
 
 
-def _receipt(print_: str, now: float, created_at: float, process: Any) -> dict[str, Any]:
+def _receipt(
+    print_: str, now: float, created_at: float, process: Any
+) -> dict[str, Any]:
     """A receipt that has not stored its question yet."""
     return {
         "status": "started",
@@ -765,7 +790,9 @@ def _receipt(print_: str, now: float, created_at: float, process: Any) -> dict[s
     }
 
 
-def _claim(conversation_id: str, request_id: str, print_: str) -> tuple[str, dict[str, Any] | None]:
+def _claim(
+    conversation_id: str, request_id: str, print_: str
+) -> tuple[str, dict[str, Any] | None]:
     """Claim the receipt for this process, or say why the turn must not run."""
     key = _receipt_key(conversation_id, request_id)
     with get_store().transaction() as tx:
@@ -848,7 +875,9 @@ def admit(data: Any, wants_live: bool) -> Admission | None:
         owner_id = get_current_owner_id(required=False)
         allowed = check_access(conversation_id, owner_id)
     except Exception:
-        logger.exception("Turn request %s was refused: access could not be checked", request_id)
+        logger.exception(
+            "Turn request %s was refused: access could not be checked", request_id
+        )
         return _store_unavailable(conversation_id, request_id)
     if not allowed:
         return Admission(
@@ -908,7 +937,9 @@ def admit(data: Any, wants_live: bool) -> Admission | None:
         try:
             decision, record = _claim(conversation_id, request_id, print_)
         except Exception:
-            logger.exception("Turn request %s was refused: its receipt was not claimed", request_id)
+            logger.exception(
+                "Turn request %s was refused: its receipt was not claimed", request_id
+            )
             return _store_unavailable(conversation_id, request_id)
         if decision == "claimed":
             admission = Admission(conversation_id, request_id, print_)

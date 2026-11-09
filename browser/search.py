@@ -15,7 +15,8 @@ import logging
 import re
 from dataclasses import dataclass, field, replace
 from datetime import date
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 from urllib.parse import parse_qs, quote_plus, urlencode, urljoin, urlsplit
 
 from browser import css
@@ -29,7 +30,12 @@ from browser.errors import (
     Deadline,
 )
 from browser.forms import build_submission
-from browser.http_engine import LoadedDocument, RequestSpec, encode_submission, origin_of
+from browser.http_engine import (
+    LoadedDocument,
+    RequestSpec,
+    encode_submission,
+    origin_of,
+)
 from browser.page import PageModel
 from browser.redact import display_url
 
@@ -46,7 +52,9 @@ _DDG_SAFE = {"strict": "1", "moderate": "-1", "off": "-2"}
 _DDG_TIME = {"day": "d", "week": "w", "month": "m", "year": "y"}
 _BING_TIME = {"day": 'ex1:"ez1"', "week": 'ex1:"ez2"', "month": 'ex1:"ez3"'}
 _REGION = re.compile(r"^([A-Za-z]{2,3})[-_]([A-Za-z]{2})$")
-_DDG_BLOCK_MARKERS = re.compile(r"anomaly[-_](?:modal|js)|/anomaly\.js|challenge-form", re.I)
+_DDG_BLOCK_MARKERS = re.compile(
+    r"anomaly[-_](?:modal|js)|/anomaly\.js|challenge-form", re.IGNORECASE
+)
 _ENGINE_TITLES = {
     "duckduckgo": "DuckDuckGo",
     "duckduckgo_lite": "DuckDuckGo Lite",
@@ -123,7 +131,9 @@ def _text(element: Element | None) -> str:
     return normalize_space(element.text()) if element is not None else ""
 
 
-def _get(fetch: Fetch, url: str, deadline: Deadline, referrer: str | None = None) -> LoadedDocument:
+def _get(
+    fetch: Fetch, url: str, deadline: Deadline, referrer: str | None = None
+) -> LoadedDocument:
     return fetch(
         RequestSpec(
             url=url,
@@ -152,8 +162,7 @@ def _normalized(url: str) -> str:
     except ValueError:
         return url.strip().lower()
     host = (parts.hostname or "").lower()
-    if host.startswith("www."):
-        host = host[4:]
+    host = host.removeprefix("www.")
     path = parts.path.rstrip("/")
     query = f"?{parts.query}" if parts.query else ""
     return f"{host}{path}{query}"
@@ -167,7 +176,9 @@ def _check_status(doc: LoadedDocument, engine: str) -> None:
             + " — результатов нет. Попробуйте позже или другой engine"
         )
     if doc.kind == "binary":
-        raise BrowserError(f"{title} вернул не страницу результатов, а файл ({doc.mime})")
+        raise BrowserError(
+            f"{title} вернул не страницу результатов, а файл ({doc.mime})"
+        )
 
 
 def _next_form_spec(
@@ -201,7 +212,9 @@ def _next_form_spec(
             best = (value, form, submit)
     if best is None:
         return None
-    model = PageModel(document, url=doc.url, engine="http", charset=doc.charset or "utf-8")
+    model = PageModel(
+        document, url=doc.url, engine="http", charset=doc.charset or "utf-8"
+    )
     submission = build_submission(model, best[1], best[2])
     spec = encode_submission(
         submission,
@@ -218,7 +231,9 @@ def _next_form_spec(
 # DuckDuckGo
 
 
-def _ddg_params(query: str, region: tuple[str, str] | None, safe: str | None, time_range: str | None) -> list[tuple[str, str]]:
+def _ddg_params(
+    query: str, region: tuple[str, str] | None, safe: str | None, time_range: str | None
+) -> list[tuple[str, str]]:
     params = [("q", query)]
     if region:
         params.append(("kl", f"{region[1].lower()}-{region[0]}"))
@@ -248,16 +263,23 @@ def _ddg_is_ad_link(url: str) -> bool:
     except ValueError:
         return False
     host = (parts.hostname or "").lower()
-    return host.endswith("duckduckgo.com") and parts.path.startswith(("/y.js", "/aclick"))
+    return host.endswith("duckduckgo.com") and parts.path.startswith(
+        ("/y.js", "/aclick")
+    )
 
 
 def _ddg_blocked(doc: LoadedDocument, document: Document) -> bool:
-    if css.select_one(document, "form#challenge-form, .anomaly-modal, #challenge-form") is not None:
+    if (
+        css.select_one(document, "form#challenge-form, .anomaly-modal, #challenge-form")
+        is not None
+    ):
         return True
     return bool(_DDG_BLOCK_MARKERS.search(doc.text or ""))
 
 
-def _parse_ddg_html(doc: LoadedDocument, current_offset: int, deadline: Deadline) -> _Parsed:
+def _parse_ddg_html(
+    doc: LoadedDocument, current_offset: int, deadline: Deadline
+) -> _Parsed:
     _check_status(doc, "duckduckgo")
     document = _document(doc)
     if _ddg_blocked(doc, document):
@@ -299,7 +321,9 @@ def _parse_ddg_html(doc: LoadedDocument, current_offset: int, deadline: Deadline
     )
 
 
-def _parse_ddg_lite(doc: LoadedDocument, current_offset: int, deadline: Deadline) -> _Parsed:
+def _parse_ddg_lite(
+    doc: LoadedDocument, current_offset: int, deadline: Deadline
+) -> _Parsed:
     _check_status(doc, "duckduckgo_lite")
     document = _document(doc)
     if _ddg_blocked(doc, document):
@@ -376,7 +400,11 @@ def _ddg(
     documents: list[LoadedDocument] = []
     start = max((number for number in pages if number <= page), default=1)
     if start == 1:
-        doc = _get(fetch, base + "?" + urlencode(_ddg_params(query, region, safe, time_range)), deadline)
+        doc = _get(
+            fetch,
+            base + "?" + urlencode(_ddg_params(query, region, safe, time_range)),
+            deadline,
+        )
         offset = 0
     else:
         stored_spec, offset = pages[start]
@@ -405,10 +433,22 @@ def _ddg(
 # Bing
 
 
-def _bing_params(query: str, page: int, region: tuple[str, str] | None, safe: str | None, time_range: str | None) -> list[tuple[str, str]]:
+def _bing_params(
+    query: str,
+    page: int,
+    region: tuple[str, str] | None,
+    safe: str | None,
+    time_range: str | None,
+) -> list[tuple[str, str]]:
     params = [("q", query), ("first", str((page - 1) * 10 + 1))]
     if region:
-        params.extend([("mkt", f"{region[0]}-{region[1]}"), ("setlang", region[0]), ("cc", region[1])])
+        params.extend(
+            [
+                ("mkt", f"{region[0]}-{region[1]}"),
+                ("setlang", region[0]),
+                ("cc", region[1]),
+            ]
+        )
     if safe:
         params.append(("adlt", safe))
     if time_range:
@@ -433,7 +473,9 @@ def _bing_target(href: str | None, base: str) -> str:
             payload = encoded[2:]
             payload += "=" * (-len(payload) % 4)
             try:
-                decoded = base64.urlsafe_b64decode(payload.encode("ascii")).decode("utf-8")
+                decoded = base64.urlsafe_b64decode(payload.encode("ascii")).decode(
+                    "utf-8"
+                )
             except (binascii.Error, ValueError, UnicodeError):
                 decoded = ""
             if decoded.startswith(("http://", "https://")):
@@ -448,7 +490,10 @@ def _parse_bing(doc: LoadedDocument) -> _Parsed:
         path = urlsplit(doc.url).path
     except ValueError:
         path = ""
-    if "/challenge" in path or css.select_one(document, "#b_captcha, .captcha, #captcha") is not None:
+    if (
+        "/challenge" in path
+        or css.select_one(document, "#b_captcha, .captcha, #captcha") is not None
+    ):
         raise BrowserError(E_SEARCH_BLOCKED.format(engine="Bing"))
     results: list[SearchResult] = []
     for item in css.select(document, "li.b_algo"):
@@ -483,7 +528,9 @@ def _parse_bing(doc: LoadedDocument) -> _Parsed:
     for block in css.select(document, "li.b_ad"):
         ads += max(1, len(css.select(block, "li")))
     has_next = css.select_one(document, "a.sb_pagN") is not None
-    return _Parsed(results=results, ads=ads, has_next=has_next, next_spec=None, document=doc)
+    return _Parsed(
+        results=results, ads=ads, has_next=has_next, next_spec=None, document=doc
+    )
 
 
 def _bing(
@@ -506,9 +553,19 @@ def _bing(
 
 
 def _custom(
-    fetch: Fetch, *, query: str, page: int, custom: CustomEngine | None, deadline: Deadline
+    fetch: Fetch,
+    *,
+    query: str,
+    page: int,
+    custom: CustomEngine | None,
+    deadline: Deadline,
 ) -> tuple[_Parsed, list[str], list[LoadedDocument]]:
-    if custom is None or not custom.url_template or "{query}" not in custom.url_template or not custom.result_selector:
+    if (
+        custom is None
+        or not custom.url_template
+        or "{query}" not in custom.url_template
+        or not custom.result_selector
+    ):
         raise BrowserError(E_SEARCH_CUSTOM)
     template = custom.url_template
     if "{offset}" in template and not custom.page_size:
@@ -524,7 +581,11 @@ def _custom(
     document = _document(doc)
     results: list[SearchResult] = []
     for block in css.select(document, custom.result_selector):
-        title_el = css.select_one(block, custom.title_selector) if custom.title_selector else None
+        title_el = (
+            css.select_one(block, custom.title_selector)
+            if custom.title_selector
+            else None
+        )
         title = _text(title_el) if title_el is not None else _text(block)
         if custom.link_selector:
             link_el = css.select_one(block, custom.link_selector)
@@ -555,10 +616,14 @@ def _custom(
             )
         )
     paged = "{page}" in template or "{offset}" in template
-    has_next = paged and bool(results) and (
-        not custom.page_size or len(results) >= int(custom.page_size)
+    has_next = (
+        paged
+        and bool(results)
+        and (not custom.page_size or len(results) >= int(custom.page_size))
     )
-    parsed = _Parsed(results=results, ads=0, has_next=has_next, next_spec=None, document=doc)
+    parsed = _Parsed(
+        results=results, ads=0, has_next=has_next, next_spec=None, document=doc
+    )
     return parsed, [], [doc]
 
 
@@ -622,7 +687,9 @@ def search(
     if not text:
         raise BrowserError("Укажите query — что искать")
     if engine not in ENGINES:
-        raise BrowserError(f"Неизвестный engine «{engine}»; доступны: {', '.join(ENGINES)}")
+        raise BrowserError(
+            f"Неизвестный engine «{engine}»; доступны: {', '.join(ENGINES)}"
+        )
     if safe_search is not None and safe_search not in SAFE_SEARCH:
         raise BrowserError(f"safe_search: ожидается {', '.join(SAFE_SEARCH)}")
     if time_range is not None and time_range not in TIME_RANGES:
@@ -651,7 +718,9 @@ def search(
         outcome.has_next = parsed.has_next
         outcome.notes = notes
         outcome.documents = documents
-        logger.debug("search %s page %d: %d results", engine, number, len(parsed.results))
+        logger.debug(
+            "search %s page %d: %d results", engine, number, len(parsed.results)
+        )
         return outcome
     finished: list[tuple[str, _Parsed]] = []
     failures: list[tuple[str, BrowserError]] = []
@@ -710,7 +779,9 @@ def render_results(outcome: SearchOutcome) -> str:
     show_engines = outcome.engine == "all"
     for item in outcome.results:
         lines.append("")
-        lines.append(f"{item.rank}. {item.title or item.display_url or display_url(item.url)}")
+        lines.append(
+            f"{item.rank}. {item.title or item.display_url or display_url(item.url)}"
+        )
         lines.append(f"   {display_url(item.url)}")
         engines = f" ({', '.join(item.engines)})" if show_engines else ""
         if item.snippet:

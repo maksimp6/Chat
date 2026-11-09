@@ -441,7 +441,7 @@ class _JournalStore:
             self._commit_changes([{"op": "delete", "namespace": namespace, "key": key}])
 
     @contextmanager
-    def transaction(self) -> Iterator["_JournalTransaction"]:
+    def transaction(self) -> Iterator[_JournalTransaction]:
         """Commit staged changes together on success; discard on exception."""
         with self._lock:
             self._ensure_open()
@@ -751,7 +751,7 @@ class _JournalStore:
                     self._lock_file.close()
                 self._closed = True
 
-    def __enter__(self) -> "_JournalStore":
+    def __enter__(self) -> _JournalStore:
         return self
 
     def __exit__(self, *_args: object) -> None:
@@ -849,7 +849,7 @@ class Kristall:
             return self._engine.last_commit.sequence
 
     @contextmanager
-    def transaction(self) -> Iterator["Transaction"]:
+    def transaction(self) -> Iterator[Transaction]:
         """Serialize an atomic read-modify-write operation."""
         with self._engine._lock:
             if self._pending:
@@ -901,7 +901,7 @@ class Kristall:
             with self._engine._view_lock:
                 self._pending.clear()
 
-    def __enter__(self) -> "Kristall":
+    def __enter__(self) -> Kristall:
         return self
 
     def __exit__(self, *_args: object) -> None:

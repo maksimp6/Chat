@@ -32,7 +32,18 @@ __all__ = ["PYTHON_TOOLS", "python"]
 logger = logging.getLogger("logos.tool_providers.python_exec")
 
 # Only what Python needs. The backend's own environment holds provider and deployment secrets.
-_ENV_NAMES = ("PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "USER", "LOGNAME", "PREFIX", "LD_LIBRARY_PATH")
+_ENV_NAMES = (
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    "TMPDIR",
+    "USER",
+    "LOGNAME",
+    "PREFIX",
+    "LD_LIBRARY_PATH",
+)
 
 # The collection the runs are embedded into.
 COLLECTION = "python"
@@ -68,7 +79,9 @@ def _timeout(args: dict) -> float | None:
         return None
     timeout = float(raw)
     if not math.isfinite(timeout) or timeout <= 0:
-        raise ValueError("timeout_seconds must be a positive number, 0 or null (no limit)")
+        raise ValueError(
+            "timeout_seconds must be a positive number, 0 or null (no limit)"
+        )
     return timeout
 
 
@@ -80,18 +93,26 @@ def _cwd(args: dict) -> str:
     return cwd
 
 
-def _run_process(argv: list[str], *, cwd: str, timeout: float | None, stdin: str | None) -> dict[str, Any]:
+def _run_process(
+    argv: list[str], *, cwd: str, timeout: float | None, stdin: str | None
+) -> dict[str, Any]:
     """Run ``argv`` and give its output, exit code and duration; the process leads its own session."""
     started = time.perf_counter()
     try:
-        completed = run_bounded(argv, cwd=cwd, env=_environment(), timeout=timeout, stdin=stdin)
+        completed = run_bounded(
+            argv, cwd=cwd, env=_environment(), timeout=timeout, stdin=stdin
+        )
         return {
             "success": completed.returncode == 0,
             "stdout": limit_output(completed.stdout, _MAX_OUTPUT_BYTES),
             "stderr": limit_output(completed.stderr, _MAX_OUTPUT_BYTES),
             "exit_code": completed.returncode,
             "seconds": round(time.perf_counter() - started, 3),
-            **({} if completed.returncode == 0 else {"error": f"Python exited with code {completed.returncode}"}),
+            **(
+                {}
+                if completed.returncode == 0
+                else {"error": f"Python exited with code {completed.returncode}"}
+            ),
         }
     except subprocess.TimeoutExpired as exc:
         return {
@@ -113,7 +134,9 @@ def _run_process(argv: list[str], *, cwd: str, timeout: float | None, stdin: str
         }
 
 
-def _remember(action: str, args: dict, result: dict[str, Any], cfg: dict | None) -> None:
+def _remember(
+    action: str, args: dict, result: dict[str, Any], cfg: dict | None
+) -> None:
     """The run goes into the vector database in its own thread (AGENTS.md: every datum is embedded)."""
     code = str(args.get("code") or "")
     text = (
@@ -152,14 +175,25 @@ def _run(args: dict, cfg: dict | None) -> dict[str, Any]:
     stdin = args.get("stdin")
     stdin = None if stdin is None else str(stdin)
     argv_extra = args.get("argv")
-    if argv_extra is not None and not (isinstance(argv_extra, list) and all(isinstance(a, str) for a in argv_extra)):
+    if argv_extra is not None and not (
+        isinstance(argv_extra, list) and all(isinstance(a, str) for a in argv_extra)
+    ):
         raise ValueError("argv must be a list of strings")
-    _trace_event(cfg, "runtime_started", {"runtime": "python", "operation": "run", "cwd": cwd})
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", prefix="logos_python_", suffix=".py", delete=False) as script:
+    _trace_event(
+        cfg, "runtime_started", {"runtime": "python", "operation": "run", "cwd": cwd}
+    )
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", prefix="logos_python_", suffix=".py", delete=False
+    ) as script:
         script.write(code)
         path = script.name
     try:
-        result = _run_process([sys.executable, path, *(argv_extra or [])], cwd=cwd, timeout=timeout, stdin=stdin)
+        result = _run_process(
+            [sys.executable, path, *(argv_extra or [])],
+            cwd=cwd,
+            timeout=timeout,
+            stdin=stdin,
+        )
     finally:
         try:
             os.unlink(path)
@@ -173,8 +207,13 @@ def _run(args: dict, cfg: dict | None) -> dict[str, Any]:
     _trace_event(
         cfg,
         "runtime_finished" if result["success"] else "runtime_failed",
-        {"runtime": "python", "operation": "run", "cwd": cwd, "exit_code": result["exit_code"],
-         **({"error": result["error"]} if result.get("error") else {})},
+        {
+            "runtime": "python",
+            "operation": "run",
+            "cwd": cwd,
+            "exit_code": result["exit_code"],
+            **({"error": result["error"]} if result.get("error") else {}),
+        },
     )
     return result
 
@@ -216,13 +255,23 @@ def _info(args: dict, cfg: dict | None) -> dict[str, Any]:
 
 
 _ACTIONS: dict[str, dict[str, Any]] = {
-    "run": {"fn": _run, "remember": True,
-            "about": "выполнить code как скрипт интерпретатора Logos (stdin — ввод, argv — аргументы, "
-                     "cwd — каталог, timeout_seconds — свой предел, 0 или пусто — без предела); "
-                     "вернёт stdout, stderr, exit_code"},
-    "eval": {"fn": _eval, "remember": True,
-             "about": "вычислить одно выражение code и вернуть его repr в value"},
-    "info": {"fn": _info, "remember": False, "about": "интерпретатор: путь, версия, платформа, sys.path"},
+    "run": {
+        "fn": _run,
+        "remember": True,
+        "about": "выполнить code как скрипт интерпретатора Logos (stdin — ввод, argv — аргументы, "
+        "cwd — каталог, timeout_seconds — свой предел, 0 или пусто — без предела); "
+        "вернёт stdout, stderr, exit_code",
+    },
+    "eval": {
+        "fn": _eval,
+        "remember": True,
+        "about": "вычислить одно выражение code и вернуть его repr в value",
+    },
+    "info": {
+        "fn": _info,
+        "remember": False,
+        "about": "интерпретатор: путь, версия, платформа, sys.path",
+    },
 }
 
 
@@ -231,7 +280,10 @@ def python(args, cfg=None):
     action = args.get("action") if isinstance(args, dict) else None
     entry = _ACTIONS.get(action) if isinstance(action, str) else None
     if entry is None:
-        return {"success": False, "error": "action must be one of: " + ", ".join(_ACTIONS)}
+        return {
+            "success": False,
+            "error": "action must be one of: " + ", ".join(_ACTIONS),
+        }
     try:
         result = entry["fn"](args, cfg)
     except ValueError as exc:
@@ -245,7 +297,8 @@ PYTHON_TOOLS = {
     "python": {
         "title": "Python",
         "description": "Python интерпретатора Logos (с его пакетами) одной функцией: поле action выбирает "
-        "действие. " + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items()),
+        "действие. "
+        + "; ".join(f"{name} — {entry['about']}" for name, entry in _ACTIONS.items()),
         "parameters": {
             "type": "object",
             "properties": {
@@ -254,7 +307,9 @@ PYTHON_TOOLS = {
                 "stdin": {"type": "string"},
                 "argv": {"type": "array", "items": {"type": "string"}},
                 "cwd": {"type": "string", "minLength": 1, "maxLength": 4096},
-                "timeout_seconds": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "timeout_seconds": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
             },
             "required": ["action"],
             "additionalProperties": False,

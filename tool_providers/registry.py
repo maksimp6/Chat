@@ -344,7 +344,10 @@ class ToolRegistry:
         """The actions of one tool this transport and host can run."""
         which = self._which_per_listing()
         return [
-            name for name, _ in self._offered_actions(category, transport, which, allow_action)
+            name
+            for name, _ in self._offered_actions(
+                category, transport, which, allow_action
+            )
         ]
 
     def get_tool_actions(self) -> dict[str, list[str]]:
@@ -391,9 +394,9 @@ class ToolRegistry:
                 "поле arguments — объект параметров этого действия (его схема стоит "
                 "в arguments под именем действия).\nДействия — не функции: функций "
                 f"с именами действий нет, вызывайте только функцию «{category}» с "
-                "tool=\"<действие>\". Упоминание действия в описаниях, например "
-                f"{names[0]}(x=…), означает вызов «{category}» с tool=\"{names[0]}\" "
-                "и arguments={\"x\": …}.\nДействия:\n" + listing
+                'tool="<действие>". Упоминание действия в описаниях, например '
+                f'{names[0]}(x=…), означает вызов «{category}» с tool="{names[0]}" '
+                'и arguments={"x": …}.\nДействия:\n' + listing
             ),
             "parameters": {
                 "type": "object",
@@ -427,7 +430,7 @@ class ToolRegistry:
         actions = self._offered_actions(category, transport, which, allow_action)
         return [self._tool_function(category, actions)] if actions else []
 
-    def get_definitions(self, active_categories: set = None) -> list:
+    def get_definitions(self, active_categories: set | None = None) -> list:
         """One function per tool (category), for the active categories."""
         tools_list = []
         for category in self._categories:
@@ -475,7 +478,9 @@ class ToolRegistry:
     def _tool_cfg(self, category: str) -> dict[str, Any]:
         """The Universal Tool contract of a tool, summed up from its actions."""
         names = self._categories[category]
-        actions = [(name, self._actions[name]) for name in names if name in self._actions]
+        actions = [
+            (name, self._actions[name]) for name in names if name in self._actions
+        ]
         function = self._tool_function(category, actions)
         capabilities: list[str] = []
         transports: list[str] = []
@@ -498,9 +503,14 @@ class ToolRegistry:
             "description": function["description"],
             "inputSchema": function["parameters"],
             "capabilities": capabilities or [category],
-            "risk_level": _highest_risk(str(cfg.get("risk_level")) for _, cfg in actions),
-            "read_only": bool(actions) and all(cfg.get("read_only") for _, cfg in actions),
-            "requires_approval": any(cfg.get("requires_approval") for _, cfg in actions),
+            "risk_level": _highest_risk(
+                str(cfg.get("risk_level")) for _, cfg in actions
+            ),
+            "read_only": bool(actions)
+            and all(cfg.get("read_only") for _, cfg in actions),
+            "requires_approval": any(
+                cfg.get("requires_approval") for _, cfg in actions
+            ),
             "supported_transports": transports or ["responses_api", "local_agent"],
             "executor": {"type": "local"},
             "metadata": {"actions": list(names), "approval_actions": approval_actions},
@@ -534,7 +544,7 @@ class ToolRegistry:
         self,
         tool_name: str,
         arguments: dict,
-        server_configs: list = None,
+        server_configs: list | None = None,
         context: Mapping[str, Any] | None = None,
     ) -> dict:
         if tool_name not in self._actions and tool_name in self._categories:

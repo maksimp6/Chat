@@ -118,7 +118,11 @@ def branch(args: dict[str, Any], cfg=None) -> dict[str, Any]:
         return {"success": False, "error": str(error)}
     # A branch has no model parameter: it keeps the model of the dialog it copies.
     row = next(
-        (r for r in bound.list_owned_conversations(owner) if r.get("id") == conversation_id),
+        (
+            r
+            for r in bound.list_owned_conversations(owner)
+            if r.get("id") == conversation_id
+        ),
         {},
     )
     model = row.get("model")
@@ -136,7 +140,12 @@ def branch(args: dict[str, Any], cfg=None) -> dict[str, Any]:
             drop_ids=drops,
         )
     except bound.ForkError as error:
-        return {"success": False, "error": error.code, "status": error.status, **error.fields}
+        return {
+            "success": False,
+            "error": error.code,
+            "status": error.status,
+            **error.fields,
+        }
     return {"success": True, "branch": made}
 
 
@@ -162,5 +171,9 @@ def yandex_call(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     except (bound.OperationRefused, bound.ContractViolation) as error:
         return {"success": False, "error": "operation_refused", "detail": str(error)}
     except bound.YandexClientError as error:
-        return {"success": False, "error": "yandex_request_failed", "detail": str(error)}
+        return {
+            "success": False,
+            "error": "yandex_request_failed",
+            "detail": str(error),
+        }
     return {"success": True, "operation": operation, **answer}

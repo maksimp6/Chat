@@ -173,7 +173,7 @@ class SignedInputSocket:
         while not self._stop.is_set():
             try:
                 conn, _ = server.accept()
-            except socket.timeout:
+            except TimeoutError:
                 continue
             except OSError:
                 break

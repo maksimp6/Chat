@@ -25,7 +25,12 @@ import urllib.request
 from pathlib import Path
 
 DIRECTORY = "https://acme-v02.api.letsencrypt.org/directory"
-NAMES = ("chat.maxxxpavlov.ru", "maxxxpavlov.ru", "www.maxxxpavlov.ru", "tunnel.maxxxpavlov.ru")
+NAMES = (
+    "chat.maxxxpavlov.ru",
+    "maxxxpavlov.ru",
+    "www.maxxxpavlov.ru",
+    "tunnel.maxxxpavlov.ru",
+)
 ROOT = Path.home() / ".config/acme"
 CHALLENGES = ROOT / "challenges"
 ACCOUNT_KEY = ROOT / "account.key"
@@ -41,9 +46,13 @@ def _b64(data: bytes) -> str:
 
 
 def _openssl(*args: str, data: bytes | None = None) -> bytes:
-    done = subprocess.run(["openssl", *args], input=data, capture_output=True)
+    done = subprocess.run(
+        ["openssl", *args], input=data, capture_output=True, check=False
+    )
     if done.returncode:
-        raise RuntimeError(f"openssl {args[0]}: {done.stderr.decode(errors='replace').strip()}")
+        raise RuntimeError(
+            f"openssl {args[0]}: {done.stderr.decode(errors='replace').strip()}"
+        )
     return done.stdout
 
 
@@ -66,11 +75,15 @@ class Acme:
         self.directory = self._request(DIRECTORY)[0]
         self.jwk = _jwk()
         self.thumbprint = _b64(
-            hashlib.sha256(json.dumps(self.jwk, sort_keys=True, separators=(",", ":")).encode()).digest()
+            hashlib.sha256(
+                json.dumps(self.jwk, sort_keys=True, separators=(",", ":")).encode()
+            ).digest()
         )
 
     def _request(self, url: str, body: bytes | None = None) -> tuple[dict, dict, bytes]:
-        request = urllib.request.Request(url, data=body, method="POST" if body is not None else "GET")
+        request = urllib.request.Request(
+            url, data=body, method="POST" if body is not None else "GET"
+        )
         if body is not None:
             request.add_header("Content-Type", "application/jose+json")
         try:
@@ -79,7 +92,9 @@ class Acme:
         except urllib.error.HTTPError as error:
             raw, headers = error.read(), dict(error.headers)
             self.nonce = headers.get("Replay-Nonce") or self.nonce
-            raise RuntimeError(f"{url}: {error.code} {raw.decode(errors='replace')[:400]}") from None
+            raise RuntimeError(
+                f"{url}: {error.code} {raw.decode(errors='replace')[:400]}"
+            ) from None
         self.nonce = headers.get("Replay-Nonce") or self.nonce
         try:
             data = json.loads(raw) if raw[:1] == b"{" else {}
@@ -98,8 +113,12 @@ class Acme:
         self.nonce = None
         head = _b64(json.dumps(protected).encode())
         body = "" if payload is None else _b64(json.dumps(payload).encode())
-        signature = _openssl("dgst", "-sha256", "-sign", str(ACCOUNT_KEY), data=f"{head}.{body}".encode())
-        envelope = json.dumps({"protected": head, "payload": body, "signature": _b64(signature)})
+        signature = _openssl(
+            "dgst", "-sha256", "-sign", str(ACCOUNT_KEY), data=f"{head}.{body}".encode()
+        )
+        envelope = json.dumps(
+            {"protected": head, "payload": body, "signature": _b64(signature)}
+        )
         return self._request(url, envelope.encode())
 
     def poll(self, url: str, until: str) -> dict:
@@ -108,7 +127,9 @@ class Acme:
             if data.get("status") == until:
                 return data
             if data.get("status") == "invalid":
-                raise RuntimeError(f"{url}: invalid {json.dumps(data, ensure_ascii=False)[:600]}")
+                raise RuntimeError(
+                    f"{url}: invalid {json.dumps(data, ensure_ascii=False)[:600]}"
+                )
             time.sleep(3)
         raise RuntimeError(f"{url}: still {data.get('status')}")
 
@@ -119,13 +140,20 @@ def days_left() -> float | None:
     except OSError:
         return None
     first = pem.split("-----END CERTIFICATE-----")[0] + "-----END CERTIFICATE-----\n"
-    end = _openssl("x509", "-noout", "-enddate", data=first.encode()).decode().strip().split("=", 1)[1]
+    end = (
+        _openssl("x509", "-noout", "-enddate", data=first.encode())
+        .decode()
+        .strip()
+        .split("=", 1)[1]
+    )
     return (ssl.cert_time_to_seconds(end) - time.time()) / 86400
 
 
 def _covers() -> bool:
     try:
-        text = _openssl("x509", "-noout", "-ext", "subjectAltName", "-in", str(CERT)).decode()
+        text = _openssl(
+            "x509", "-noout", "-ext", "subjectAltName", "-in", str(CERT)
+        ).decode()
     except (OSError, RuntimeError):
         return False
     return all(f"DNS:{name}" in text for name in NAMES)
@@ -138,10 +166,13 @@ def issue() -> None:
     _key(ACCOUNT_KEY)
     _key(KEY)
     acme = Acme()
-    _, headers, _ = acme.post(acme.directory["newAccount"], {"termsOfServiceAgreed": True})
+    _, headers, _ = acme.post(
+        acme.directory["newAccount"], {"termsOfServiceAgreed": True}
+    )
     acme.kid = headers["Location"]
     order, headers, _ = acme.post(
-        acme.directory["newOrder"], {"identifiers": [{"type": "dns", "value": n} for n in NAMES]}
+        acme.directory["newOrder"],
+        {"identifiers": [{"type": "dns", "value": n} for n in NAMES]},
     )
     order_url = headers["Location"]
     written: list[Path] = []
@@ -160,8 +191,16 @@ def issue() -> None:
             acme.poll(url, "valid")
         san = ",".join(f"DNS:{n}" for n in NAMES)
         csr = _openssl(
-            "req", "-new", "-key", str(KEY), "-subj", f"/CN={NAMES[0]}",
-            "-addext", f"subjectAltName={san}", "-outform", "DER",
+            "req",
+            "-new",
+            "-key",
+            str(KEY),
+            "-subj",
+            f"/CN={NAMES[0]}",
+            "-addext",
+            f"subjectAltName={san}",
+            "-outform",
+            "DER",
         )
         acme.post(order["finalize"], {"csr": _b64(csr)})
         order = acme.poll(order_url, "valid")
@@ -191,7 +230,12 @@ def ensure() -> bool:
     status["checked"] = time.strftime("%d.%m.%Y %H:%M")
     ROOT.mkdir(parents=True, exist_ok=True)
     STATUS.write_text(json.dumps(status, ensure_ascii=False), encoding="utf-8")
-    print(time.strftime("%Y-%m-%d %H:%M:%S"), "certificate:", json.dumps(status, ensure_ascii=False), flush=True)
+    print(
+        time.strftime("%Y-%m-%d %H:%M:%S"),
+        "certificate:",
+        json.dumps(status, ensure_ascii=False),
+        flush=True,
+    )
     return renewed
 
 

@@ -48,7 +48,9 @@ def resolve(path: Path, root: Path, depth: int = 0) -> str:
 
 def substitute(text: str, presets: dict[str, str]) -> str:
     for _ in range(4):
-        replaced = VARIABLE.sub(lambda m: str(presets.get(m.group(1), m.group(0))), text)
+        replaced = VARIABLE.sub(
+            lambda m: str(presets.get(m.group(1), m.group(0))), text
+        )
         if replaced == text:
             break
         text = replaced
@@ -91,9 +93,9 @@ def main() -> int:
     checkout, output = Path(sys.argv[1]).resolve(), Path(sys.argv[2])
     ru = checkout / "ru"
     studio = ru / "ai-studio"
-    presets = (yaml.safe_load((ru / "presets.yaml").read_text(encoding="utf-8")) or {}).get(
-        "default", {}
-    )
+    presets = (
+        yaml.safe_load((ru / "presets.yaml").read_text(encoding="utf-8")) or {}
+    ).get("default", {})
     toc = yaml.safe_load((studio / "toc.yaml").read_text(encoding="utf-8")) or {}
     ordered: list = []
     toc_pages(toc.get("items"), studio, [], ordered)
@@ -109,7 +111,9 @@ def main() -> int:
 
     revision = subprocess.run(
         ["git", "-C", str(checkout), "log", "-1", "--format=%H %cs"],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     ).stdout.strip()
     head = [
         "# Документация Yandex AI Studio — одним файлом",
@@ -141,7 +145,9 @@ def main() -> int:
         title = substitute(title, presets)
         head.append(f"{index}. [{title or rel}](#{anchor(index)}) — `{rel}`")
         text = demote(substitute(resolve(path, ru), presets)).strip()
-        body.append(f'\n\n<a id="{anchor(index)}"></a>\n\n# {index}. {title or rel}\n\n`ru/ai-studio/{rel}`\n\n{text}\n')
+        body.append(
+            f'\n\n<a id="{anchor(index)}"></a>\n\n# {index}. {title or rel}\n\n`ru/ai-studio/{rel}`\n\n{text}\n'
+        )
     output.write_text("\n".join(head) + "\n" + "".join(body), encoding="utf-8")
     print(f"{len(pages)} pages -> {output} ({output.stat().st_size} bytes)")
     return 0

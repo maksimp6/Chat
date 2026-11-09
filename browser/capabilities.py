@@ -9,7 +9,8 @@ silently gaining cloud-session or credential access.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 
 BROWSER_ACTIONS = (
@@ -186,10 +187,10 @@ def sanitize_browser_value(value: Any) -> Any:
 __all__ = [
     "BROWSER_ACTIONS",
     "BROWSER_CAPABILITY_CONTRACTS",
-    "BrowserAction",
-    "BrowserCapabilityContract",
     "CLOUD_BROWSING",
     "LOCAL_BROWSING",
+    "BrowserAction",
+    "BrowserCapabilityContract",
     "sanitize_browser_value",
     "validate_browser_action",
 ]

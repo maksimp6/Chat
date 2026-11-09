@@ -49,7 +49,7 @@ class PluginManifest:
     description: str = ""
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "PluginManifest":
+    def from_dict(cls, data: Mapping[str, Any]) -> PluginManifest:
         if not isinstance(data, Mapping):
             raise PluginError("manifest must be a JSON object")
         unknown = sorted(set(data) - ALLOWED_MANIFEST_FIELDS)

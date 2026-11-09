@@ -2,7 +2,7 @@
 # and run `python3 scripts/check_independence.py --sync-vendored`.
 """Shared extraction of user-visible text from Yandex Responses API output."""
 
-from typing import Any, Optional
+from typing import Any
 
 
 # WIKIFUNCTIONS-CANDIDATE WF-10: https://www.wikifunctions.org/wiki/Z872 + Z873 + Z12899.
@@ -40,7 +40,11 @@ def extract_response_text(data: dict[str, Any]) -> tuple[str, str]:
         # Top-level "text" is the text config ({"format": ..., "verbosity": ...}),
         # not an answer: only strings count.
         text = next(
-            (v for v in (data.get("output_text"), data.get("text")) if isinstance(v, str) and v),
+            (
+                v
+                for v in (data.get("output_text"), data.get("text"))
+                if isinstance(v, str) and v
+            ),
             "",
         ).strip()
     return "\n\n".join(reasoning_parts), text
@@ -50,7 +54,7 @@ def extract_response_text(data: dict[str, Any]) -> tuple[str, str]:
 # Заменить поиск последнего текста на reverse + адаптер ленивого filter/map/first-match;
 # обычные W filter/map не обещают lazy/early-stop и без такой адаптации неэквивалентны.
 # адаптер не вычисляет ранние ответы после совпадения и возвращает исходную trace entry рядом с текстом.
-def extract_last_response_text(responses: list) -> tuple[str, Optional[dict[str, Any]]]:
+def extract_last_response_text(responses: list) -> tuple[str, dict[str, Any] | None]:
     """Return the last non-empty user-visible response text and its trace entry."""
     if not isinstance(responses, list):
         return "", None

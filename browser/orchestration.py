@@ -11,7 +11,8 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 import json
 import time
-from typing import Any, Callable, Mapping
+from typing import Any
+from collections.abc import Callable, Mapping
 
 from browser.capabilities import BROWSER_ACTIONS
 
@@ -439,13 +440,13 @@ class BrowserRoleDag:
 
 
 __all__ = [
+    "READ_ACTIONS",
+    "ROLE_ACTIONS",
+    "WRITE_ACTIONS",
     "BrowserDagBudget",
     "BrowserDagResult",
     "BrowserRoleDag",
     "BrowserRoleTask",
     "BrowserTaskBudget",
     "BrowserTaskResult",
-    "READ_ACTIONS",
-    "ROLE_ACTIONS",
-    "WRITE_ACTIONS",
 ]

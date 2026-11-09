@@ -537,7 +537,9 @@ def _define_logos_client(base: type) -> type:
         def _ask_provider(self, **kwargs: Any) -> Any:
             return super().ask_with_mcp(**kwargs)
 
-        def _execute_single_tool(self, tc, all_servers, trace=None, *, execution_policy=None):
+        def _execute_single_tool(
+            self, tc, all_servers, trace=None, *, execution_policy=None
+        ):
             """Run one function call of the model through the tool registry. The same for
             every provider: Yandex and Ollama models call the same tools."""
             import time as _t
@@ -546,8 +548,12 @@ def _define_logos_client(base: type) -> type:
             if not isinstance(function, dict):
                 function = {}
             name = tc.get("name") or function.get("name")
-            args = tc["arguments"] if "arguments" in tc else function.get("arguments", {})
-            call_id = tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or name
+            args = (
+                tc["arguments"] if "arguments" in tc else function.get("arguments", {})
+            )
+            call_id = (
+                tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or name
+            )
             start_timestamp = _t.time()
             t_start = _t.perf_counter()
             traced = isinstance(trace, bound.ExecutionTrace)
@@ -555,10 +561,14 @@ def _define_logos_client(base: type) -> type:
             try:
                 try:
                     if not isinstance(name, str) or not name.strip():
-                        raise ValueError("Invalid tool name: expected a non-empty string")
+                        raise ValueError(
+                            "Invalid tool name: expected a non-empty string"
+                        )
                     name = name.split("<|", 1)[0].strip()
                     if not name:
-                        raise ValueError("Invalid tool name: expected a non-empty string")
+                        raise ValueError(
+                            "Invalid tool name: expected a non-empty string"
+                        )
                     if isinstance(args, str):
                         try:
                             args = _json.loads(args)
@@ -567,7 +577,9 @@ def _define_logos_client(base: type) -> type:
                                 "Invalid tool arguments: expected a valid JSON object"
                             ) from None
                     if not isinstance(args, dict):
-                        raise ValueError("Invalid tool arguments: expected a JSON object")
+                        raise ValueError(
+                            "Invalid tool arguments: expected a JSON object"
+                        )
                     # A tool's one function names its action in "tool" (one tool, one function).
                     inner_name, args = bound.registry.unwrap_call(name, args)
                     if inner_name != name and traced:
@@ -577,7 +589,9 @@ def _define_logos_client(base: type) -> type:
                         )
                     name = inner_name
                     if not isinstance(args, dict):
-                        raise ValueError("Invalid tool arguments: expected a JSON object")
+                        raise ValueError(
+                            "Invalid tool arguments: expected a JSON object"
+                        )
                 except ValueError as exc:
                     if traced:
                         trace.add_event(
@@ -607,7 +621,9 @@ def _define_logos_client(base: type) -> type:
                         call, trace, server_configs=all_servers
                     )
                 else:
-                    universal_result = executor.execute(call, server_configs=all_servers)
+                    universal_result = executor.execute(
+                        call, server_configs=all_servers
+                    )
                 if universal_result.get("success"):
                     result = universal_result.get("data")
                     error = None
@@ -739,13 +755,24 @@ def _define_logos_client(base: type) -> type:
                 except (TypeError, ValueError):
                     inner = call.get("arguments")
                 arguments = inner
-                if isinstance(name, str) and isinstance(inner, dict) and isinstance(inner.get("tool"), str):
+                if (
+                    isinstance(name, str)
+                    and isinstance(inner, dict)
+                    and isinstance(inner.get("tool"), str)
+                ):
                     # A tool's one function picks the action by "tool": show that action
                     # and the action's own arguments.
                     name = inner["tool"]
                     arguments = inner.get("arguments", {})
                 # The live view shows what the tool was called with and what it returned.
-                emit({"kind": "tool_call", "phase": "start", "name": name, "arguments": arguments})
+                emit(
+                    {
+                        "kind": "tool_call",
+                        "phase": "start",
+                        "name": name,
+                        "arguments": arguments,
+                    }
+                )
                 try:
                     if tool_servers is None:
                         tool_servers = bound.mcp_storage.list_servers(
@@ -792,14 +819,23 @@ def _define_logos_client(base: type) -> type:
                         else {"result": output, "screen_description": description}
                     )
                 # Screenshots were taken out of output above, so it carries no image data.
-                emit({"kind": "tool_call", "phase": "done", "name": name, "output": output})
+                emit(
+                    {
+                        "kind": "tool_call",
+                        "phase": "done",
+                        "name": name,
+                        "output": output,
+                    }
+                )
                 return output
 
             def describe_screenshots(images):
                 """The screenshots described in text by a model that reads images."""
                 describers = sorted(image_input_model_keys())
                 if not describers:
-                    return {"error": "no_image_model: ни одна модель не принимает изображения"}
+                    return {
+                        "error": "no_image_model: ни одна модель не принимает изображения"
+                    }
                 describer = describers[0]
                 # The describer's own provider: the turn's client may be another one.
                 describer_client = chat_client(describer)
@@ -872,9 +908,7 @@ def _define_logos_client(base: type) -> type:
                         else "auto"
                     )
                 continuation_params["input"] = input_items
-                continuation_params["background"] = base_params.get(
-                    "background", False
-                )
+                continuation_params["background"] = base_params.get("background", False)
                 start_round(round_kind, part)
                 response = self._ask_provider(
                     message="",
@@ -917,7 +951,8 @@ def _define_logos_client(base: type) -> type:
                 ):
                     # Only reasoning was cut: give it back instead of "go on" (#1705).
                     prompt = REASONING_CUT_CONTINUE_PROMPT + (
-                        cut_reasoning.strip() or "(текст рассуждения провайдер не вернул)"
+                        cut_reasoning.strip()
+                        or "(текст рассуждения провайдер не вернул)"
                     )
                     if trace is not None:
                         trace.add_event(
@@ -1139,7 +1174,11 @@ def _court_censor(conv_id: str, reply: str, **ids: Any) -> dict[str, Any] | None
 
 
 def _court_record(
-    conv_id: str, message_id: Any, judged: dict[str, Any] | None, owner_id: Any, **ids: Any
+    conv_id: str,
+    message_id: Any,
+    judged: dict[str, Any] | None,
+    owner_id: Any,
+    **ids: Any,
 ) -> None:
     """Keep the original of a censored reply and bring the dialog's sitting up to date."""
     if judged is None or message_id is None:
@@ -1148,11 +1187,17 @@ def _court_record(
         record_court_reply(conv_id, message_id, judged, owner_id)
     except Exception as exc:
         logger.exception("[COURT] The sitting over the dialog was not updated")
-        _file_court_failure(conv_id, "court_sitting_failed", exc, message_id=message_id, **ids)
+        _file_court_failure(
+            conv_id, "court_sitting_failed", exc, message_id=message_id, **ids
+        )
 
 
 def _embed_turn(
-    conv_id: str, user_message_id: Any, reply_message_id: Any, reply: str, reasoning: str = ""
+    conv_id: str,
+    user_message_id: Any,
+    reply_message_id: Any,
+    reply: str,
+    reasoning: str = "",
 ) -> None:
     """The question, the model's thinking and the stored answer go into the app's vector
     database (collection dialogs): the thinking is the memory the remember tool searches
@@ -1160,31 +1205,59 @@ def _embed_turn(
 
     Runs in its own thread after the reply is stored; a failure is a Court case."""
     try:
-        question = get_message(conv_id, int(user_message_id)) if user_message_id else None
+        question = (
+            get_message(conv_id, int(user_message_id)) if user_message_id else None
+        )
         text = (
-            ("Пользователь: " + str(question.get("text") or question.get("content") or "") + "\n\n")
-            if isinstance(question, dict) else ""
-        ) + (
-            ("Мысли Логоса: " + reasoning.strip() + "\n\n") if reasoning and reasoning.strip() else ""
-        ) + (("Логос: " + reply) if reply else "")
+            (
+                (
+                    "Пользователь: "
+                    + str(question.get("text") or question.get("content") or "")
+                    + "\n\n"
+                )
+                if isinstance(question, dict)
+                else ""
+            )
+            + (
+                ("Мысли Логоса: " + reasoning.strip() + "\n\n")
+                if reasoning and reasoning.strip()
+                else ""
+            )
+            + (("Логос: " + reply) if reply else "")
+        )
         vector_add(
             "dialogs",
             text,
             f"{conv_id}-{reply_message_id}",
-            {"conversation_id": conv_id, "message_id": reply_message_id,
-             "user_message_id": user_message_id},
+            {
+                "conversation_id": conv_id,
+                "message_id": reply_message_id,
+                "user_message_id": user_message_id,
+            },
         )
     except Exception as exc:
         logger.exception("[VECTORS] The turn was not embedded")
-        _file_court_failure(conv_id, "dialog_embedding_failed", exc, message_id=reply_message_id)
+        _file_court_failure(
+            conv_id, "dialog_embedding_failed", exc, message_id=reply_message_id
+        )
 
 
 def _start_embed_turn(
-    conv_id: str, user_message_id: Any, reply_message_id: Any, reply: Any, reasoning: Any = ""
+    conv_id: str,
+    user_message_id: Any,
+    reply_message_id: Any,
+    reply: Any,
+    reasoning: Any = "",
 ) -> None:
     threading.Thread(
         target=_embed_turn,
-        args=(conv_id, user_message_id, reply_message_id, str(reply), str(reasoning or "")),
+        args=(
+            conv_id,
+            user_message_id,
+            reply_message_id,
+            str(reply),
+            str(reasoning or ""),
+        ),
         name="logos-embed-turn",
         daemon=True,
     ).start()
@@ -1346,11 +1419,14 @@ class _ChatReply:
 def _vector_dialog_reply(message, trace) -> _ChatReply:
     """A turn of the pinned embeddings dialog: the sense the vector database holds on the
     message, as text. Only the embedding model runs, so no chat model is loaded for it."""
-    found = vector_sense(str(message), exclude_conversation=VECTOR_CONVERSATION_ID, trace=trace)
+    found = vector_sense(
+        str(message), exclude_conversation=VECTOR_CONVERSATION_ID, trace=trace
+    )
     diagnostics: dict[str, Any] = {}
     capture_provider_diagnostics(diagnostics, {"status": "completed"})
     return _ChatReply(
-        reply=found["text"] or (
+        reply=found["text"]
+        or (
             "В базе есть записи, но к этому вопросу они ничего не добавляют."
             if found["searched"]
             else "В векторной базе нет ничего для поиска."
@@ -1373,14 +1449,18 @@ def _vector_dialog_reply(message, trace) -> _ChatReply:
     )
 
 
-def _execute_chat_model(message, model_key, invocation, params, trace, execution_policy=None):
+def _execute_chat_model(
+    message, model_key, invocation, params, trace, execution_policy=None
+):
     """Run one provider/tool turn and collect its terminal response.
 
     ``execution_policy`` (a named policy of chat.tool_policies) bounds what the turn's
     model is offered and may run: the corporation's roles work under theirs."""
     if invocation.conversation_id == VECTOR_CONVERSATION_ID:
         return _vector_dialog_reply(message, trace)
-    policy_kwargs = {"execution_policy": execution_policy} if execution_policy is not None else {}
+    policy_kwargs = (
+        {"execution_policy": execution_policy} if execution_policy is not None else {}
+    )
     client = chat_client(model_key)
     local = is_local_model(model_key)
     if local:
@@ -1539,10 +1619,14 @@ def _output_limit_message(client, response, trace) -> str:
                 + (f" {cut_names[0]}" if cut_names else "")
                 + ": он не выполнялся"
             )
-        return message + (
-            f"Модель не успела дописать {unfinished}. Нажмите «Повторить»; если так "
-            "повторяется, попросите модель разбить действие на части."
-        ) + cap_hint
+        return (
+            message
+            + (
+                f"Модель не успела дописать {unfinished}. Нажмите «Повторить»; если так "
+                "повторяется, попросите модель разбить действие на части."
+            )
+            + cap_hint
+        )
     # The last part decides, not the first: a continuation can spend its whole output
     # on reasoning after earlier parts wrote text. Hidden reasoning (no summary
     # returned) shows only in that part's token counts. The reasoning depth is fixed
@@ -1553,26 +1637,38 @@ def _output_limit_message(client, response, trace) -> str:
         part == 1 or last_reasoning_tokens >= (last_usage.get("output_tokens") or 0)
     )
     if reasoning_only or hidden_reasoning:
-        return message + (
-            (
-                "Модель потратила весь вывод продолжения на рассуждения и не "
-                "продолжила ответ. "
-                if part > 1
-                else "Модель потратила весь вывод на рассуждения и не начала ответ. "
+        return (
+            message
+            + (
+                (
+                    "Модель потратила весь вывод продолжения на рассуждения и не "
+                    "продолжила ответ. "
+                    if part > 1
+                    else "Модель потратила весь вывод на рассуждения и не начала ответ. "
+                )
+                + "Нажмите «Повторить»; если так повторяется, попросите ответить короче "
+                "или разбить ответ на части, либо выберите другую модель."
             )
-            + "Нажмите «Повторить»; если так повторяется, попросите ответить короче "
-            "или разбить ответ на части, либо выберите другую модель."
-        ) + cap_hint
+            + cap_hint
+        )
     if part == 1:
         # No continuation was sent: the first part already came without answer text.
-        return message + (
-            "Модель не успела начать ответ. Нажмите «Повторить»; если диалог очень "
+        return (
+            message
+            + (
+                "Модель не успела начать ответ. Нажмите «Повторить»; если диалог очень "
+                "длинный, начните новый диалог."
+            )
+            + cap_hint
+        )
+    return (
+        message
+        + (
+            "Продолжение не добавило текста. Нажмите «Повторить»; если диалог очень "
             "длинный, начните новый диалог."
-        ) + cap_hint
-    return message + (
-        "Продолжение не добавило текста. Нажмите «Повторить»; если диалог очень "
-        "длинный, начните новый диалог."
-    ) + cap_hint
+        )
+        + cap_hint
+    )
 
 
 def _build_chat_reply(client, response, trace) -> _ChatReply:
@@ -1727,7 +1823,11 @@ def _remember_turn_facts(owner_id, conv_id, model_key):
     """
     try:
         config = bound.load_memory_config()
-        if not owner_id or not config.get("enabled") or not config.get("auto_extraction"):
+        if (
+            not owner_id
+            or not config.get("enabled")
+            or not config.get("auto_extraction")
+        ):
             return
         lines = [
             f"{message['role']}: {message['text']}"
@@ -1843,7 +1943,11 @@ def _finalize_chat_turn(
     persist_invocation_trace(invocation.invocation_id, trace_data)
     judged = None
     # The Court judges a model's reply; no model speaks in the embeddings dialog, its answer is stored words.
-    if not provider_failed and reply and invocation.conversation_id != VECTOR_CONVERSATION_ID:
+    if (
+        not provider_failed
+        and reply
+        and invocation.conversation_id != VECTOR_CONVERSATION_ID
+    ):
         judged = _court_censor(
             invocation.conversation_id,
             str(reply),
@@ -2071,7 +2175,11 @@ def _chat_error_response(
         fail_invocation(invocation.invocation_id, error={"message": recorded_error})
     if error_message_id is not None and (partial_output or partial_reasoning):
         _start_embed_turn(
-            conv_id, user_message_id, error_message_id, partial_output, partial_reasoning
+            conv_id,
+            user_message_id,
+            error_message_id,
+            partial_output,
+            partial_reasoning,
         )
 
     return jsonify(
@@ -2158,9 +2266,7 @@ def _response_parts(rv):
 
 
 # The answer of a live turn whose worker failed outside every handled path.
-_LIVE_TURN_FAILED = (
-    "Сервер не смог обработать запрос. Повторите его; причина записана в журнале сервера."
-)
+_LIVE_TURN_FAILED = "Сервер не смог обработать запрос. Повторите его; причина записана в журнале сервера."
 
 
 def _live_done_body(status, body):
@@ -2374,7 +2480,9 @@ def _chat_turn(*, t_start, admission=None, live=None):
             user_message_id = add_message(
                 conv_id, "user", message, source=source, request_id=request_id
             )
-            reply_message_id = add_message(conv_id, "assistant", reply, source="corporation")
+            reply_message_id = add_message(
+                conv_id, "assistant", reply, source="corporation"
+            )
             return jsonify(
                 {
                     "reply": reply,
@@ -2412,7 +2520,9 @@ def _chat_turn(*, t_start, admission=None, live=None):
                     params["instructions"] = ROLES[office_role].prompt()
                     # the operational watchdog, unless the owner's request set a round limit
                     if not params.get("max_rounds"):
-                        params["max_rounds"] = ROLES[office_role].rounds or WATCHDOG_ROUNDS
+                        params["max_rounds"] = (
+                            ROLES[office_role].rounds or WATCHDOG_ROUNDS
+                        )
                     tool_policy = policy_for(office_role)
                 else:
                     office_role = None
@@ -2501,7 +2611,6 @@ def _chat_turn(*, t_start, admission=None, live=None):
                 base_instructions=params.get("instructions"),
             )
 
-
         if user_message_id is None:
             # The photo count is kept with the message, so a reloaded chat still shows which turn had photos.
             # The question carries the request id in the same commit: a request re-sent after
@@ -2541,7 +2650,12 @@ def _chat_turn(*, t_start, admission=None, live=None):
             office_token = corporation_context.set_role(office_role)
         try:
             result = _execute_chat_model(
-                message, model_key, invocation, params, trace, execution_policy=tool_policy
+                message,
+                model_key,
+                invocation,
+                params,
+                trace,
+                execution_policy=tool_policy,
             )
         finally:
             if office_token is not None:
@@ -2652,8 +2766,6 @@ def list_tool_categories():
             "failed_sources": bound.registry.load_failures,
         }
     )
-
-
 
 
 # Stored server credentials are not echoed back to the browser.
@@ -2803,7 +2915,12 @@ def conversations():
         else row
         for row in list_owned_conversations(owner_id)
     ]
-    rows.sort(key=lambda row: (row["id"] != COURT_CONVERSATION_ID, row["id"] != VECTOR_CONVERSATION_ID))
+    rows.sort(
+        key=lambda row: (
+            row["id"] != COURT_CONVERSATION_ID,
+            row["id"] != VECTOR_CONVERSATION_ID,
+        )
+    )
     return jsonify({"conversations": rows})
 
 
@@ -2900,14 +3017,21 @@ def fork_dialog(
             logger.exception("[COPY] Provider copy of %s failed", conv_id)
             raise ForkError("provider_copy_failed", 502, message=str(exc))
     copy_id = str(uuid.uuid4())
-    branch_title = normalize_conversation_title(title or get_conversation_title(conv_id))
+    branch_title = normalize_conversation_title(
+        title or get_conversation_title(conv_id)
+    )
     set_owner(copy_id, owner_id)
     create_conversation(copy_id, branch_title, model)
     if provider_id is not None:
         set_yandex_conversation(copy_id, provider_id)
     for m in turns:
         add_message(copy_id, m["role"], m["text"])
-    return {"id": copy_id, "title": branch_title, "model": model, "messages": len(turns)}
+    return {
+        "id": copy_id,
+        "title": branch_title,
+        "model": model,
+        "messages": len(turns),
+    }
 
 
 def call_yandex_operation(
@@ -2960,17 +3084,32 @@ def _message_id_arg(name):
 
 def _message_lines(messages, count):
     """NDJSON lines: the conversation's message count, the messages newest first, the end."""
-    yield _json.dumps(
-        validate_api_contract("chat.conversation.messages.stream.start", {"count": count})
-    ) + "\n"
+    yield (
+        _json.dumps(
+            validate_api_contract(
+                "chat.conversation.messages.stream.start", {"count": count}
+            )
+        )
+        + "\n"
+    )
     for message in reversed(messages):
-        yield _json.dumps(
-            validate_api_contract("chat.conversation.messages.stream.message", message),
-            ensure_ascii=False,
-        ) + "\n"
-    yield _json.dumps(
-        validate_api_contract("chat.conversation.messages.stream.end", {"end": True})
-    ) + "\n"
+        yield (
+            _json.dumps(
+                validate_api_contract(
+                    "chat.conversation.messages.stream.message", message
+                ),
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
+    yield (
+        _json.dumps(
+            validate_api_contract(
+                "chat.conversation.messages.stream.end", {"end": True}
+            )
+        )
+        + "\n"
+    )
 
 
 @mcp_bp.route("/api/conversations/<conv_id>/messages", methods=["GET"])
@@ -3003,7 +3142,9 @@ def get_conv_messages(conv_id):
             "last": messages[-1] if messages else None,
         }
         if since is not None:
-            body["range_count"] = sum(1 for message in messages if message["id"] >= since)
+            body["range_count"] = sum(
+                1 for message in messages if message["id"] >= since
+            )
         return jsonify(
             validate_api_contract("chat.conversation.messages.after.response", body)
         )

@@ -33,7 +33,7 @@ class LiveAcceptanceBudget:
         self.max_rub = max_rub
         self.max_window_seconds = max_window_seconds
         self.action_on_limit = "deny"
-        self._committed = Decimal("0")
+        self._committed = Decimal(0)
         self._finished = False
         self._outcome: str | None = None
 
@@ -46,7 +46,7 @@ class LiveAcceptanceBudget:
         *,
         predicted_rub: Decimal,
         elapsed_seconds: int,
-        free_tier_remaining_rub: Decimal = Decimal("0"),
+        free_tier_remaining_rub: Decimal = Decimal(0),
     ) -> None:
         del free_tier_remaining_rub
         if self._finished:

@@ -35,7 +35,9 @@ def mask(text: str) -> tuple[str, int]:
         if match.group("value").casefold().startswith(_PLACEHOLDERS):
             return match.group(0)
         count += 1
-        return match.group(1) + match.group("quote") + "[REDACTED]" + match.group("quote")
+        return (
+            match.group(1) + match.group("quote") + "[REDACTED]" + match.group("quote")
+        )
 
     def auth(match: re.Match) -> str:
         nonlocal count
@@ -50,7 +52,11 @@ def mask(text: str) -> tuple[str, int]:
     def email(match: re.Match) -> str:
         nonlocal count
         count += 1
-        return "[email:" + hashlib.sha256(match.group().casefold().encode()).hexdigest()[:16] + "]"
+        return (
+            "[email:"
+            + hashlib.sha256(match.group().casefold().encode()).hexdigest()[:16]
+            + "]"
+        )
 
     text = JSON_SECRET.sub(secret, text)
     text = AUTH_SECRET.sub(auth, text)
@@ -62,9 +68,19 @@ def path_is_sensitive(path: str) -> bool:
     """A credential file: its contents are never read."""
     name = path.rsplit("/", 1)[-1].lower()
     if name in {
-        ".env", ".npmrc", ".pypirc", "secrets.yaml", "secrets.yml", "secrets.json",
-        "credentials.yaml", "credentials.yml", "credentials.json", "auth.json",
-        "private.key", "id_rsa", "id_ed25519",
+        ".env",
+        ".npmrc",
+        ".pypirc",
+        "secrets.yaml",
+        "secrets.yml",
+        "secrets.json",
+        "credentials.yaml",
+        "credentials.yml",
+        "credentials.json",
+        "auth.json",
+        "private.key",
+        "id_rsa",
+        "id_ed25519",
     }:
         return True
     if name.startswith(".env.") and name != ".env.example":

@@ -13,7 +13,8 @@ import logging
 import math
 import re
 import time
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 logger = logging.getLogger("logos.browser.errors")
 
@@ -162,11 +163,14 @@ E_URL_SCHEME_HTTP = Message(
 )
 E_NO_HOST = Message("В адресе нет имени сервера: {url}")
 E_REDIRECT_LINK_LOCAL = Message(
-    "Перенаправление на адрес link-local заблокировано ({url}). "
-    + LINK_LOCAL_MESSAGE
+    "Перенаправление на адрес link-local заблокировано ({url}). " + LINK_LOCAL_MESSAGE
 )
-E_GUARD_FAILED = Message("Не удалось проверить адрес {url} ({type}); запрос не выполнен")
-E_GUARD_SETUP = Message("Не удалось включить проверку адресов в Chrome; вкладка закрыта")
+E_GUARD_FAILED = Message(
+    "Не удалось проверить адрес {url} ({type}); запрос не выполнен"
+)
+E_GUARD_SETUP = Message(
+    "Не удалось включить проверку адресов в Chrome; вкладка закрыта"
+)
 
 # Redirects and network
 E_TOO_MANY_REDIRECTS = Message(
@@ -290,7 +294,9 @@ E_BLOB_LINK = Message(
 
 # Forms. E_FIELD_NOT_FOUND: {where} is " в форме F1" or empty.
 E_FIELD_NOT_FOUND = Message("Поле «{field}» не найдено{where}. Поля: {list}")
-E_OPTION_NOT_FOUND = Message("В списке {ref} нет варианта «{value}». Варианты: {options}")
+E_OPTION_NOT_FOUND = Message(
+    "В списке {ref} нет варианта «{value}». Варианты: {options}"
+)
 E_FORM_MIXED = Message(
     "Поля относятся к разным формам ({forms}); заполняйте по одной форме"
 )
@@ -317,7 +323,9 @@ E_MAX_BYTES = Message(
     "Файл больше max_bytes={n} (получено {got}); загрузка прервана, частичный "
     "файл удалён"
 )
-E_DOWNLOAD_STATUS = Message("Сервер ответил {status} {reason} на {url}; файл не сохранён")
+E_DOWNLOAD_STATUS = Message(
+    "Сервер ответил {status} {reason} на {url}; файл не сохранён"
+)
 E_FILE_MISSING = Message("Файл не найден: {path}")
 
 # Views and reading. E_HISTORY_BACK: {earlier} is "; раньше: …" or empty.
@@ -449,7 +457,7 @@ def field_not_found_message(field: str, form_ref: str | None, fields: str) -> st
 class Deadline:
     """A whole-operation time budget; None or a non-positive value means none."""
 
-    __slots__ = ("seconds", "_end")
+    __slots__ = ("_end", "seconds")
 
     def __init__(self, seconds: float | None) -> None:
         value: float | None
@@ -483,15 +491,15 @@ class Deadline:
 
 
 __all__ = [
+    "CHROME_INSTALL_HINT",
+    "LINK_LOCAL_MESSAGE",
     "BrowserBlocked",
     "BrowserError",
     "BrowserNetworkError",
     "BrowserNotFound",
     "BrowserTimeout",
     "BrowserUnavailable",
-    "CHROME_INSTALL_HINT",
     "Deadline",
-    "LINK_LOCAL_MESSAGE",
     "Message",
     "auto_no_chrome_message",
     "chrome_missing_message",

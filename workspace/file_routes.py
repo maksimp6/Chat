@@ -37,7 +37,12 @@ def _err_response(e):
         # Provider and internal error text stays in the log, not in the response; a failure the person can act on
         # (a rejected API key) says so in its own Russian text.
         logger.error("[FILES] Request failed: %s", e)
-        return jsonify({"error": getattr(e, "user_text", None) or "Внутренняя ошибка сервиса файлов"}), code
+        return jsonify(
+            {
+                "error": getattr(e, "user_text", None)
+                or "Внутренняя ошибка сервиса файлов"
+            }
+        ), code
     return jsonify({"error": str(e)}), code
 
 
@@ -168,7 +173,9 @@ def create_vector_store():
     try:
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
-            return jsonify({"error": "Сервер не получил данные запроса. Повторите действие."}), 400
+            return jsonify(
+                {"error": "Сервер не получил данные запроса. Повторите действие."}
+            ), 400
         name = data.get("name")
         if not name:
             return jsonify({"error": "Введите название."}), 400
@@ -227,7 +234,9 @@ def add_file_to_vs(vs_id):
     try:
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
-            return jsonify({"error": "Сервер не получил данные запроса. Повторите действие."}), 400
+            return jsonify(
+                {"error": "Сервер не получил данные запроса. Повторите действие."}
+            ), 400
         file_id = data.get("file_id")
         if not file_id:
             return jsonify({"error": "Файл не выбран. Выберите файл и повторите."}), 400

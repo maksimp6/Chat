@@ -35,7 +35,9 @@ class _BodyReader:
     def read(self, size: int = -1) -> bytes:
         if self.remaining <= 0:
             return b""
-        to_read = self.remaining if size is None or size < 0 else min(size, self.remaining)
+        to_read = (
+            self.remaining if size is None or size < 0 else min(size, self.remaining)
+        )
         data = self._rfile.read(to_read)
         self.remaining -= len(data)
         if not data:
@@ -157,7 +159,7 @@ class WSGIRequestHandler(BaseHTTPRequestHandler):
                 self.close_connection = True
                 return
             self.run_wsgi()
-        except (TimeoutError, socket.timeout):
+        except TimeoutError:
             self.close_connection = True
         except (ConnectionError, OSError) as error:
             log.debug("connection %s dropped: %s", self.client_address, error)
@@ -308,7 +310,7 @@ class WSGIRequestHandler(BaseHTTPRequestHandler):
                 close = getattr(app_iter, "close", None)
                 if callable(close):
                     close()
-        except (ConnectionError, TimeoutError, socket.timeout) as error:
+        except (ConnectionError, TimeoutError) as error:
             log.debug("client %s went away: %s", self.client_address, error)
             self.close_connection = True
             return
@@ -373,7 +375,9 @@ class WSGIServer(socketserver.ThreadingMixIn, HTTPServer):
     request_queue_size = 128
     multithreaded = True
 
-    def __init__(self, app: Any, host: str, port: int, idle_timeout: float | None = 120.0) -> None:
+    def __init__(
+        self, app: Any, host: str, port: int, idle_timeout: float | None = 120.0
+    ) -> None:
         self.app = app
         self.idle_timeout = idle_timeout
         try:
@@ -396,7 +400,9 @@ class SingleThreadedWSGIServer(HTTPServer):
     allow_reuse_address = True
     multithreaded = False
 
-    def __init__(self, app: Any, host: str, port: int, idle_timeout: float | None = 120.0) -> None:
+    def __init__(
+        self, app: Any, host: str, port: int, idle_timeout: float | None = 120.0
+    ) -> None:
         self.app = app
         self.idle_timeout = idle_timeout
         super().__init__((host, port), WSGIRequestHandler)
@@ -409,11 +415,15 @@ def make_server(app: Any, host: str, port: int, threaded: bool = True) -> HTTPSe
     return cls(app, host, port)
 
 
-def serve(app: Any, host: str = "127.0.0.1", port: int = 5000, threaded: bool = True) -> None:
+def serve(
+    app: Any, host: str = "127.0.0.1", port: int = 5000, threaded: bool = True
+) -> None:
     """Serve ``app`` until the process is interrupted."""
     server = make_server(app, host, port, threaded=threaded)
     shown_host = host if ":" not in host else f"[{host}]"
-    log.info("Serving on http://%s:%s (press Ctrl+C to quit)", shown_host, server.server_port)
+    log.info(
+        "Serving on http://%s:%s (press Ctrl+C to quit)", shown_host, server.server_port
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:

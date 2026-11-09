@@ -22,8 +22,9 @@ import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Mapping
+from datetime import datetime, UTC
+from typing import Any
+from collections.abc import Callable, Mapping
 
 from browser.engine import HistoryItem, Hop, TabEngine
 from browser.errors import (
@@ -43,7 +44,7 @@ from browser.settings import ENGINE_MODES, SessionSettings
 
 logger = logging.getLogger("logos.browser.sessions")
 
-_SESSIONS: dict[str, "BrowserSession"] = {}
+_SESSIONS: dict[str, BrowserSession] = {}
 _SESSIONS_LOCK = threading.Lock()
 # Process-wide one-time steps: the exit hook and the orphan sweep of old Chrome profiles.
 _PROCESS_STATE: dict[str, bool] = {"atexit": False, "swept": False}
@@ -97,7 +98,7 @@ _NULL_SINK = _NullSink()
 def _iso(timestamp: float | None) -> str:
     if not timestamp:
         return "—"
-    return datetime.fromtimestamp(timestamp, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.fromtimestamp(timestamp, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _alive(browser: Any) -> bool:
@@ -188,7 +189,9 @@ class BrowserSession:
                 try:
                     cdp_to_jar(self._http.cookies, browser.get_cookies())
                 except BrowserError as exc:
-                    logger.debug("cookie pull from chrome failed: %s", type(exc).__name__)
+                    logger.debug(
+                        "cookie pull from chrome failed: %s", type(exc).__name__
+                    )
                     self.add_note(f"Не удалось забрать cookies из Chrome: {exc}")
             self.cookie_owner = "http"
         return self._http
@@ -231,7 +234,9 @@ class BrowserSession:
         if self.cookie_owner == "chrome":
             # Chrome's cookies are gone with it; the jar is the store again.
             self.cookie_owner = "http"
-        logger.debug("chrome of session %s lost (%s), tabs %s", self.key, exit_text, lost)
+        logger.debug(
+            "chrome of session %s lost (%s), tabs %s", self.key, exit_text, lost
+        )
         return lost
 
     def chrome(self, action: str, *, deadline: Deadline, ctx: Any) -> Any:
@@ -272,9 +277,15 @@ class BrowserSession:
                     "swept": swept,
                 },
             )
-            logger.debug("chrome started for session %s, pid %s", self.key, getattr(browser, "pid", None))
+            logger.debug(
+                "chrome started for session %s, pid %s",
+                self.key,
+                getattr(browser, "pid", None),
+            )
             if lost:
-                self.add_note(f"Chrome был перезапущен; вкладки chrome потеряны: {', '.join(lost)}")
+                self.add_note(
+                    f"Chrome был перезапущен; вкладки chrome потеряны: {', '.join(lost)}"
+                )
             if self.cookie_owner == "chrome":
                 self.cookie_owner = "http"
         if self.cookie_owner == "http":
@@ -346,11 +357,15 @@ class BrowserSession:
         tab = self.tabs.get(key)
         if tab is None:
             raise BrowserNotFound(
-                E_TAB_NOT_FOUND.format(id=str(tab_id).strip(), ids=", ".join(self.tabs) or "нет")
+                E_TAB_NOT_FOUND.format(
+                    id=str(tab_id).strip(), ids=", ".join(self.tabs) or "нет"
+                )
             )
         return tab
 
-    def new_tab(self, *, mode: str | None, opener: str | None = None, make_current: bool = True) -> Tab:
+    def new_tab(
+        self, *, mode: str | None, opener: str | None = None, make_current: bool = True
+    ) -> Tab:
         chosen = mode or self.settings.default_engine
         if chosen not in ENGINE_MODES:
             raise BrowserError(E_ENGINE_UNKNOWN.format(engine=chosen), kind="engine")
@@ -366,7 +381,13 @@ class BrowserSession:
         return tab
 
     def make_engine(
-        self, tab: Tab, kind: str, *, deadline: Deadline, ctx: Any, action: str = "browser_open"
+        self,
+        tab: Tab,
+        kind: str,
+        *,
+        deadline: Deadline,
+        ctx: Any,
+        action: str = "browser_open",
     ) -> TabEngine:
         """A new engine for ``tab`` without attaching it (the tab keeps its engine)."""
         if kind == "http":
@@ -374,7 +395,9 @@ class BrowserSession:
         browser = self.chrome(action, deadline=deadline, ctx=ctx)
         return browser.new_tab(tab.id, deadline=deadline)
 
-    def attach_engine(self, tab: Tab, engine: TabEngine, *, ctx: Any, reason: str = "") -> None:
+    def attach_engine(
+        self, tab: Tab, engine: TabEngine, *, ctx: Any, reason: str = ""
+    ) -> None:
         """Make ``engine`` the tab's engine; the old one's history is kept in tab.previous."""
         old = tab.engine
         if old is engine:
@@ -390,7 +413,9 @@ class BrowserSession:
             try:
                 old.close()
             except Exception as exc:
-                logger.debug("closing old engine of %s failed: %s", tab.id, type(exc).__name__)
+                logger.debug(
+                    "closing old engine of %s failed: %s", tab.id, type(exc).__name__
+                )
         tab.engine = engine
         tab.lost_reason = None
         ctx.event(
@@ -573,7 +598,11 @@ class BrowserSession:
 
     def describe(self) -> str:
         browser = self._chrome
-        pid = getattr(browser, "pid", None) if browser is not None and _alive(browser) else None
+        pid = (
+            getattr(browser, "pid", None)
+            if browser is not None and _alive(browser)
+            else None
+        )
         current = f", текущая {self.current_tab}" if self.current_tab else ""
         chrome_text = f", Chrome pid {pid}" if pid else ", Chrome не запущен"
         return (
@@ -624,10 +653,14 @@ def close_all() -> None:
             session.abort()
             session.shutdown("процесс Logos завершается")
         except Exception as exc:
-            logger.debug("closing session %s failed: %s", session.key, type(exc).__name__)
+            logger.debug(
+                "closing session %s failed: %s", session.key, type(exc).__name__
+            )
 
 
-def run_operation(ctx: Any, operation: Callable[[BrowserSession, dict, Any], dict], args: dict) -> dict:
+def run_operation(
+    ctx: Any, operation: Callable[[BrowserSession, dict, Any], dict], args: dict
+) -> dict:
     """Run one tool operation under the session lock of the caller's session."""
     session = get_session(ctx.session_key)
     with session.lock:

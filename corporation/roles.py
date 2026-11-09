@@ -17,7 +17,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-__all__ = ["ROLES", "ROLE_ORDER", "DEFAULT_GOAL", "WATCHDOG_ROUNDS", "Role", "RolePolicy", "policy_for", "policy_name"]
+__all__ = [
+    "DEFAULT_GOAL",
+    "ROLES",
+    "ROLE_ORDER",
+    "WATCHDOG_ROUNDS",
+    "Role",
+    "RolePolicy",
+    "policy_for",
+    "policy_name",
+]
 
 # The chat model the stick boots with today; a role that names another file makes the
 # cycle switch the runner's model at the shift boundary (POST /v1/model, a reboot).
@@ -48,8 +57,10 @@ class Role:
     name: str
     title: str
     instructions: str
-    rounds: int = 0             # tool rounds in one turn; 0 = the chat's own default, no cap of ours
-    turns: int = 0              # turns per task before it fails; 0 = as many as it takes
+    rounds: int = (
+        0  # tool rounds in one turn; 0 = the chat's own default, no cap of ours
+    )
+    turns: int = 0  # turns per task before it fails; 0 = as many as it takes
     gguf: str = DEFAULT_GGUF
     writes_products: bool = False
     # A placeholder personality (owner, 08.11.2026: "дай им личности пустышки"): a name, a face
@@ -58,10 +69,18 @@ class Role:
 
     @property
     def person(self) -> dict[str, str]:
-        return {"name": self.persona[0] or self.title, "avatar": self.persona[1], "motto": self.persona[2]}
+        return {
+            "name": self.persona[0] or self.title,
+            "avatar": self.persona[1],
+            "motto": self.persona[2],
+        }
 
     def prompt(self) -> str:
-        who = f"Тебя зовут {self.persona[0]}; {self.persona[2]}\n\n" if self.persona[0] else ""
+        who = (
+            f"Тебя зовут {self.persona[0]}; {self.persona[2]}\n\n"
+            if self.persona[0]
+            else ""
+        )
         return _COMMON + "\n\n" + who + self.instructions
 
 
@@ -79,7 +98,11 @@ ROLES: dict[str, Role] = {
             "directive (text — что делаем, для кого, по какой цене, почему это принесёт деньги; line — линия). "
             "Если открытые проекты не продаются, напиши note, что мешает и что изменить."
         ),
-        persona=("Вера", "💡", "ты основательница: хочешь, чтобы компания зарабатывала, и выбираешь то, что продастся быстрее."),
+        persona=(
+            "Вера",
+            "💡",
+            "ты основательница: хочешь, чтобы компания зарабатывала, и выбираешь то, что продастся быстрее.",
+        ),
     ),
     "director": Role(
         name="director",
@@ -93,7 +116,11 @@ ROLES: dict[str, Role] = {
             "Закрывай проекты, в которых всё сделано (corporation note с итогом). Когда директив без проекта "
             "нет, напиши строку отчёта правлению через corporation note: что сделано, что продано, что мешает."
         ),
-        persona=("Глеб", "🗂️", "ты директор: раскладываешь цель на задачи с измеримым результатом и не плодишь лишних."),
+        persona=(
+            "Глеб",
+            "🗂️",
+            "ты директор: раскладываешь цель на задачи с измеримым результатом и не плодишь лишних.",
+        ),
     ),
     "research": Role(
         name="research",
@@ -105,7 +132,11 @@ ROLES: dict[str, Role] = {
             "поручение corporation finish_task (task, result — выводы)."
         ),
         writes_products=True,
-        persona=("Ника", "🔭", "ты разведчица: факты, цифры, источники; домыслов не несёшь."),
+        persona=(
+            "Ника",
+            "🔭",
+            "ты разведчица: факты, цифры, источники; домыслов не несёшь.",
+        ),
     ),
     "production": Role(
         name="production",
@@ -119,7 +150,11 @@ ROLES: dict[str, Role] = {
             "(task, result). Если поручение невыполнимо — corporation fail_task с причиной."
         ),
         writes_products=True,
-        persona=("Макар", "👨‍🔧", "ты мастер цеха: делаешь вещь до конца, без заготовок и отговорок."),
+        persona=(
+            "Макар",
+            "👨‍🔧",
+            "ты мастер цеха: делаешь вещь до конца, без заготовок и отговорок.",
+        ),
     ),
     "critic": Role(
         name="critic",
@@ -130,7 +165,11 @@ ROLES: dict[str, Role] = {
             "ready или rework, notes). ready — продукт можно продавать как есть; rework — список конкретных "
             "правок. Мелкое можешь поправить сам и сказать об этом в notes. Затем corporation finish_task."
         ),
-        persona=("Инга", "🕵️", "ты контролёр: придирчива по делу, хвалишь редко, брак называешь браком."),
+        persona=(
+            "Инга",
+            "🕵️",
+            "ты контролёр: придирчива по делу, хвалишь редко, брак называешь браком.",
+        ),
     ),
     "marketing": Role(
         name="marketing",
@@ -141,7 +180,11 @@ ROLES: dict[str, Role] = {
             "тот, что включён; ВК для русской аудитории первый). Вызови corporation draft_offer (product, "
             "price, channel, text), затем corporation finish_task."
         ),
-        persona=("Лев", "🧑‍🎨", "ты маркетолог: пишешь коротко и ярко, цену называешь честно."),
+        persona=(
+            "Лев",
+            "🧑‍🎨",
+            "ты маркетолог: пишешь коротко и ярко, цену называешь честно.",
+        ),
     ),
     "sales": Role(
         name="sales",
@@ -153,7 +196,11 @@ ROLES: dict[str, Role] = {
             "product) отдаёт продукт после оплаты. Отвечай покупателям вежливо и по делу, без обещаний сверх "
             "оффера. Что сделал — corporation finish_task."
         ),
-        persona=("Дана", "🧑‍💼", "ты продавец: вежлива, конкретна, не обещаешь лишнего и доводишь до оплаты."),
+        persona=(
+            "Дана",
+            "🧑‍💼",
+            "ты продавец: вежлива, конкретна, не обещаешь лишнего и доводишь до оплаты.",
+        ),
     ),
 }
 

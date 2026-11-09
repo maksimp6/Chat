@@ -93,7 +93,9 @@ def _password() -> str:
         PRIVATE_KEY.chmod(0o600)
     _openssl("pkey", "-in", str(PRIVATE_KEY), "-pubout", "-out", str(PUBLIC_KEY))
     SERVER_KEY.write_text(SERVER_PUBLIC_KEY, encoding="ascii")
-    shared = _openssl("pkeyutl", "-derive", "-inkey", str(PRIVATE_KEY), "-peerkey", str(SERVER_KEY))
+    shared = _openssl(
+        "pkeyutl", "-derive", "-inkey", str(PRIVATE_KEY), "-peerkey", str(SERVER_KEY)
+    )
     return hashlib.sha256(shared).hexdigest()
 
 
@@ -115,7 +117,12 @@ def _config(password: str) -> dict:
                     "key_path": str(acme_cert.KEY),
                 },
             },
-            {"type": "socks", "tag": "socks", "listen": "0.0.0.0", "listen_port": SOCKS_PORT},
+            {
+                "type": "socks",
+                "tag": "socks",
+                "listen": "0.0.0.0",
+                "listen_port": SOCKS_PORT,
+            },
         ],
         "outbounds": [
             {"type": "direct", "tag": "direct"},
@@ -145,7 +152,12 @@ def _config(password: str) -> dict:
                     "action": "route",
                     "outbound": "direct",
                 },
-                {"inbound": ["socks"], "source_ip_cidr": HOME_NETWORK, "action": "route", "outbound": "server"},
+                {
+                    "inbound": ["socks"],
+                    "source_ip_cidr": HOME_NETWORK,
+                    "action": "route",
+                    "outbound": "server",
+                },
                 {"inbound": ["socks"], "action": "reject"},
             ],
         },
@@ -159,7 +171,9 @@ def _binary() -> str:
         return found
     # The package lists on the phone may be older than the files on the mirror.
     subprocess.run(["apt-get", "update"], check=False, stdin=subprocess.DEVNULL)
-    subprocess.run(["apt-get", "install", "-y", "sing-box"], check=True, stdin=subprocess.DEVNULL)
+    subprocess.run(
+        ["apt-get", "install", "-y", "sing-box"], check=True, stdin=subprocess.DEVNULL
+    )
     return shutil.which("sing-box") or "sing-box"
 
 

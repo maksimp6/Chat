@@ -225,12 +225,23 @@ def _category_names() -> set[str]:
     ):
         tree = ast.parse((ROOT / rel).read_text(encoding="utf-8"), rel)
         for node in tree.body:
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+            targets = (
+                node.targets
+                if isinstance(node, ast.Assign)
+                else [node.target]
+                if isinstance(node, ast.AnnAssign)
+                else []
+            )
             if not any(isinstance(t, ast.Name) and t.id == variable for t in targets):
                 continue
             value = getattr(node, "value", None)
             for entry in getattr(value, "elts", []):
-                if isinstance(entry, ast.Tuple) and entry.elts and isinstance(entry.elts[0], ast.Constant) and isinstance(entry.elts[0].value, str):
+                if (
+                    isinstance(entry, ast.Tuple)
+                    and entry.elts
+                    and isinstance(entry.elts[0], ast.Constant)
+                    and isinstance(entry.elts[0].value, str)
+                ):
                     names.add(entry.elts[0].value)
     bridge = ROOT / "mcp_server" / "tools.py"
     for node in ast.walk(ast.parse(bridge.read_text(encoding="utf-8"), str(bridge))):
@@ -248,9 +259,11 @@ def _category_names() -> set[str]:
 
 def tool_names() -> list[str]:
     names: set[str] = set(_category_names())
-    files = sorted((ROOT / "tool_providers").glob("*.py")) + [
-        ROOT / rel for rel in UNIT_TOOL_FILES
-    ] + _source_files()
+    files = (
+        sorted((ROOT / "tool_providers").glob("*.py"))
+        + [ROOT / rel for rel in UNIT_TOOL_FILES]
+        + _source_files()
+    )
     for path in sorted(set(files)):
         if not path.exists():
             continue
@@ -258,7 +271,9 @@ def tool_names() -> list[str]:
             _tool_dict_keys(ast.parse(path.read_text(encoding="utf-8"), str(path)))
         )
     bridge = ROOT / "mcp_server" / "tools.py"
-    names.update(_bridge_names(ast.parse(bridge.read_text(encoding="utf-8"), str(bridge))))
+    names.update(
+        _bridge_names(ast.parse(bridge.read_text(encoding="utf-8"), str(bridge)))
+    )
     return sorted(names)
 
 

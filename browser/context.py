@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 logger = logging.getLogger("logos.browser.context")
 
@@ -57,7 +58,9 @@ def resolve_session_key(args: Mapping[str, Any], cfg: Mapping[str, Any] | None) 
     if not isinstance(data, Mapping):
         return _DEFAULT_SESSION
     context = data.get("context")
-    conversation = context.get("conversation_id") if isinstance(context, Mapping) else None
+    conversation = (
+        context.get("conversation_id") if isinstance(context, Mapping) else None
+    )
     text = str(conversation or "").strip()
     if not text or text.startswith("mcp:"):
         return _DEFAULT_SESSION
@@ -67,12 +70,20 @@ def resolve_session_key(args: Mapping[str, Any], cfg: Mapping[str, Any] | None) 
 class CallContext:
     """What a browser operation needs from its tool call (the engines' EventSink)."""
 
-    def __init__(self, tool: str, args: Mapping[str, Any] | None, cfg: Mapping[str, Any] | None) -> None:
+    def __init__(
+        self, tool: str, args: Mapping[str, Any] | None, cfg: Mapping[str, Any] | None
+    ) -> None:
         self.tool = tool
         self.call = _call_of(cfg)
         self.trace = _trace_of(self.call) if self.call is not None else None
-        self.transport = str(getattr(self.call, "transport", "") or "") if self.call is not None else ""
-        self.session_key = resolve_session_key(args if isinstance(args, Mapping) else {}, cfg)
+        self.transport = (
+            str(getattr(self.call, "transport", "") or "")
+            if self.call is not None
+            else ""
+        )
+        self.session_key = resolve_session_key(
+            args if isinstance(args, Mapping) else {}, cfg
+        )
         # Trace events are recorded on the calling thread only (engine worker
         # threads queue theirs and the operation forwards them).
         self._thread = threading.get_ident()
