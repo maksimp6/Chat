@@ -6,6 +6,8 @@ the same breath, "dont do work instead of them". So nothing here writes a file *
 employee. The onboarding is one turn in the employee's own office dialog, where the
 employee answers with a ``corporation personnel`` call (cv, mood, readiness): the record
 is theirs — actor = the role — and it is embedded like every ledger record (``staff.file``).
+The file is also a file, ``<state>/corporation/staff/<role>.md`` (owner, 09.11.2026: the
+embeddings database "is not replace files manager"); the record carries its path.
 An employee who ends the turn without that call gets a ``note`` saying so, with their own
 words quoted; no file is invented for them.
 
@@ -215,4 +217,6 @@ def file_text(role: str) -> str:
     )
     if item.get("notes"):
         text += f"\nПримечания: {item['notes']}"
+    if item.get("path"):
+        text += f"\nФайл: {item['path']}"
     return text

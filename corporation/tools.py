@@ -282,18 +282,36 @@ def _personnel(args: dict[str, Any], cfg=None) -> dict[str, Any]:
         raise ValueError(
             f"a personnel file is written by an employee in their own office; here the actor is {actor}"
         )
+    cv, mood, readiness = str(args["cv"]), str(args["mood"]), str(args["readiness"])
+    notes = str(args.get("notes") or "")
+    # The file is a file (owner, 09.11.2026: the embeddings "is not replace files manager"):
+    # <state>/corporation/staff/<role>.md, the employee's own words and nothing added; the
+    # ledger record is the fact and carries the path; the vector copy is only the index.
+    path = journal.staff_dir() / f"{_safe_segment(actor)}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    title = ROLES[actor].title
+    text = (
+        f"# Личное дело — {title} ({actor})\n\n"
+        f"Компания мобильных приложений. Записано сотрудником самим.\n\n"
+        f"## Резюме\n\n{cv}\n\n## Эмоциональное состояние\n\n{mood}\n\n"
+        f"## Готовность к работе\n\n{readiness}\n"
+    )
+    if notes:
+        text += f"\n## Примечания\n\n{notes}\n"
+    path.write_text(text, encoding="utf-8")
     entry = journal.ledger().append(
         "staff.file",
         actor,
         {
             "role": actor,
-            "cv": str(args["cv"]),
-            "mood": str(args["mood"]),
-            "readiness": str(args["readiness"]),
-            "notes": str(args.get("notes") or ""),
+            "cv": cv,
+            "mood": mood,
+            "readiness": readiness,
+            "notes": notes,
+            "path": str(path),
         },
     )
-    return {"success": True, "role": actor, "seq": entry["seq"]}
+    return {"success": True, "role": actor, "seq": entry["seq"], "path": str(path)}
 
 
 def _note(args: dict[str, Any], cfg=None) -> dict[str, Any]:

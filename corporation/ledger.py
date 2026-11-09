@@ -28,7 +28,7 @@ from typing import Any
 
 logger = logging.getLogger("logos.corporation.ledger")
 
-__all__ = ["Ledger", "State", "ledger", "products_dir", "state", "state_dir"]
+__all__ = ["Ledger", "State", "ledger", "products_dir", "staff_dir", "state", "state_dir"]
 
 _ZERO = "0" * 64
 COLLECTION = "corporation"
@@ -88,6 +88,14 @@ def state_dir() -> Path:
 def products_dir() -> Path:
     """Where production writes the products: a directory the deploy keeps."""
     return state_dir() / "corporation" / "products"
+
+
+def staff_dir() -> Path:
+    """Where the personnel files live as files (``<role>.md``), next to the products.
+
+    Owner, 09.11.2026: the embeddings database "is not replace files manager" — the
+    vector copy is an index, a file is a file."""
+    return state_dir() / "corporation" / "staff"
 
 
 def _now() -> str:
@@ -285,6 +293,8 @@ class Ledger:
                     shutil.copytree(
                         products_dir(), target / "products", dirs_exist_ok=True
                     )
+                if staff_dir().is_dir():
+                    shutil.copytree(staff_dir(), target / "staff", dirs_exist_ok=True)
                 written.append(str(target))
             except OSError as exc:
                 logger.warning("[CORP] snapshot to %s failed: %s", target, exc)
@@ -663,6 +673,7 @@ def build_state(entries: list[dict[str, Any]]) -> State:
                     "mood": data.get("mood", ""),
                     "readiness": data.get("readiness", ""),
                     "notes": data.get("notes", ""),
+                    "path": data.get("path", ""),
                     "versions": (previous["versions"] + 1) if previous else 1,
                 }
         elif kind == "note":
