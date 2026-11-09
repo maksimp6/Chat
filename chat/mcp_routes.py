@@ -2863,6 +2863,32 @@ def _ensure_pinned_dialog(conv_id: str, title: str, owner_id: str) -> None:
         set_owner(conv_id, owner_id)
 
 
+def _ensure_corporation_offices(owner_id: str) -> dict[str, int]:
+    """Ensure every employee's static office dialog exists and is owned by the owner.
+
+    Returns {conversation_id: rank} for the offices (empty if the corporation module is
+    absent), so the listing can pin them and keep them in the company's own order, right
+    after the Court and the embeddings dialogs. Each office is created once, the first time
+    the list is drawn after a deploy, and its creation is written to the ledger (and so the
+    embeddings) — the seven employees are then always in the chat list, no command needed.
+    """
+    try:
+        from corporation import office as corporation_office
+    except Exception:
+        return {}
+    ranks: dict[str, int] = {}
+    for rank, (role, cid, ttl) in enumerate(corporation_office.OFFICES):
+        try:
+            fresh = get_conversation_title(cid) is None
+            _ensure_pinned_dialog(cid, ttl, owner_id)
+            if fresh:
+                corporation_office.record_office(role, cid)
+            ranks[cid] = rank
+        except Exception:
+            logger.exception("[CHAT] could not ensure corporation office %s", cid)
+    return ranks
+
+
 @mcp_bp.route("/api/conversations", methods=["GET", "POST"])
 def conversations():
     owner_id = get_current_owner_id()
@@ -2907,18 +2933,23 @@ def conversations():
 
     _ensure_pinned_dialog(COURT_CONVERSATION_ID, COURT_CONVERSATION_TITLE, owner_id)
     _ensure_pinned_dialog(VECTOR_CONVERSATION_ID, VECTOR_CONVERSATION_TITLE, owner_id)
-    rows = [
-        {**row, "court": True}
-        if row["id"] == COURT_CONVERSATION_ID
-        else {**row, "pinned": True}
-        if row["id"] == VECTOR_CONVERSATION_ID
-        else row
-        for row in list_owned_conversations(owner_id)
-    ]
+    office_ranks = _ensure_corporation_offices(owner_id)
+
+    def _decorate(row):
+        if row["id"] == COURT_CONVERSATION_ID:
+            return {**row, "court": True}
+        if row["id"] == VECTOR_CONVERSATION_ID:
+            return {**row, "pinned": True}
+        if row["id"] in office_ranks:
+            return {**row, "pinned": True, "office": True}
+        return row
+
+    rows = [_decorate(row) for row in list_owned_conversations(owner_id)]
     rows.sort(
         key=lambda row: (
             row["id"] != COURT_CONVERSATION_ID,
             row["id"] != VECTOR_CONVERSATION_ID,
+            office_ranks.get(row["id"], len(office_ranks)),
         )
     )
     return jsonify({"conversations": rows})
