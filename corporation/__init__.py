@@ -1,5 +1,9 @@
-"""The corporation: a company of roles that works on the owner's bare-metal runner
-and keeps every step in a ledger that forgets nothing (docs/agents/logos-corporation.md).
+"""The corporation: a mobile app company of roles that works on the owner's bare-metal
+runner and keeps every step in a ledger that forgets nothing (docs/agents/logos-corporation.md).
+
+Owner, 09.11.2026: "build me a mobile app company" — the company makes and sells mobile
+applications: source projects for Android and installable mobile web applications (PWA);
+``lines.COMPANY_LINES`` and ``roles.DEFAULT_GOAL`` say so.
 
 Owner, 08.11.2026: "i want full company running there, imagine like corporation
 making money so let them be there, build infrastructure and no lose any data of it

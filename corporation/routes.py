@@ -1,7 +1,7 @@
 """POST /api/corporation: the board window reads here; actions are the owner's commands.
 
 One endpoint, ``action`` picks what to do (status, conveyor, ledger, projects, start, stop,
-directive, decision, sold, expense, channel, backup), the same words as the chat
+goal, directive, decision, sold, expense, channel, backup), the same words as the chat
 commands, so the window and the chat are one steering wheel.
 """
 
@@ -18,6 +18,7 @@ corporation_bp = Blueprint("corporation", __name__)
 _COMMAND_WORDS = {
     "start": "старт",
     "stop": "стоп",
+    "goal": "цель",
     "directive": "директива",
     "decision": "решение",
     "sold": "продано",

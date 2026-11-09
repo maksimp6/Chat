@@ -390,11 +390,11 @@ class State:
 
     def brief(self, limit_chars: int = 1500) -> str:
         """The company's situation for a role's prompt: short, Russian, facts only."""
+        from corporation.roles import DEFAULT_GOAL
+
         lines = []
         money = self.money
-        lines.append(
-            f"Цель компании: {self.goal or 'увеличивать подтверждённую выручку любой работой, которую можно сделать здесь и продать'}"
-        )
+        lines.append(f"Цель компании: {self.goal or DEFAULT_GOAL}")
         lines.append(
             f"Касса: предложено {money['proposed']:.0f}, подтверждено {money['confirmed']:.0f}, расходы {money['expenses']:.0f} RUB."
         )
