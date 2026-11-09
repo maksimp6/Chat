@@ -137,6 +137,17 @@ def screen_state():
     }
 
 
+def require_screen(expected=None):
+    state = screen_state()
+    if state.get("display_on") is not True:
+        raise AgentError("screen_not_awake")
+    if not state["unlocked"] or not state["package"] or not state.get("focus_window"):
+        raise AgentError("screen_locked_or_unknown")
+    if expected is not None and state["package"] != expected:
+        raise AgentError("foreground_package_mismatch")
+    return state
+
+
 def screen_size():
     """Current display size in pixels, for bounding absolute coordinates."""
     out = bounded_command(["/system/bin/wm", "size"], 256).decode("utf-8", "replace")
