@@ -16,6 +16,8 @@ make system synchronous step after step".
 - ``channels`` the company's own hands outside (Telegram, mail) behind the Court gate
 - ``cash``     revenue and expenses, counted from the ledger
 - ``cycle``    the synchronous loop: one step, one role, one runner; shifts by model
+- ``office``   an employee's own dialog (fixed id ``logos-corp-<role>``), where the owner talks to one
+- ``staff``    onboarding: each employee writes their own personnel file; the Court checks the set
 - ``commands`` the owner's steering lines in the chat ("корпорация: …")
 - ``routes``   POST /api/corporation for the board window
 """

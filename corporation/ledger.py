@@ -68,6 +68,7 @@ KINDS = frozenset(
         "cycle.tick",
         "cycle.error",
         "model.switch",
+        "staff.file",
         "note",
         "backup",
     }
@@ -346,6 +347,9 @@ class State:
     published: list[dict[str, Any]] = field(
         default_factory=list
     )  # offer.published: boxes on the shelf
+    staff: dict[str, dict[str, Any]] = field(
+        default_factory=dict
+    )  # role -> the latest personnel file (staff.file, written by the employee)
 
     def next_id(self, prefix: str, table: dict[str, Any]) -> str:
         width = {"p": 4, "t": 5, "pr": 4, "o": 4}.get(prefix, 4)
@@ -381,6 +385,7 @@ class State:
                 for status in ("draft", "published")
             },
             "clients": len(self.clients),
+            "staff": len(self.staff),
             "money": {
                 key: self.money[key] for key in ("proposed", "confirmed", "expenses")
             },
@@ -646,6 +651,20 @@ def build_state(entries: list[dict[str, Any]]) -> State:
                 st.last_founder = e["at"]
         elif kind == "model.switch":
             st.cycle["model"] = data.get("to")
+        elif kind == "staff.file":
+            role = str(data.get("role") or e.get("actor") or "")
+            if role:
+                previous = st.staff.get(role)
+                st.staff[role] = {
+                    "role": role,
+                    "seq": e["seq"],
+                    "at": e["at"],
+                    "cv": data.get("cv", ""),
+                    "mood": data.get("mood", ""),
+                    "readiness": data.get("readiness", ""),
+                    "notes": data.get("notes", ""),
+                    "versions": (previous["versions"] + 1) if previous else 1,
+                }
         elif kind == "note":
             st.notes.append(
                 {"seq": e["seq"], "at": e["at"], "actor": e.get("actor"), **data}

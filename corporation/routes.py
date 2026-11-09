@@ -1,7 +1,7 @@
 """POST /api/corporation: the board window reads here; actions are the owner's commands.
 
-One endpoint, ``action`` picks what to do (status, conveyor, ledger, projects, start, stop,
-goal, directive, decision, sold, expense, channel, backup), the same words as the chat
+One endpoint, ``action`` picks what to do (status, conveyor, ledger, projects, staff, start,
+stop, goal, directive, decision, sold, expense, channel, backup, onboarding), the same words as the chat
 commands, so the window and the chat are one steering wheel.
 """
 
@@ -25,6 +25,7 @@ _COMMAND_WORDS = {
     "expense": "расход",
     "channel": "канал",
     "backup": "снимок",
+    "onboarding": "онбординг",
 }
 
 
@@ -78,6 +79,22 @@ def corporation_action() -> Any:
                     "clients": list(st.clients.values()),
                     "decisions": st.decisions[-20:],
                     "cash": cash.summary(st),
+                }
+            )
+        if action == "staff":
+            from corporation import staff
+            from corporation.roles import ROLES
+
+            st = journal.state()
+            return jsonify(
+                {
+                    "success": True,
+                    "staff": st.staff,
+                    "onboarding_running": staff.running(),
+                    "roles": {
+                        name: {"title": role.title, "person": role.person}
+                        for name, role in ROLES.items()
+                    },
                 }
             )
         if action in _COMMAND_WORDS:

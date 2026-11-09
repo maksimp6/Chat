@@ -278,6 +278,8 @@ python, remember); нет бюджетов ходов и раундов, нет 
 | `корпорация: продано <продукт> <сумма> [<примечание>]` | `revenue.confirmed` вручную — для продаж мимо каналов (касса пишет остальные сама) |
 | `корпорация: расход <сумма> <на что>` | `expense` |
 | `корпорация: канал <имя> вкл|выкл` | включить или остановить канал продаж |
+| `корпорация: онбординг [роль]` | каждый сотрудник (или один) получает ход в своём кабинете и сам пишет личное дело инструментом `corporation personnel` (cv, mood, readiness → запись `staff.file`, actor — его роль); кто не записал — `note` с его словами, дело за него не пишется (владелец, 09.11.2026: «dont do work instead of them»); когда прошли все, набор уходит в Суд (диалог `logos-court`), вердикт — `note` actor `court`, `check: onboarding` |
+| `корпорация: дело <роль>` | личное дело сотрудника из журнала: резюме, состояние, готовность, версия |
 | `корпорация: статус` | ответ в чат: проекты, задачи, продукты, касса, последний тик |
 | `корпорация: снимок` | резервная копия сейчас |
 
@@ -332,8 +334,10 @@ python, remember); нет бюджетов ходов и раундов, нет 
 | `corporation/roles.py` | отделы: промпты, инструменты, бюджеты; ворота цикла (что роли можно) |
 | `corporation/cycle.py` | тик, выбор смены, ход роли через клиент Логоса с инструментами, бюджеты, снимки, фоновый поток |
 | `corporation/commands.py` | разбор команд «корпорация: …» из чата |
-| `corporation/routes.py` | `POST /api/corporation` с полем `action`: status, conveyor, ledger, projects, start, stop, goal, directive, decision, sold, expense, channel, backup |
-| `corporation/tools.py` | инструмент `corporation` для ролей: одна функция, действия open_project, open_task, finish_task, fail_task, draft_product, product_ready, draft_offer, note |
+| `corporation/routes.py` | `POST /api/corporation` с полем `action`: status, conveyor, ledger, projects, staff, start, stop, goal, directive, decision, sold, expense, channel, backup, onboarding |
+| `corporation/tools.py` | инструмент `corporation` для ролей: одна функция, действия open_project, open_task, finish_task, fail_task, draft_product, review_product, draft_offer, directive, personnel, note, status |
+| `corporation/office.py` | кабинеты: фиксированный диалог `logos-corp-<роль>` на каждого сотрудника, закреплён в списке чатов |
+| `corporation/staff.py` | онбординг: ход в кабинете каждого, личное дело пишет сам сотрудник (`staff.file`), набор сверяет Суд |
 | `corporation/channels.py` | каналы наружу (Telegram, почта, сайт, git) за воротами Суда; инструмент `channels` для продаж: publish, reply, deliver, inbox |
 | `corporation/treasury.py` | касса: опрос провайдера и почты, `revenue.*`, `expense`, итоги |
 | `static/corporation/` | окно правления |

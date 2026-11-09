@@ -30,6 +30,8 @@ HELP = (
     "• корпорация: статус — положение дел\n"
     "• корпорация: снимок — резервная копия сейчас\n"
     "• корпорация: журнал [n] — последние записи\n"
+    "• корпорация: онбординг [роль] — каждый сотрудник сам пишет личное дело в своём кабинете (резюме, состояние, готовность); набор сверяет Суд\n"
+    "• корпорация: дело <роль> — личное дело сотрудника из журнала\n"
     "• корпорация: кабинеты — открыть кабинеты сотрудников (диалоги)\n"
     "• корпорация: <имя> (Вера, Глеб, Ника, Макар, Инга, Лев, Дана) — кабинет сотрудника; пиши туда и он сделает"
 )
@@ -200,7 +202,32 @@ def handle(message: str) -> str:
         except ValueError:
             count = 20
         return _journal_text(max(1, count))
-    if word in ("кабинеты", "сотрудники", "offices", "staff"):
+    if word in ("онбординг", "onboarding"):
+        from corporation import staff
+        from corporation.roles import ROLES
+
+        role = tail.lower() or None
+        if role and role not in ROLES:
+            return f"Нет такой роли: {role}. Роли: {', '.join(ROLES)}."
+        made = staff.onboard(role)
+        if not made["started"]:
+            return str(made["reason"])
+        return (
+            "Онбординг запущен: "
+            + ", ".join(ROLES[r].title for r in made["roles"])
+            + ". Каждый пишет личное дело сам, в своём кабинете (corporation personnel: резюме, "
+            "состояние, готовность); за него никто не пишет. Когда все прошли, набор уходит на "
+            "сверку в Суд. Смотреть: корпорация: дело <роль>."
+        )
+    if word in ("дело", "file"):
+        from corporation import staff
+        from corporation.roles import ROLES
+
+        role = tail.lower()
+        if role not in ROLES:
+            return "Формат: корпорация: дело <роль>; роли: " + ", ".join(ROLES) + "."
+        return staff.file_text(role)
+    if word in ("кабинеты", "сотрудники", "offices"):
         from corporation import office
 
         made = office.ensure_all()

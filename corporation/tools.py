@@ -274,6 +274,28 @@ def _directive(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     }
 
 
+def _personnel(args: dict[str, Any], cfg=None) -> dict[str, Any]:
+    """The employee's own personnel file — written by the employee in their office, never
+    for them (owner, 09.11.2026: "dont do work instead of them")."""
+    actor = _actor()
+    if actor not in ROLES:
+        raise ValueError(
+            f"a personnel file is written by an employee in their own office; here the actor is {actor}"
+        )
+    entry = journal.ledger().append(
+        "staff.file",
+        actor,
+        {
+            "role": actor,
+            "cv": str(args["cv"]),
+            "mood": str(args["mood"]),
+            "readiness": str(args["readiness"]),
+            "notes": str(args.get("notes") or ""),
+        },
+    )
+    return {"success": True, "role": actor, "seq": entry["seq"]}
+
+
 def _note(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     step = _step()
     entry = journal.ledger().append(
@@ -448,6 +470,21 @@ CORPORATION_TOOLS = {
         },
         title="Директива основателя",
         description="Основатель: что компания делает дальше (что, для кого, цена, почему принесёт деньги). Директор откроет по ней проект.",
+    ),
+    "personnel": _tool(
+        _personnel,
+        read_only=False,
+        schema={
+            "properties": {
+                "cv": _TEXT,
+                "mood": _TEXT,
+                "readiness": _TEXT,
+                "notes": _TEXT,
+            },
+            "required": ["cv", "mood", "readiness"],
+        },
+        title="Личное дело",
+        description="Сотрудник о себе, в своём кабинете: cv — резюме (кто ты, что умеешь, чем полезен компании мобильных приложений); mood — эмоциональное состояние сейчас; readiness — готовность к работе (готов или нет и почему). Пишется только самим сотрудником; за него никто не пишет.",
     ),
     "note": _tool(
         _note,
