@@ -54,9 +54,8 @@ def safe_join(directory: str, *pathnames: str) -> str | None:
             return None
         normalized = posixpath.normpath(filename)
         if (
-            normalized.startswith("/")
+            normalized.startswith(("/", "../"))
             or normalized == ".."
-            or normalized.startswith("../")
             or os.path.isabs(normalized)
         ):
             return None

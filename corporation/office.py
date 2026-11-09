@@ -30,14 +30,14 @@ from corporation import ledger as journal
 from corporation.roles import ROLE_ORDER, ROLES
 
 __all__ = [
-    "title",
-    "office_id",
     "OFFICES",
-    "role_of_conversation",
-    "ensure_office",
     "ensure_all",
-    "record_office",
+    "ensure_office",
+    "office_id",
     "offices",
+    "record_office",
+    "role_of_conversation",
+    "title",
 ]
 
 logger = logging.getLogger("logos.corporation.office")
@@ -127,7 +127,14 @@ def ensure_all() -> list[dict[str, str]]:
     for role, cid, ttl in OFFICES:
         _ensure_dialog(cid, ttl)
         record_office(role, cid)
-        result.append({"role": role, "name": ROLES[role].person["name"], "title": ttl, "conversation": cid})
+        result.append(
+            {
+                "role": role,
+                "name": ROLES[role].person["name"],
+                "title": ttl,
+                "conversation": cid,
+            }
+        )
     return result
 
 
@@ -138,8 +145,15 @@ def _ensure_dialog(conv_id: str, ttl: str) -> None:
     when an office is opened by command before the list has been drawn.
     """
     try:
-        from chat.host import create_conversation, get_conversation_title, get_current_owner_id, set_owner
-    except Exception:  # pragma: no cover - the store is always present in the web process
+        from chat.host import (
+            create_conversation,
+            get_conversation_title,
+            get_current_owner_id,
+            set_owner,
+        )
+    except (
+        Exception
+    ):  # pragma: no cover - the store is always present in the web process
         logger.exception("[CORP] office store unavailable")
         return
     try:

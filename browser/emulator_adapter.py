@@ -12,8 +12,9 @@ import os
 import shutil
 import subprocess
 import threading
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping, TextIO
+from typing import Any
 
 from browser.capabilities import BrowserAction
 
@@ -95,4 +96,4 @@ class EmulatorBrowserAdapter:
         return self._process
 
 
-__all__ = ["EmulatorBrowserAdapter", "SERVER_SCRIPT"]
+__all__ = ["SERVER_SCRIPT", "EmulatorBrowserAdapter"]

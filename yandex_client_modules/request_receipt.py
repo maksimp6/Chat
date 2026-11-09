@@ -210,7 +210,12 @@ def build_request_manifest(payload: dict[str, Any]) -> dict[str, Any]:
         "metadata": _field(payload, "metadata"),
         "linkage": {
             name: _field(payload, name)
-            for name in ("conversation", "previous_response_id", "prompt_cache_key", "user")
+            for name in (
+                "conversation",
+                "previous_response_id",
+                "prompt_cache_key",
+                "user",
+            )
         },
     }
 
@@ -281,7 +286,9 @@ def build_model_view(payload: dict[str, Any]) -> dict[str, Any]:
     tool_groups = []
     for entry in sorted(groups.values(), key=lambda item: -item["chars"]):
         sized = sorted(entry.pop("sized"), reverse=True)
-        entry["names"] = ", ".join(f"{name} {size}" for size, name in sized)[:_VIEW_PART]
+        entry["names"] = ", ".join(f"{name} {size}" for size, name in sized)[
+            :_VIEW_PART
+        ]
         tool_groups.append(entry)
 
     raw_input = payload.get("input")
@@ -306,7 +313,10 @@ def build_model_view(payload: dict[str, Any]) -> dict[str, Any]:
         elif kind == "function_call_output":
             output = item.get("output")
             row["text_parts"] = _view_parts(
-                output if isinstance(output, str) else json.dumps(output, ensure_ascii=False), 10
+                output
+                if isinstance(output, str)
+                else json.dumps(output, ensure_ascii=False),
+                10,
             )
         input_rows.append(row)
     if len(items) > _VIEW_ITEMS:
@@ -318,9 +328,14 @@ def build_model_view(payload: dict[str, Any]) -> dict[str, Any]:
         "model": model
         if isinstance(model, str) and not _CREDENTIAL_MARKER.search(model)
         else None,
-        "tool_choice": choice if isinstance(choice, str) or choice is None else json.dumps(choice),
+        "tool_choice": choice
+        if isinstance(choice, str) or choice is None
+        else json.dumps(choice),
         "payload_chars": _view_chars(payload),
-        "instructions": {"chars": len(instructions), "text_parts": _view_parts(instructions)},
+        "instructions": {
+            "chars": len(instructions),
+            "text_parts": _view_parts(instructions),
+        },
         "tools": {
             "count": len(tools),
             "chars": _view_chars(tools) if tools else 0,

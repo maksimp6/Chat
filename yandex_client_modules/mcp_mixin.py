@@ -2,8 +2,12 @@
 
 from typing import Any
 
-
 from yandex_client_modules.api_logger import api_logger
+from yandex_client_modules.host import (
+    bound,
+    get_controlled_memory_summary,
+    get_current_owner_id,
+)
 from yandex_client_modules.request_builder import response_input
 from yandex_client_modules.tool_config import (
     deferred_tool_categories,
@@ -11,11 +15,6 @@ from yandex_client_modules.tool_config import (
     global_settings,
     knowledge_vector_store_ids,
     normalize_tools_config,
-)
-from yandex_client_modules.host import (
-    bound,
-    get_controlled_memory_summary,
-    get_current_owner_id,
 )
 
 
@@ -91,6 +90,7 @@ FILE_SEARCH_ON_NOTE = (
     "содержит, так и скажи."
 )
 
+
 class YandexMcpMixin:
     def ask_with_mcp(
         self,
@@ -112,6 +112,7 @@ class YandexMcpMixin:
         # Shared conversations use the installation's MCP configuration, including
         # conversations created before ownership metadata existed.
         owner_id = get_current_owner_id()
+
         def note(source: str, message: str) -> None:
             """A part of the turn left out on purpose is recorded, not dropped silently."""
             if trace is not None and isinstance(trace, bound.ExecutionTrace):
@@ -250,11 +251,15 @@ class YandexMcpMixin:
         actions_offered = 0
         # Which tool each action sits in, for a tool_choice that names an action.
         grouped_into: dict[str, str] = {}
-        allow_action = None if execution_policy is None else execution_policy.allows_tool
+        allow_action = (
+            None if execution_policy is None else execution_policy.allows_tool
+        )
         defer_on, eager_categories = deferred_tool_categories(tools_config)
         for category in active_cats:
             try:
-                actions = bound.registry.get_actions(category, allow_action=allow_action)
+                actions = bound.registry.get_actions(
+                    category, allow_action=allow_action
+                )
                 if not actions:
                     continue
                 functions = bound.registry.get_tools_by_category(
@@ -319,7 +324,10 @@ class YandexMcpMixin:
         if not tools and ask_params.get("tool_choice") == "required":
             # Nothing to call (every tool switched off): a required call cannot be met.
             ask_params["tool_choice"] = "auto"
-            note("tool_choice", "tool_choice required released to auto: no tool in this turn")
+            note(
+                "tool_choice",
+                "tool_choice required released to auto: no tool in this turn",
+            )
         elif ask_params.get("tool_choice") == "required" and not any(
             tool.get("type") in ("function", "mcp") for tool in tools
         ):
@@ -328,7 +336,9 @@ class YandexMcpMixin:
             # File Search first.
             hosted_types = [tool.get("type") for tool in tools]
             ask_params["tool_choice"] = {
-                "type": "file_search" if "file_search" in hosted_types else hosted_types[0]
+                "type": "file_search"
+                if "file_search" in hosted_types
+                else hosted_types[0]
             }
         choice = ask_params.get("tool_choice")
         if (
@@ -341,7 +351,7 @@ class YandexMcpMixin:
             # and say which action of it, so the choice is not widened to the tool.
             ask_params["tool_choice"] = {**choice, "name": grouped_into[choice["name"]]}
             ask_params["instructions"] = (ask_params.get("instructions") or "") + (
-                f"\n\nВызови {grouped_into[choice['name']]} с tool=\"{choice['name']}\"."
+                f'\n\nВызови {grouped_into[choice["name"]]} с tool="{choice["name"]}".'
             )
             if trace is not None and isinstance(trace, bound.ExecutionTrace):
                 trace.add_event(

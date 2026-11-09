@@ -10,7 +10,7 @@ import math
 from types import SimpleNamespace
 
 import requests
-from webframe import Blueprint, jsonify, request
+
 from chat._error_details import error_body
 from chat.host import (
     bound,
@@ -20,7 +20,7 @@ from chat.host import (
     provider_request_headers,
     traced_operation,
 )
-
+from webframe import Blueprint, jsonify, request
 
 completion_bp = Blueprint("completion", __name__)
 
@@ -41,6 +41,8 @@ def _cost(usage: dict | None) -> float | None:
         "total_tokens": int(usage.get("totalTokens") or 0),
     }
     return build_ai_billing_item(MODEL_KEY, tokens, step=1).get("total_cost")
+
+
 MAX_TEXT_CHARS = 32000
 MAX_INT64 = (1 << 63) - 1
 ALLOWED_FIELDS = {"model", "message", "messages", "temperature", "max_tokens"}
@@ -115,9 +117,7 @@ def create_completion():
             error_body("unknown_parameters", parameters=sorted(unknown))
         ), 400
     if body.get("model", MODEL_KEY) != MODEL_KEY:
-        return jsonify(
-            error_body("unsupported_completion_model", model=MODEL_KEY)
-        ), 400
+        return jsonify(error_body("unsupported_completion_model", model=MODEL_KEY)), 400
     try:
         messages = _messages_from_body(body)
         options = _completion_options(body)

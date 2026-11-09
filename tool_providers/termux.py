@@ -96,7 +96,7 @@ def remove_file(args: dict, cfg: dict) -> dict:
                 os.remove(f)
                 deleted.append(f)
         except Exception as e:
-            return {"success": False, "error": f"Ошибка при удалении {f}: {str(e)}"}
+            return {"success": False, "error": f"Ошибка при удалении {f}: {e!s}"}
     return {
         "success": True,
         "message": f"Удалено файлов: {len(deleted)} ({', '.join(deleted)})",

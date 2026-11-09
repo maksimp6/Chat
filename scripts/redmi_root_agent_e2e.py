@@ -102,18 +102,18 @@ class Witness:
 
     def snapshot(self):
         with self.lock:
-            return dict(
-                ready=self.ready,
-                negative=self.negative,
-                clicks=self.clicks,
-                move_time=self.move_time,
-                move_seq=self.move_seq,
-                inside=self.inside,
-                heartbeat_time=self.heartbeat_time,
-                focused=self.focused,
-                painted=self.painted,
-                page=dict(self.page),
-            )
+            return {
+                "ready": self.ready,
+                "negative": self.negative,
+                "clicks": self.clicks,
+                "move_time": self.move_time,
+                "move_seq": self.move_seq,
+                "inside": self.inside,
+                "heartbeat_time": self.heartbeat_time,
+                "focused": self.focused,
+                "painted": self.painted,
+                "page": dict(self.page),
+            }
 
     def active(self):
         state = self.snapshot()
@@ -135,6 +135,7 @@ def run_cli(helper, *args):
         capture_output=True,
         text=True,
         timeout=30,
+        check=False,
     )
     try:
         data = json.loads(result.stdout)
@@ -318,7 +319,9 @@ def main():
                 args.package,
             ]
         )
-        opened = subprocess.run(["su", "-c", command], capture_output=True, timeout=15)
+        opened = subprocess.run(
+            ["su", "-c", command], capture_output=True, timeout=15, check=False
+        )
         if (
             opened.returncode
             or b"Error:" in opened.stdout

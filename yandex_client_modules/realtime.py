@@ -6,13 +6,12 @@ import asyncio
 import base64
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 from urllib.parse import urlencode
 
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
-
 
 REALTIME_URL = "wss://ai.api.cloud.yandex.net/v1/realtime/openai"
 OUTPUT_RATE = 44100
@@ -120,7 +119,7 @@ async def generate_realtime(
                     raise RealtimeError("Истекло время голосовой сессии")
                 try:
                     raw = await asyncio.wait_for(websocket.recv(), min(1, remaining))
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
                 try:
                     event = json.loads(raw)

@@ -25,8 +25,6 @@ import urllib.request
 from typing import Any
 from uuid import uuid4
 
-from webframe import Blueprint, jsonify, request
-
 from court import filing
 from court.host import (
     add_message,
@@ -39,6 +37,7 @@ from court.host import (
     list_owned_conversations,
 )
 from court.judging import COURT_SOURCE, censor, judge_dialog, rules_table
+from webframe import Blueprint, jsonify, request
 
 __all__ = [
     "DECISIONS",
@@ -159,7 +158,9 @@ def open_hearing(
 ) -> dict[str, Any]:
     """Judge the dialog now and keep the sitting."""
     owner = opened_by if opened_by is not None else _owner()
-    messages = _with_originals(conversation_id, _dialog_messages(conversation_id, owner))
+    messages = _with_originals(
+        conversation_id, _dialog_messages(conversation_id, owner)
+    )
     protocol = judge_dialog(messages, crisis=crisis)
     now = int(time.time())
     hearing = {
@@ -488,7 +489,9 @@ def censor_reply(conversation_id: str, reply: str) -> dict[str, Any]:
     return censor(str(reply or ""), get_messages(str(conversation_id)), crisis=crisis)
 
 
-def _with_originals(conversation_id: str, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _with_originals(
+    conversation_id: str, messages: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """The dialog as it was said: a censored reply is judged by its original words."""
     records = get_store().items(prefix=CENSOR_PREFIX + str(conversation_id) + "/")
     originals = {
@@ -530,7 +533,9 @@ def record_reply(
                     "at": int(time.time()),
                 },
             )
-    messages = _with_originals(conversation_id, _dialog_messages(conversation_id, owner))
+    messages = _with_originals(
+        conversation_id, _dialog_messages(conversation_id, owner)
+    )
     for _attempt in range(3):
         try:
             return _sit(conversation_id, messages, owner)
@@ -546,7 +551,8 @@ def _sit(
     sittings = [
         hearing
         for hearing in get_store().items(prefix=PREFIX).values()
-        if isinstance(hearing, dict) and hearing.get("conversation_id") == conversation_id
+        if isinstance(hearing, dict)
+        and hearing.get("conversation_id") == conversation_id
     ]
     sittings.sort(key=lambda hearing: int(hearing.get("opened_at") or 0))
     if sittings and sittings[-1].get("closure") != "OPEN":
@@ -557,9 +563,12 @@ def _sit(
     if hearing is None:
         now = int(time.time())
         # One id per dialog: two replies stored at once open one sitting, not two.
-        key = _key("hearing-censor-" + hashlib.sha256(conversation_id.encode()).hexdigest()[:16])
+        key = _key(
+            "hearing-censor-"
+            + hashlib.sha256(conversation_id.encode()).hexdigest()[:16]
+        )
         hearing = {
-            "id": key[len(PREFIX):],
+            "id": key[len(PREFIX) :],
             "conversation_id": conversation_id,
             "title": str(get_conversation_title(conversation_id, "") or ""),
             "opened_at": now,
@@ -615,7 +624,7 @@ def _bare_title(title: str) -> str:
         prefix = next((p for p in _TITLE_PREFIXES if title.startswith(p)), None)
         if prefix is None:
             return title
-        title = title[len(prefix):]
+        title = title[len(prefix) :]
 
 
 def interrogate(conversation_id: str, message: str) -> dict[str, Any]:
@@ -627,10 +636,16 @@ def interrogate(conversation_id: str, message: str) -> dict[str, Any]:
     copy = get_store().get(key)
     if copy is None:
         row = next(
-            (r for r in list_owned_conversations(owner) if r.get("id") == conversation_id),
+            (
+                r
+                for r in list_owned_conversations(owner)
+                if r.get("id") == conversation_id
+            ),
             {},
         )
-        title = _bare_title(get_conversation_title(conversation_id, "") or conversation_id)
+        title = _bare_title(
+            get_conversation_title(conversation_id, "") or conversation_id
+        )
         if owner is None:
             raise LookupError("owner_unavailable")
         try:
@@ -648,7 +663,11 @@ def interrogate(conversation_id: str, message: str) -> dict[str, Any]:
             tx.set(key, copy)
     answer = _local_post(
         "/api/chat",
-        {"conversation_id": copy["id"], "model": copy["model"], "message": str(message)},
+        {
+            "conversation_id": copy["id"],
+            "model": copy["model"],
+            "message": str(message),
+        },
     )
     return {
         "copy_id": copy["id"],
@@ -714,7 +733,9 @@ def conclude(conversation_id: str, text: str) -> dict[str, Any]:
     """The judge's conclusion of guilt on the open sitting over the dialog."""
     hearing = _hearing_of(str(conversation_id))
     if hearing is None:
-        raise ValueError("no open sitting over this dialog: open it first (hearing_open)")
+        raise ValueError(
+            "no open sitting over this dialog: open it first (hearing_open)"
+        )
     hearing["conclusion"] = {"text": str(text), "at": int(time.time())}
     return _save(hearing)
 

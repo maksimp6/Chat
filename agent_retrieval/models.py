@@ -68,9 +68,7 @@ class RetrievalQuery:
             self,
             "selected_skills",
             tuple(
-                sorted(
-                    set(_clean(item) for item in self.selected_skills if _clean(item))
-                )
+                sorted({_clean(item) for item in self.selected_skills if _clean(item)})
             ),
         )
         if not 1 <= int(self.max_results) <= MAX_RESULTS:

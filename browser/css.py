@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Iterator
 
 from browser.dom import Document, Element, normalize_space
 from browser.errors import E_SELECTOR_SYNTAX, BrowserError
@@ -394,7 +394,9 @@ class _Parser:
             if not has_args:
                 raise self.error(f":{name}() требует аргумент", start)
             inner = SelectorList(self.text, self.parse_list(nested=True))
-            return Pseudo("is" if name in ("where", "matches") else name, selectors=inner)
+            return Pseudo(
+                "is" if name in ("where", "matches") else name, selectors=inner
+            )
         if name == "contains":
             if not has_args:
                 raise self.error(":contains() требует текст", start)
@@ -468,8 +470,10 @@ def _match_attr(element: Element, test: AttrTest) -> bool:
     if op == "=":
         return actual == expected
     if op == "~=":
-        return bool(expected) and not any(c.isspace() for c in expected) and (
-            expected in actual.split()
+        return (
+            bool(expected)
+            and not any(c.isspace() for c in expected)
+            and (expected in actual.split())
         )
     if op == "|=":
         return actual == expected or actual.startswith(expected + "-")
@@ -497,12 +501,17 @@ def is_disabled(element: Element) -> bool:
         return True
     if element.tag == "option":
         parent = element.parent
-        return parent is not None and parent.tag == "optgroup" and "disabled" in parent.attrs
+        return (
+            parent is not None
+            and parent.tag == "optgroup"
+            and "disabled" in parent.attrs
+        )
     child = element
     for ancestor in element.ancestors():
         if ancestor.tag == "fieldset" and "disabled" in ancestor.attrs:
             legend = next(
-                (kid for kid in ancestor.element_children() if kid.tag == "legend"), None
+                (kid for kid in ancestor.element_children() if kid.tag == "legend"),
+                None,
             )
             if legend is None or child is not legend:
                 return True

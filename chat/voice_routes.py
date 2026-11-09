@@ -3,34 +3,19 @@
 from __future__ import annotations
 
 import asyncio
-from contextvars import copy_context
 import io
 import json
 import threading
 import time
 import uuid
 import wave
+from contextvars import copy_context
 from dataclasses import dataclass, field
 from typing import Any
 
 import requests
-from webframe import (
-    Blueprint,
-    Response,
-    copy_current_request_context,
-    jsonify,
-    request,
-    stream_with_context,
-)
 
 from chat._error_details import error_body
-from chat.mcp_routes import (
-    _court_censor,
-    _court_record,
-    _provider_conversation_id,
-    _start_embed_turn,
-    logos_client_type,
-)
 from chat.host import (
     add_message,
     bound,
@@ -44,7 +29,21 @@ from chat.host import (
     maybe_update_conversation_title,
     reserve_request,
 )
-
+from chat.mcp_routes import (
+    _court_censor,
+    _court_record,
+    _provider_conversation_id,
+    _start_embed_turn,
+    logos_client_type,
+)
+from webframe import (
+    Blueprint,
+    Response,
+    copy_current_request_context,
+    jsonify,
+    request,
+    stream_with_context,
+)
 
 voice_bp = Blueprint("voice", __name__)
 
@@ -445,7 +444,9 @@ def _process(session: VoiceSession) -> None:
         if result.reply:
             # The Court judges the spoken reply's text like any other reply; the audio is already played.
             judged = _court_censor(
-                session.conversation_id, result.reply, voice_session_id=session.session_id
+                session.conversation_id,
+                result.reply,
+                voice_session_id=session.session_id,
             )
             reply_text = judged["text"] if judged is not None else result.reply
             voice_message_id = add_message(
@@ -473,7 +474,10 @@ def _process(session: VoiceSession) -> None:
             )
             if voice_message_id is not None and reply_text:
                 _start_embed_turn(
-                    session.conversation_id, input_message_id, voice_message_id, reply_text
+                    session.conversation_id,
+                    input_message_id,
+                    voice_message_id,
+                    reply_text,
                 )
             _emit(
                 session,

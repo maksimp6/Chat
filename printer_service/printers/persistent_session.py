@@ -12,6 +12,7 @@ import struct
 import threading
 import time
 from collections.abc import Callable
+from typing import Self
 
 from printer_service.printers.bambu_a1mini import (
     PrinterProtocolError,
@@ -40,7 +41,7 @@ class PrinterSession:
         self.tcp_nodelay = tcp_nodelay
         self.keepalive = keepalive
 
-    def __enter__(self) -> "PrinterSession":
+    def __enter__(self) -> Self:
         with self._lock:
             if self._sock is not None:
                 raise RuntimeError("session already open")

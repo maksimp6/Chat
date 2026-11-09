@@ -5,8 +5,8 @@ import binascii
 from typing import Any
 
 import requests
-from yandex_client_modules.host import bound, upstream_model_id
 
+from yandex_client_modules.host import bound, upstream_model_id
 
 GENERATE_URL = "https://ai.api.cloud.yandex.net/v1/images/generations"
 MAX_PROMPT_CHARS = 500

@@ -1,11 +1,11 @@
 """Bounded read-only model inspection of immutable PR evidence, not a verdict oracle."""
 
 from __future__ import annotations
-import os
 
 import hashlib
 import http.client
 import json
+import os
 import subprocess
 import time
 from pathlib import Path

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from webframe import Blueprint, jsonify, request
-
 from rag_sync.sync import reset, start, status
+from webframe import Blueprint, jsonify, request
 
 __all__ = ["rag_bp"]
 

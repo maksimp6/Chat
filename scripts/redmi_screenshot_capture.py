@@ -4,11 +4,10 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import resource
-import shutil
 import shlex
+import shutil
 import signal
 import socket
 import stat
@@ -17,9 +16,9 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path
 from urllib.request import urlopen
-
 
 SOCKET = "\0io.github.forkmaintainers.iceraven/firefox-debugger-socket"
 PACKAGE = "io.github.forkmaintainers.iceraven"
@@ -128,7 +127,7 @@ def remaining(limit, deadline=None):
 
 
 def command(*args):
-    p = subprocess.run(args, capture_output=True, timeout=remaining(20))
+    p = subprocess.run(args, capture_output=True, timeout=remaining(20), check=False)
     if p.returncode:
         raise RuntimeError("Android command failed: " + Path(args[0]).name)
     return p.stdout
@@ -1126,7 +1125,7 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
     def mark(name, browser=None):
         event = {
             "event": name,
-            "wall_utc": datetime.now(timezone.utc).isoformat(),
+            "wall_utc": datetime.now(UTC).isoformat(),
             "monotonic_ns": time.monotonic_ns(),
         }
         if browser is not None:
@@ -1144,9 +1143,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             "message_reply_observed",
             "screenshot_finished:22-logos-rag-top.png",
             "screenshot_finished:23-logos-rag-bottom.png",
-        ):
-            if not event.get("recorder_running"):
-                failures.append("native_video_ended_before_scenario_complete")
+        ) and not event.get("recorder_running"):
+            failures.append("native_video_ended_before_scenario_complete")
         events.append(event)
 
     def app_state():
@@ -1909,7 +1907,7 @@ def capture(out, uid, gid, metadata):
                 "size": len(png),
                 "width": width,
                 "height": height,
-                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "captured_at": datetime.now(UTC).isoformat(),
                 "browser": state,
             }
         )
@@ -2361,7 +2359,7 @@ def restore_clean_page(target_url=None):
 
 
 def main():
-    global LOGOS_URL, CAPTURE_STORAGE_ROOT
+    global LOGOS_URL
     # Both the runner driver and its root child enforce the same storage budget.
     if len(sys.argv) > 2 and sys.argv[1] == "_capture":
         capture_output = Path(sys.argv[2]).resolve()
@@ -2432,7 +2430,11 @@ def main():
         "PYTHONDONTWRITEBYTECODE": "1",
     }
     result = subprocess.run(
-        ["su", "-c", shlex.join(argv)], env=safe_env, capture_output=True, timeout=300
+        ["su", "-c", shlex.join(argv)],
+        env=safe_env,
+        capture_output=True,
+        timeout=300,
+        check=False,
     )
     if result.returncode:
         # No job token is in the capture child's environment or argv.

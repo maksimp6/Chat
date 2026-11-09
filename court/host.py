@@ -44,13 +44,12 @@ bound = _binding.names()
 __all__ = [
     "Host",
     "HostNotBound",
+    "add_message",
     "bind",
     "bound",
-    "current",
-    "provide",
-    "add_message",
     "call_yandex_operation",
     "check_access",
+    "current",
     "fork_dialog",
     "get_conversation_title",
     "get_current_owner_id",
@@ -62,6 +61,7 @@ __all__ = [
     "list_message_traces",
     "list_owned_conversations",
     "list_yandex_operations",
+    "provide",
 ]
 
 

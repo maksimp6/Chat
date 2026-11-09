@@ -243,7 +243,7 @@ class SSHRuntime:
         limit = (
             ""
             if timeout is None
-            else f"timeout -s TERM -k 5 {max(1, int(math.ceil(timeout)))} "
+            else f"timeout -s TERM -k 5 {max(1, math.ceil(timeout))} "
         )
         safe_path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         inner = shlex.quote(command)

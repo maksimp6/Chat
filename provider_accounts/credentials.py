@@ -67,7 +67,7 @@ def utcnow() -> datetime:
 
 def _as_utc(value: datetime | str) -> datetime:
     if isinstance(value, str):
-        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        value = datetime.fromisoformat(value)
     return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 

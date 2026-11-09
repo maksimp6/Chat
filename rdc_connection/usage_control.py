@@ -6,7 +6,7 @@ import math
 import threading
 import time
 from collections.abc import Callable
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -32,7 +32,7 @@ def _validate_collection(
         raise ValueError("initial wait must be in 1..60 seconds")
 
 
-class RdcTask(Generic[T]):
+class RdcTask[T]:
     """Serialize one owner/device/invocation's authorized connector callbacks.
 
     Callbacks must retain normal policy/trace boundaries and transport timeouts.

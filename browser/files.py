@@ -19,6 +19,7 @@ import os
 import posixpath
 import secrets
 import shutil
+from typing import Self
 from urllib.parse import unquote, urlsplit
 
 from browser.errors import (
@@ -38,7 +39,14 @@ logger = logging.getLogger("logos.browser.files")
 
 NAME_MAX = 255
 _FORBIDDEN_CHARS = set('<>:"|?*')
-_COMPOUND_EXTENSIONS = (".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".tar.lz", ".tar.lzma")
+_COMPOUND_EXTENSIONS = (
+    ".tar.gz",
+    ".tar.bz2",
+    ".tar.xz",
+    ".tar.zst",
+    ".tar.lz",
+    ".tar.lzma",
+)
 
 _EXTENSIONS = {
     "text/html": ".html",
@@ -211,7 +219,7 @@ def resolve_target(
     raw = str(path or "")
     if not raw.strip():
         raise BrowserError(E_PATH_REQUIRED)
-    directory_hint = raw.endswith("/") or raw.endswith(os.sep)
+    directory_hint = raw.endswith(("/", os.sep))
     absolute = _tool_path(raw)
     if directory_hint or os.path.isdir(absolute):
         if os.path.lexists(absolute) and not os.path.isdir(absolute):
@@ -346,7 +354,7 @@ class AtomicWriter:
         except OSError as exc:
             logger.debug("could not remove %s: %s", self.temp_path, exc)
 
-    def __enter__(self) -> "AtomicWriter":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -395,8 +403,8 @@ def filename_from_response(
 
 
 __all__ = [
-    "AtomicWriter",
     "NAME_MAX",
+    "AtomicWriter",
     "disk_free",
     "disk_full_error",
     "extension_for",

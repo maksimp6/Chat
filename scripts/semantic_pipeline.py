@@ -690,11 +690,15 @@ def report(
         f"Status: **{outcome['status']}**",
         f"RED control: **{outcome['red_control']}**",
         f"Claim assessment: **{card['assessment']}**",
-        "Дословность проверена только для перечисленных цитат. Смысловая достаточность "
-        "не проверена; вывод модели не является подтверждённым фактом.",
+        (
+            "Дословность проверена только для перечисленных цитат. Смысловая достаточность "
+            "не проверена; вывод модели не является подтверждённым фактом."
+        ),
         "NO_CANDIDATES означает отсутствие совпадений BM25, а не отсутствие ответа в корпусе.",
-        "GitHub open/closed и state_reason — состояние задачи, а не доказательство выполнения. "
-        "Комментарии, связанные PR и исходники требуют отдельного чтения.",
+        (
+            "GitHub open/closed и state_reason — состояние задачи, а не доказательство выполнения. "
+            "Комментарии, связанные PR и исходники требуют отдельного чтения."
+        ),
         _code_block(card),
     ]
     return "\n\n".join(lines)
@@ -1691,7 +1695,9 @@ def purge_superseded_snapshots(
 
     protected = {keep_store_id, *knowledge_vector_store_ids()}
     deleted_stores = []
-    for store in list_yandex_objects("/vector_stores", project, key, ("vector_stores",)):
+    for store in list_yandex_objects(
+        "/vector_stores", project, key, ("vector_stores",)
+    ):
         store_id, name = store.get("id"), store.get("name")
         if (
             isinstance(store_id, str)
@@ -2436,7 +2442,9 @@ def _upload_repository_snapshots(
     if len(store_files) != len(attached_file_ids):
         raise ValueError("vector_store_file_metadata_missing")
     progress["stage"] = "purge_superseded_snapshots"
-    purged = purge_superseded_snapshots(store_id, [issue_file_id, file_id], project, key)
+    purged = purge_superseded_snapshots(
+        store_id, [issue_file_id, file_id], project, key
+    )
     current = {issue_file_id, file_id}
     return {
         "store_id": store_id,

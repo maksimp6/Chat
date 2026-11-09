@@ -175,7 +175,9 @@ class Session:
 
 class Proxy:
     def __init__(self, user, password):
-        self.expected = "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()
+        self.expected = (
+            "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()
+        )
         self.sessions = {}
 
     async def tunnel_open(self, stream, target):
@@ -198,7 +200,9 @@ class Proxy:
         if not key:
             await reply(writer, "400 Bad Request")
             return
-        writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n")
+        writer.write(
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n"
+        )
         await writer.drain()
         session = self.sessions.get(key)
         if session is None or session.dead:
@@ -237,7 +241,9 @@ class Proxy:
         if method.upper() == "CONNECT":
             host, _, port = target.rpartition(":")
             try:
-                u_reader, u_writer = await asyncio.open_connection(host.strip("[]"), int(port))
+                u_reader, u_writer = await asyncio.open_connection(
+                    host.strip("[]"), int(port)
+                )
             except Exception as e:
                 log.info("connect %s failed: %s", target, e)
                 await reply(c_writer, "502 Bad Gateway")
@@ -253,7 +259,9 @@ class Proxy:
             hostport, _, path = target[7:].partition("/")
             host, _, port = hostport.partition(":")
             try:
-                u_reader, u_writer = await asyncio.open_connection(host, int(port or 80))
+                u_reader, u_writer = await asyncio.open_connection(
+                    host, int(port or 80)
+                )
             except Exception:
                 await reply(c_writer, "502 Bad Gateway")
                 return
@@ -297,7 +305,9 @@ async def read_head(reader):
 
 
 async def reply(writer, status):
-    writer.write(f"HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".encode())
+    writer.write(
+        f"HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".encode()
+    )
     await writer.drain()
     writer.close()
 

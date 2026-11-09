@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from webframe import Application, jsonify, request
-
-from conversations.ownership import _conversation_record, check_access, delete_owner
 from conversations.host import (
     delete_conversation,
     get_current_owner_id,
@@ -14,6 +11,8 @@ from conversations.host import (
     update_conversation_title,
     validate_dialog_model,
 )
+from conversations.ownership import _conversation_record, check_access, delete_owner
+from webframe import Application, jsonify, request
 
 
 def patch_conversation(conv_id):
@@ -95,4 +94,6 @@ def install(app: Application) -> None:
     )
     # Settings are global and read-only: shown, never saved through the API.
     app.add_url_rule("/api/settings", view_func=get_settings, methods=["GET"])
-    app.add_url_rule("/api/ollama/settings", view_func=get_ollama_settings, methods=["GET"])
+    app.add_url_rule(
+        "/api/ollama/settings", view_func=get_ollama_settings, methods=["GET"]
+    )

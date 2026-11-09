@@ -23,7 +23,7 @@ from typing import Any
 from rag_sync import git_source, github_source
 from rag_sync.host import bound, get_store, knowledge_vector_store_ids, vector_add
 
-__all__ = ["PACK_LIMIT", "OLD_PREFIXES", "PREFIX", "reset", "start", "status"]
+__all__ = ["OLD_PREFIXES", "PACK_LIMIT", "PREFIX", "reset", "start", "status"]
 
 log = logging.getLogger("logos.rag_sync")
 
@@ -45,7 +45,11 @@ def _now() -> str:
 
 def _ledger() -> dict[str, Any]:
     ledger = get_store().get(LEDGER)
-    return ledger if isinstance(ledger, dict) else {"cursors": {}, "edges": {}, "files": []}
+    return (
+        ledger
+        if isinstance(ledger, dict)
+        else {"cursors": {}, "edges": {}, "files": []}
+    )
 
 
 def _save_ledger(ledger: dict[str, Any]) -> None:
@@ -56,7 +60,14 @@ def _save_ledger(ledger: dict[str, Any]) -> None:
 def _set_state(**fields: Any) -> None:
     with get_store().transaction() as tx:
         current = tx.get(STATE)
-        tx.set(STATE, {**(current if isinstance(current, dict) else {}), **fields, "updated_at": int(time.time())})
+        tx.set(
+            STATE,
+            {
+                **(current if isinstance(current, dict) else {}),
+                **fields,
+                "updated_at": int(time.time()),
+            },
+        )
 
 
 def _client():
@@ -71,18 +82,29 @@ class _Writer:
     """Packs records of one source into files; each full file is stored before the next is begun."""
 
     def __init__(self, kind: str, client, store_id: str, ledger: dict, totals: dict):
-        self.kind, self.client, self.store_id, self.ledger, self.totals = kind, client, store_id, ledger, totals
+        self.kind, self.client, self.store_id, self.ledger, self.totals = (
+            kind,
+            client,
+            store_id,
+            ledger,
+            totals,
+        )
         self.stamp, self.part = _now(), 0
         self.parts: list[str] = []
         self.size = 0
-        self.last: tuple[str, list[str]] | None = None  # cursor and the keys stored at it
+        self.last: tuple[str, list[str]] | None = (
+            None  # cursor and the keys stored at it
+        )
 
     def add(self, cursor: str, key: str, text: str) -> None:
         # Every record goes into the app's own vector database (vector_db) as it is read,
         # one document per record; the same key replaces its document, so a record
         # written again is not doubled.
         embedded = vector_add(
-            f"repository-{self.kind}", text, key.replace("/", "_"), {"kind": self.kind, "key": key}
+            f"repository-{self.kind}",
+            text,
+            key.replace("/", "_"),
+            {"kind": self.kind, "key": key},
         )
         self.totals["embedded_records"] = self.totals.get("embedded_records", 0) + 1
         self.totals["embedded_chunks"] += embedded["chunks"]
@@ -103,7 +125,11 @@ class _Writer:
             return
         self.part += 1
         name = f"{PREFIX}{self.kind}-{self.stamp}-{self.part:03d}.md"
-        body = (f"# {self.kind} · {github_source.repository()}\n\n" + _SEPARATOR.join(self.parts) + "\n").encode()
+        body = (
+            f"# {self.kind} · {github_source.repository()}\n\n"
+            + _SEPARATOR.join(self.parts)
+            + "\n"
+        ).encode()
         cursor, keys = self.last
         self.ledger["cursors"][self.kind] = cursor
         self.ledger["edges"][self.kind] = keys
@@ -114,8 +140,15 @@ class _Writer:
             raise RuntimeError(f"Files returned no id for {name}")
         self.client.add_file_to_vs(self.store_id, file_id)
         self.ledger["files"].append(
-            {"file_id": file_id, "name": name, "kind": self.kind, "records": len(self.parts),
-             "bytes": len(body), "cursor": cursor, "at": int(time.time())}
+            {
+                "file_id": file_id,
+                "name": name,
+                "kind": self.kind,
+                "records": len(self.parts),
+                "bytes": len(body),
+                "cursor": cursor,
+                "at": int(time.time()),
+            }
         )
         _save_ledger(self.ledger)
         self.totals["files"] += 1
@@ -132,12 +165,16 @@ def _sync_git(client, store_id: str, ledger: dict, totals: dict) -> None:
     for sha, text, masked in git_source.records(root, since):
         totals["masked"] += masked
         totals["read_records"] = totals.get("read_records", 0) + 1
-        _set_state(totals=dict(totals), stage=f"git: {sha[:12]} read ({len(text)} chars)")
+        _set_state(
+            totals=dict(totals), stage=f"git: {sha[:12]} read ({len(text)} chars)"
+        )
         writer.add(sha, sha, text)
     writer.flush()
 
 
-def _sync_github(client, store_id: str, ledger: dict, totals: dict, token: str | None) -> None:
+def _sync_github(
+    client, store_id: str, ledger: dict, totals: dict, token: str | None
+) -> None:
     repo = github_source.repository()
     for kind in github_source.KINDS:
         writer = _Writer(kind, client, store_id, ledger, totals)
@@ -145,7 +182,9 @@ def _sync_github(client, store_id: str, ledger: dict, totals: dict, token: str |
         edge = set(ledger["edges"].get(kind) or [])
         try:
             _set_state(stage=f"{kind}: listing since {cursor or 'the beginning'}")
-            for at, key, text, masked in github_source.records(kind, repo, cursor, edge, token):
+            for at, key, text, masked in github_source.records(
+                kind, repo, cursor, edge, token
+            ):
                 totals["masked"] += masked
                 totals["read_records"] = totals.get("read_records", 0) + 1
                 writer.add(at, key, text)
@@ -155,34 +194,70 @@ def _sync_github(client, store_id: str, ledger: dict, totals: dict, token: str |
 
 
 def _run(token: str | None, sources: tuple[str, ...]) -> None:
-    totals = {"files": 0, "records": 0, "masked": 0, "embedded_chunks": 0, "embedding_tokens": 0}
+    totals = {
+        "files": 0,
+        "records": 0,
+        "masked": 0,
+        "embedded_chunks": 0,
+        "embedding_tokens": 0,
+    }
     try:
         client, store_id = _client(), _store_id()
         ledger = _ledger()
-        ledger.setdefault("cursors", {}), ledger.setdefault("edges", {}), ledger.setdefault("files", [])
-        _set_state(running=True, started_at=int(time.time()), finished_at=None, error=None,
-                   totals=totals, store_id=store_id, stage="started")
+        (
+            ledger.setdefault("cursors", {}),
+            ledger.setdefault("edges", {}),
+            ledger.setdefault("files", []),
+        )
+        _set_state(
+            running=True,
+            started_at=int(time.time()),
+            finished_at=None,
+            error=None,
+            totals=totals,
+            store_id=store_id,
+            stage="started",
+        )
         if "git" in sources:
             _sync_git(client, store_id, ledger, totals)
         if "github" in sources:
-            _sync_github(client, store_id, ledger, totals, token or github_source.env_token())
-        _set_state(running=False, finished_at=int(time.time()), totals=totals, stage="done")
+            _sync_github(
+                client, store_id, ledger, totals, token or github_source.env_token()
+            )
+        _set_state(
+            running=False, finished_at=int(time.time()), totals=totals, stage="done"
+        )
     except github_source.RateLimited as exc:
-        _set_state(running=False, finished_at=int(time.time()), totals=totals, stage="rate_limited", error=str(exc))
+        _set_state(
+            running=False,
+            finished_at=int(time.time()),
+            totals=totals,
+            stage="rate_limited",
+            error=str(exc),
+        )
     except Exception as exc:
         log.exception("rag sync failed")
-        _set_state(running=False, finished_at=int(time.time()), totals=totals, stage="failed",
-                   error=f"{type(exc).__name__}: {exc}")
+        _set_state(
+            running=False,
+            finished_at=int(time.time()),
+            totals=totals,
+            stage="failed",
+            error=f"{type(exc).__name__}: {exc}",
+        )
     finally:
         _lock.release()
 
 
-def start(token: str | None = None, sources: tuple[str, ...] = ("git", "github")) -> dict[str, Any]:
+def start(
+    token: str | None = None, sources: tuple[str, ...] = ("git", "github")
+) -> dict[str, Any]:
     """Start a sync in the background; a sync already running is reported, not doubled."""
     if not _lock.acquire(blocking=False):
         return {"started": False, "reason": "sync_running", **status()}
     _set_state(running=True, stage="starting", error=None)
-    threading.Thread(target=_run, args=(token, sources), name="logos-rag-sync", daemon=True).start()
+    threading.Thread(
+        target=_run, args=(token, sources), name="logos-rag-sync", daemon=True
+    ).start()
     return {"started": True, **status()}
 
 
@@ -223,7 +298,9 @@ def reset() -> dict[str, Any]:
         removed, failed = [], []
         for row in _all_files(client):
             name, file_id = str(row.get("filename") or ""), row.get("id")
-            if not isinstance(file_id, str) or not name.startswith((PREFIX, *OLD_PREFIXES)):
+            if not isinstance(file_id, str) or not name.startswith(
+                (PREFIX, *OLD_PREFIXES)
+            ):
                 continue
             try:
                 try:
@@ -241,8 +318,11 @@ def reset() -> dict[str, Any]:
                 failed.append({"name": name, "error": str(exc)})
         if not failed:
             _save_ledger({"cursors": {}, "edges": {}, "files": []})
-        _set_state(running=False, stage="reset" if not failed else "reset_incomplete",
-                   error=None if not failed else f"{len(failed)} file(s) not removed")
+        _set_state(
+            running=False,
+            stage="reset" if not failed else "reset_incomplete",
+            error=None if not failed else f"{len(failed)} file(s) not removed",
+        )
         return {"reset": not failed, "removed": len(removed), "failed": failed}
     finally:
         _lock.release()

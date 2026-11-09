@@ -53,6 +53,7 @@ def read_output(
 
     def left() -> float | None:
         return None if deadline is None else deadline - time.monotonic()
+
     kept = {stdout_pipe.fileno(): bytearray(), stderr_pipe.fileno(): bytearray()}
     with selectors.DefaultSelector() as selector:
         for fd in kept:

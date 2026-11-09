@@ -9,7 +9,8 @@ from __future__ import annotations
 import logging
 import math
 import re
-from typing import Any, Callable, Mapping
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from browser.errors import (
     E_ARG_NEGATIVE,
@@ -21,7 +22,7 @@ from browser.errors import (
 
 logger = logging.getLogger("logos.browser.paging")
 
-_REF_PATTERN = re.compile(r"^\[?\s*([LBIFTMN])\s*(\d+)\s*\]?$", re.I)
+_REF_PATTERN = re.compile(r"^\[?\s*([LBIFTMN])\s*(\d+)\s*\]?$", re.IGNORECASE)
 _TRUE_WORDS = frozenset({"true", "1", "yes", "on", "да"})
 _FALSE_WORDS = frozenset({"false", "0", "no", "off", "нет"})
 
@@ -44,7 +45,12 @@ def paginate(text: str, offset: int | None, max_chars: int | None) -> dict[str, 
     if start > total:
         raise BrowserError(E_OFFSET.format(offset=start, total=total))
     if start == total:
-        return {"content": "", "offset": start, "next_offset": None, "total_chars": total}
+        return {
+            "content": "",
+            "offset": start,
+            "next_offset": None,
+            "total_chars": total,
+        }
     end = total if limit == 0 else min(total, start + limit)
     if end < total:
         floor = start + limit // 2
@@ -91,7 +97,9 @@ def arg_int(args: Mapping[str, Any] | None, name: str) -> int | None:
         return None
     if isinstance(value, bool):
         raise BrowserError(
-            E_ARG_TYPE.format(name=name, expected="целым числом", value=_describe(value))
+            E_ARG_TYPE.format(
+                name=name, expected="целым числом", value=_describe(value)
+            )
         )
     if isinstance(value, int):
         return value
@@ -121,7 +129,9 @@ def arg_float(args: Mapping[str, Any] | None, name: str) -> float | None:
             number = None
     if number is None or not math.isfinite(number):
         raise BrowserError(
-            E_ARG_TYPE.format(name=name, expected="конечным числом", value=_describe(value))
+            E_ARG_TYPE.format(
+                name=name, expected="конечным числом", value=_describe(value)
+            )
         )
     return number
 
@@ -180,14 +190,18 @@ def arg_pairs(args: Mapping[str, Any] | None, name: str) -> list[tuple[str, str]
         else:
             raise BrowserError(
                 E_ARG_TYPE.format(
-                    name=name, expected="списком пар {name, value}", value=_describe(item)
+                    name=name,
+                    expected="списком пар {name, value}",
+                    value=_describe(item),
                 )
             )
         key_text = "" if key is None else str(key).strip()
         if not key_text:
             raise BrowserError(
                 E_ARG_TYPE.format(
-                    name=f"{name}[].name", expected="непустой строкой", value=_describe(key)
+                    name=f"{name}[].name",
+                    expected="непустой строкой",
+                    value=_describe(key),
                 )
             )
         pairs.append((key_text, "" if raw is None else str(raw)))
@@ -205,7 +219,7 @@ def compile_filter(pattern: str | None) -> Callable[[str], bool]:
     if len(pattern) >= 2 and pattern.startswith("/") and pattern.endswith("/"):
         inner = pattern[1:-1]
         try:
-            search = re.compile(inner, re.I).search
+            search = re.compile(inner, re.IGNORECASE).search
         except re.error as exc:
             raise BrowserError(E_REGEX.format(q=pattern, reason=str(exc))) from exc
         return lambda line: search(line) is not None
@@ -232,7 +246,7 @@ def normalize_ref(text: Any) -> str:
 
 
 def human_bytes(n: int | None) -> str:
-    """"512 Б", "1,2 КБ", "3,4 МБ", "1,1 ГБ"; None gives "размер неизвестен"."""
+    """ "512 Б", "1,2 КБ", "3,4 МБ", "1,1 ГБ"; None gives "размер неизвестен"."""
     if n is None:
         return "размер неизвестен"
     size = int(n)

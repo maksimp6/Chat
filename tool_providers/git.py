@@ -73,9 +73,8 @@ def write_op(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         read_lock, write_lock = _locks_for(args, kwargs)
-        with write_lock:
-            with read_lock:
-                return func(*args, **kwargs)
+        with write_lock, read_lock:
+            return func(*args, **kwargs)
 
     return wrapper
 
@@ -95,7 +94,7 @@ def _inside(path: str, roots: list[str]) -> bool:
     )
 
 
-def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
+def _resolve_repo_path(repo_name: str | None = None, cfg: dict | None = None) -> str:
     cfg = cfg or {}
     base_dir = cfg.get("repos_base_dir") or "/sdcard/repo"
     target = repo_name or cfg.get("active_repo") or cfg.get("repo_path")
@@ -137,6 +136,7 @@ def _is_bare_repo(repo_path: str) -> bool:
             capture_output=True,
             text=True,
             timeout=5,
+            check=False,
         )
         return res.stdout.strip() == "true"
     except Exception:
@@ -168,7 +168,10 @@ def _git_process_in(repo_path: str) -> bool:
 
 
 def _run_git(
-    args: list, cfg: dict = None, repo_name: str = None, is_read: bool = False
+    args: list,
+    cfg: dict | None = None,
+    repo_name: str | None = None,
+    is_read: bool = False,
 ) -> dict:
     cfg = cfg or {}
     repo_path = _resolve_repo_path(repo_name, cfg)

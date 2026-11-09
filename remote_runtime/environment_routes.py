@@ -1,7 +1,5 @@
 """REST API for branch-aware application environments."""
 
-from webframe import Blueprint, Response, current_app, jsonify, request
-
 from remote_runtime.environments import (
     GitUnavailable,
     _get,
@@ -15,6 +13,7 @@ from remote_runtime.environments import (
     stop_environment,
 )
 from remote_runtime.host import get_current_owner_id
+from webframe import Blueprint, Response, current_app, jsonify, request
 
 environment_bp = Blueprint("environments", __name__, url_prefix="/api/environments")
 environment_gateway_bp = Blueprint("environment_gateway", __name__)
@@ -175,7 +174,8 @@ def _proxy(environment_id, subpath=""):
     headers = [
         (key, value)
         for key, value in request.headers.items()
-        if key.lower() not in {"host", "content-length", "connection", "accept-encoding"}
+        if key.lower()
+        not in {"host", "content-length", "connection", "accept-encoding"}
     ]
     try:
         upstream = dispatch_environment_http(

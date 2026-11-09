@@ -6,7 +6,7 @@ import io
 import json as _json
 from collections.abc import Callable, Iterable, Iterator
 from http.cookies import SimpleCookie
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Self
 from urllib.parse import parse_qsl, quote
 
 from webframe.datastructures import Accept, Headers, MultiDict
@@ -358,7 +358,10 @@ class Request:
 def _environ_headers(environ: dict[str, Any]) -> list[tuple[str, str]]:
     headers: list[tuple[str, str]] = []
     for key, value in environ.items():
-        if key.startswith("HTTP_") and key not in ("HTTP_CONTENT_TYPE", "HTTP_CONTENT_LENGTH"):
+        if key.startswith("HTTP_") and key not in (
+            "HTTP_CONTENT_TYPE",
+            "HTTP_CONTENT_LENGTH",
+        ):
             name = key[5:].replace("_", "-").title()
             headers.append((name, _wsgi_decode(str(value))))
         elif key in ("CONTENT_TYPE", "CONTENT_LENGTH") and value:
@@ -527,7 +530,9 @@ class Response:
         content_type: str | None = None,
         direct_passthrough: bool = False,
     ) -> None:
-        self.headers = headers.copy() if isinstance(headers, Headers) else Headers(headers)
+        self.headers = (
+            headers.copy() if isinstance(headers, Headers) else Headers(headers)
+        )
         if content_type is None:
             if mimetype is None and "Content-Type" not in self.headers:
                 mimetype = self.default_mimetype
@@ -643,10 +648,10 @@ class Response:
         for func in self._on_close:
             func()
 
-    def __enter__(self) -> Response:
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *exc_info: Any) -> None:
+    def __exit__(self, *exc_info: object) -> None:
         self.close()
 
     # headers
@@ -862,7 +867,11 @@ class Response:
         return app_iter
 
     def __repr__(self) -> str:
-        body = "streamed" if self.is_streamed else f"{self.calculate_content_length()} bytes"
+        body = (
+            "streamed"
+            if self.is_streamed
+            else f"{self.calculate_content_length()} bytes"
+        )
         return f"<{type(self).__name__} {body} [{self.status}]>"
 
 

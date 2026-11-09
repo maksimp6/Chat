@@ -2,9 +2,11 @@
 
 import json
 import time
+
 import requests
 
 from yandex_client_modules.errors import YandexClientError
+from yandex_client_modules.host import bound
 from yandex_client_modules.provider_retry import (
     backoff_delay,
     classify_poll,
@@ -14,7 +16,6 @@ from yandex_client_modules.provider_retry import (
     retry_after_too_long_text,
 )
 from yandex_client_modules.response_poller import poll_delay_cap
-from yandex_client_modules.host import bound
 from yandex_client_modules.stream_mixin import (
     emit_event,
     note_retry,
@@ -294,7 +295,11 @@ class YandexPollingMixin:
                 last_status = status
                 emit_event(
                     on_event,
-                    {"kind": "response_status", "status": status, "response_id": task_id},
+                    {
+                        "kind": "response_status",
+                        "status": status,
+                        "response_id": task_id,
+                    },
                 )
             if status in _TERMINAL_STATUSES or response.get("error") is not None:
                 return self._poll_terminal(

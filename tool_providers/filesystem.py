@@ -165,7 +165,7 @@ def read_file(args: dict) -> dict:
             }
     except Exception as e:
         logger.exception(f"[FS] Ошибка чтения файла {path}: {e}")
-        return {"error": f"Ошибка чтения: {str(e)}"}
+        return {"error": f"Ошибка чтения: {e!s}"}
 
 
 def write_file(args: dict) -> dict:
@@ -214,6 +214,7 @@ def write_file(args: dict) -> dict:
                 ],
                 capture_output=True,
                 text=True,
+                check=False,
             )
             if verify.returncode != 0:
                 if os.path.exists(tmp_path):
@@ -280,9 +281,7 @@ def write_file(args: dict) -> dict:
                 else f"Файл '{path}' сохранен."
             ),
             "diff": "\n".join(diff) if diff else "(файл создан заново)",
-            "backup": (
-                os.path.relpath(backup_file, BASE_DIR) if backup_file else None
-            ),
+            "backup": (os.path.relpath(backup_file, BASE_DIR) if backup_file else None),
         }
         if backup_warning:
             result["warning"] = backup_warning
@@ -294,10 +293,10 @@ def write_file(args: dict) -> dict:
             except OSError:
                 pass
         logger.exception(f"[FS] Ошибка записи файла {path}: {e}")
-        return {"error": f"Ошибка записи: {str(e)}"}
+        return {"error": f"Ошибка записи: {e!s}"}
 
 
-def apply_patch(args: dict, cfg: dict = None) -> dict:
+def apply_patch(args: dict, cfg: dict | None = None) -> dict:
     """Точечно заменить участок текста в файле на новый."""
     path = args.get("file_path") or args.get("path")
     search_text = args.get("search_text")
@@ -400,12 +399,12 @@ def python_ast_outline(args: dict) -> dict:
             "path": path,
             "total_lines": len(code.splitlines()),
             "docstring": ast.get_docstring(tree) or "",
-            "imports": sorted(list(set(imports))),
+            "imports": sorted(set(imports)),
             "classes": classes,
             "functions": functions,
         }
     except Exception as e:
-        return {"error": f"Ошибка AST-анализа: {str(e)}"}
+        return {"error": f"Ошибка AST-анализа: {e!s}"}
 
 
 def calculate_hash(args: dict) -> dict:
@@ -433,7 +432,7 @@ def calculate_hash(args: dict) -> dict:
             "size_bytes": os.path.getsize(abs_path),
         }
     except Exception as e:
-        return {"error": f"Ошибка вычисления хеша: {str(e)}"}
+        return {"error": f"Ошибка вычисления хеша: {e!s}"}
 
 
 def zip_compress(args: dict) -> dict:
@@ -505,7 +504,7 @@ def zip_compress(args: dict) -> dict:
             "archive_size_bytes": os.path.getsize(abs_out),
         }
     except Exception as e:
-        return {"error": f"Ошибка создания архива: {str(e)}"}
+        return {"error": f"Ошибка создания архива: {e!s}"}
     finally:
         if tmp_path is not None:
             try:
@@ -545,7 +544,7 @@ def zip_extract(args: dict) -> dict:
             "files": extracted[:50],
         }
     except Exception as e:
-        return {"error": f"Ошибка распаковки архива: {str(e)}"}
+        return {"error": f"Ошибка распаковки архива: {e!s}"}
 
 
 def _resolves_to_link_local(url: str) -> bool:
@@ -589,7 +588,7 @@ def http_fetch(args: dict) -> dict:
     url = args.get("url")
     if not url:
         return {"error": "Параметр 'url' обязателен"}
-    if not (url.startswith("http://") or url.startswith("https://")):
+    if not (url.startswith(("http://", "https://"))):
         return {"error": "URL должен начинаться с http:// или https://"}
     if _resolves_to_link_local(url):
         return {"error": "Адреса link-local, включая метаданные облака, недоступны"}
@@ -634,7 +633,7 @@ def http_fetch(args: dict) -> dict:
             "error": f"HTTP Error {he.code}: {he.reason}",
         }
     except Exception as e:
-        return {"success": False, "error": f"Ошибка сетевого запроса: {str(e)}"}
+        return {"success": False, "error": f"Ошибка сетевого запроса: {e!s}"}
 
 
 def make_directory(args: dict) -> dict:
@@ -651,7 +650,7 @@ def make_directory(args: dict) -> dict:
             "message": f"Директория '{path}' создана.",
         }
     except Exception as e:
-        return {"error": f"Ошибка создания папки: {str(e)}"}
+        return {"error": f"Ошибка создания папки: {e!s}"}
 
 
 def copy_or_move_file(args: dict) -> dict:
@@ -682,7 +681,7 @@ def copy_or_move_file(args: dict) -> dict:
 
         return {"success": True, "action": action, "message": msg}
     except Exception as e:
-        return {"error": f"Ошибка {action}: {str(e)}"}
+        return {"error": f"Ошибка {action}: {e!s}"}
 
 
 def delete_path(args: dict) -> dict:
@@ -718,7 +717,7 @@ def delete_path(args: dict) -> dict:
             "message": f"{kind.capitalize()} '{path}' удален.",
         }
     except Exception as e:
-        return {"error": f"Ошибка удаления: {str(e)}"}
+        return {"error": f"Ошибка удаления: {e!s}"}
 
 
 def list_directory(args: dict) -> dict:
@@ -748,7 +747,7 @@ def list_directory(args: dict) -> dict:
         items.sort(key=lambda x: (not x["is_dir"], x["name"]))
         return {"success": True, "path": path, "items": items}
     except Exception as e:
-        return {"error": f"Ошибка сканирования директории: {str(e)}"}
+        return {"error": f"Ошибка сканирования директории: {e!s}"}
 
 
 def glob_search(args: dict) -> dict:
@@ -779,7 +778,7 @@ def glob_search(args: dict) -> dict:
             "matches": results,
         }
     except Exception as e:
-        return {"error": f"Ошибка поиска по маске: {str(e)}"}
+        return {"error": f"Ошибка поиска по маске: {e!s}"}
 
 
 def grep_search(args: dict) -> dict:
@@ -843,7 +842,7 @@ def grep_search(args: dict) -> dict:
             "matches": results,
         }
     except Exception as e:
-        return {"error": f"Ошибка grep-поиска: {str(e)}"}
+        return {"error": f"Ошибка grep-поиска: {e!s}"}
 
 
 def file_stat(args: dict) -> dict:
@@ -868,7 +867,7 @@ def file_stat(args: dict) -> dict:
             "permissions_octal": oct(st.st_mode)[-3:],
         }
     except Exception as e:
-        return {"error": f"Ошибка чтения метаданных: {str(e)}"}
+        return {"error": f"Ошибка чтения метаданных: {e!s}"}
 
 
 _PROTECTED_COMMAND_RE = re.compile(
@@ -959,7 +958,7 @@ def get_system_info(args: dict) -> dict:
             "disk_free_gb": round(free / (1024**3), 2),
         }
     except Exception as e:
-        return {"error": f"Ошибка сбора системной информации: {str(e)}"}
+        return {"error": f"Ошибка сбора системной информации: {e!s}"}
 
 
 TOOL_REGISTRY = {

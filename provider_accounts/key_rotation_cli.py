@@ -63,7 +63,7 @@ def rotate_yandex_key() -> int:
             return 0
 
         provider = bound.YandexApiKeyProvider(project_id=str(row["project_id"]))
-        new_id, issued_at, expires_at = rotate_active_key(
+        new_id, _issued_at, expires_at = rotate_active_key(
             db=conn,
             provider=provider,
             encrypt=bound.encrypt_secret,
@@ -126,9 +126,7 @@ def rotate_cloudru_key() -> int:
         if management.get("expires_at"):
             from datetime import datetime
 
-            master_expires = datetime.fromisoformat(
-                management["expires_at"].replace("Z", "+00:00")
-            )
+            master_expires = datetime.fromisoformat(management["expires_at"])
             # A timestamp without an offset is read as UTC; comparing it with an aware time would raise.
             if master_expires.tzinfo is None:
                 master_expires = master_expires.replace(tzinfo=UTC)
@@ -160,7 +158,7 @@ def rotate_cloudru_key() -> int:
         if not row or not rotation_needed(row["expires_at"]):
             return 0
 
-        new_id, issued_at, expires_at = rotate_active_key(
+        new_id, _issued_at, expires_at = rotate_active_key(
             db=conn,
             provider=provider,
             encrypt=bound.encrypt_secret,

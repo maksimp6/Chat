@@ -30,7 +30,11 @@ class RateLimited(RuntimeError):
 
 
 def repository() -> str:
-    return os.environ.get("GITHUB_REPOSITORY") or os.environ.get("LOGOS_COURT_REPO") or "maksimp6/Chat"
+    return (
+        os.environ.get("GITHUB_REPOSITORY")
+        or os.environ.get("LOGOS_COURT_REPO")
+        or "maksimp6/Chat"
+    )
 
 
 def env_token() -> str | None:
@@ -46,15 +50,23 @@ def _get(url: str, token: str | None) -> tuple[Any, str]:
     if token:
         headers["Authorization"] = "Bearer " + token
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as response:
-            return json.loads(response.read().decode()), response.headers.get("Link", "")
+        with urllib.request.urlopen(
+            urllib.request.Request(url, headers=headers), timeout=60
+        ) as response:
+            return json.loads(response.read().decode()), response.headers.get(
+                "Link", ""
+            )
     except urllib.error.HTTPError as error:
-        if error.code == 429 or (error.code == 403 and error.headers.get("X-RateLimit-Remaining") == "0"):
+        if error.code == 429 or (
+            error.code == 403 and error.headers.get("X-RateLimit-Remaining") == "0"
+        ):
             raise RateLimited(f"GitHub rate limit (HTTP {error.code})") from error
         raise
 
 
-def _pages(path: str, params: dict[str, str], token: str | None, key: str | None = None) -> Iterator[dict]:
+def _pages(
+    path: str, params: dict[str, str], token: str | None, key: str | None = None
+) -> Iterator[dict]:
     url = API + path + "?" + urllib.parse.urlencode({**params, "per_page": "100"})
     while url:
         body, link = _get(url, token)
@@ -67,11 +79,17 @@ def _pages(path: str, params: dict[str, str], token: str | None, key: str | None
 KINDS = ("issues", "issue_comments", "review_comments", "runs")
 
 
-def _listing(kind: str, repo: str, cursor: str | None, token: str | None) -> Iterator[dict]:
+def _listing(
+    kind: str, repo: str, cursor: str | None, token: str | None
+) -> Iterator[dict]:
     if kind == "runs":
         params = {"created": f">={cursor}"} if cursor else {}
-        rows = list(_pages(f"/repos/{repo}/actions/runs", params, token, "workflow_runs"))
-        yield from sorted(rows, key=lambda row: (row.get("created_at") or "", row.get("id") or 0))
+        rows = list(
+            _pages(f"/repos/{repo}/actions/runs", params, token, "workflow_runs")
+        )
+        yield from sorted(
+            rows, key=lambda row: (row.get("created_at") or "", row.get("id") or 0)
+        )
         return
     path = {
         "issues": f"/repos/{repo}/issues",
@@ -96,7 +114,8 @@ def _record(kind: str, row: dict) -> str:
         labels = ", ".join(label.get("name", "") for label in row.get("labels") or [])
         head = [
             f"## {what} #{row.get('number')}: {row.get('title')}",
-            f"State: {row.get('state')}" + (f" ({row.get('state_reason')})" if row.get("state_reason") else ""),
+            f"State: {row.get('state')}"
+            + (f" ({row.get('state_reason')})" if row.get("state_reason") else ""),
             f"Author: {(row.get('user') or {}).get('login')}",
             f"Created: {row.get('created_at')} · Updated: {row.get('updated_at')} · Closed: {row.get('closed_at')}",
             f"Labels: {labels}",

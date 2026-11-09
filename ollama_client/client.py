@@ -90,31 +90,56 @@ class OllamaClient:
         started = time.time()
         perf = time.perf_counter()
         if trace is not None:
-            trace.add_event("api_request_sent", {"method": "POST", "url": url, "step": step})
+            trace.add_event(
+                "api_request_sent", {"method": "POST", "url": url, "step": step}
+            )
         sink = params.get("on_stream_event")
         if not callable(sink):
             sink = None
         live = None
         if sink is not None:
-            _emit(sink, {"kind": "response_status", "status": "in_progress", "response_id": None})
+            _emit(
+                sink,
+                {
+                    "kind": "response_status",
+                    "status": "in_progress",
+                    "response_id": None,
+                },
+            )
             # One reasoning part per request: the live view joins its pieces without breaks.
             part = f"ollama-{step or 0}-{started}"
 
             def live(event: dict[str, Any]) -> None:
                 kind = event.get("kind")
                 if kind == "reasoning_delta":
-                    _emit(sink, {"kind": "reasoning_delta", "text": event["text"], "summary": False, "part": part})
+                    _emit(
+                        sink,
+                        {
+                            "kind": "reasoning_delta",
+                            "text": event["text"],
+                            "summary": False,
+                            "part": part,
+                        },
+                    )
                 elif kind == "text_delta":
                     _emit(sink, {"kind": "text_delta", "text": event["text"]})
                 elif kind == "tool_call_requested":
                     # A tool's one function names its action in "tool": show the action.
                     arguments = event.get("arguments")
                     name = event.get("name")
-                    if isinstance(arguments, dict) and isinstance(arguments.get("tool"), str):
+                    if isinstance(arguments, dict) and isinstance(
+                        arguments.get("tool"), str
+                    ):
                         name = arguments["tool"]
                     _emit(
                         sink,
-                        {"kind": "tool_progress", "tool": "function", "phase": "requested", "name": name, "server_label": None},
+                        {
+                            "kind": "tool_progress",
+                            "tool": "function",
+                            "phase": "requested",
+                            "name": name,
+                            "server_label": None,
+                        },
                     )
 
         try:
@@ -131,7 +156,9 @@ class OllamaClient:
             raise OllamaClientError(str(exc), status_code=exc.status_code) from exc
         if trace is not None:
             ended = time.time()
-            trace.add_api_request(body, step_index=step, start_timestamp=started, provider_key_id=None)
+            trace.add_api_request(
+                body, step_index=step, start_timestamp=started, provider_key_id=None
+            )
             trace.add_response(
                 result,
                 step_index=step,
@@ -143,23 +170,42 @@ class OllamaClient:
             )
             trace.add_event(
                 "api_request_completed",
-                {"method": "POST", "url": url, "step": step, "response_id": result["id"], "status": result["status"]},
+                {
+                    "method": "POST",
+                    "url": url,
+                    "step": step,
+                    "response_id": result["id"],
+                    "status": result["status"],
+                },
             )
         on_provider_response = params.get("on_provider_response")
         if callable(on_provider_response):
             on_provider_response(result)
-        _emit(sink, {"kind": "response_status", "status": result["status"], "response_id": result["id"]})
+        _emit(
+            sink,
+            {
+                "kind": "response_status",
+                "status": result["status"],
+                "response_id": result["id"],
+            },
+        )
         return result
 
     def tools(self, execution_policy: Any = None) -> list[dict[str, Any]]:
         """The functions of Ollama's tool categories (one function per category)."""
         if self.registry is None:
             return []
-        allow_action = None if execution_policy is None else execution_policy.allows_tool
+        allow_action = (
+            None if execution_policy is None else execution_policy.allows_tool
+        )
         functions: list[dict[str, Any]] = []
         for category in settings.TOOLS:
             if self.registry.get_actions(category, allow_action=allow_action):
-                functions.extend(self.registry.get_tools_by_category(category, allow_action=allow_action))
+                functions.extend(
+                    self.registry.get_tools_by_category(
+                        category, allow_action=allow_action
+                    )
+                )
         return functions
 
     def ask_with_mcp(
@@ -194,8 +240,13 @@ class OllamaClient:
                     *response_input(ask_params, message),
                 ]
         if _traced(trace):
-            trace.add_event("ollama_tools", {"tools": [tool.get("name") for tool in ask_params["tools"]]})
-        return self.ask(message, model_key, conversation_id, ask_params, execution_trace=trace)
+            trace.add_event(
+                "ollama_tools",
+                {"tools": [tool.get("name") for tool in ask_params["tools"]]},
+            )
+        return self.ask(
+            message, model_key, conversation_id, ask_params, execution_trace=trace
+        )
 
     @staticmethod
     def extract_reasoning_and_text(data: Any) -> tuple[str, str]:
@@ -211,13 +262,17 @@ class OllamaClient:
                 reasoning.extend(
                     entry["text"]
                     for entry in item.get("summary") or []
-                    if isinstance(entry, dict) and isinstance(entry.get("text"), str) and entry["text"]
+                    if isinstance(entry, dict)
+                    and isinstance(entry.get("text"), str)
+                    and entry["text"]
                 )
             elif item.get("type") == "message":
                 text.extend(
                     part["text"]
                     for part in item.get("content") or []
-                    if isinstance(part, dict) and part.get("type") == "output_text" and isinstance(part.get("text"), str)
+                    if isinstance(part, dict)
+                    and part.get("type") == "output_text"
+                    and isinstance(part.get("text"), str)
                 )
         return "\n\n".join(reasoning), "".join(text)
 
@@ -230,11 +285,19 @@ class OllamaClient:
         if not isinstance(data, dict):
             return None
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
-        details = usage.get("output_tokens_details") if isinstance(usage.get("output_tokens_details"), dict) else {}
+        details = (
+            usage.get("output_tokens_details")
+            if isinstance(usage.get("output_tokens_details"), dict)
+            else {}
+        )
 
         def count(name: str, source: dict[str, Any] = usage) -> int:
             value = source.get(name)
-            return int(value) if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+            return (
+                int(value)
+                if isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                else 0
+            )
 
         return {
             "input_tokens": count("input_tokens"),

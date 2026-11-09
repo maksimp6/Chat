@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-__all__ = ["get_policy", "register_policy", "policy_names"]
+__all__ = ["get_policy", "policy_names", "register_policy"]
 
 _POLICIES: dict[str, Any] = {}
 

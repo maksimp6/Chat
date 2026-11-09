@@ -13,7 +13,7 @@ from typing import Any
 from corporation import cash, cycle
 from corporation import ledger as journal
 
-__all__ = ["is_command", "handle"]
+__all__ = ["handle", "is_command"]
 
 PREFIX = re.compile(r"^\s*корпорация\s*[:：]\s*", re.IGNORECASE)
 
@@ -50,11 +50,24 @@ def _status_text() -> str:
     lines = [
         f"Цикл: {'работает' if cyc.get('running') else 'остановлен'}; шагов {cyc.get('steps', 0)}, последний ход: {cyc.get('last_tick') or '—'} ({cyc.get('last_role') or '—'}).",
         f"Касса: подтверждено {_fmt_money(money['confirmed'])} ₽, предложено {_fmt_money(money['proposed'])} ₽, расходы {_fmt_money(money['expenses'])} ₽, итог {_fmt_money(money['net'])} ₽.",
-        f"Директив {len(st.directives)} (без проекта {sum(1 for d in st.directives if not d.get('project'))}); проектов открыто {sum(1 for p in st.projects.values() if p['status']=='open')}.",
-        "Задачи: " + ", ".join(f"{k} {v}" for k, v in st.summary()["tasks"].items()) + ".",
-        "Продукты: " + ", ".join(f"{k} {v}" for k, v in st.summary()["products"].items())
-        + "; офферы: " + ", ".join(f"{k} {v}" for k, v in st.summary()["offers"].items()) + ".",
-        "Каналы: " + (", ".join(f"{name} {'вкл' if c.get('enabled') else 'выкл'}" for name, c in st.channels.items()) or "нет") + ".",
+        f"Директив {len(st.directives)} (без проекта {sum(1 for d in st.directives if not d.get('project'))}); проектов открыто {sum(1 for p in st.projects.values() if p['status'] == 'open')}.",
+        "Задачи: "
+        + ", ".join(f"{k} {v}" for k, v in st.summary()["tasks"].items())
+        + ".",
+        "Продукты: "
+        + ", ".join(f"{k} {v}" for k, v in st.summary()["products"].items())
+        + "; офферы: "
+        + ", ".join(f"{k} {v}" for k, v in st.summary()["offers"].items())
+        + ".",
+        "Каналы: "
+        + (
+            ", ".join(
+                f"{name} {'вкл' if c.get('enabled') else 'выкл'}"
+                for name, c in st.channels.items()
+            )
+            or "нет"
+        )
+        + ".",
         f"Записей в журнале: {st.records}; последний снимок: {(st.last_backup or {}).get('at') or '—'}.",
     ]
     return "\n".join(lines)
@@ -64,8 +77,18 @@ def _journal_text(count: int) -> str:
     rows = []
     for entry in journal.ledger().tail(count):
         data = entry.get("data") or {}
-        what = data.get("text") or data.get("reason") or data.get("result") or data.get("reply") or data.get("title") or data.get("error") or ""
-        rows.append(f"{entry['seq']} {entry['at'][11:19]} {entry['kind']} [{entry.get('actor')}] {str(what)}")
+        what = (
+            data.get("text")
+            or data.get("reason")
+            or data.get("result")
+            or data.get("reply")
+            or data.get("title")
+            or data.get("error")
+            or ""
+        )
+        rows.append(
+            f"{entry['seq']} {entry['at'][11:19]} {entry['kind']} [{entry.get('actor')}] {what!s}"
+        )
     return "\n".join(rows) or "Журнал пуст."
 
 
@@ -81,7 +104,16 @@ def handle(message: str) -> str:
     book.append("board.command", "owner", {"text": rest[:2000]})
     if word in ("старт", "start"):
         result = cycle.start(message.strip())
-        return "Цикл запущен. " + ("Поток работает." if result["thread_alive"] else "Поток не поднялся: смотри журнал.") + "\n" + _status_text()
+        return (
+            "Цикл запущен. "
+            + (
+                "Поток работает."
+                if result["thread_alive"]
+                else "Поток не поднялся: смотри журнал."
+            )
+            + "\n"
+            + _status_text()
+        )
     if word in ("стоп", "stop"):
         cycle.stop("owner")
         return "Цикл остановится на границе хода.\n" + _status_text()
@@ -90,7 +122,11 @@ def handle(message: str) -> str:
             st = journal.state()
             from corporation.roles import DEFAULT_GOAL
 
-            return "Постоянная цель: " + (st.goal or DEFAULT_GOAL + " (по умолчанию компании; измените: корпорация: цель <текст>)")
+            return "Постоянная цель: " + (
+                st.goal
+                or DEFAULT_GOAL
+                + " (по умолчанию компании; измените: корпорация: цель <текст>)"
+            )
         entry = book.append("board.goal", "owner", {"text": tail[:2000]})
         return f"Цель записана ([{entry['seq']}]). Основатель будет исходить из неё."
     if word in ("директива", "directive"):
@@ -106,7 +142,11 @@ def handle(message: str) -> str:
         text = parts[2] if len(parts) > 2 else ""
         if verdict not in ("close", "requeue", "keep"):
             return "Вердикт: close (закрыть проект), requeue (вернуть задачу в очередь) или keep."
-        entry = book.append("board.decision", "owner", {"target": target, "verdict": verdict, "text": text[:2000]})
+        entry = book.append(
+            "board.decision",
+            "owner",
+            {"target": target, "verdict": verdict, "text": text[:2000]},
+        )
         return f"Решение записано ([{entry['seq']}]): {target} → {verdict}."
     if word in ("продано", "sold"):
         parts = tail.split(" ", 3)
@@ -141,7 +181,11 @@ def handle(message: str) -> str:
 
             keys = channels.configured().get(name)
             book.append("channel.start", "owner", {"name": name})
-            return f"Канал {name} включён." + ("" if keys else f" Ключей канала в core/.env нет: продажи через {name} откажут, пока их не положить.")
+            return f"Канал {name} включён." + (
+                ""
+                if keys
+                else f" Ключей канала в core/.env нет: продажи через {name} откажут, пока их не положить."
+            )
         book.append("channel.stop", "owner", {"name": name, "reason": "owner"})
         return f"Канал {name} выключен."
     if word in ("статус", "status"):
@@ -160,11 +204,16 @@ def handle(message: str) -> str:
         from corporation import office
 
         made = office.ensure_all()
-        rows = "\n".join(f"• {o['title']} — диалог «{o['title']}» в списке чатов" for o in made)
-        return ("Кабинеты открыты. Напиши в диалог сотрудника — он сделает по-твоему, "
-                "с полным набором инструментов, и запишет результат в журнал:\n" + rows)
+        rows = "\n".join(
+            f"• {o['title']} — диалог «{o['title']}» в списке чатов" for o in made
+        )
+        return (
+            "Кабинеты открыты. Напиши в диалог сотрудника — он сделает по-твоему, "
+            "с полным набором инструментов, и запишет результат в журнал:\n" + rows
+        )
     # корпорация: <имя или роль> — open or point to one employee's office
     from corporation.roles import ROLES
+
     by_name = {ROLES[r].person["name"].lower(): r for r in ROLES}
     role = word if word in ROLES else by_name.get(word)
     if role is not None:
@@ -172,6 +221,8 @@ def handle(message: str) -> str:
 
         conv = office.ensure_office(role)
         person = ROLES[role].person
-        return (f"Кабинет {person['name']} ({ROLES[role].title}) открыт: диалог «{office.title(role)}» в списке чатов. "
-                f"Пиши туда — {person['name']} делает по-твоему. conversation_id: {conv}")
+        return (
+            f"Кабинет {person['name']} ({ROLES[role].title}) открыт: диалог «{office.title(role)}» в списке чатов. "
+            f"Пиши туда — {person['name']} делает по-твоему. conversation_id: {conv}"
+        )
     return "Не понял команду.\n" + HELP

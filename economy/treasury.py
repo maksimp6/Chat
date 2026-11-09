@@ -144,15 +144,14 @@ def demo_top_up(
     # The check, the credit and the running total are one store transaction: they commit
     # together or not at all, so neither a failure between them nor another writer
     # can credit without counting it toward the total.
-    with _DEMO_LOCK:
-        with get_store().transaction() as tx:
-            credited = float((tx.get(key) or {}).get("total", 0.0))
-            if credited + value > DEMO_TOP_UP_TOTAL_LIMIT:
-                raise ValueError(
-                    f"demo top-ups are limited to {DEMO_TOP_UP_TOTAL_LIMIT:g} per owner"
-                )
-            _record_in(tx, owner_id, value, description, "credit")
-            tx.set(key, {"total": credited + value})
+    with _DEMO_LOCK, get_store().transaction() as tx:
+        credited = float((tx.get(key) or {}).get("total", 0.0))
+        if credited + value > DEMO_TOP_UP_TOTAL_LIMIT:
+            raise ValueError(
+                f"demo top-ups are limited to {DEMO_TOP_UP_TOTAL_LIMIT:g} per owner"
+            )
+        _record_in(tx, owner_id, value, description, "credit")
+        tx.set(key, {"total": credited + value})
     return get_account(owner_id)
 
 

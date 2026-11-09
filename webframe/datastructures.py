@@ -224,9 +224,7 @@ class MultiDict:
         except (ValueError, TypeError):
             return default
 
-    def getlist(
-        self, key: str, type: Callable[[Any], Any] | None = None
-    ) -> list[Any]:
+    def getlist(self, key: str, type: Callable[[Any], Any] | None = None) -> list[Any]:
         values = self._dict.get(key, [])
         if type is None:
             return list(values)

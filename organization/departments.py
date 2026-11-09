@@ -7,9 +7,8 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
-from webframe import Blueprint, jsonify, request
-
 from organization.host import create_session, get_session, get_store
+from webframe import Blueprint, jsonify, request
 
 departments_bp = Blueprint("departments", __name__, url_prefix="/api/departments")
 _DEPT_ID_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789-_"

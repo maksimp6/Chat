@@ -23,11 +23,17 @@ _TEXT_PARTS = ("input_text", "output_text", "text")
 class OllamaError(Exception):
     """Ollama did not answer: ``reached`` is False when the request never got there."""
 
-    def __init__(self, message: str, *, status_code: int | None = None, reached: bool = True):
+    def __init__(
+        self, message: str, *, status_code: int | None = None, reached: bool = True
+    ):
         super().__init__(message)
         self.status_code = status_code
         # An embedding failure reaches the chat as this error: the pinned embeddings dialog says why.
-        self.user_text = f"asmrun ответил ошибкой: {message}" if reached else settings.USER_TEXT_UNREACHABLE
+        self.user_text = (
+            f"asmrun ответил ошибкой: {message}"
+            if reached
+            else settings.USER_TEXT_UNREACHABLE
+        )
 
 
 def _text(content: Any) -> str:
@@ -70,7 +76,9 @@ def chat_messages(instructions: Any, items: Any) -> list[dict[str, Any]]:
             if last is not None and last["role"] == "assistant":
                 last.setdefault("tool_calls", []).append(call)
             else:
-                messages.append({"role": "assistant", "content": "", "tool_calls": [call]})
+                messages.append(
+                    {"role": "assistant", "content": "", "tool_calls": [call]}
+                )
         elif kind == "function_call_output":
             output = item.get("output")
             messages.append(
@@ -95,7 +103,11 @@ def chat_tools(tools: Any) -> list[dict[str, Any]]:
     """The function tools; hosted provider tools (web and file search, MCP) do not exist locally."""
     result = []
     for tool in tools if isinstance(tools, list) else []:
-        if isinstance(tool, dict) and tool.get("type") == "function" and tool.get("name"):
+        if (
+            isinstance(tool, dict)
+            and tool.get("type") == "function"
+            and tool.get("name")
+        ):
             result.append(
                 {
                     "type": "function",
@@ -129,7 +141,11 @@ def _response(data: dict[str, Any], model_key: str, started: float) -> dict[str,
                 "role": "assistant",
                 "status": "completed",
                 "content": [
-                    {"type": "output_text", "text": message["content"], "annotations": []}
+                    {
+                        "type": "output_text",
+                        "text": message["content"],
+                        "annotations": [],
+                    }
                 ],
             }
         )
@@ -226,13 +242,18 @@ def ask(
         ) from exc
     if resp.status_code != 200:
         raise OllamaError(
-            f"asmrun HTTP {resp.status_code}: {resp.text[:500]}", status_code=resp.status_code
+            f"asmrun HTTP {resp.status_code}: {resp.text[:500]}",
+            status_code=resp.status_code,
         )
-    data = _read_stream(resp, on_event if on_event is not None else (lambda _event: None))
+    data = _read_stream(
+        resp, on_event if on_event is not None else (lambda _event: None)
+    )
     return body, _response(data if isinstance(data, dict) else {}, model_key, started)
 
 
-def _read_stream(resp: requests.Response, on_event: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
+def _read_stream(
+    resp: requests.Response, on_event: Callable[[dict[str, Any]], None]
+) -> dict[str, Any]:
     """The streamed /api/chat answer joined into one, reported piece by piece; ``thinking_pieces``
     counts the pieces of thinking (Ollama streams one per generated token)."""
     thinking: list[str] = []
@@ -246,12 +267,16 @@ def _read_stream(resp: requests.Response, on_event: Callable[[dict[str, Any]], N
             try:
                 chunk = json.loads(line)
             except ValueError as exc:
-                raise OllamaError("asmrun streamed a line that is not valid JSON", status_code=200) from exc
+                raise OllamaError(
+                    "asmrun streamed a line that is not valid JSON", status_code=200
+                ) from exc
             if not isinstance(chunk, dict):
                 continue
             if chunk.get("error"):
-                raise OllamaError(f"asmrun: {chunk["error"]}", status_code=200)
-            message = chunk.get("message") if isinstance(chunk.get("message"), dict) else {}
+                raise OllamaError(f"asmrun: {chunk['error']}", status_code=200)
+            message = (
+                chunk.get("message") if isinstance(chunk.get("message"), dict) else {}
+            )
             if message.get("thinking"):
                 thinking.append(message["thinking"])
                 on_event({"kind": "reasoning_delta", "text": message["thinking"]})
@@ -273,11 +298,18 @@ def _read_stream(resp: requests.Response, on_event: Callable[[dict[str, Any]], N
             if chunk.get("done"):
                 last = chunk
     except requests.RequestException as exc:
-        raise OllamaError(f"asmrun stream broke: {type(exc).__name__}: {exc}", status_code=200) from exc
+        raise OllamaError(
+            f"asmrun stream broke: {type(exc).__name__}: {exc}", status_code=200
+        ) from exc
     finally:
         resp.close()
     return {
         **last,
         "thinking_pieces": len(thinking),
-        "message": {"role": "assistant", "thinking": "".join(thinking), "content": "".join(content), "tool_calls": calls},
+        "message": {
+            "role": "assistant",
+            "thinking": "".join(thinking),
+            "content": "".join(content),
+            "tool_calls": calls,
+        },
     }

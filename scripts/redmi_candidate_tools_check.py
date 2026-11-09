@@ -47,7 +47,7 @@ def require(condition, message):
 
 def command(argv, *, cwd=None, env=None, timeout=120, log=None):
     result = subprocess.run(
-        argv, cwd=cwd, env=env, capture_output=True, timeout=timeout
+        argv, cwd=cwd, env=env, capture_output=True, timeout=timeout, check=False
     )
     if log is not None:
         Path(log).write_bytes(result.stdout + result.stderr)
@@ -637,6 +637,7 @@ def main():
                 env=environment,
                 capture_output=True,
                 timeout=120,
+                check=False,
             )
             (private / "regressions.log").write_bytes(result.stdout + result.stderr)
             print(

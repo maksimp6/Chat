@@ -4,6 +4,7 @@ import logging
 import math
 import time
 import uuid
+
 import requests
 
 from yandex_client_modules.errors import YandexClientError
@@ -150,7 +151,13 @@ class YandexConversationMixin:
                 unknown_status = resp.status_code if resp is not None else None
                 raise YandexClientError(
                     "Create conversation: outcome unknown ("
-                    + (str(exc) if exc is not None else f"HTTP {unknown_status}" if unknown_status else unknown_reason)
+                    + (
+                        str(exc)
+                        if exc is not None
+                        else f"HTTP {unknown_status}"
+                        if unknown_status
+                        else unknown_reason
+                    )
                     + ")",
                     status_code=unknown_status
                     if unknown_status is not None and unknown_status >= 400

@@ -66,13 +66,13 @@ class CloudBudgetLimits:
         if self.monthly_limit is not None:
             object.__setattr__(self, "monthly_limit", _money(self.monthly_limit))
         ratio = Decimal(str(self.warn_ratio))
-        if not Decimal("0") < ratio <= Decimal("1"):
+        if not Decimal(0) < ratio <= Decimal(1):
             raise InvalidOperation("warn_ratio must be in (0, 1]")
         object.__setattr__(self, "warn_ratio", ratio)
         object.__setattr__(self, "currency", self.currency.strip().upper())
 
     @classmethod
-    def from_env(cls, env: dict[str, str] | None = None) -> "CloudBudgetLimits":
+    def from_env(cls, env: dict[str, str] | None = None) -> CloudBudgetLimits:
 
         source = dict(os.environ) if env is None else env
         raw_limit = str(source.get("CLOUDRU_MONTHLY_BUDGET", "")).strip()

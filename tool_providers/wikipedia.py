@@ -55,7 +55,7 @@ def _http_error(res: requests.Response) -> dict[str, Any]:
     }
 
 
-def wikipedia_search(arguments: dict, cfg: dict = None) -> dict:
+def wikipedia_search(arguments: dict, cfg: dict | None = None) -> dict:
     query = arguments.get("query")
     if not query:
         return {"success": False, "error": "Не указан поисковый запрос (query)"}
@@ -83,7 +83,7 @@ def wikipedia_search(arguments: dict, cfg: dict = None) -> dict:
         return {"success": False, "error": str(e)}
 
 
-def wikipedia_summary(arguments: dict, cfg: dict = None) -> dict:
+def wikipedia_summary(arguments: dict, cfg: dict | None = None) -> dict:
     title = arguments.get("title")
     if not title:
         return {"success": False, "error": "Не указан заголовок статьи (title)"}

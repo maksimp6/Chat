@@ -14,7 +14,7 @@ from __future__ import annotations
 import importlib
 import threading
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 H = TypeVar("H")
 
@@ -41,7 +41,7 @@ def _register_default_root() -> None:
     root.register_all()
 
 
-class Binding(Generic[H]):
+class Binding[H]:
     """Holds one unit's host; process-global so worker threads see it too."""
 
     def __init__(self, unit: str) -> None:

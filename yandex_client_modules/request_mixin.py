@@ -1,25 +1,12 @@
 """Request mixin of the Responses client: credentials, per-user quotas, transport timeouts, request capture and ask()."""
 
-import time
 import copy
-
 import math
-from typing import Any, Callable
+import time
+from collections.abc import Callable
+from typing import Any
 
-
-from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
-from yandex_client_modules.request_builder import (
-    _response_input,
-    build_response_payload,
-    ultra_applied_event,
-    validate_generation_params,
-)
-from yandex_client_modules.request_receipt import build_model_view, build_request_manifest
 from yandex_client_modules.errors import YandexClientError
-from yandex_client_modules.stream_mixin import (
-    LiveStream,
-    emit_event,
-)
 from yandex_client_modules.host import (
     bound,
     get_current_owner_id,
@@ -28,6 +15,20 @@ from yandex_client_modules.host import (
     release_request,
     reserve_request,
     resolve_client_credential,
+)
+from yandex_client_modules.request_builder import (
+    build_response_payload,
+    ultra_applied_event,
+    validate_generation_params,
+)
+from yandex_client_modules.request_receipt import (
+    build_model_view,
+    build_request_manifest,
+)
+from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
+from yandex_client_modules.stream_mixin import (
+    LiveStream,
+    emit_event,
 )
 
 
@@ -262,7 +263,8 @@ class YandexRequestMixin:
             # "assembled", not "applied": the profile adapter is not integrated, and
             # the event shows only what the request carries (#1657).
             execution_trace.add_event(
-                "ultra_profile_assembled", ultra_applied_event(model_key, params, payload)
+                "ultra_profile_assembled",
+                ultra_applied_event(model_key, params, payload),
             )
 
         # Reserved after the payload is built, so a request rejected for its parameters uses no quota.
@@ -299,7 +301,9 @@ class YandexRequestMixin:
                 isinstance(execution_trace, bound.ExecutionTrace)
                 and trace_step_number is None
             ):
-                trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
+                trace_step_number = (
+                    len(execution_trace.trace.get("api_requests", [])) + 1
+                )
         except BaseException:
             # Reserved but not yet sent: the quota reservation is returned.
             release_request(quota_reservation)

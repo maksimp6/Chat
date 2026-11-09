@@ -10,7 +10,12 @@ from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 from webframe.datastructures import Headers
-from webframe.exceptions import HTTPError, InternalServerError, MethodNotAllowed, NotFound
+from webframe.exceptions import (
+    HTTPError,
+    InternalServerError,
+    MethodNotAllowed,
+    NotFound,
+)
 from webframe.globals import AppContext, RequestContext
 from webframe.helpers import redirect, send_from_directory
 from webframe.json import JSONProvider
@@ -51,7 +56,11 @@ class _RouteMethods:
     """``route`` and the ``get``/``post``/... shortcuts, shared by apps and blueprints."""
 
     def add_url_rule(
-        self, rule: str, endpoint: str | None = None, view_func: ViewFunc | None = None, **options: Any
+        self,
+        rule: str,
+        endpoint: str | None = None,
+        view_func: ViewFunc | None = None,
+        **options: Any,
     ) -> None:
         raise NotImplementedError
 
@@ -105,7 +114,11 @@ class Blueprint(_RouteMethods):
         self.error_handlers: dict[Any, Callable[[Exception], Any]] = {}
 
     def add_url_rule(
-        self, rule: str, endpoint: str | None = None, view_func: ViewFunc | None = None, **options: Any
+        self,
+        rule: str,
+        endpoint: str | None = None,
+        view_func: ViewFunc | None = None,
+        **options: Any,
     ) -> None:
         if endpoint is not None and "." in endpoint:
             raise ValueError("a blueprint endpoint may not contain a dot")
@@ -116,7 +129,9 @@ class Blueprint(_RouteMethods):
         full_endpoint = f"{self.name}.{endpoint}"
 
         def register(app: Application, prefix: str | None) -> None:
-            app.add_url_rule(_join_prefix(prefix, rule), full_endpoint, view_func, **options)
+            app.add_url_rule(
+                _join_prefix(prefix, rule), full_endpoint, view_func, **options
+            )
 
         self._deferred.append(register)
 
@@ -124,14 +139,20 @@ class Blueprint(_RouteMethods):
         self.before_request_funcs.append(func)
         return func
 
-    def after_request(self, func: Callable[[Response], Response]) -> Callable[[Response], Response]:
+    def after_request(
+        self, func: Callable[[Response], Response]
+    ) -> Callable[[Response], Response]:
         self.after_request_funcs.append(func)
         return func
 
-    def register_error_handler(self, code_or_exception: Any, func: Callable[[Exception], Any]) -> None:
+    def register_error_handler(
+        self, code_or_exception: Any, func: Callable[[Exception], Any]
+    ) -> None:
         self.error_handlers[code_or_exception] = func
 
-    def errorhandler(self, code_or_exception: Any) -> Callable[[Callable[[Exception], Any]], Callable[[Exception], Any]]:
+    def errorhandler(
+        self, code_or_exception: Any
+    ) -> Callable[[Callable[[Exception], Any]], Callable[[Exception], Any]]:
         def decorator(func: Callable[[Exception], Any]) -> Callable[[Exception], Any]:
             self.register_error_handler(code_or_exception, func)
             return func
@@ -142,8 +163,12 @@ class Blueprint(_RouteMethods):
         prefix = self.url_prefix if url_prefix is None else url_prefix
         for register in self._deferred:
             register(app, prefix)
-        app.before_request_funcs.setdefault(self.name, []).extend(self.before_request_funcs)
-        app.after_request_funcs.setdefault(self.name, []).extend(self.after_request_funcs)
+        app.before_request_funcs.setdefault(self.name, []).extend(
+            self.before_request_funcs
+        )
+        app.after_request_funcs.setdefault(self.name, []).extend(
+            self.after_request_funcs
+        )
         app.error_handler_spec.setdefault(self.name, {}).update(self.error_handlers)
 
     def __repr__(self) -> str:
@@ -188,10 +213,16 @@ class Application(_RouteMethods):
         self.url_map = Router()
         self.view_functions: dict[str, ViewFunc] = {}
         self.blueprints: dict[str, Blueprint] = {}
-        self.before_request_funcs: dict[str | None, list[Callable[[], Any]]] = {None: []}
-        self.after_request_funcs: dict[str | None, list[Callable[[Response], Response]]] = {None: []}
+        self.before_request_funcs: dict[str | None, list[Callable[[], Any]]] = {
+            None: []
+        }
+        self.after_request_funcs: dict[
+            str | None, list[Callable[[Response], Response]]
+        ] = {None: []}
         self.teardown_request_funcs: list[Callable[[BaseException | None], Any]] = []
-        self.error_handler_spec: dict[str | None, dict[Any, Callable[[Exception], Any]]] = {None: {}}
+        self.error_handler_spec: dict[
+            str | None, dict[Any, Callable[[Exception], Any]]
+        ] = {None: {}}
         self._templates = TemplateLoader(
             os.path.join(self.root_path, template_folder or "templates")
         )
@@ -252,24 +283,35 @@ class Application(_RouteMethods):
         self.before_request_funcs[None].append(func)
         return func
 
-    def after_request(self, func: Callable[[Response], Response]) -> Callable[[Response], Response]:
+    def after_request(
+        self, func: Callable[[Response], Response]
+    ) -> Callable[[Response], Response]:
         self.after_request_funcs[None].append(func)
         return func
 
-    def teardown_request(self, func: Callable[[BaseException | None], Any]) -> Callable[[BaseException | None], Any]:
+    def teardown_request(
+        self, func: Callable[[BaseException | None], Any]
+    ) -> Callable[[BaseException | None], Any]:
         self.teardown_request_funcs.append(func)
         return func
 
-    def register_error_handler(self, code_or_exception: Any, func: Callable[[Exception], Any]) -> None:
+    def register_error_handler(
+        self, code_or_exception: Any, func: Callable[[Exception], Any]
+    ) -> None:
         """Handle an HTTP status code or an exception class (and its subclasses) with ``func``."""
         if isinstance(code_or_exception, int) or (
-            isinstance(code_or_exception, type) and issubclass(code_or_exception, BaseException)
+            isinstance(code_or_exception, type)
+            and issubclass(code_or_exception, BaseException)
         ):
             self.error_handler_spec[None][code_or_exception] = func
             return
-        raise ValueError("an error handler is registered for a status code or an exception class")
+        raise ValueError(
+            "an error handler is registered for a status code or an exception class"
+        )
 
-    def errorhandler(self, code_or_exception: Any) -> Callable[[Callable[[Exception], Any]], Callable[[Exception], Any]]:
+    def errorhandler(
+        self, code_or_exception: Any
+    ) -> Callable[[Callable[[Exception], Any]], Callable[[Exception], Any]]:
         def decorator(func: Callable[[Exception], Any]) -> Callable[[Exception], Any]:
             self.register_error_handler(code_or_exception, func)
             return func
@@ -290,7 +332,9 @@ class Application(_RouteMethods):
         return Client(self)
 
     def render_template(self, template_name: str, context: dict[str, Any]) -> str:
-        return self._templates.render(template_name, context, json_dumps=self.json.dumps)
+        return self._templates.render(
+            template_name, context, json_dumps=self.json.dumps
+        )
 
     # responses
 
@@ -326,7 +370,7 @@ class Application(_RouteMethods):
         if isinstance(rv, HTTPError):
             rv = rv.get_response()
         if not isinstance(rv, Response):
-            if isinstance(rv, (str, bytes, bytearray)) or isinstance(rv, Iterator):
+            if isinstance(rv, (str, bytes, bytearray, Iterator)):
                 rv = self.response_class(rv, status=status, headers=headers)
                 status = headers = None
             elif isinstance(rv, (dict, list)):
@@ -345,7 +389,9 @@ class Application(_RouteMethods):
 
     def make_default_options_response(self, path: str) -> Response:
         response = self.response_class(status=200)
-        response.headers["Allow"] = ", ".join(sorted(self.url_map.allowed_methods(path)))
+        response.headers["Allow"] = ", ".join(
+            sorted(self.url_map.allowed_methods(path))
+        )
         return response
 
     # dispatch
@@ -378,20 +424,26 @@ class Application(_RouteMethods):
         return self.view_functions[rule.endpoint](**(request.view_args or {}))
 
     def process_response(self, request: Request, response: Response) -> Response:
-        names: tuple[str | None, ...] = (request.blueprint, None) if request.blueprint else (None,)
+        names: tuple[str | None, ...] = (
+            (request.blueprint, None) if request.blueprint else (None,)
+        )
         for name in names:
             for func in reversed(self.after_request_funcs.get(name, [])):
                 response = func(response)
         return response
 
-    def finalize_request(self, request: Request, rv: Any, from_error_handler: bool = False) -> Response:
+    def finalize_request(
+        self, request: Request, rv: Any, from_error_handler: bool = False
+    ) -> Response:
         response = self.make_response(rv)
         try:
             response = self.process_response(request, response)
         except Exception:
             if not from_error_handler:
                 raise
-            self.logger.exception("Request finalizing failed with an error while handling an error")
+            self.logger.exception(
+                "Request finalizing failed with an error while handling an error"
+            )
         return response
 
     def full_dispatch_request(self, request: Request) -> Response:
@@ -403,7 +455,9 @@ class Application(_RouteMethods):
             rv = self.handle_user_exception(request, error)
         return self.finalize_request(request, rv)
 
-    def _find_error_handler(self, error: BaseException, blueprint: str | None) -> Callable[[Exception], Any] | None:
+    def _find_error_handler(
+        self, error: BaseException, blueprint: str | None
+    ) -> Callable[[Exception], Any] | None:
         code = error.code if isinstance(error, HTTPError) else None
         for name in (blueprint, None):
             handlers = self.error_handler_spec.get(name)
@@ -451,7 +505,9 @@ class Application(_RouteMethods):
 
     # WSGI
 
-    def wsgi_app(self, environ: dict[str, Any], start_response: Callable[..., Any]) -> Any:
+    def wsgi_app(
+        self, environ: dict[str, Any], start_response: Callable[..., Any]
+    ) -> Any:
         request = self.request_class(environ)
         ctx = RequestContext(self, request)
         ctx.push()
@@ -475,7 +531,9 @@ class Application(_RouteMethods):
             request.close()
             ctx.pop()
 
-    def __call__(self, environ: dict[str, Any], start_response: Callable[..., Any]) -> Any:
+    def __call__(
+        self, environ: dict[str, Any], start_response: Callable[..., Any]
+    ) -> Any:
         return self.wsgi_app(environ, start_response)
 
     def run(

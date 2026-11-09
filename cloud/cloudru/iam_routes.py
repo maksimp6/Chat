@@ -8,10 +8,9 @@ import os
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from webframe import Blueprint, jsonify, request
-
 from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
 from cloud.host import secret_storage_ready, store_secret
+from webframe import Blueprint, jsonify, request
 
 logger = logging.getLogger("logos.cloud.cloudru.iam_routes")
 cloudru_iam_bp = Blueprint("cloudru_iam", __name__, url_prefix="/api/cloudru/iam")
@@ -45,7 +44,7 @@ def _parse_expiry(value: Any) -> str | None:
         return None
     raw = str(value).strip()
     try:
-        expiry = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        expiry = datetime.fromisoformat(raw)
     except ValueError as exc:
         raise ValueError("expires_at must be an ISO-8601 timestamp") from exc
     if expiry.tzinfo is None:
@@ -168,11 +167,7 @@ def create_api_key():
                 provider="cloudru",
                 environment=environment,
                 owner=owner,
-                expires_at=(
-                    datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-                    if expires_at
-                    else None
-                ),
+                expires_at=(datetime.fromisoformat(expires_at) if expires_at else None),
                 key_ref=f"cloudru_{key_id}",
             )
         except Exception:

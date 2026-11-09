@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from webframe import Blueprint, Response, request
-
 from mcp_server.auth import _auth_user_from_request
 from mcp_server.protocol import (
     MCP_PATH,
@@ -15,6 +13,7 @@ from mcp_server.protocol import (
 )
 from mcp_server.runtime_bridge import ToolOutputError, _handle_call
 from mcp_server.tools import _tools_list
+from webframe import Blueprint, Response, request
 
 chatgpt_mcp_bp = Blueprint("chatgpt_mcp", __name__)
 

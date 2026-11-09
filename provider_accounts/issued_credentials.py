@@ -60,7 +60,7 @@ def issuance_status():
 
 def _date(value):
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value)
         if parsed.tzinfo is None:
             raise ValueError()
         return parsed.astimezone(UTC)

@@ -199,7 +199,11 @@ def _entry(line: bytes, floor: int, needle: str) -> dict[str, Any] | None:
         entry.get("trace_id"),
         entry.get("invocation_id"),
     )
-    return entry if needle in " ".join(str(value) for value in held if value).casefold() else None
+    return (
+        entry
+        if needle in " ".join(str(value) for value in held if value).casefold()
+        else None
+    )
 
 
 def read_entries(

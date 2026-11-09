@@ -273,8 +273,10 @@ def render_markdown(data: dict[str, Any]) -> str:
             "",
             f"Entries reported as stale or unverified: {attention}.",
             "",
-            "An integration PR that changes implementation/support status must update "
-            "the structured catalog in the same slice.",
+            (
+                "An integration PR that changes implementation/support status must update "
+                "the structured catalog in the same slice."
+            ),
             "",
         ]
     )

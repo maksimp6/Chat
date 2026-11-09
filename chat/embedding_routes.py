@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 
-from webframe import Blueprint, jsonify, request
-
 from chat._error_details import DETAILS, error_body
 from chat.host import (
     bound,
@@ -14,6 +12,7 @@ from chat.host import (
     get_current_trace,
     traced_operation,
 )
+from webframe import Blueprint, jsonify, request
 
 embedding_bp = Blueprint("embeddings", __name__)
 logger = logging.getLogger("logos.embeddings")

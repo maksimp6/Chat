@@ -7,10 +7,9 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
-from webframe import Blueprint, jsonify, request
-
 from organization._vendor.schema import object_schema
 from organization.host import get_current_owner_id, get_store
+from webframe import Blueprint, jsonify, request
 
 government_bp = Blueprint("government", __name__, url_prefix="/api/government")
 

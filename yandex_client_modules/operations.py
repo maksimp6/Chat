@@ -21,7 +21,9 @@ from yandex_client_modules.errors import YandexClientError
 
 ALLOWED_METHODS = ("GET", "POST")
 API_HOST = "api.cloud.yandex.net"
-_REFUSED_NAME = re.compile(r"(?i)cancel|delete|remove|revoke|destroy|purge|update|modify|rename")
+_REFUSED_NAME = re.compile(
+    r"(?i)cancel|delete|remove|revoke|destroy|purge|update|modify|rename"
+)
 _PLACEHOLDER = re.compile(r"\{([^{}]+)\}")
 
 
@@ -56,7 +58,9 @@ def list_operations() -> list[dict[str, Any]]:
                 "operation": name,
                 "method": entry["transport"]["method"],
                 "title": entry.get("title", ""),
-                "path_params": sorted(set(_PLACEHOLDER.findall(template.replace("{{ api-host }}", "")))),
+                "path_params": sorted(
+                    set(_PLACEHOLDER.findall(template.replace("{{ api-host }}", "")))
+                ),
             }
         )
     return sorted(rows, key=lambda row: row["operation"])
@@ -80,8 +84,12 @@ def _target(name: str, path_params: dict[str, Any]) -> tuple[str, str]:
     for key in names:
         value = path_params[key]
         if isinstance(value, bool) or not isinstance(value, (str, int)):
-            raise OperationRefused(f"{name}: path parameter {key} must be a string or an integer")
-    url = _PLACEHOLDER.sub(lambda match: quote(str(path_params[match.group(1)]), safe=""), template)
+            raise OperationRefused(
+                f"{name}: path parameter {key} must be a string or an integer"
+            )
+    url = _PLACEHOLDER.sub(
+        lambda match: quote(str(path_params[match.group(1)]), safe=""), template
+    )
     return method, url
 
 
@@ -113,7 +121,9 @@ class YandexOperationMixin:
         self._log_request(method, url, json=body)
         try:
             response = yandex_request(
-                lambda target, **options: self.session.request(method, target, **options),
+                lambda target, **options: self.session.request(
+                    method, target, **options
+                ),
                 method,
                 url,
                 json=body,
@@ -135,7 +145,10 @@ class YandexOperationMixin:
         elif content_type.startswith("text/") or not content_type:
             payload = response.text
         else:
-            payload = {"encoding": "base64", "data": base64.b64encode(response.content).decode("ascii")}
+            payload = {
+                "encoding": "base64",
+                "data": base64.b64encode(response.content).decode("ascii"),
+            }
         if execution_trace is not None:
             execution_trace.add_event(
                 "yandex_operation",

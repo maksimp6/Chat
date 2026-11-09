@@ -39,7 +39,9 @@ def _git(root: Path, *args: str) -> bytes:
         ).stdout
     except (OSError, subprocess.CalledProcessError) as exc:
         detail = getattr(exc, "stderr", b"") or b""
-        raise GitError(f"git {args[0]}: {detail.decode(errors='replace').strip() or exc}") from exc
+        raise GitError(
+            f"git {args[0]}: {detail.decode(errors='replace').strip() or exc}"
+        ) from exc
 
 
 def new_commits(root: Path, since: str | None) -> list[str]:
@@ -48,7 +50,9 @@ def new_commits(root: Path, since: str | None) -> list[str]:
     return _git(root, "rev-list", "--reverse", "--topo-order", *spec).decode().split()
 
 
-def _changes(root: Path, sha: str, parent: str | None) -> list[tuple[str, str, str | None]]:
+def _changes(
+    root: Path, sha: str, parent: str | None
+) -> list[tuple[str, str, str | None]]:
     # --no-commit-id: with one commit (the root) diff-tree would print its id as the first field.
     args = ["diff-tree", "-r", "-z", "--no-commit-id", "--name-status", "-M"]
     args += [parent, sha] if parent else ["--root", sha]
@@ -79,7 +83,9 @@ def _file_text(root: Path, sha: str, path: str) -> str:
 
 def commit_record(root: Path, sha: str) -> tuple[str, int]:
     """One commit as text, and how many values were masked in it."""
-    raw = _git(root, "show", "-s", "--format=%H%n%P%n%an%n%aI%n%B", sha).decode(errors="replace")
+    raw = _git(root, "show", "-s", "--format=%H%n%P%n%an%n%aI%n%B", sha).decode(
+        errors="replace"
+    )
     full, parents, author, date, message = (raw.split("\n", 4) + [""] * 5)[:5]
     parent = parents.split()[0] if parents.split() else None
     lines = [
@@ -97,7 +103,9 @@ def commit_record(root: Path, sha: str) -> tuple[str, int]:
         lines.append(f"- {label}: {path}" + (f" (from {old})" if old else ""))
         if status != "D":
             bodies.append(f"### {path} @ {full[:12]}\n\n" + _file_text(root, sha, path))
-    text, masked = mask("\n".join(lines) + ("\n\n" + "\n\n".join(bodies) if bodies else ""))
+    text, masked = mask(
+        "\n".join(lines) + ("\n\n" + "\n\n".join(bodies) if bodies else "")
+    )
     return text, masked
 
 

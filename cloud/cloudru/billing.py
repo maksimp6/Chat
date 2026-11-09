@@ -74,7 +74,7 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
         rows = payload.get(list_key)
         if not isinstance(rows, list):
             continue
-        total = Decimal("0")
+        total = Decimal(0)
         counted = 0
         row_currencies: set[str] = set()
         for row in rows:

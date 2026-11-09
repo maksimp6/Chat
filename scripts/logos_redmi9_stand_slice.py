@@ -146,7 +146,7 @@ def main() -> int:
         str(args.model.resolve()),
     ]
     res = subprocess.run(
-        cmd, capture_output=True, text=True, cwd=out, env=env, timeout=330
+        cmd, capture_output=True, text=True, cwd=out, env=env, timeout=330, check=False
     )
     print("SLICER_EXIT", res.returncode, flush=True)
     print("SLICER_LOG_TAIL", (res.stdout + res.stderr)[-1500:], flush=True)

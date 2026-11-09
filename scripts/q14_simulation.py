@@ -21,13 +21,41 @@ class Scenario:
     guards_enabled: bool = True
 
 
-NORMAL = ("ISOLATE", "SECURE", "PROHIBIT", "CHECK_ABSENCE", "GROUND", "FINISH_SITE", "ADMIT")
-EARLY_GROUND = ("ISOLATE", "SECURE", "PROHIBIT", "GROUND", "CHECK_ABSENCE", "FINISH_SITE", "ADMIT")
-ARM_ORDER = ("ISOLATE", "CHECK_ABSENCE", "GROUND", "SECURE", "PROHIBIT", "FINISH_SITE", "ADMIT")
+NORMAL = (
+    "ISOLATE",
+    "SECURE",
+    "PROHIBIT",
+    "CHECK_ABSENCE",
+    "GROUND",
+    "FINISH_SITE",
+    "ADMIT",
+)
+EARLY_GROUND = (
+    "ISOLATE",
+    "SECURE",
+    "PROHIBIT",
+    "GROUND",
+    "CHECK_ABSENCE",
+    "FINISH_SITE",
+    "ADMIT",
+)
+ARM_ORDER = (
+    "ISOLATE",
+    "CHECK_ABSENCE",
+    "GROUND",
+    "SECURE",
+    "PROHIBIT",
+    "FINISH_SITE",
+    "ADMIT",
+)
 CASES = (
     Scenario("S1", "Основной порядок в исправной модели", NORMAL, "MODEL_ACCEPTED"),
     Scenario(
-        "S2", "После команды отключения осталось напряжение", NORMAL, "BLOCKED", hidden_voltage=True
+        "S2",
+        "После команды отключения осталось напряжение",
+        NORMAL,
+        "BLOCKED",
+        hidden_voltage=True,
     ),
     Scenario("S3", "Попытка заземления до проверки", EARLY_GROUND, "BLOCKED"),
     Scenario("S4", "Поздние запреты при основном порядке", ARM_ORDER, "BLOCKED"),
@@ -38,7 +66,9 @@ CASES = (
         "MODEL_ACCEPTED",
         arm_conditions_assumed=True,
     ),
-    Scenario("S6", "Готовность заявлена без действий", ("CLAIM_DONE", "ADMIT"), "BLOCKED"),
+    Scenario(
+        "S6", "Готовность заявлена без действий", ("CLAIM_DONE", "ADMIT"), "BLOCKED"
+    ),
     Scenario(
         "S7",
         "Непригодное доказательство отсутствия напряжения",

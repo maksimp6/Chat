@@ -13,7 +13,7 @@ from typing import Any
 
 from corporation import ledger as journal
 
-__all__ = ["summary", "confirm_sale", "expense"]
+__all__ = ["confirm_sale", "expense", "summary"]
 
 WATTS = 7.0
 RUB_PER_KWH = 6.0
@@ -49,18 +49,36 @@ def summary(st: journal.State | None = None) -> dict[str, Any]:
     }
 
 
-def confirm_sale(product: str, amount: float, note: str = "", client: str | None = None) -> dict[str, Any]:
+def confirm_sale(
+    product: str, amount: float, note: str = "", client: str | None = None
+) -> dict[str, Any]:
     st = journal.state()
     if product not in st.products:
         raise ValueError(f"no such product: {product}")
     entry = journal.ledger().append(
-        "revenue.confirmed", "owner",
-        {"amount": float(amount), "currency": "RUB", "product": product, "client": client, "channel": "owner", "note": note[:1000]},
-        product=product, project=st.products[product]["project"],
+        "revenue.confirmed",
+        "owner",
+        {
+            "amount": float(amount),
+            "currency": "RUB",
+            "product": product,
+            "client": client,
+            "channel": "owner",
+            "note": note[:1000],
+        },
+        product=product,
+        project=st.products[product]["project"],
     )
-    return {"seq": entry["seq"], "confirmed": round(st.money["confirmed"] + float(amount), 2)}
+    return {
+        "seq": entry["seq"],
+        "confirmed": round(st.money["confirmed"] + float(amount), 2),
+    }
 
 
 def expense(amount: float, what: str) -> dict[str, Any]:
-    entry = journal.ledger().append("expense", "owner", {"amount": float(amount), "currency": "RUB", "what": what[:1000]})
+    entry = journal.ledger().append(
+        "expense",
+        "owner",
+        {"amount": float(amount), "currency": "RUB", "what": what[:1000]},
+    )
     return {"seq": entry["seq"]}

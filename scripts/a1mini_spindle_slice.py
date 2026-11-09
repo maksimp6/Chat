@@ -177,7 +177,13 @@ def main():
         str(stl),
     ]
     result = subprocess.run(
-        command, cwd=out, env=env, text=True, capture_output=True, timeout=240
+        command,
+        cwd=out,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=240,
+        check=False,
     )
     print(
         "SLICER_EXIT",
@@ -218,25 +224,25 @@ def main():
     b = objs[0].get("bbox") or {}
     if not (0 < float(b.get("height", 0)) <= 180):
         raise ValueError("invalid print height")
-    audit = dict(
-        source_sha256=SOURCE_SHA,
-        output_sha256=hashlib.sha256(dest.read_bytes()).hexdigest(),
-        bytes=dest.stat().st_size,
-        filename=OUTPUT,
-        printer="Bambu Lab A1 mini",
-        nozzle_mm="0.4",
-        material="PLA",
-        prototype_only=True,
-        parts=7,
-        triangles=9660,
-        bed="Textured PEI Plate",
-        nozzle_c=220,
-        bed_c=60,
-        walls=4,
-        infill="35%",
-        status="SLICED_NOT_PRINTED",
-        estimated_seconds=plates[0].get("total_predication"),
-    )
+    audit = {
+        "source_sha256": SOURCE_SHA,
+        "output_sha256": hashlib.sha256(dest.read_bytes()).hexdigest(),
+        "bytes": dest.stat().st_size,
+        "filename": OUTPUT,
+        "printer": "Bambu Lab A1 mini",
+        "nozzle_mm": "0.4",
+        "material": "PLA",
+        "prototype_only": True,
+        "parts": 7,
+        "triangles": 9660,
+        "bed": "Textured PEI Plate",
+        "nozzle_c": 220,
+        "bed_c": 60,
+        "walls": 4,
+        "infill": "35%",
+        "status": "SLICED_NOT_PRINTED",
+        "estimated_seconds": plates[0].get("total_predication"),
+    }
     (out / "spindle_audit.json").write_text(
         json.dumps(audit, indent=2, sort_keys=True) + "\n"
     )

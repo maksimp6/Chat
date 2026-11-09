@@ -11,7 +11,8 @@ from __future__ import annotations
 import gzip
 import re
 import zlib
-from typing import Any, Iterable, Iterator
+from collections.abc import Iterable, Iterator
+from typing import Any
 
 from webframe import Application, Response, request
 from webframe.json import JSONProvider
@@ -53,8 +54,7 @@ def _compressible(response: Response) -> bool:
     if not (
         mimetype.startswith("text/")
         or mimetype in _COMPRESSIBLE_TYPES
-        or mimetype.endswith("+json")
-        or mimetype.endswith("+xml")
+        or mimetype.endswith(("+json", "+xml"))
     ):
         return False
     if request.method == "HEAD" or _secret_path(request.path):

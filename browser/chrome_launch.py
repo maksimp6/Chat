@@ -44,7 +44,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger("logos.browser.chrome")
 
 CHROME_ENV = "LOGOS_BROWSER_CHROME"
-PATH_NAMES = ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "chrome")
+PATH_NAMES = (
+    "chromium",
+    "chromium-browser",
+    "google-chrome",
+    "google-chrome-stable",
+    "chrome",
+)
 WORKDIR_PREFIX = "logos-browser-"
 PROFILE_DIRNAME = "chrome-profile"
 OWNER_FILE = "owner.json"
@@ -111,7 +117,9 @@ class ChromeBinary:
     headless_shell: bool
 
     def describe(self) -> str:
-        return f"{self.path} (найден через {_SOURCE_WORDS.get(self.source, self.source)})"
+        return (
+            f"{self.path} (найден через {_SOURCE_WORDS.get(self.source, self.source)})"
+        )
 
 
 @dataclass
@@ -147,7 +155,9 @@ def find_chrome() -> tuple[ChromeBinary | None, str | None]:
         path = expanded if os.path.isabs(expanded) else shutil.which(expanded)
         if path and _is_executable(path):
             return (
-                ChromeBinary(path=path, source="env", headless_shell=_looks_headless_shell(path)),
+                ChromeBinary(
+                    path=path, source="env", headless_shell=_looks_headless_shell(path)
+                ),
                 None,
             )
         return None, E_CHROME_ENV.format(value=configured)
@@ -155,7 +165,11 @@ def find_chrome() -> tuple[ChromeBinary | None, str | None]:
         found = shutil.which(name)
         if found and _is_executable(found):
             return (
-                ChromeBinary(path=found, source="path", headless_shell=_looks_headless_shell(found)),
+                ChromeBinary(
+                    path=found,
+                    source="path",
+                    headless_shell=_looks_headless_shell(found),
+                ),
                 None,
             )
     return None, None
@@ -324,7 +338,9 @@ def _signal_group(pid: int, signum: int) -> bool:
     except OSError as exc:
         if exc.errno == errno.ESRCH:
             return False
-        logger.debug("signal %s to chrome group %s failed: %s", signum, pid, type(exc).__name__)
+        logger.debug(
+            "signal %s to chrome group %s failed: %s", signum, pid, type(exc).__name__
+        )
         return False
     return True
 
@@ -360,7 +376,9 @@ def _launch_failed(
     )
 
 
-def launch(binary: ChromeBinary, options: ChromeOptions, workdir: str, deadline: Deadline) -> LaunchedChrome:
+def launch(
+    binary: ChromeBinary, options: ChromeOptions, workdir: str, deadline: Deadline
+) -> LaunchedChrome:
     """Start headless Chrome with a fresh profile in ``workdir``; returns once DevTools listens."""
     profile_dir = os.path.join(workdir, PROFILE_DIRNAME)
     # Every launch starts from an empty profile, even after a crash in the same session.
@@ -398,7 +416,10 @@ def launch(binary: ChromeBinary, options: ChromeOptions, workdir: str, deadline:
         logger.warning("chrome did not start (%s): %s", binary.path, reason)
         raise BrowserUnavailable(
             E_CHROME_START.format(
-                binary=binary.path, code=exc.errno if exc.errno is not None else "—", log_tail=reason, path="—"
+                binary=binary.path,
+                code=exc.errno if exc.errno is not None else "—",
+                log_tail=reason,
+                path="—",
             )
         ) from None
     _write_owner(profile_dir, proc.pid)
@@ -452,12 +473,16 @@ def terminate(launched: LaunchedChrome, grace: float = 5.0) -> list[str]:
         try:
             proc.wait(timeout=grace)
         except subprocess.TimeoutExpired:
-            notes.append(f"Chrome не завершился за {grace:g} с — остановлен принудительно")
+            notes.append(
+                f"Chrome не завершился за {grace:g} с — остановлен принудительно"
+            )
             _signal_group(proc.pid, kill_signal)
             try:
                 proc.wait()
             except Exception as exc:
-                logger.debug("chrome pid %s not reaped: %s", proc.pid, type(exc).__name__)
+                logger.debug(
+                    "chrome pid %s not reaped: %s", proc.pid, type(exc).__name__
+                )
     else:
         # The main process is gone; renderers and helpers of its group may remain.
         _signal_group(proc.pid, kill_signal)
@@ -491,7 +516,9 @@ def _pid_alive(pid: int) -> bool:
 def _cmdline(pid: int) -> str | None:
     try:
         with open(f"/proc/{pid}/cmdline", "rb") as handle:
-            return handle.read().replace(b"\x00", b" ").decode("utf-8", errors="replace")
+            return (
+                handle.read().replace(b"\x00", b" ").decode("utf-8", errors="replace")
+            )
     except OSError:
         return None
 
@@ -504,7 +531,9 @@ def sweep_orphans() -> list[str]:
     Chrome. Downloads of the dead session stay in its folder.
     """
     swept: list[str] = []
-    pattern = os.path.join(tempfile.gettempdir(), WORKDIR_PREFIX + "*", PROFILE_DIRNAME, OWNER_FILE)
+    pattern = os.path.join(
+        tempfile.gettempdir(), WORKDIR_PREFIX + "*", PROFILE_DIRNAME, OWNER_FILE
+    )
     for owner_path in glob.glob(pattern):
         profile_dir = os.path.dirname(owner_path)
         try:

@@ -1,16 +1,16 @@
 """Q14 runner evidence and bounded, explicitly approved Yandex model review."""
 
 from __future__ import annotations
-import os
 
 import argparse
 import hashlib
 import http.client
 import json
+import os
 import re
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from scripts.q14_simulation import BASELINE_HEAD, CASES, run_cases
 
@@ -129,12 +129,21 @@ def make_transport(key: str, project: str) -> Transport:
             raw = response.read(MAX_RESPONSE_BYTES + 1)
             request_id = safe_identifier(response.getheader("x-request-id", ""))
             if response.status != 200:
-                return {"error": f"provider_http_{response.status}", "request_id": request_id}
+                return {
+                    "error": f"provider_http_{response.status}",
+                    "request_id": request_id,
+                }
             if len(raw) > MAX_RESPONSE_BYTES:
-                return {"error": "provider_response_too_large", "request_id": request_id}
+                return {
+                    "error": "provider_response_too_large",
+                    "request_id": request_id,
+                }
             parsed = json.loads(raw)
             if not isinstance(parsed, dict):
-                return {"error": "provider_response_not_object", "request_id": request_id}
+                return {
+                    "error": "provider_response_not_object",
+                    "request_id": request_id,
+                }
             return {
                 "data": parsed,
                 "request_id": request_id,
@@ -345,7 +354,11 @@ def live_review(
     try:
         for stage in STAGES:
             text = prompt(stage, evidence, prior)
-            call: JsonObject = {"stage": stage, "status": "ATTEMPTED", "input_sha256": digest(text)}
+            call: JsonObject = {
+                "stage": stage,
+                "status": "ATTEMPTED",
+                "input_sha256": digest(text),
+            }
             calls.append(call)
             write_json(output / "ai-ledger.json", ledger, secrets)
             result = send(
@@ -374,14 +387,20 @@ def live_review(
             call["response_id"] = safe_identifier(data.get("id", ""))
             usage = data.get("usage")
             call["usage"] = (
-                {k: v for k, v in usage.items() if isinstance(v, int) and not isinstance(v, bool)}
+                {
+                    k: v
+                    for k, v in usage.items()
+                    if isinstance(v, int) and not isinstance(v, bool)
+                }
                 if isinstance(usage, dict)
                 else None
             )
             call["status"] = "RESPONSE_RECEIVED"
             write_json(output / "ai-ledger.json", ledger, secrets)
             text_result = response_text(data)
-            write_json(output / f"{stage}-response.json", {"text": text_result}, secrets)
+            write_json(
+                output / f"{stage}-response.json", {"text": text_result}, secrets
+            )
             review = validate_review(text_result, stage, evidence)
             prior.append(review)
             call["status"] = "SCHEMA_VALIDATED_NOT_INDEPENDENTLY_ACCEPTED"
@@ -399,14 +418,18 @@ def live_review(
         raise
     comparison = evaluate_decision(prior[-1])
     write_json(output / "ai-comparison.json", comparison, secrets)
-    ledger["status"] = "AI_REVIEWS_RECEIVED" if comparison["all_match"] else "AI_REVIEW_DISAGREES"
+    ledger["status"] = (
+        "AI_REVIEWS_RECEIVED" if comparison["all_match"] else "AI_REVIEW_DISAGREES"
+    )
     write_json(output / "ai-ledger.json", ledger, secrets)
     return ledger
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("offline", "probe", "live"), default="offline")
+    parser.add_argument(
+        "--mode", choices=("offline", "probe", "live"), default="offline"
+    )
     parser.add_argument("--out", type=Path, default=Path("q14-evidence"))
     parser.add_argument("--approved-calls", type=int, default=0)
     parser.add_argument("--approval-reference", default="")
@@ -415,7 +438,9 @@ def main() -> int:
     results = run_cases()
     metadata: JsonObject = {
         "baseline_head": BASELINE_HEAD,
-        "checkout_head": os.environ.get("Q14_CHECKOUT_SHA", "LOCAL_NOT_GITHUB_VERIFIED"),
+        "checkout_head": os.environ.get(
+            "Q14_CHECKOUT_SHA", "LOCAL_NOT_GITHUB_VERIFIED"
+        ),
         "run_id": os.environ.get("GITHUB_RUN_ID"),
         "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
         "mode": args.mode,
@@ -454,7 +479,9 @@ def main() -> int:
                 metadata["status"] = ledger["status"]
     except (OSError, http.client.HTTPException, ValueError, UnicodeError) as exc:
         metadata["status"] = "BLOCKED"
-        metadata["ai_status"] = "INCOMPLETE_NO_RETRY" if args.mode == "live" else "NOT_RUN"
+        metadata["ai_status"] = (
+            "INCOMPLETE_NO_RETRY" if args.mode == "live" else "NOT_RUN"
+        )
         known = {
             "missing_yandex_credentials",
             "invalid_yandex_credentials",
@@ -478,20 +505,20 @@ def main() -> int:
         metadata["error"] = str(exc) if str(exc) in known else type(exc).__name__
     write_json(args.out / "manifest.json", metadata, secrets)
     summary = "# Q14: учебная симуляция\n\n"
+    summary += f"Режим: `{args.mode}`. Статус: `{metadata['status']}`. ИИ: `{metadata['ai_status']}`.\n\n"
     summary += (
-        f"Режим: `{args.mode}`. Статус: `{metadata['status']}`. ИИ: `{metadata['ai_status']}`.\n\n"
+        f"Проверено {len(results)} сценариев. Реальный вред: `NOT_ESTABLISHED`.\n\n"
     )
-    summary += f"Проверено {len(results)} сценариев. Реальный вред: `NOT_ESTABLISHED`.\n\n"
     summary += "| Сценарий | Результат модели |\n| --- | --- |\n"
     summary += "".join(
         f"| {case.id} | {result['outcome']} |\n"
         for case, result in zip(CASES, results, strict=True)
     )
     summary += "\nЭто не проверка электроустановки, не окончательный приговор и не приёмка пользователем.\n"
+    summary += "Символические определения в context.json являются предложениями, не новым законом.\n"
     summary += (
-        "Символические определения в context.json являются предложениями, не новым законом.\n"
+        "Три ИИ-этапа используют один backend и не являются независимыми экспертами.\n"
     )
-    summary += "Три ИИ-этапа используют один backend и не являются независимыми экспертами.\n"
     (args.out / "report.md").write_text(summary, encoding="utf-8")
     hashes = {
         file.name: hashlib.sha256(file.read_bytes()).hexdigest()
@@ -503,7 +530,11 @@ def main() -> int:
     return (
         0
         if metadata["status"]
-        in {"DETERMINISTIC_CASES_CHECKED", "MODEL_CATALOGUE_READ", "AI_REVIEWS_RECEIVED"}
+        in {
+            "DETERMINISTIC_CASES_CHECKED",
+            "MODEL_CATALOGUE_READ",
+            "AI_REVIEWS_RECEIVED",
+        }
         else 1
     )
 

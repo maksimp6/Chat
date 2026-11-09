@@ -50,18 +50,34 @@ def compact_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
         function = tool.get("function") if isinstance(tool, dict) else None
         if not isinstance(function, dict) or not function.get("name"):
             continue
-        params = function.get("parameters") if isinstance(function.get("parameters"), dict) else {}
-        props = params.get("properties") if isinstance(params.get("properties"), dict) else {}
+        params = (
+            function.get("parameters")
+            if isinstance(function.get("parameters"), dict)
+            else {}
+        )
+        props = (
+            params.get("properties")
+            if isinstance(params.get("properties"), dict)
+            else {}
+        )
         actions: list[tuple[str, list[str], str]] = []
-        arguments = props.get("arguments") if isinstance(props.get("arguments"), dict) else {}
+        arguments = (
+            props.get("arguments") if isinstance(props.get("arguments"), dict) else {}
+        )
         for option in arguments.get("anyOf") or []:
             if not isinstance(option, dict) or not option.get("title"):
                 continue
             required = set(option.get("required") or [])
             names = []
-            for key in (option.get("properties") or {}):
+            for key in option.get("properties") or {}:
                 names.append(key if key in required else key + "?")
-            actions.append((str(option["title"]), names, _first_sentence(option.get("description"), 90)))
+            actions.append(
+                (
+                    str(option["title"]),
+                    names,
+                    _first_sentence(option.get("description"), 90),
+                )
+            )
         enum = []
         tool_prop = props.get("tool") if isinstance(props.get("tool"), dict) else {}
         if isinstance(tool_prop.get("enum"), list):
@@ -101,7 +117,11 @@ def turn_body(instructions: Any, items: Any, tools: Any) -> dict[str, Any]:
     tool_results, else the last user message; the system text and the tools always."""
     if isinstance(items, str):
         items = [{"role": "user", "content": items}]
-    items = [item for item in (items if isinstance(items, list) else []) if isinstance(item, dict)]
+    items = [
+        item
+        for item in (items if isinstance(items, list) else [])
+        if isinstance(item, dict)
+    ]
     system_parts: list[str] = []
     if isinstance(instructions, str) and instructions.strip():
         system_parts.append(instructions)
@@ -130,7 +150,9 @@ def turn_body(instructions: Any, items: Any, tools: Any) -> dict[str, Any]:
             0,
             {
                 "name": names.get(item.get("call_id")) or "",
-                "content": output if isinstance(output, str) else json.dumps(output, ensure_ascii=False, default=str),
+                "content": output
+                if isinstance(output, str)
+                else json.dumps(output, ensure_ascii=False, default=str),
             },
         )
     if results:
@@ -154,7 +176,9 @@ def _response(final: dict[str, Any], model_key: str, started: float) -> dict[str
                 "id": "msg_" + uuid.uuid4().hex,
                 "role": "assistant",
                 "status": "completed",
-                "content": [{"type": "output_text", "text": content, "annotations": []}],
+                "content": [
+                    {"type": "output_text", "text": content, "annotations": []}
+                ],
             }
         )
     for call in final.get("tool_calls") or []:
@@ -168,7 +192,9 @@ def _response(final: dict[str, Any], model_key: str, started: float) -> dict[str
                 "id": "fc_" + uuid.uuid4().hex,
                 "call_id": "call_" + uuid.uuid4().hex,
                 "name": function["name"],
-                "arguments": arguments if isinstance(arguments, str) else json.dumps(arguments or {}, ensure_ascii=False),
+                "arguments": arguments
+                if isinstance(arguments, str)
+                else json.dumps(arguments or {}, ensure_ascii=False),
                 "status": "completed",
             }
         )
@@ -193,7 +219,15 @@ def _response(final: dict[str, Any], model_key: str, started: float) -> dict[str
         # the runner's own numbers for this turn: shown with the answer and kept in the trace
         "asmrun": {
             key: final.get(key)
-            for key in ("prompt_ms", "gen_ms", "mhz", "temp_c", "pkg_temp_c", "ctx_used", "ctx")
+            for key in (
+                "prompt_ms",
+                "gen_ms",
+                "mhz",
+                "temp_c",
+                "pkg_temp_c",
+                "ctx_used",
+                "ctx",
+            )
         },
     }
     if cut:
@@ -223,9 +257,14 @@ def ask(
     try:
         resp = requests.post(endpoint, json=body, timeout=timeout, stream=True)
     except requests.RequestException as exc:
-        raise OllamaError(f"asmrun {endpoint} unreachable: {type(exc).__name__}: {exc}", reached=False) from exc
+        raise OllamaError(
+            f"asmrun {endpoint} unreachable: {type(exc).__name__}: {exc}", reached=False
+        ) from exc
     if resp.status_code != 200:
-        raise OllamaError(f"asmrun HTTP {resp.status_code}: {resp.text[:500]}", status_code=resp.status_code)
+        raise OllamaError(
+            f"asmrun HTTP {resp.status_code}: {resp.text[:500]}",
+            status_code=resp.status_code,
+        )
     report = on_event if on_event is not None else (lambda _event: None)
     final: dict[str, Any] = {}
     pending = ""  # text held back while it may be the start of <tool_call>
@@ -237,7 +276,9 @@ def ask(
             try:
                 chunk = json.loads(line)
             except ValueError as exc:
-                raise OllamaError("asmrun streamed a line that is not valid JSON", status_code=200) from exc
+                raise OllamaError(
+                    "asmrun streamed a line that is not valid JSON", status_code=200
+                ) from exc
             if not isinstance(chunk, dict):
                 continue
             if chunk.get("error"):
@@ -264,15 +305,25 @@ def ask(
             report({"kind": "text_delta", "text": pending})
             pending = ""
     except requests.RequestException as exc:
-        raise OllamaError(f"asmrun stream broke: {type(exc).__name__}: {exc}", status_code=200) from exc
+        raise OllamaError(
+            f"asmrun stream broke: {type(exc).__name__}: {exc}", status_code=200
+        ) from exc
     finally:
         resp.close()
     if pending and not silent:
         report({"kind": "text_delta", "text": pending})
     if not final:
-        raise OllamaError("asmrun closed the stream without its final line", status_code=200)
+        raise OllamaError(
+            "asmrun closed the stream without its final line", status_code=200
+        )
     for call in final.get("tool_calls") or []:
         function = call.get("function") if isinstance(call, dict) else None
         if isinstance(function, dict) and function.get("name"):
-            report({"kind": "tool_call_requested", "name": function["name"], "arguments": function.get("arguments")})
+            report(
+                {
+                    "kind": "tool_call_requested",
+                    "name": function["name"],
+                    "arguments": function.get("arguments"),
+                }
+            )
     return body, _response(final, model_key, started)

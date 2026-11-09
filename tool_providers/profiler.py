@@ -14,7 +14,7 @@ logger = logging.getLogger("logos.tool_providers.profiler")
 SORT_KEYS = ("cumulative", "time", "calls")
 
 
-def profile_application_performance(arguments: dict, cfg: dict = None) -> dict:
+def profile_application_performance(arguments: dict, cfg: dict | None = None) -> dict:
     """Запускает сборку мусора и показывает её профиль и число объектов в памяти."""
     sort_by = arguments.get("sort") or "cumulative"
     if sort_by not in SORT_KEYS:
@@ -53,9 +53,9 @@ def _native_journal_status() -> dict[str, object]:
     }
 
 
-def inspect_app_internals(arguments: dict, cfg: dict = None) -> dict:
+def inspect_app_internals(arguments: dict, cfg: dict | None = None) -> dict:
     """Возвращает полную карту модулей, путей и состояние окружения приложения."""
-    loaded_modules = [m for m in sys.modules.keys() if not m.startswith("_")]
+    loaded_modules = [m for m in sys.modules if not m.startswith("_")]
 
     return {
         "success": True,

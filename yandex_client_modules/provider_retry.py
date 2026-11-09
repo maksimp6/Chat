@@ -9,7 +9,7 @@ import email.utils
 import math
 import random
 import ssl
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 from urllib3.exceptions import ConnectTimeoutError, MaxRetryError, NewConnectionError
@@ -62,8 +62,8 @@ def retry_after_seconds(headers):
         if when is None:
             return None
         if when.tzinfo is None:
-            when = when.replace(tzinfo=timezone.utc)
-        seconds = (when - datetime.now(timezone.utc)).total_seconds()
+            when = when.replace(tzinfo=UTC)
+        seconds = (when - datetime.now(UTC)).total_seconds()
     if not math.isfinite(seconds):
         return None
     return max(0.0, seconds)

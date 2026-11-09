@@ -90,7 +90,6 @@ def iter_sse_events(resp, *, comments=False):
                     yield {"type": COMMENT_MARKER}
                 continue
             field, _, value = line.partition(":")
-            if value.startswith(" "):
-                value = value[1:]
+            value = value.removeprefix(" ")
             if field == "data":
                 data_lines.append(value)

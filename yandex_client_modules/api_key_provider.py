@@ -1,10 +1,10 @@
 """Concrete Yandex Cloud API-key provider used by the rotation worker."""
 
 from __future__ import annotations
-import os
 
+import os
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable, Optional
 from urllib.parse import quote
 
 import requests
@@ -22,12 +22,12 @@ class YandexApiKeyProvider:
     def __init__(
         self,
         *,
-        iam_token: Optional[str] = None,
-        service_account_id: Optional[str] = None,
-        scopes: Optional[Iterable[str]] = None,
-        endpoint: Optional[str] = None,
-        ai_endpoint: Optional[str] = None,
-        project_id: Optional[str] = None,
+        iam_token: str | None = None,
+        service_account_id: str | None = None,
+        scopes: Iterable[str] | None = None,
+        endpoint: str | None = None,
+        ai_endpoint: str | None = None,
+        project_id: str | None = None,
         timeout: float = 30.0,
     ) -> None:
         self.iam_token = iam_token or os.environ.get("YANDEX_IAM_TOKEN")
@@ -64,7 +64,7 @@ class YandexApiKeyProvider:
             raise ValueError("Yandex project_id is required")
         self.timeout = timeout
 
-    def rotation_supported(self, provider_key_id: Optional[str]) -> bool:
+    def rotation_supported(self, provider_key_id: str | None) -> bool:
         return bool(provider_key_id and self.iam_token and self.service_account_id)
 
     def _require_management_credentials(self) -> None:

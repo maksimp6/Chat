@@ -73,7 +73,9 @@ _LEGACY_POLICIES = {
     "always": "unsafe-url",
     "origin-when-crossorigin": "origin-when-cross-origin",
 }
-_REFRESH = re.compile(r"^\s*(\d+(?:\.\d*)?)?\s*[;,]?\s*(?:url\s*=\s*)?(.*)$", re.I | re.S)
+_REFRESH = re.compile(
+    r"^\s*(\d+(?:\.\d*)?)?\s*[;,]?\s*(?:url\s*=\s*)?(.*)$", re.IGNORECASE | re.DOTALL
+)
 _TRAILING_COMMA = re.compile(r",(\s*[}\]])")
 # Microdata: the property value comes from an attribute on these elements.
 _URL_VALUE_ATTRS = {
@@ -122,7 +124,10 @@ def referrer_policy(doc: Document) -> str | None:
     """The policy of <meta name="referrer">, the last valid token winning."""
     found: str | None = None
     for element in doc.elements:
-        if element.tag != "meta" or (element.attrs.get("name") or "").strip().lower() != "referrer":
+        if (
+            element.tag != "meta"
+            or (element.attrs.get("name") or "").strip().lower() != "referrer"
+        ):
             continue
         for token in re.split(r"[\s,]+", (element.attrs.get("content") or "").lower()):
             token = _LEGACY_POLICIES.get(token, token)
@@ -185,7 +190,9 @@ def page_metadata(doc: Document, base_url: str) -> dict[str, Any]:
                 result["charset_meta"] = attrs["charset"].strip() or None
             equiv = (attrs.get("http-equiv") or "").strip().lower()
             if equiv == "content-type" and content and result["charset_meta"] is None:
-                found = re.search(r"charset\s*=\s*[\"']?([\w.:-]+)", content, re.I)
+                found = re.search(
+                    r"charset\s*=\s*[\"']?([\w.:-]+)", content, re.IGNORECASE
+                )
                 if found:
                     result["charset_meta"] = found.group(1)
             if equiv == "refresh" and content is not None and result["refresh"] is None:
@@ -198,7 +205,11 @@ def page_metadata(doc: Document, base_url: str) -> dict[str, Any]:
                 if not name:
                     continue
                 named.setdefault(name, value)
-                for prefix, bucket in (("og:", "og"), ("twitter:", "twitter"), ("article:", "article")):
+                for prefix, bucket in (
+                    ("og:", "og"),
+                    ("twitter:", "twitter"),
+                    ("article:", "article"),
+                ):
                     if name.startswith(prefix):
                         sub = name[len(prefix) :]
                         stored = (
@@ -222,11 +233,14 @@ def page_metadata(doc: Document, base_url: str) -> dict[str, Any]:
                     result["canonical"] = href
                 if "alternate" in rels or "feed" in rels:
                     if kind in _FEED_TYPES or "feed" in rels:
-                        result["feeds"].append({"type": kind or "feed", "title": title, "href": href})
+                        result["feeds"].append(
+                            {"type": kind or "feed", "title": title, "href": href}
+                        )
                     else:
                         result["alternates"].append(
                             {
-                                "hreflang": (attrs.get("hreflang") or "").strip() or None,
+                                "hreflang": (attrs.get("hreflang") or "").strip()
+                                or None,
                                 "media": (attrs.get("media") or "").strip() or None,
                                 "type": kind or None,
                                 "href": href,
@@ -252,14 +266,21 @@ def page_metadata(doc: Document, base_url: str) -> dict[str, Any]:
                 result["next"] = href
     for key, name in _META_NAMES.items():
         result[key] = named.get(name)
-    result["published"] = next((named[name] for name in _PUBLISHED_NAMES if named.get(name)), None)
-    result["modified"] = next((named[name] for name in _MODIFIED_NAMES if named.get(name)), None)
+    result["published"] = next(
+        (named[name] for name in _PUBLISHED_NAMES if named.get(name)), None
+    )
+    result["modified"] = next(
+        (named[name] for name in _MODIFIED_NAMES if named.get(name)), None
+    )
     if result["published"] is None:
         for element in doc.elements:
-            if element.tag == "time" and (element.attrs.get("itemprop") or "").lower() == "datepublished":
-                result["published"] = (element.attrs.get("datetime") or "").strip() or normalize_space(
-                    element.text()
-                )
+            if (
+                element.tag == "time"
+                and (element.attrs.get("itemprop") or "").lower() == "datepublished"
+            ):
+                result["published"] = (
+                    element.attrs.get("datetime") or ""
+                ).strip() or normalize_space(element.text())
                 break
     return result
 

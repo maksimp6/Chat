@@ -40,8 +40,8 @@ from typing import Any
 
 import requests
 import urllib3
-from webframe import Blueprint, jsonify, request
 
+from webframe import Blueprint, jsonify, request
 from workspace.file_routes import (
     ALLOWED_EXTENSIONS,
     MAX_FILE_SIZE,
@@ -96,7 +96,9 @@ def _lock(upload_id: str) -> threading.Lock:
 def _storage_failed(error: OSError):
     # A full or read-only disk does not pass by itself: the browser stops instead of trying again.
     logger.error("[UPLOADS] Storage failed: %s", error)
-    return jsonify({"error": "upload_storage_failed", "message": _TEXTS["upload_storage_failed"]}), 507
+    return jsonify(
+        {"error": "upload_storage_failed", "message": _TEXTS["upload_storage_failed"]}
+    ), 507
 
 
 def _drop_stale_pieces() -> None:
@@ -157,7 +159,9 @@ def _remove(upload_id: str) -> None:
 
 
 def _not_found():
-    return jsonify({"error": "upload_not_found", "message": _TEXTS["upload_not_found"]}), 404
+    return jsonify(
+        {"error": "upload_not_found", "message": _TEXTS["upload_not_found"]}
+    ), 404
 
 
 @upload_bp.route("/api/uploads", methods=["POST"])
@@ -176,7 +180,9 @@ def create_upload():
     if isinstance(size, bool) or not isinstance(size, int) or size < 1:
         return jsonify({"error": "size must be a positive number of bytes"}), 400
     if size > MAX_FILE_SIZE:
-        return jsonify({"error": "file_too_large", "message": _TEXTS["file_too_large"]}), 413
+        return jsonify(
+            {"error": "file_too_large", "message": _TEXTS["file_too_large"]}
+        ), 413
     if not isinstance(purpose, str) or not purpose.strip():
         return jsonify({"error": "purpose must be a string"}), 400
     name = os.path.basename(name)
@@ -184,7 +190,8 @@ def create_upload():
         return jsonify(
             {
                 "error": "file_type_not_allowed",
-                "message": _TEXTS["file_type_not_allowed"] + ", ".join(sorted(ALLOWED_EXTENSIONS)),
+                "message": _TEXTS["file_type_not_allowed"]
+                + ", ".join(sorted(ALLOWED_EXTENSIONS)),
             }
         ), 400
     upload_id = data.get("id", uuid.uuid4().hex)
@@ -197,7 +204,9 @@ def create_upload():
             # The same create sent again: the upload it made answers.
             if all(existing.get(key) == value for key, value in meta.items()):
                 return jsonify(_state(upload_id, existing))
-            return jsonify({"error": "upload_id_taken", "message": _TEXTS["upload_id_taken"]}), 409
+            return jsonify(
+                {"error": "upload_id_taken", "message": _TEXTS["upload_id_taken"]}
+            ), 409
         try:
             upload_dir().mkdir(parents=True, exist_ok=True)
             _drop_stale_pieces()
@@ -227,7 +236,12 @@ def delete_upload(upload_id):
             sending = upload_id in _sending
         if sending:
             # Files is storing it right now: a deletion would not stop that.
-            return jsonify({"error": "completion_in_progress", "message": _TEXTS["completion_in_progress"]}), 409
+            return jsonify(
+                {
+                    "error": "completion_in_progress",
+                    "message": _TEXTS["completion_in_progress"],
+                }
+            ), 409
         try:
             _remove(upload_id)
         except OSError as error:
@@ -247,12 +261,22 @@ def append_upload(upload_id):
     # A piece for another place is refused before it is read: the browser asks again from the received size.
     if offset != meta["received"] or meta.get("completed") is not None:
         return jsonify(
-            {"error": "offset_mismatch", "message": _TEXTS["offset_mismatch"], **_state(upload_id, meta)}
+            {
+                "error": "offset_mismatch",
+                "message": _TEXTS["offset_mismatch"],
+                **_state(upload_id, meta),
+            }
         ), 409
     remaining = meta["size"] - offset
     expected = request.content_length
     if expected is not None and expected > remaining:
-        return jsonify({"error": "piece_exceeds_size", "message": _TEXTS["piece_exceeds_size"], **_state(upload_id, meta)}), 413
+        return jsonify(
+            {
+                "error": "piece_exceeds_size",
+                "message": _TEXTS["piece_exceeds_size"],
+                **_state(upload_id, meta),
+            }
+        ), 413
     _, part_path = _paths(upload_id)
     try:
         handle, piece_name = tempfile.mkstemp(
@@ -269,18 +293,32 @@ def append_upload(upload_id):
                 except Exception:
                     # The connection broke inside the piece: nothing of it is kept.
                     return jsonify(
-                        {"error": "piece_incomplete", "message": _TEXTS["piece_incomplete"], **_state(upload_id, meta)}
+                        {
+                            "error": "piece_incomplete",
+                            "message": _TEXTS["piece_incomplete"],
+                            **_state(upload_id, meta),
+                        }
                     ), 400
                 if not block:
                     break
                 written += len(block)
                 if written > remaining:
                     return jsonify(
-                        {"error": "piece_exceeds_size", "message": _TEXTS["piece_exceeds_size"], **_state(upload_id, meta)}
+                        {
+                            "error": "piece_exceeds_size",
+                            "message": _TEXTS["piece_exceeds_size"],
+                            **_state(upload_id, meta),
+                        }
                     ), 413
                 piece.write(block)
         if written == 0 or (expected is not None and written != expected):
-            return jsonify({"error": "piece_incomplete", "message": _TEXTS["piece_incomplete"], **_state(upload_id, meta)}), 400
+            return jsonify(
+                {
+                    "error": "piece_incomplete",
+                    "message": _TEXTS["piece_incomplete"],
+                    **_state(upload_id, meta),
+                }
+            ), 400
         with _lock(upload_id):
             current = _load(upload_id)
             if current is None:
@@ -288,7 +326,11 @@ def append_upload(upload_id):
             if current["received"] != offset or current.get("completed") is not None:
                 # Another copy of this piece got here first.
                 return jsonify(
-                    {"error": "offset_mismatch", "message": _TEXTS["offset_mismatch"], **_state(upload_id, current)}
+                    {
+                        "error": "offset_mismatch",
+                        "message": _TEXTS["offset_mismatch"],
+                        **_state(upload_id, current),
+                    }
                 ), 409
             with open(piece_name, "rb") as piece, open(part_path, "ab") as part:
                 shutil.copyfileobj(piece, part)
@@ -305,7 +347,13 @@ def append_upload(upload_id):
 
 
 def _uncertain(upload_id: str, meta: dict[str, Any]):
-    return jsonify({"error": "completion_uncertain", "message": _TEXTS["completion_uncertain"], **_state(upload_id, meta)}), 409
+    return jsonify(
+        {
+            "error": "completion_uncertain",
+            "message": _TEXTS["completion_uncertain"],
+            **_state(upload_id, meta),
+        }
+    ), 409
 
 
 # Completions this process is sending to Files, by upload id: a repeat waits for the one running instead of sending the
@@ -393,9 +441,19 @@ def complete_upload(upload_id):
             # its mark): sending it again would store a second copy.
             if (meta.get("uncertain") or meta.get("completing")) and not force:
                 return _uncertain(upload_id, meta)
-            meta = {key: value for key, value in meta.items() if key not in ("uncertain", "completing")}
+            meta = {
+                key: value
+                for key, value in meta.items()
+                if key not in ("uncertain", "completing")
+            }
             if meta["received"] != meta["size"]:
-                return jsonify({"error": "upload_incomplete", "message": _TEXTS["upload_incomplete"], **_state(upload_id, meta)}), 409
+                return jsonify(
+                    {
+                        "error": "upload_incomplete",
+                        "message": _TEXTS["upload_incomplete"],
+                        **_state(upload_id, meta),
+                    }
+                ), 409
             if meta["kind"] == "image":
                 return jsonify({"upload_id": upload_id, "size": meta["size"]})
             _, part_path = _paths(upload_id)
@@ -423,23 +481,31 @@ def complete_upload(upload_id):
             logger.error("[UPLOADS] Completion not sent: %s", error)
             with _lock(upload_id):
                 _save_meta(upload_id, meta)
-            return jsonify({"error": "files_key_unavailable", "message": _FILES_FAILED}), 503
+            return jsonify(
+                {"error": "files_key_unavailable", "message": _FILES_FAILED}
+            ), 503
         except Exception as error:
-            if isinstance(error, bound.YandexClientError) and _never_sent(error) and getattr(
-                error, "status_code", None
-            ) in (None, 504):
+            if (
+                isinstance(error, bound.YandexClientError)
+                and _never_sent(error)
+                and getattr(error, "status_code", None) in (None, 504)
+            ):
                 # The request never reached Files: nothing was stored. A connection that did not open is tried again
                 # by the browser by itself; a provider key that cannot be used waits until it is fixed.
                 logger.warning("[UPLOADS] Files not reached: %s", error)
                 with _lock(upload_id):
                     _save_meta(upload_id, meta)
-                network = isinstance(error.__cause__, requests.exceptions.RequestException)
+                network = isinstance(
+                    error.__cause__, requests.exceptions.RequestException
+                )
                 code = "files_unreachable" if network else "files_key_unavailable"
                 return jsonify({"error": code, "message": _FILES_FAILED}), 503
             if not isinstance(error, bound.YandexClientError) or _maybe_stored(error):
                 # Anything else may come after Files stored the file (an answer that could not be read).
                 if not isinstance(error, bound.YandexClientError):
-                    logger.error("[UPLOADS] Completion failed: %s", error, exc_info=True)
+                    logger.error(
+                        "[UPLOADS] Completion failed: %s", error, exc_info=True
+                    )
                 with _lock(upload_id):
                     _save_meta(upload_id, {**meta, "uncertain": True})
                 return _uncertain(upload_id, meta)

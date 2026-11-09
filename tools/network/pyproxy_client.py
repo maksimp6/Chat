@@ -191,7 +191,9 @@ class Tunnel:
         u = urlsplit(url)
         self.host = u.hostname
         self.port = u.port or 80
-        self.auth = "Basic " + base64.b64encode(f"{u.username}:{u.password}".encode()).decode()
+        self.auth = (
+            "Basic " + base64.b64encode(f"{u.username}:{u.password}".encode()).decode()
+        )
         self.legs = legs
         self.session = None
         self.lock = asyncio.Lock()
@@ -274,7 +276,9 @@ class Local:
                 host = (await reader.readexactly(ln)).decode()
             elif atyp == 4:
                 raw = await reader.readexactly(16)
-                host = "[" + ":".join(raw[i : i + 2].hex() for i in range(0, 16, 2)) + "]"
+                host = (
+                    "[" + ":".join(raw[i : i + 2].hex() for i in range(0, 16, 2)) + "]"
+                )
             else:
                 raise ValueError("bad atyp")
             (port,) = struct.unpack(">H", await reader.readexactly(2))
@@ -315,9 +319,14 @@ class Local:
             kept = [
                 line
                 for line in lines[1:]
-                if line and not line.lower().startswith(("proxy-authorization:", "proxy-connection:"))
+                if line
+                and not line.lower().startswith(
+                    ("proxy-authorization:", "proxy-connection:")
+                )
             ]
-            first = ("\r\n".join([f"{method} /{path} {version}"] + kept) + "\r\n\r\n").encode("latin-1")
+            first = (
+                "\r\n".join([f"{method} /{path} {version}"] + kept) + "\r\n\r\n"
+            ).encode("latin-1")
         else:
             writer.write(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n")
             await writer.drain()
@@ -345,11 +354,19 @@ async def serve():
     http_port = int(os.environ.get("PYPROXY_HTTP_PORT", "8888"))
     tunnel = Tunnel(load_server_url(), legs)
     local = Local(tunnel)
-    socks = await asyncio.start_server(local.handle_socks, "127.0.0.1", socks_port, backlog=1024)
-    http = await asyncio.start_server(local.handle_http, "127.0.0.1", http_port, backlog=1024)
+    socks = await asyncio.start_server(
+        local.handle_socks, "127.0.0.1", socks_port, backlog=1024
+    )
+    http = await asyncio.start_server(
+        local.handle_http, "127.0.0.1", http_port, backlog=1024
+    )
     log.info(
         "server %s:%s, %d legs; SOCKS5 127.0.0.1:%d, HTTP 127.0.0.1:%d",
-        tunnel.host, tunnel.port, legs, socks_port, http_port,
+        tunnel.host,
+        tunnel.port,
+        legs,
+        socks_port,
+        http_port,
     )
     async with socks, http:
         await asyncio.gather(socks.serve_forever(), http.serve_forever())
@@ -358,7 +375,9 @@ async def serve():
 def main():
     fmt = "%(asctime)s %(message)s"
     if sys.stdout is None:  # pythonw: no console
-        log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pyproxy_client.log")
+        log_file = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "pyproxy_client.log"
+        )
         logging.basicConfig(level=logging.INFO, format=fmt, filename=log_file)
     else:
         logging.basicConfig(level=logging.INFO, format=fmt, stream=sys.stdout)

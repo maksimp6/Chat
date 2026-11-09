@@ -1319,7 +1319,9 @@ def check_docs(umap: UnitMap, violations: list[Violation], mermaid: str) -> None
     for unit in sorted(on_path):
         readme = ROOT / unit / "README.md"
         if readme.is_file() and not re.search(
-            r"^#+\s*role in a dialog", readme.read_text(encoding="utf-8"), re.I | re.M
+            r"^#+\s*role in a dialog",
+            readme.read_text(encoding="utf-8"),
+            re.IGNORECASE | re.MULTILINE,
         ):
             violations.append(
                 Violation(

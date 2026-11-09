@@ -36,6 +36,7 @@ def commit_files(repo: str, sha: str) -> set[str] | None:
     check = subprocess.run(
         ["git", "-C", repo, "cat-file", "-e", f"{sha}^{{commit}}"],
         capture_output=True,
+        check=False,
     )
     if check.returncode != 0:
         return None
@@ -43,6 +44,7 @@ def commit_files(repo: str, sha: str) -> set[str] | None:
         ["git", "-C", repo, "show", "--name-only", "--pretty=format:", sha],
         capture_output=True,
         text=True,
+        check=False,
     )
     return {line for line in out.stdout.splitlines() if line.strip()}
 
@@ -68,7 +70,9 @@ def judge(report: dict, repo: str) -> tuple[str, list[str], list[str]]:
         else:
             in_repo = commit_files(repo, sha)
             if in_repo is None:
-                violations.append(f"доказательство: коммит {sha} не найден в репозитории {repo}")
+                violations.append(
+                    f"доказательство: коммит {sha} не найден в репозитории {repo}"
+                )
             else:
                 claimed = set(report.get("files_touched") or [])
                 if claimed and claimed != in_repo:
@@ -94,9 +98,13 @@ def judge(report: dict, repo: str) -> tuple[str, list[str], list[str]]:
     touched = set(report.get("files_touched") or [])
     scope = set(report.get("task_files") or [])
     if not scope:
-        notes.append("минимальный diff: task_files не заполнены, объём задачи не проверен")
+        notes.append(
+            "минимальный diff: task_files не заполнены, объём задачи не проверен"
+        )
     elif touched - scope:
-        violations.append(f"минимальный diff: файлы вне задачи {sorted(touched - scope)}")
+        violations.append(
+            f"минимальный diff: файлы вне задачи {sorted(touched - scope)}"
+        )
 
     # 5. CI — фиксируется, вердикт не меняет
     ci = report.get("ci_pass")
@@ -108,7 +116,9 @@ def judge(report: dict, repo: str) -> tuple[str, list[str], list[str]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Приёмка отчёта исполнителя по правилам «Суд Логоса».")
+    parser = argparse.ArgumentParser(
+        description="Приёмка отчёта исполнителя по правилам «Суд Логоса»."
+    )
     parser.add_argument("report", help="JSON-отчёт исполнителя")
     parser.add_argument("--repo", default=".", help="репозиторий, где проверяется sha")
     args = parser.parse_args(argv)

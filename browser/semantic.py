@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
-from typing import Any, Iterable, Mapping, Sequence
-
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import Any
 
 INTERACTIVE_ROLES = frozenset(
     {
@@ -78,13 +78,15 @@ class SemanticNode:
     states: tuple[str, ...] = ()
 
     @classmethod
-    def from_mapping(cls, raw: Mapping[str, Any], *, index: int) -> "SemanticNode":
+    def from_mapping(cls, raw: Mapping[str, Any], *, index: int) -> SemanticNode:
         node_id = str(raw.get("id") or raw.get("node_id") or f"n{index}").strip()
         role = str(raw.get("role") or "generic").strip().lower()
         return cls(
             node_id=node_id,
             role=role,
-            name=_bounded_text(raw.get("name") or raw.get("label"), SEMANTIC_NAME_LIMIT),
+            name=_bounded_text(
+                raw.get("name") or raw.get("label"), SEMANTIC_NAME_LIMIT
+            ),
             value=_bounded_text(_node_value(raw), SEMANTIC_VALUE_LIMIT),
             states=_normalize_states(raw.get("states")),
         )
@@ -177,7 +179,9 @@ def build_semantic_snapshot(
         truncated=truncated,
     )
 
-    while nodes and max_chars > 0 and len(_stable_json(snapshot.to_mapping())) > max_chars:
+    while (
+        nodes and max_chars > 0 and len(_stable_json(snapshot.to_mapping())) > max_chars
+    ):
         nodes.pop()
         truncated = True
         snapshot = SemanticSnapshot(
@@ -201,7 +205,10 @@ def build_semantic_snapshot(
                 facts=candidate,
                 truncated=True,
             )
-            if max_chars > 0 and len(_stable_json(candidate_snapshot.to_mapping())) > max_chars:
+            if (
+                max_chars > 0
+                and len(_stable_json(candidate_snapshot.to_mapping())) > max_chars
+            ):
                 break
             compact_facts = candidate
         snapshot = SemanticSnapshot(
@@ -372,13 +379,13 @@ def merge_evidence(
 
 
 __all__ = [
-    "Evidence",
     "INTERACTIVE_ROLES",
-    "MergedEvidence",
     "SEMANTIC_NAME_LIMIT",
     "SEMANTIC_URL_LIMIT",
     "SEMANTIC_VALUE_LIMIT",
     "SEMANTIC_VERSION_LIMIT",
+    "Evidence",
+    "MergedEvidence",
     "SemanticDiff",
     "SemanticNode",
     "SemanticSnapshot",

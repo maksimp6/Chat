@@ -11,8 +11,6 @@ import yaml
 class ConfigError(Exception):
     """Configuration validation error."""
 
-    pass
-
 
 def _is_secret_pattern(value: Any) -> bool:
     """Check if a value looks like a secret (base64, hex, PEM key, etc)."""
@@ -26,10 +24,7 @@ def _is_secret_pattern(value: Any) -> bool:
     # Long base64/hex-looking values (32+ chars).
     # Hex is already a strict subset of this character class, so a second
     # hex-only branch would be unreachable.
-    if re.match(r"^[A-Za-z0-9+/=]{32,}$", value):
-        return True
-
-    return False
+    return bool(re.match(r"^[A-Za-z0-9+/=]{32,}$", value))
 
 
 def _validate_no_plaintext_secrets(
@@ -203,7 +198,7 @@ def validate_service_references(
 
     # Check all services are deployed in at least one lane
     deployed_services: set[str] = set()
-    for lane_name, lane_config in lanes.items():
+    for lane_config in lanes.values():
         if isinstance(lane_config, dict):
             lane_services = lane_config.get("services", [])
             if isinstance(lane_services, list):

@@ -134,7 +134,9 @@ class HttpTabEngine:
     @staticmethod
     def _thaw(entry: _Entry) -> None:
         if entry.doc.text is None and entry.packed is not None:
-            entry.doc.text = zlib.decompress(entry.packed).decode("utf-8", "surrogatepass")
+            entry.doc.text = zlib.decompress(entry.packed).decode(
+                "utf-8", "surrogatepass"
+            )
             entry.packed = None
 
     def drop_copies(self) -> int:
@@ -349,7 +351,9 @@ class HttpTabEngine:
             notes.extend(doc.notes)
         else:
             self._thaw(entry)
-            notes.append("показана сохранённая копия; обновить — browser_history(action='reload')")
+            notes.append(
+                "показана сохранённая копия; обновить — browser_history(action='reload')"
+            )
         self.index = target
         return NavOutcome(page=self.page(), navigated=True, notes=notes)
 
@@ -408,7 +412,8 @@ class HttpTabEngine:
         return _needs_chrome(
             E_JS_NEEDED_HTTP.format(
                 ref=model.ref_label(element),
-                name=model.accessible_name(element) or normalize_space(element.text())[:80],
+                name=model.accessible_name(element)
+                or normalize_space(element.text())[:80],
                 tab=self.tab_id,
                 url=display_url(url),
             )
@@ -418,13 +423,18 @@ class HttpTabEngine:
     def _page_policy(entry: _Entry, model: PageModel) -> str | None:
         policy = None
         for element in model.document.elements:
-            if element.tag == "meta" and (element.get("name") or "").strip().lower() == "referrer":
+            if (
+                element.tag == "meta"
+                and (element.get("name") or "").strip().lower() == "referrer"
+            ):
                 found = normalize_referrer_policy(element.get("content"))
                 if found:
                     policy = found
         return policy or entry.doc.referrer_policy
 
-    def _resolve(self, model: PageModel, target: ElementTarget | None, prefixes: str, label: str) -> tuple[Element, list[str]]:
+    def _resolve(
+        self, model: PageModel, target: ElementTarget | None, prefixes: str, label: str
+    ) -> tuple[Element, list[str]]:
         if target is None or target.is_empty():
             raise BrowserError(E_TARGET_REQUIRED)
         if not (target.ref or target.selector or target.text):
@@ -465,8 +475,10 @@ class HttpTabEngine:
             return ActionOutcome(notes=notes)
         if kind == "select":
             element, notes = self._resolve(model, action.target, "I", "выбор варианта")
-            values = list(action.values) if action.values else (
-                [action.value] if action.value is not None else []
+            values = (
+                list(action.values)
+                if action.values
+                else ([action.value] if action.value is not None else [])
             )
             selected = model.select_options(element, values)
             notes.extend(self._mutated(entry, model))
@@ -537,7 +549,14 @@ class HttpTabEngine:
             if found is not None:
                 return found
         for element in label.descendants():
-            if element.tag in ("button", "select", "textarea", "meter", "output", "progress"):
+            if element.tag in (
+                "button",
+                "select",
+                "textarea",
+                "meter",
+                "output",
+                "progress",
+            ):
                 return element
             if element.tag == "input" and model.field_kind(element) != "hidden":
                 return element
@@ -566,7 +585,9 @@ class HttpTabEngine:
         if activation == "label":
             control = self._label_control(model, element)
             if control is None:
-                notes.append(f"Подпись {model.ref_label(element)} не связана с полем — нажатие ничего не меняет")
+                notes.append(
+                    f"Подпись {model.ref_label(element)} не связана с полем — нажатие ничего не меняет"
+                )
                 return ActionOutcome(notes=notes)
             element = control
             activation = self._activation(model, element) or "focus"
@@ -615,7 +636,9 @@ class HttpTabEngine:
                 f"Файлы для {model.ref_label(element)} задаются через browser_fill_form(fields=[{{field: '{model.ref_label(element)}', file_paths: […]}}])"
             )
         else:
-            notes.append(f"Фокус на {model.ref_label(element)}; ввод — browser_act(action='type')")
+            notes.append(
+                f"Фокус на {model.ref_label(element)}; ввод — browser_act(action='type')"
+            )
         return ActionOutcome(notes=notes)
 
     def _follow(
@@ -627,7 +650,9 @@ class HttpTabEngine:
         ctx: Any,
         notes: list[str],
     ) -> ActionOutcome:
-        raw = (element.get("href") if element.tag in ("a", "area") else element.get("src")) or ""
+        raw = (
+            element.get("href") if element.tag in ("a", "area") else element.get("src")
+        ) or ""
         if raw.strip().lower().startswith("javascript:"):
             raise self._js_needed(model, element)
         current = entry.doc.url
@@ -651,7 +676,9 @@ class HttpTabEngine:
                 f"У ссылки атрибут download — файл можно сохранить: browser_download(ref='{model.ref_label(element)}', path='…', overwrite=false)"
             )
         if (element.get("onclick") or "").strip():
-            notes.append("У ссылки есть обработчик onclick — без JavaScript результат может отличаться")
+            notes.append(
+                "У ссылки есть обработчик onclick — без JavaScript результат может отличаться"
+            )
         rel = (element.get("rel") or "").lower().split()
         policy = element.get("referrerpolicy") or self._page_policy(entry, model)
         referrer = referrer_value(
@@ -668,9 +695,13 @@ class HttpTabEngine:
             max_bytes=action.max_bytes,
         )
         if action.new_tab or target_name not in _SAME_CONTEXT_TARGETS:
-            return ActionOutcome(navigated=False, new_tab_navigation=navigation, notes=notes)
+            return ActionOutcome(
+                navigated=False, new_tab_navigation=navigation, notes=notes
+            )
         outcome = self.load(navigation, ctx)
-        return ActionOutcome(navigated=True, page=outcome.page, notes=notes + outcome.notes)
+        return ActionOutcome(
+            navigated=True, page=outcome.page, notes=notes + outcome.notes
+        )
 
     def _submit(
         self,
@@ -688,7 +719,9 @@ class HttpTabEngine:
             if note not in notes:
                 notes.append(note)
         current = entry.doc.url
-        referrer = referrer_value(current, submission.url, policy=self._page_policy(entry, model))
+        referrer = referrer_value(
+            current, submission.url, policy=self._page_policy(entry, model)
+        )
         navigation = Navigation(
             url=submission.url,
             method=submission.method,
@@ -704,11 +737,17 @@ class HttpTabEngine:
             origin = origin_of(current)
             if submission.method.upper() == "POST" and origin:
                 navigation.headers = [("Origin", origin)]
-            return ActionOutcome(navigated=False, new_tab_navigation=navigation, notes=notes)
+            return ActionOutcome(
+                navigated=False, new_tab_navigation=navigation, notes=notes
+            )
         outcome = self.load(navigation, ctx)
-        return ActionOutcome(navigated=True, page=outcome.page, notes=notes + outcome.notes)
+        return ActionOutcome(
+            navigated=True, page=outcome.page, notes=notes + outcome.notes
+        )
 
-    def _submit_action(self, entry: _Entry, model: PageModel, action: Action, ctx: Any) -> ActionOutcome:
+    def _submit_action(
+        self, entry: _Entry, model: PageModel, action: Action, ctx: Any
+    ) -> ActionOutcome:
         element, notes = self._resolve(model, action.target, "FBI", "отправка формы")
         form = element if element.tag == "form" else forms.form_of(model, element)
         if form is None:
@@ -719,13 +758,17 @@ class HttpTabEngine:
             notes.extend(extra)
         return self._submit(entry, model, form, submitter, action, ctx, notes)
 
-    def _press(self, entry: _Entry, model: PageModel, action: Action, ctx: Any) -> ActionOutcome:
+    def _press(
+        self, entry: _Entry, model: PageModel, action: Action, ctx: Any
+    ) -> ActionOutcome:
         key = (action.value or "").strip()
         if key.lower() not in _ENTER_KEYS:
             raise self._chrome_only(f"клавиша {key or '?'}")
         notes: list[str] = []
         if action.target is not None and not action.target.is_empty():
-            element, notes = self._resolve(model, action.target, "IBL", "нажатие клавиши")
+            element, notes = self._resolve(
+                model, action.target, "IBL", "нажатие клавиши"
+            )
         else:
             focused = model.state.focused
             if focused is None or not (0 <= focused < len(model.document.elements)):
@@ -741,7 +784,9 @@ class HttpTabEngine:
         if activation in ("submit", "reset", "toggle", "option", "summary"):
             click = Action(
                 kind="click",
-                target=ElementTarget(ref=model.ref_of(element)) if model.ref_of(element) else action.target,
+                target=ElementTarget(ref=model.ref_of(element))
+                if model.ref_of(element)
+                else action.target,
                 new_tab=action.new_tab,
                 deadline=action.deadline,
                 max_redirects=action.max_redirects,
@@ -779,7 +824,9 @@ class HttpTabEngine:
             if left <= 0:
                 break
             if self.client.closed:
-                raise BrowserNetworkError("Ожидание прервано: браузерная сессия закрыта")
+                raise BrowserNetworkError(
+                    "Ожидание прервано: браузерная сессия закрыта"
+                )
             budget = request.deadline.remaining()
             if budget is not None and budget <= 0:
                 request.deadline.check(f"пауза {seconds:g} с")

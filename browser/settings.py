@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 logger = logging.getLogger("logos.browser.settings")
 
@@ -166,8 +166,10 @@ class SessionSettings:
             f"Accept-Language: {self.accept_language}",
             f"Доп. заголовки: {headers}",
             f"Движок по умолчанию: {self.default_engine}",
-            f"Окно chrome: {self.viewport_width}×{self.viewport_height}, "
-            f"масштаб {scale}, мобильный режим: {'да' if self.mobile else 'нет'}",
+            (
+                f"Окно chrome: {self.viewport_width}×{self.viewport_height}, "
+                f"масштаб {scale}, мобильный режим: {'да' if self.mobile else 'нет'}"
+            ),
             f"JavaScript в chrome: {'да' if self.javascript else 'нет'}",
             f"Изображения в chrome: {'да' if self.load_images else 'нет'}",
             f"Диалоги страницы: {dialogs}; ответ на prompt: {prompt}",
@@ -179,7 +181,6 @@ class SessionSettings:
 
 __all__ = [
     "CLIENT_HINTS",
-    "ChromeOptions",
     "DEFAULT_ACCEPT_LANGUAGE",
     "DEFAULT_USER_AGENT",
     "DIALOG_MODES",
@@ -187,5 +188,6 @@ __all__ = [
     "ENGINE_MODES",
     "MOBILE_CLIENT_HINTS",
     "MOBILE_USER_AGENT",
+    "ChromeOptions",
     "SessionSettings",
 ]
