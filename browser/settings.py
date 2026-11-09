@@ -166,8 +166,10 @@ class SessionSettings:
             f"Accept-Language: {self.accept_language}",
             f"Доп. заголовки: {headers}",
             f"Движок по умолчанию: {self.default_engine}",
-            f"Окно chrome: {self.viewport_width}×{self.viewport_height}, "
-            f"масштаб {scale}, мобильный режим: {'да' if self.mobile else 'нет'}",
+            (
+                f"Окно chrome: {self.viewport_width}×{self.viewport_height}, "
+                f"масштаб {scale}, мобильный режим: {'да' if self.mobile else 'нет'}"
+            ),
             f"JavaScript в chrome: {'да' if self.javascript else 'нет'}",
             f"Изображения в chrome: {'да' if self.load_images else 'нет'}",
             f"Диалоги страницы: {dialogs}; ответ на prompt: {prompt}",

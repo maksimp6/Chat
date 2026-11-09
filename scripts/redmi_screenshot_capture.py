@@ -2361,7 +2361,7 @@ def restore_clean_page(target_url=None):
 
 
 def main():
-    global LOGOS_URL, CAPTURE_STORAGE_ROOT
+    global LOGOS_URL
     # Both the runner driver and its root child enforce the same storage budget.
     if len(sys.argv) > 2 and sys.argv[1] == "_capture":
         capture_output = Path(sys.argv[2]).resolve()

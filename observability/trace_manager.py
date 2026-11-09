@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Callable
 from contextvars import ContextVar
 from functools import wraps
-from typing import Any, Optional, cast
+from typing import Any, ClassVar, Optional, cast
 
 from observability.host import (
     aggregate_billing,
@@ -147,7 +147,7 @@ class ExecutionTrace:
     _MAX_REPR = MAX_REPR
     _MAX_DEPTH = MAX_DEPTH
     _MAX_ITEMS = MAX_ITEMS
-    _INTERNAL_EVENT_TYPES = {"trace_finalized"}
+    _INTERNAL_EVENT_TYPES: ClassVar[set[str]] = {"trace_finalized"}
 
     def __init__(self, trace_id: str | None = None):
         self.trace_id = trace_id or str(uuid.uuid4())

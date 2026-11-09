@@ -311,45 +311,6 @@ def ultra_applied_event(model_key, params, payload):
     }
 
 
-def build_chat_image_payload(
-    project_id,
-    model_key,
-    message,
-    images,
-    instructions=None,
-    temperature=None,
-    top_p=None,
-    max_tokens=None,
-    history=None,
-):
-    """Chat Completions body for a message with photos, in the shape the Yandex docs show for image input.
-
-    ``history`` is the earlier turns of the conversation as {"role", "text"} items; Chat Completions
-    keeps no server-side state, so the earlier turns must travel with every request.
-    """
-    content = [{"type": "text", "text": message}]
-    content += [{"type": "image_url", "image_url": {"url": url}} for url in images]
-    messages = []
-    if instructions:
-        messages.append({"role": "system", "content": instructions})
-    for turn in history or []:
-        messages.append({"role": turn["role"], "content": turn["text"]})
-    messages.append({"role": "user", "content": content})
-    payload = {
-        "model": get_model_uri(project_id, model_key),
-        "messages": messages,
-        # The answer is read as one JSON body, never as a stream.
-        "stream": False,
-    }
-    if temperature is not None:
-        payload["temperature"] = float(temperature)
-    if top_p is not None:
-        payload["top_p"] = float(top_p)
-    if max_tokens:
-        payload["max_tokens"] = int(max_tokens)
-    return payload
-
-
 def chat_completion_to_response(data):
     """Reshape a Chat Completions answer into the Responses shape the rest of the client reads.
 

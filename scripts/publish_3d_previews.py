@@ -130,13 +130,6 @@ def _model_candidates(changed: list[dict]) -> list[dict]:
     return sorted(files, key=lambda item: item["filename"])
 
 
-def select_models(changed: list[dict]) -> list[dict]:
-    files = _model_candidates(changed)
-    if len(files) > MAX_MODELS:
-        raise PublishError("PR adds too many 3D model previews")
-    return files
-
-
 def _blob(api: Github, sha: str) -> bytes:
     response = api.json("GET", api.prefix + "/git/blobs/" + _sha(sha))
     if not isinstance(response, dict) or response.get("encoding") != "base64":

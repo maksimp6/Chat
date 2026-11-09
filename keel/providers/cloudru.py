@@ -18,11 +18,6 @@ def _unavailable(operation: str) -> NoReturn:
     )
 
 
-def get_observed_state(lane: str) -> dict[str, Any]:
-    """Return authoritative observed state, or fail closed when unavailable."""
-    _unavailable(f"observed-state read for lane {lane}")
-
-
 def create_container(lane: str, service_name: str, config: dict[str, Any]) -> None:
     """Create a container only through a real approved provider."""
     _unavailable(f"create {service_name} in lane {lane}")

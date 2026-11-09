@@ -199,13 +199,13 @@ class ReplicaSink:
                 tx.set(
                     "_replication",
                     "cursor",
-                    dict(
-                        source=self._source,
-                        epoch=self._epoch,
-                        sequence=payload["sequence"],
-                        digest=digest,
-                        local_commit=local_commit,
-                    ),
+                    {
+                        "source": self._source,
+                        "epoch": self._epoch,
+                        "sequence": payload["sequence"],
+                        "digest": digest,
+                        "local_commit": local_commit,
+                    },
                 )
             return Receipt(
                 "DURABLY_APPLIED",

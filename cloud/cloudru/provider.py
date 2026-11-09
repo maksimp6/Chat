@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import quote
 
 from cloud._vendor.wikifunctions import clamp_integer
@@ -29,7 +29,7 @@ def _resource_id(value: Any) -> str:
 
 class CloudRuProvider:
     name = "cloudru"
-    _ENDPOINT_ENV_BY_SERVICE = {
+    _ENDPOINT_ENV_BY_SERVICE: ClassVar[dict[str, str]] = {
         "compute": "CLOUDRU_COMPUTE_ENDPOINT",
         "storage": "CLOUDRU_STORAGE_ENDPOINT",
         "network": "CLOUDRU_NETWORK_ENDPOINT",

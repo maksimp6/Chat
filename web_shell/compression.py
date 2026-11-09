@@ -54,8 +54,7 @@ def _compressible(response: Response) -> bool:
     if not (
         mimetype.startswith("text/")
         or mimetype in _COMPRESSIBLE_TYPES
-        or mimetype.endswith("+json")
-        or mimetype.endswith("+xml")
+        or mimetype.endswith(("+json", "+xml"))
     ):
         return False
     if request.method == "HEAD" or _secret_path(request.path):

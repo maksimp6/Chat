@@ -690,11 +690,15 @@ def report(
         f"Status: **{outcome['status']}**",
         f"RED control: **{outcome['red_control']}**",
         f"Claim assessment: **{card['assessment']}**",
-        "Дословность проверена только для перечисленных цитат. Смысловая достаточность "
-        "не проверена; вывод модели не является подтверждённым фактом.",
+        (
+            "Дословность проверена только для перечисленных цитат. Смысловая достаточность "
+            "не проверена; вывод модели не является подтверждённым фактом."
+        ),
         "NO_CANDIDATES означает отсутствие совпадений BM25, а не отсутствие ответа в корпусе.",
-        "GitHub open/closed и state_reason — состояние задачи, а не доказательство выполнения. "
-        "Комментарии, связанные PR и исходники требуют отдельного чтения.",
+        (
+            "GitHub open/closed и state_reason — состояние задачи, а не доказательство выполнения. "
+            "Комментарии, связанные PR и исходники требуют отдельного чтения."
+        ),
         _code_block(card),
     ]
     return "\n\n".join(lines)
@@ -1898,13 +1902,6 @@ def _repository_vector_text_valid(source: dict) -> bool:
         and _digest_matches(source.get("text"), index_digest)
         and (bool(source.get("redactions")) or digest == index_digest)
     )
-
-
-def verify_repository_vector_result(item: dict, repository_files: list[dict]) -> dict:
-    """Resolve an excerpt to the tracked text file path stamped into its segment."""
-    if not _repository_vector_sources_valid(repository_files):
-        return {"verbatim": False, "reason": "repository_source_hash_mismatch"}
-    return _repository_vector_match(item, repository_files)
 
 
 def _repository_vector_match(item: dict, repository_files: list[dict]) -> dict:

@@ -399,7 +399,7 @@ def python_ast_outline(args: dict) -> dict:
             "path": path,
             "total_lines": len(code.splitlines()),
             "docstring": ast.get_docstring(tree) or "",
-            "imports": sorted(list(set(imports))),
+            "imports": sorted(set(imports)),
             "classes": classes,
             "functions": functions,
         }
@@ -588,7 +588,7 @@ def http_fetch(args: dict) -> dict:
     url = args.get("url")
     if not url:
         return {"error": "Параметр 'url' обязателен"}
-    if not (url.startswith("http://") or url.startswith("https://")):
+    if not (url.startswith(("http://", "https://"))):
         return {"error": "URL должен начинаться с http:// или https://"}
     if _resolves_to_link_local(url):
         return {"error": "Адреса link-local, включая метаданные облака, недоступны"}

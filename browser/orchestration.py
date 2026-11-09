@@ -324,7 +324,7 @@ class BrowserRoleDag:
                 changed = True
                 while changed:
                     changed = False
-                    for task_id in sorted(tuple(pending)):
+                    for task_id in sorted(pending):
                         task = self._task_map[task_id]
                         dependency_results = [
                             results.get(dep) for dep in task.dependencies
@@ -347,7 +347,7 @@ class BrowserRoleDag:
                 available_slots = self.budget.max_parallel_workers - len(running)
                 if available_slots > 0:
                     running_tasks = {task.task_id: task for task in running.values()}
-                    for task_id in sorted(tuple(pending)):
+                    for task_id in sorted(pending):
                         if available_slots <= 0:
                             break
                         task = self._task_map[task_id]
@@ -394,7 +394,7 @@ class BrowserRoleDag:
                             output_chars=result.output_chars,
                             duration_ms=result.duration_ms,
                         )
-                        for pending_id in sorted(tuple(pending)):
+                        for pending_id in sorted(pending):
                             pending_task = self._task_map[pending_id]
                             results[pending_id] = BrowserTaskResult(
                                 pending_id,

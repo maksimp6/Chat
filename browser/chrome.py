@@ -1171,7 +1171,7 @@ class ChromeTabEngine:
             and doc.finished is not None
             and doc.finished >= doc.started
         ):
-            elapsed = int(round((doc.finished - doc.started) * 1000))
+            elapsed = round((doc.finished - doc.started) * 1000)
         return HeadersInfo(
             method=doc.method,
             url=doc.url,
@@ -2457,7 +2457,7 @@ class ChromeTabEngine:
                 "redirects": len(doc.hops) if doc is not None else 0,
                 "bytes": doc.bytes if doc is not None else None,
                 "kind": self._doc_kind(doc),
-                "elapsed_ms": int(round((time.monotonic() - started) * 1000)),
+                "elapsed_ms": round((time.monotonic() - started) * 1000),
             },
         )
 
@@ -3190,8 +3190,8 @@ class ChromeTabEngine:
         width_px, height_px = _image_size(data)
         if width_px is None and clip is not None:
             scale = float(self._browser.options.device_scale_factor or 1)
-            width_px = int(round(float(clip["width"]) * scale))
-            height_px = int(round(float(clip["height"]) * scale))
+            width_px = round(float(clip["width"]) * scale)
+            height_px = round(float(clip["height"]) * scale)
         return CaptureOutcome(bytes=len(data), width=width_px, height=height_px)
 
     def _print_pdf(

@@ -370,7 +370,7 @@ class Application(_RouteMethods):
         if isinstance(rv, HTTPError):
             rv = rv.get_response()
         if not isinstance(rv, Response):
-            if isinstance(rv, (str, bytes, bytearray)) or isinstance(rv, Iterator):
+            if isinstance(rv, (str, bytes, bytearray, Iterator)):
                 rv = self.response_class(rv, status=status, headers=headers)
                 status = headers = None
             elif isinstance(rv, (dict, list)):

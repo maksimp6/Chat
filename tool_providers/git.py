@@ -73,9 +73,8 @@ def write_op(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         read_lock, write_lock = _locks_for(args, kwargs)
-        with write_lock:
-            with read_lock:
-                return func(*args, **kwargs)
+        with write_lock, read_lock:
+            return func(*args, **kwargs)
 
     return wrapper
 

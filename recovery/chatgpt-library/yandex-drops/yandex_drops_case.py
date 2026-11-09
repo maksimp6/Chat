@@ -306,8 +306,8 @@ def mesh_validation(stl: Path) -> dict[str, Any]:
     report = {
         "filename": stl.name,
         "sha256": hashlib.sha256(stl.read_bytes()).hexdigest(),
-        "triangles": int(len(mesh.faces)),
-        "vertices_after_welding": int(len(mesh.vertices)),
+        "triangles": len(mesh.faces),
+        "vertices_after_welding": len(mesh.vertices),
         "bounds_mm": [round(float(n), 3) for n in dims],
         "min_print_z_mm": round(float(mesh.bounds[0][2]), 5),
         "flat_bed_contact_area_mm2": round(contact_area, 2),

@@ -348,7 +348,7 @@ class LiveTurn:
                     if isinstance(status_code, int)
                     and not isinstance(status_code, bool)
                     else None,
-                    "delay_ms": int(round(delay_s * 1000)),
+                    "delay_ms": round(delay_s * 1000),
                     "text": retry_text(
                         event.get("operation"), event.get("reason"), delay_s, attempt
                     ),

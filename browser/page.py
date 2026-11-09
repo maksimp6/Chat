@@ -64,19 +64,23 @@ REF_KINDS = (
     ("L", "a[href], area[href], iframe[src], frame[src]"),
     (
         "B",
-        "button, input[type=submit], input[type=button], input[type=reset], "
-        "input[type=image], summary, [role=button], [role=link], [role=menuitem], "
-        "[role=menuitemcheckbox], [role=menuitemradio], [role=tab], [role=option], "
-        "[role=treeitem], [role=switch], [onclick]",
+        (
+            "button, input[type=submit], input[type=button], input[type=reset], "
+            "input[type=image], summary, [role=button], [role=link], [role=menuitem], "
+            "[role=menuitemcheckbox], [role=menuitemradio], [role=tab], [role=option], "
+            "[role=treeitem], [role=switch], [onclick]"
+        ),
     ),
     (
         "I",
-        "input:not([type=hidden]):not([type=submit]):not([type=button])"
-        ":not([type=reset]):not([type=image]), select, textarea, "
-        "[contenteditable=''], [contenteditable=true], "
-        "[contenteditable=plaintext-only], [role=textbox], [role=searchbox], "
-        "[role=combobox], [role=checkbox], [role=radio], [role=slider], "
-        "[role=spinbutton]",
+        (
+            "input:not([type=hidden]):not([type=submit]):not([type=button])"
+            ":not([type=reset]):not([type=image]), select, textarea, "
+            "[contenteditable=''], [contenteditable=true], "
+            "[contenteditable=plaintext-only], [role=textbox], [role=searchbox], "
+            "[role=combobox], [role=checkbox], [role=radio], [role=slider], "
+            "[role=spinbutton]"
+        ),
     ),
     ("T", "table"),
     ("M", "img, video, audio, [role=img]"),
@@ -1045,8 +1049,10 @@ class PageModel:
             "readonly" in element.attrs and element.tag in ("input", "textarea")
         ):
             return [
-                f"поле {self.ref_label(element)} недоступно для ввода на странице "
-                "(disabled/readonly) — значение всё равно записано"
+                (
+                    f"поле {self.ref_label(element)} недоступно для ввода на странице "
+                    "(disabled/readonly) — значение всё равно записано"
+                )
             ]
         return []
 

@@ -218,7 +218,7 @@ def resolve_target(
     raw = str(path or "")
     if not raw.strip():
         raise BrowserError(E_PATH_REQUIRED)
-    directory_hint = raw.endswith("/") or raw.endswith(os.sep)
+    directory_hint = raw.endswith(("/", os.sep))
     absolute = _tool_path(raw)
     if directory_hint or os.path.isdir(absolute):
         if os.path.lexists(absolute) and not os.path.isdir(absolute):

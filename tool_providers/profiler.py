@@ -55,7 +55,7 @@ def _native_journal_status() -> dict[str, object]:
 
 def inspect_app_internals(arguments: dict, cfg: dict | None = None) -> dict:
     """Возвращает полную карту модулей, путей и состояние окружения приложения."""
-    loaded_modules = [m for m in sys.modules.keys() if not m.startswith("_")]
+    loaded_modules = [m for m in sys.modules if not m.startswith("_")]
 
     return {
         "success": True,

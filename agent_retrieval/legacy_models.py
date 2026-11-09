@@ -69,16 +69,12 @@ class RetrievalQuery:
         object.__setattr__(
             self,
             "source_types",
-            tuple(
-                sorted(set(_clean(item).strip() for item in self.source_types if item))
-            ),
+            tuple(sorted({_clean(item).strip() for item in self.source_types if item})),
         )
         object.__setattr__(
             self,
             "memory_kinds",
-            tuple(
-                sorted(set(_clean(item).strip() for item in self.memory_kinds if item))
-            ),
+            tuple(sorted({_clean(item).strip() for item in self.memory_kinds if item})),
         )
         if not 1 <= int(self.limit) <= 50:
             raise ValueError("limit must be between 1 and 50")
@@ -115,9 +111,7 @@ class RetrievalDocument:
         object.__setattr__(
             self,
             "visibility",
-            tuple(
-                sorted(set(_clean(item).strip() for item in self.visibility if item))
-            ),
+            tuple(sorted({_clean(item).strip() for item in self.visibility if item})),
         )
         clean_metadata = sanitize_trace_value(dict(self.metadata))
         object.__setattr__(self, "metadata", _freeze(clean_metadata))

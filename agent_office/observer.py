@@ -577,15 +577,6 @@ def _has_copilot_review(thread: Thread) -> bool:
     )
 
 
-def _has_codex_check(thread: Thread) -> bool:
-    """The review bot answered with a review or comment; a request or a commit by it is not one."""
-    return any(
-        event.kind in {"reviewed", "commented"}
-        and classify_login(event.actor) == "codex"
-        for event in thread.events
-    )
-
-
 _MAINTAINER_STATUS = re.compile(
     r"^\s*(?:BLOCKED|DEFERRED|ЗАБЛОКИРОВАНО|ОТЛОЖЕНО)\s*:",
     re.IGNORECASE,
@@ -799,10 +790,12 @@ def render_digest(
         DIGEST_MARKER,
         "# Наблюдатель: офис агентов",
         "",
-        f"Обновлено {now:%Y-%m-%d %H:%M} UTC · репозиторий `{repo}` · "
-        f"открыто {sum(t.kind == 'pr' for t in open_threads)} PR и "
-        f"{sum(t.kind == 'issue' for t in open_threads)} задач · "
-        f"смержено за сутки {len(merged)}.",
+        (
+            f"Обновлено {now:%Y-%m-%d %H:%M} UTC · репозиторий `{repo}` · "
+            f"открыто {sum(t.kind == 'pr' for t in open_threads)} PR и "
+            f"{sum(t.kind == 'issue' for t in open_threads)} задач · "
+            f"смержено за сутки {len(merged)}."
+        ),
         "",
         "| Агент | Открытые PR | Задачи в работе | Шагов за сутки |",
         "| --- | ---: | ---: | ---: |",
