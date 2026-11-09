@@ -15,10 +15,9 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
-from webframe import Blueprint, jsonify, request
-
 from organization._vendor.schema import object_schema
 from organization.host import get_current_owner_id, get_store, validate_json_schema
+from webframe import Blueprint, jsonify, request
 
 partner_relations_bp = Blueprint(
     "partner_relations",

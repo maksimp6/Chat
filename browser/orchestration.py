@@ -7,15 +7,14 @@ UniversalToolExecutor boundary.
 
 from __future__ import annotations
 
-from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from dataclasses import dataclass, field
 import json
 import time
-from typing import Any
 from collections.abc import Callable, Mapping
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from dataclasses import dataclass, field
+from typing import Any
 
 from browser.capabilities import BROWSER_ACTIONS
-
 
 READ_ACTIONS = frozenset({"navigate", "inspect", "screenshot", "assert_state"})
 WRITE_ACTIONS = frozenset({"click", "fill"})

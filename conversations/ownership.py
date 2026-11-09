@@ -6,17 +6,16 @@ stored directly in the native Kristall with no SQL migration.
 
 from __future__ import annotations
 
-from threading import RLock
 import time
-from typing import TypedDict
-from typing import Any
+from threading import RLock
+from typing import Any, TypedDict
+
 from conversations.host import (
     bound,
     get_conversations,
     get_memory_client,
     memory_file_path,
 )
-
 
 _OWNERSHIP_LOCK = RLock()
 # Every conversation is its own journal record "chat/conversation/<id>" (storage.records),

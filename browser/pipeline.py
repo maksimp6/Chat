@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
-from collections.abc import Callable, Mapping
 
 from browser.orchestration import BrowserDagResult, BrowserRoleDag, BrowserRoleTask
 from browser.semantic import (
@@ -17,7 +17,6 @@ from browser.semantic import (
     diff_semantic_snapshots,
     merge_evidence,
 )
-
 
 SemanticRawWorker = Callable[[BrowserRoleTask], Any]
 

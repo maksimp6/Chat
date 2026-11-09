@@ -9,7 +9,7 @@ import email.utils
 import math
 import random
 import ssl
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import requests
 from urllib3.exceptions import ConnectTimeoutError, MaxRetryError, NewConnectionError

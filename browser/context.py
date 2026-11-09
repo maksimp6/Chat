@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any
 from collections.abc import Mapping
+from typing import Any
 
 logger = logging.getLogger("logos.browser.context")
 

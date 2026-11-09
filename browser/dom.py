@@ -13,9 +13,9 @@ from __future__ import annotations
 import html
 import logging
 import re
+from collections.abc import Callable, Iterator
 from html.parser import HTMLParser
 from typing import Any
-from collections.abc import Callable, Iterator
 
 logger = logging.getLogger("logos.browser.dom")
 

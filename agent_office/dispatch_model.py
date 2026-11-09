@@ -148,12 +148,11 @@ def resolve_task_plan(
                 " and cannot be used for implementation"
             )
 
-    if stage == "solution-review":
-        if role in IMPLEMENTATION_ROLES:
-            raise AgentDispatchError(
-                f"{role!r} is an implementation role and cannot perform solution review;"
-                " use a non-implementation supervisory role"
-            )
+    if stage == "solution-review" and role in IMPLEMENTATION_ROLES:
+        raise AgentDispatchError(
+            f"{role!r} is an implementation role and cannot perform solution review;"
+            " use a non-implementation supervisory role"
+        )
 
     can_merge = stage == "maintain" and role == "release-manager"
     can_implement = stage == "implementation" and role in IMPLEMENTATION_ROLES

@@ -1,16 +1,16 @@
 """Q14 runner evidence and bounded, explicitly approved Yandex model review."""
 
 from __future__ import annotations
-import os
 
 import argparse
 import hashlib
 import http.client
 import json
+import os
 import re
 import time
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
 from scripts.q14_simulation import BASELINE_HEAD, CASES, run_cases
 

@@ -12,8 +12,8 @@ listing the tools imports neither ``requests`` nor Chrome support.
 from __future__ import annotations
 
 import logging
-from typing import Any
 from collections.abc import Callable, Mapping
+from typing import Any
 
 from browser._vendor.schema import object_schema
 from browser.context import CallContext

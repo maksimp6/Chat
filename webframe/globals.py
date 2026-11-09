@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from contextvars import ContextVar
 from functools import wraps
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
     from webframe.app import Application
@@ -47,7 +47,7 @@ class RequestContext:
             # thread): the thread simply leaves the request.
             _request_ctx.set(None)
 
-    def __enter__(self) -> RequestContext:
+    def __enter__(self) -> Self:
         self.push()
         return self
 
@@ -74,7 +74,7 @@ class AppContext:
         except ValueError:
             _app_ctx.set(None)
 
-    def __enter__(self) -> AppContext:
+    def __enter__(self) -> Self:
         self.push()
         return self
 

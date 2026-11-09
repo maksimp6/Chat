@@ -17,10 +17,9 @@ import time
 import uuid
 from typing import Any
 
-from webframe import Response, jsonify, stream_with_context
-
 from chat._error_details import error_body
 from chat.host import check_access, get_current_owner_id, get_store
+from webframe import Response, jsonify, stream_with_context
 
 logger = logging.getLogger("logos.chat.live_turns")
 

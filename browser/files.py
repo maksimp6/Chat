@@ -19,6 +19,7 @@ import os
 import posixpath
 import secrets
 import shutil
+from typing import Self
 from urllib.parse import unquote, urlsplit
 
 from browser.errors import (
@@ -353,7 +354,7 @@ class AtomicWriter:
         except OSError as exc:
             logger.debug("could not remove %s: %s", self.temp_path, exc)
 
-    def __enter__(self) -> AtomicWriter:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

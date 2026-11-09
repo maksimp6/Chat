@@ -1,17 +1,18 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 
-from webframe import Blueprint, copy_current_request_context, request, jsonify, Response
+import base64
 import contextlib
 import contextvars
+import functools
 import json as _json
-import threading
 import logging
 import re
+import threading
 import uuid
-from typing import Any
 from dataclasses import dataclass
-import base64
-import functools
+from typing import Any
+
+from chat import live_turns
 from chat._error_details import (
     EMPTY_MODEL_REPLY,
     PROVIDER_KEY_EXPIRED,
@@ -23,8 +24,7 @@ from chat._vendor.partial_output import (
     format_partial_output_message,
 )
 from chat._vendor.provider_receipt import capture_provider_diagnostics
-from chat._vendor.responses_tool_loop import run_tool_loop, extract_function_calls
-from chat import live_turns
+from chat._vendor.responses_tool_loop import extract_function_calls, run_tool_loop
 from chat.host import (
     add_message,
     aggregate_billing,
@@ -53,8 +53,6 @@ from chat.host import (
     read_upload,
     record_court_reply,
     record_yandex_mcp_activity,
-    vector_add,
-    vector_sense,
     reset_current_trace,
     set_owner,
     set_yandex_conversation,
@@ -63,7 +61,10 @@ from chat.host import (
     validate_api_contract,
     validate_dialog_model,
     validate_generation_params,
+    vector_add,
+    vector_sense,
 )
+from webframe import Blueprint, Response, copy_current_request_context, jsonify, request
 
 logger = logging.getLogger("logos.chat.mcp_routes")
 mcp_bp = Blueprint("mcp", __name__)
@@ -2367,7 +2368,7 @@ def _event_position():
             value = int(str(raw).strip())
         except ValueError:
             return 0
-        return value if value >= 0 else 0
+        return max(value, 0)
     return 0
 
 

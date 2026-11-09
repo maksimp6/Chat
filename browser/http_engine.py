@@ -33,10 +33,10 @@ import tempfile
 import threading
 import time
 import warnings
-from dataclasses import dataclass, field, replace
-from datetime import datetime, UTC
-from typing import TYPE_CHECKING, Any
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 from urllib.parse import (
     quote,
     unquote,

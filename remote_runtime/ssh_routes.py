@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from webframe import Application, jsonify
-
 from remote_runtime.ssh_settings import public_settings
+from webframe import Application, jsonify
 
 logger = logging.getLogger("logos.remote_runtime.ssh_routes")
 

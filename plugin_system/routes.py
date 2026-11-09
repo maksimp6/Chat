@@ -1,8 +1,7 @@
 """HTTP API for shared local plugin discovery and lifecycle management."""
 
-from webframe import Blueprint, jsonify, request
-
 from plugin_system.manager import PluginError, plugin_manager
+from webframe import Blueprint, jsonify, request
 
 plugin_bp = Blueprint("plugins", __name__, url_prefix="/api/plugins")
 

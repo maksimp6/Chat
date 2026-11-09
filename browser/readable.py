@@ -429,11 +429,13 @@ class _Renderer:
         # noscript visibility is part of is_hidden (render_noscript, or Chrome's own state).
         if not self.include_hidden and self.model.is_hidden(element):
             return False
-        if self.skip_landmarks and (
-            tag in ("nav", "aside") or _role(element) in ("navigation", "complementary")
-        ):
-            return False
-        return True
+        return not (
+            self.skip_landmarks
+            and (
+                tag in ("nav", "aside")
+                or _role(element) in ("navigation", "complementary")
+            )
+        )
 
     def run(self, root: Element) -> None:
         self.root = root

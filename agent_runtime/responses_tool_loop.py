@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
 from collections.abc import Callable, Iterable
+from typing import Any
 
 
 # WIKIFUNCTIONS-CANDIDATE WF-12: https://www.wikifunctions.org/wiki/Z872 + Z873 + Z18755.

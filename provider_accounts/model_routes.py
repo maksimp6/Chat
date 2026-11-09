@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from webframe import Application, jsonify, request
-
 from provider_accounts.host import annotate_catalog
 from provider_accounts.model_discovery import (
     ModelDiscovery,
@@ -11,6 +9,7 @@ from provider_accounts.model_discovery import (
     get_model_discovery,
     static_model_catalog,
 )
+from webframe import Application, jsonify, request
 
 # The process model discovery, created when the routes are installed (at boot).
 MODEL_DISCOVERY: ModelDiscovery | None = None

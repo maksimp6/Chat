@@ -5,6 +5,7 @@ sdk.py - Минимальный SDK для работы с Yandex AI Studio
 import os
 
 import requests
+
 from yandex_client_modules.host import get_model_uri
 
 

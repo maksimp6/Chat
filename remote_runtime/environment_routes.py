@@ -1,7 +1,5 @@
 """REST API for branch-aware application environments."""
 
-from webframe import Blueprint, Response, current_app, jsonify, request
-
 from remote_runtime.environments import (
     GitUnavailable,
     _get,
@@ -15,6 +13,7 @@ from remote_runtime.environments import (
     stop_environment,
 )
 from remote_runtime.host import get_current_owner_id
+from webframe import Blueprint, Response, current_app, jsonify, request
 
 environment_bp = Blueprint("environments", __name__, url_prefix="/api/environments")
 environment_gateway_bp = Blueprint("environment_gateway", __name__)

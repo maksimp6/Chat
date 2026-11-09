@@ -11,9 +11,8 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
-from webframe import Blueprint, jsonify, request
-
 from agent_runtime.host import get_store
+from webframe import Blueprint, jsonify, request
 
 local_agent_bp = Blueprint("local_agents", __name__, url_prefix="/api/local-agents")
 

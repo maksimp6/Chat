@@ -38,12 +38,12 @@ import signal
 import struct
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from collections.abc import Callable
 
 from browser import chrome_launch, guard
 from browser.cdp import CdpConnection, CdpError, ChromeClosed

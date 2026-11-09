@@ -7,8 +7,6 @@ import os
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from webframe import Blueprint, jsonify, request
-
 from provider_accounts.credentials import (
     CLOUDRU,
     YANDEX,
@@ -32,6 +30,7 @@ from provider_accounts.host import (
     traced_operation,
 )
 from provider_accounts.model_discovery import invalidate_model_discovery_cache
+from webframe import Blueprint, jsonify, request
 
 logger = logging.getLogger("logos.provider_credentials")
 
@@ -318,9 +317,7 @@ def cloudru_service_accounts():
     expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
     if expires_raw:
         try:
-            if datetime.fromisoformat(
-                expires_raw.replace("Z", "+00:00")
-            ) <= datetime.now(UTC):
+            if datetime.fromisoformat(expires_raw) <= datetime.now(UTC):
                 return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
         except ValueError:
             return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
@@ -448,9 +445,7 @@ def bootstrap_cloudru():
     iam_expires_at = None
     if iam_expires_raw:
         try:
-            iam_expires_at = datetime.fromisoformat(
-                iam_expires_raw.replace("Z", "+00:00")
-            )
+            iam_expires_at = datetime.fromisoformat(iam_expires_raw)
             if iam_expires_at <= datetime.now(UTC):
                 return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
         except ValueError:

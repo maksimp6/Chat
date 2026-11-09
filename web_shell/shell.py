@@ -6,15 +6,7 @@ import logging
 import os
 from typing import Any
 
-from webframe import (
-    Application,
-    HTTPError,
-    current_app,
-    jsonify,
-    render_template,
-    request,
-)
-
+from web_shell.compression import install as install_compression
 from web_shell.host import (
     bound,
     current_runtime_base_path,
@@ -25,8 +17,15 @@ from web_shell.host import (
     problem,
     read_log_entries,
 )
-from web_shell.compression import install as install_compression
 from web_shell.version import boot_version, static_file_states
+from webframe import (
+    Application,
+    HTTPError,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+)
 
 logger = logging.getLogger("logos.web_shell")
 

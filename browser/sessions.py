@@ -21,10 +21,10 @@ import shutil
 import tempfile
 import threading
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, UTC
-from typing import Any
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
 
 from browser.engine import HistoryItem, Hop, TabEngine
 from browser.errors import (

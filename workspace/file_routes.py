@@ -6,7 +6,6 @@ import re
 from urllib.parse import quote
 
 from webframe import Blueprint, Response, jsonify, request
-
 from workspace.host import bound
 
 logger = logging.getLogger("logos.workspace.file_routes")

@@ -24,10 +24,7 @@ def _is_secret_pattern(value: Any) -> bool:
     # Long base64/hex-looking values (32+ chars).
     # Hex is already a strict subset of this character class, so a second
     # hex-only branch would be unreachable.
-    if re.match(r"^[A-Za-z0-9+/=]{32,}$", value):
-        return True
-
-    return False
+    return bool(re.match(r"^[A-Za-z0-9+/=]{32,}$", value))
 
 
 def _validate_no_plaintext_secrets(

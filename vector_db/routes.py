@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from webframe import Blueprint, jsonify, request
-
 from vector_db.tools import vectors
+from webframe import Blueprint, jsonify, request
 
 __all__ = ["vectors_bp"]
 

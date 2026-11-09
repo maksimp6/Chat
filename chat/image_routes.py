@@ -10,10 +10,7 @@ import time
 
 import requests
 
-from webframe import Blueprint, jsonify, request, send_file
-
 from chat._error_details import DETAILS, error_body
-from chat.mcp_routes import _file_court_failure, logos_client_type
 from chat.host import (
     add_message,
     bound,
@@ -29,6 +26,8 @@ from chat.host import (
     save_image_file,
     vector_add,
 )
+from chat.mcp_routes import _file_court_failure, logos_client_type
+from webframe import Blueprint, jsonify, request, send_file
 
 image_bp = Blueprint("images", __name__)
 logger = logging.getLogger("logos.chat.image_routes")

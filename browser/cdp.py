@@ -19,8 +19,8 @@ import itertools
 import json
 import logging
 import threading
-from typing import Any
 from collections.abc import Callable
+from typing import Any
 
 from browser.errors import (
     E_CHROME_DIED,

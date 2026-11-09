@@ -112,7 +112,7 @@ def _check_active(row: DatabaseRow) -> None:
         raise KeyManagerError(f"Key '{row['key_ref']}' is not active")
     expires_at = row["expires_at"]
     if expires_at:
-        expires = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+        expires = datetime.fromisoformat(expires_at)
         if datetime.now(UTC) >= expires:
             raise KeyExpiredError(f"Key '{row['key_ref']}' is expired")
 

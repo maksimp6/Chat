@@ -13,10 +13,10 @@ import base64
 import binascii
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Any
-from collections.abc import Callable
 from urllib.parse import parse_qs, quote_plus, urlencode, urljoin, urlsplit
 
 from browser import css

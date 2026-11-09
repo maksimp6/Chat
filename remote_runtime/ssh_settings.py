@@ -270,11 +270,10 @@ def _check_operation(
                     raise SSHRuntimeError(
                         "Approval is required for privileged SSH commands"
                     )
-    if operation == "write_file":
-        if not settings["allow_write_operations"]:
-            raise SSHRuntimeError(
-                "SSH file write operations are disabled in SSH Runtime settings"
-            )
+    if operation == "write_file" and not settings["allow_write_operations"]:
+        raise SSHRuntimeError(
+            "SSH file write operations are disabled in SSH Runtime settings"
+        )
     if settings["read_only"] and operation != "read_file":
         raise SSHRuntimeError("SSH Runtime is configured as read-only")
 

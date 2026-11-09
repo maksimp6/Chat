@@ -1,10 +1,10 @@
 """Concrete Yandex Cloud API-key provider used by the rotation worker."""
 
 from __future__ import annotations
-import os
 
-from datetime import datetime
+import os
 from collections.abc import Iterable
+from datetime import datetime
 from urllib.parse import quote
 
 import requests

@@ -6,7 +6,7 @@ import io
 import json as _json
 from collections.abc import Callable, Iterable, Iterator
 from http.cookies import SimpleCookie
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Self
 from urllib.parse import parse_qsl, quote
 
 from webframe.datastructures import Accept, Headers, MultiDict
@@ -648,7 +648,7 @@ class Response:
         for func in self._on_close:
             func()
 
-    def __enter__(self) -> Response:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc_info: object) -> None:

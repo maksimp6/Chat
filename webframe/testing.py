@@ -6,7 +6,7 @@ import io
 import json as _json
 import sys
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Self
 from urllib.parse import unquote_to_bytes, urlencode, urlsplit
 
 from webframe.datastructures import Headers, MultiDict
@@ -164,7 +164,7 @@ class Client:
     def __init__(self, app: Any) -> None:
         self.app = app
 
-    def __enter__(self) -> Client:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc_info: object) -> None:

@@ -6,13 +6,12 @@ import asyncio
 import base64
 import json
 import time
-from dataclasses import dataclass, field
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from urllib.parse import urlencode
 
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
-
 
 REALTIME_URL = "wss://ai.api.cloud.yandex.net/v1/realtime/openai"
 OUTPUT_RATE = 44100

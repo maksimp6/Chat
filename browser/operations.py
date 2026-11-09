@@ -17,10 +17,10 @@ import logging
 import os
 import re
 import time
-from dataclasses import replace
-from datetime import datetime, UTC
-from typing import Any
 from collections.abc import Callable, Mapping
+from dataclasses import replace
+from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import unquote, urlencode, urlsplit
 
 from browser import css, forms, views
@@ -77,8 +77,8 @@ from browser.errors import (
 from browser.files import AtomicWriter, disk_free, extension_for, resolve_target
 from browser.http_engine import (
     RequestSpec,
-    cookie_rows,
     clear_cookies,
+    cookie_rows,
     decode_data_url,
     delete_cookies,
     encode_multipart,

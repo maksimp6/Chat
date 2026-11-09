@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from webframe import Application, jsonify
-
 from agent_memory.extractor import list_global_memory_facts
 from agent_memory.manager import load_memory_config
+from webframe import Application, jsonify
 
 
 def api_memory_panel_data():

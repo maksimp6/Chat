@@ -10,7 +10,7 @@ import math
 from types import SimpleNamespace
 
 import requests
-from webframe import Blueprint, jsonify, request
+
 from chat._error_details import error_body
 from chat.host import (
     bound,
@@ -20,7 +20,7 @@ from chat.host import (
     provider_request_headers,
     traced_operation,
 )
-
+from webframe import Blueprint, jsonify, request
 
 completion_bp = Blueprint("completion", __name__)
 

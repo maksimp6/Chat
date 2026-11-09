@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from functools import lru_cache
-from collections.abc import Iterator
 
 from browser.dom import Document, Element, normalize_space
 from browser.errors import E_SELECTOR_SYNTAX, BrowserError

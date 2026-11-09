@@ -25,8 +25,6 @@ import urllib.request
 from typing import Any
 from uuid import uuid4
 
-from webframe import Blueprint, jsonify, request
-
 from court import filing
 from court.host import (
     add_message,
@@ -39,6 +37,7 @@ from court.host import (
     list_owned_conversations,
 )
 from court.judging import COURT_SOURCE, censor, judge_dialog, rules_table
+from webframe import Blueprint, jsonify, request
 
 __all__ = [
     "DECISIONS",

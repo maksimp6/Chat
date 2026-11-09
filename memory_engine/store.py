@@ -16,7 +16,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock, get_ident
-from typing import Any, Protocol, TypeVar
+from typing import Any, Protocol, Self, TypeVar
 
 from memory_engine._vendor.value_validation import (
     validate_journal_changes,
@@ -703,7 +703,7 @@ class _JournalStore:
                 os.close(self._directory_fd)
                 self._closed = True
 
-    def __enter__(self) -> _JournalStore:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_args: object) -> None:
@@ -804,7 +804,7 @@ class MemoryStore:
             self._engine.close()
             self._pending.clear()
 
-    def __enter__(self) -> MemoryStore:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_args: object) -> None:

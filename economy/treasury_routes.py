@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from typing import cast
 
-from webframe import Application, jsonify, request
-
 from economy.host import get_store
 from economy.treasury import demo_top_up, get_account
 from economy.treasury_identity import get_current_owner_id
+from webframe import Application, jsonify, request
 
 
 def treasury_account():

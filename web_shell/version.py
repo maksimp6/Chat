@@ -10,7 +10,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
 # The kinds of static files the UI fingerprint covers.
 _FINGERPRINTED_SUFFIXES = {".js", ".css", ".svg", ".png", ".woff", ".woff2"}
 

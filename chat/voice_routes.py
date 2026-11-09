@@ -3,34 +3,19 @@
 from __future__ import annotations
 
 import asyncio
-from contextvars import copy_context
 import io
 import json
 import threading
 import time
 import uuid
 import wave
+from contextvars import copy_context
 from dataclasses import dataclass, field
 from typing import Any
 
 import requests
-from webframe import (
-    Blueprint,
-    Response,
-    copy_current_request_context,
-    jsonify,
-    request,
-    stream_with_context,
-)
 
 from chat._error_details import error_body
-from chat.mcp_routes import (
-    _court_censor,
-    _court_record,
-    _provider_conversation_id,
-    _start_embed_turn,
-    logos_client_type,
-)
 from chat.host import (
     add_message,
     bound,
@@ -44,7 +29,21 @@ from chat.host import (
     maybe_update_conversation_title,
     reserve_request,
 )
-
+from chat.mcp_routes import (
+    _court_censor,
+    _court_record,
+    _provider_conversation_id,
+    _start_embed_turn,
+    logos_client_type,
+)
+from webframe import (
+    Blueprint,
+    Response,
+    copy_current_request_context,
+    jsonify,
+    request,
+    stream_with_context,
+)
 
 voice_bp = Blueprint("voice", __name__)
 

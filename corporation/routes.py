@@ -9,10 +9,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from webframe import Blueprint, jsonify, request
-
 from corporation import cash, commands, cycle
 from corporation import ledger as journal
+from webframe import Blueprint, jsonify, request
 
 corporation_bp = Blueprint("corporation", __name__)
 

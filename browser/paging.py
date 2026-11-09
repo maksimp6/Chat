@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 import math
 import re
-from typing import Any
 from collections.abc import Callable, Mapping
+from typing import Any
 
 from browser.errors import (
     E_ARG_NEGATIVE,

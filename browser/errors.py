@@ -13,8 +13,8 @@ import logging
 import math
 import re
 import time
-from typing import Any
 from collections.abc import Mapping
+from typing import Any
 
 logger = logging.getLogger("logos.browser.errors")
 

@@ -6,7 +6,7 @@ import math
 from types import SimpleNamespace
 
 import requests
-from webframe import Blueprint, jsonify, request
+
 from chat._error_details import DETAILS, error_body
 from chat.host import (
     bound,
@@ -18,7 +18,7 @@ from chat.host import (
     reserve_request,
     traced_operation,
 )
-
+from webframe import Blueprint, jsonify, request
 
 classification_bp = Blueprint("classification", __name__)
 

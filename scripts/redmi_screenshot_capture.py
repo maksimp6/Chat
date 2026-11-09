@@ -4,11 +4,10 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import resource
-import shutil
 import shlex
+import shutil
 import signal
 import socket
 import stat
@@ -17,9 +16,9 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+from pathlib import Path
 from urllib.request import urlopen
-
 
 SOCKET = "\0io.github.forkmaintainers.iceraven/firefox-debugger-socket"
 PACKAGE = "io.github.forkmaintainers.iceraven"
@@ -1144,9 +1143,8 @@ def record_creation(rdp, actor, out, uid, gid, snapshot, tools_check=False):
             "message_reply_observed",
             "screenshot_finished:22-logos-rag-top.png",
             "screenshot_finished:23-logos-rag-bottom.png",
-        ):
-            if not event.get("recorder_running"):
-                failures.append("native_video_ended_before_scenario_complete")
+        ) and not event.get("recorder_running"):
+            failures.append("native_video_ended_before_scenario_complete")
         events.append(event)
 
     def app_state():

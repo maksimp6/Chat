@@ -2,8 +2,12 @@
 
 from typing import Any
 
-
 from yandex_client_modules.api_logger import api_logger
+from yandex_client_modules.host import (
+    bound,
+    get_controlled_memory_summary,
+    get_current_owner_id,
+)
 from yandex_client_modules.request_builder import response_input
 from yandex_client_modules.tool_config import (
     deferred_tool_categories,
@@ -11,11 +15,6 @@ from yandex_client_modules.tool_config import (
     global_settings,
     knowledge_vector_store_ids,
     normalize_tools_config,
-)
-from yandex_client_modules.host import (
-    bound,
-    get_controlled_memory_summary,
-    get_current_owner_id,
 )
 
 

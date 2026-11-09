@@ -699,9 +699,7 @@ class PageModel:
             return True
         if tag == "dialog" and "open" not in attrs:
             return True
-        if tag == "noscript" and not self.render_noscript:
-            return True
-        return False
+        return bool(tag == "noscript" and not self.render_noscript)
 
     def is_hidden(self, element: Element) -> bool:
         """True when the element or one of its ancestors is not displayed."""
@@ -1401,11 +1399,13 @@ class PageModel:
         scores: dict[int, float] = {}
         for element in elements:
             tag = element.tag
-            if tag not in _SCORE_TAGS:
-                if tag != "div" or any(
+            if tag not in _SCORE_TAGS and (
+                tag != "div"
+                or any(
                     kid.tag in _LEAF_DIV_BLOCKERS for kid in element.element_children()
-                ):
-                    continue
+                )
+            ):
+                continue
             length = text_len[element.index]
             if length < PARAGRAPH_MIN_CHARS or self.is_hidden(element):
                 continue

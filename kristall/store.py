@@ -17,7 +17,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock, get_ident
-from typing import Any, Protocol, TypeVar
+from typing import Any, Protocol, Self, TypeVar
 
 from kristall.value_validation import (
     validate_journal_changes,
@@ -751,7 +751,7 @@ class _JournalStore:
                     self._lock_file.close()
                 self._closed = True
 
-    def __enter__(self) -> _JournalStore:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_args: object) -> None:
@@ -901,7 +901,7 @@ class Kristall:
             with self._engine._view_lock:
                 self._pending.clear()
 
-    def __enter__(self) -> Kristall:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_args: object) -> None:
