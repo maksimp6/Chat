@@ -36,6 +36,14 @@ __all__ = ["file_text", "onboard", "running"]
 _thread: threading.Thread | None = None
 _lock = threading.Lock()
 
+# A low round cap for the onboarding turn (owner, 09.11.2026: "fix"). The office turn
+# otherwise runs at WATCHDOG_ROUNDS (20): a weak model (the 4B) then re-calls the same
+# tool again and again — on 09.11 one role wrote its file 21 times in a single turn. The
+# onboarding is one tool call plus one sentence, so a cap of 4 is generous and stops the
+# loop. The office route keeps a caller's max_rounds (chat.mcp_routes); the cycle is
+# untouched. This is not a business limit — it bounds one onboarding turn only.
+ONBOARD_ROUNDS = 4
+
 
 def running() -> bool:
     return bool(_thread is not None and _thread.is_alive())
@@ -46,38 +54,54 @@ def _brief(role: str) -> str:
 
     st = journal.state()
     return (
-        "Онбординг. Компания мобильных приложений принимает тебя на работу.\n"
-        f"Постоянная цель компании: {st.goal or DEFAULT_GOAL}\n"
-        f"Твоя роль: {ROLES[role].title}.\n\n"
-        "Напиши о себе сам и запиши это одним вызовом инструмента corporation, tool personnel:\n"
-        "- cv — резюме: кто ты, что умеешь, чем полезен компании мобильных приложений, какими "
-        "инструментами компании будешь работать;\n"
-        "- mood — твоё эмоциональное состояние сейчас, честно, своими словами;\n"
-        "- readiness — готовность к работе: готов или не готов, и почему; чего не хватает.\n"
-        "Запись делаешь ты сам; за тебя её никто не напишет. Без вызова corporation personnel "
-        "личное дело не заведено."
+        f"Онбординг. Ты — {ROLES[role].title} в компании мобильных приложений. "
+        f"Цель компании: {st.goal or DEFAULT_GOAL}\n\n"
+        "Сделай ровно одно действие: вызови инструмент corporation с tool=personnel и "
+        "arguments с тремя полями — cv (кто ты и чем полезен компании мобильных приложений), "
+        "mood (твоё эмоциональное состояние сейчас, своими словами), readiness (готов ли ты к "
+        "работе и почему). Затем напиши одно короткое предложение. Других инструментов "
+        "(status, git, filesystem) не вызывай: нужен только personnel. Личное дело пишешь ты сам."
     )
 
 
-def _turn(conversation: str, message: str, source: str) -> str:
+def _retry_brief(role: str) -> str:
+    return (
+        f"Ты — {ROLES[role].title}. Личное дело ещё не записано. Сейчас вызови инструмент "
+        'corporation ровно один раз: tool=personnel, arguments={"cv": "…", "mood": "…", '
+        '"readiness": "…"} — заполни поля своими словами про себя как сотрудника компании '
+        "мобильных приложений. Не вызывай status, git, filesystem и другие инструменты. "
+        "После вызова напиши одно предложение."
+    )
+
+
+def _turn(conversation: str, message: str, source: str, max_rounds: int = 0) -> str:
     from corporation.cycle import _local
 
-    answer = _local(
-        "POST",
-        "/api/chat",
-        {"conversation_id": conversation, "message": message, "source": source},
-        timeout=3600,
-    )
+    body: dict[str, Any] = {
+        "conversation_id": conversation,
+        "message": message,
+        "source": source,
+    }
+    if max_rounds:
+        body["params"] = {"max_rounds": max_rounds}
+    answer = _local("POST", "/api/chat", body, timeout=3600)
     return str(answer.get("reply") or "")
 
 
 def _onboard_one(role: str) -> dict[str, Any]:
     """One employee's onboarding turn in their office; True in ``recorded`` only when the
-    employee's own ``personnel`` call landed in the ledger during the turn."""
+    employee's own ``personnel`` call landed in the ledger during the turn.
+
+    A tool-only turn that ends without a text reply makes the chat pipeline answer HTTP 500
+    (_EmptyModelReply), and a weak model sometimes reaches for the wrong tool (status) and
+    never calls personnel. So the turn is capped at ONBOARD_ROUNDS and, if no file landed,
+    retried once with a blunter brief; both are survivable — the file lands from the tool
+    call even when the turn then 500s on the empty reply (we check the ledger, not the text).
+    """
     from corporation import office
 
     conversation = office.ensure_office(role)
-    before = journal.state().staff.get(role)
+    source = f"corporation:onboarding:{role}"
     book = journal.ledger()
     book.append(
         "note",
@@ -88,19 +112,25 @@ def _onboard_one(role: str) -> dict[str, Any]:
             "conversation": conversation,
         },
     )
-    try:
-        reply = _turn(conversation, _brief(role), f"corporation:onboarding:{role}")
-        error = reply.startswith("⚠️")
-    except Exception as exc:
-        reply, error = f"{type(exc).__name__}: {exc}", True
-    after = journal.state().staff.get(role)
-    recorded = bool(after and (before is None or after["seq"] != before["seq"]))
+    reply, error, recorded = "", True, False
+    for brief in (_brief(role), _retry_brief(role)):
+        before = journal.state().staff.get(role)
+        try:
+            reply = _turn(conversation, brief, source, ONBOARD_ROUNDS)
+            error = reply.startswith("⚠️")
+        except Exception as exc:
+            reply, error = f"{type(exc).__name__}: {exc}", True
+        after = journal.state().staff.get(role)
+        recorded = bool(after and (before is None or after["seq"] != before["seq"]))
+        if recorded:
+            error = False
+            break
     if not recorded:
         book.append(
             "note",
             "owner",
             {
-                "text": f"онбординг: {role} закончил ход без corporation personnel — личное дело не заведено",
+                "text": f"онбординг: {role} закончил оба хода без corporation personnel — личное дело не заведено",
                 "onboarding": role,
                 "reply": reply[:2000],
                 "error": error,
@@ -139,7 +169,15 @@ def _court_check(results: list[dict[str, Any]]) -> str:
             lines.append(
                 f"- {role} ({ROLES[role].title}): дела нет; ход закончился словами: {result['reply'][:300]}"
             )
-    verdict = _turn(COURT_CONVERSATION_ID, "\n".join(lines), "corporation:onboarding:court")
+    try:
+        verdict = _turn(
+            COURT_CONVERSATION_ID,
+            "\n".join(lines),
+            "corporation:onboarding:court",
+            max_rounds=8,
+        )
+    except Exception as exc:
+        verdict = f"сверка не вынесена: ход Суда не удался ({type(exc).__name__}: {exc})"
     journal.ledger().append(
         "note",
         "court",
