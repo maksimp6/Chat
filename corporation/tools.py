@@ -12,9 +12,12 @@ from pathlib import Path
 from typing import Any
 
 from corporation import ledger as journal
-from corporation.roles import ROLES
+from corporation.roles import ROLES, all_roles, get_role
 
 __all__ = ["CORPORATION_TOOLS"]
+
+# A hired role's key: a short latin word, safe as a file name and a conversation id.
+_ROLE_KEY = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 
 _ID = {"type": "string", "minLength": 1}
 _TEXT = {"type": "string", "minLength": 1}
@@ -92,8 +95,9 @@ def _open_task(args: dict[str, Any], cfg=None) -> dict[str, Any]:
             f"no such project: {project}; projects: {', '.join(st.projects) or 'none'}"
         )
     role = str(args["role"])
-    if role not in ROLES:
-        raise ValueError(f"role must be one of: {', '.join(ROLES)}")
+    staff_now = all_roles()
+    if role not in staff_now:
+        raise ValueError(f"role must be one of: {', '.join(staff_now)}")
     tid = st.next_id("t", st.tasks)
     text = str(args["text"])
     data = {"id": tid, "role": role, "text": text, "folder": str(_project_dir(project))}
@@ -278,7 +282,8 @@ def _personnel(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     """The employee's own personnel file — written by the employee in their office, never
     for them (owner, 09.11.2026: "dont do work instead of them")."""
     actor = _actor()
-    if actor not in ROLES:
+    employee = get_role(actor)
+    if employee is None:
         raise ValueError(
             f"a personnel file is written by an employee in their own office; here the actor is {actor}"
         )
@@ -289,7 +294,7 @@ def _personnel(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     # ledger record is the fact and carries the path; the vector copy is only the index.
     path = journal.staff_dir() / f"{_safe_segment(actor)}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
-    title = ROLES[actor].title
+    title = employee.title
     text = (
         f"# Личное дело — {title} ({actor})\n\n"
         f"Компания мобильных приложений. Записано сотрудником самим.\n\n"
@@ -314,6 +319,78 @@ def _personnel(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     return {"success": True, "role": actor, "seq": entry["seq"], "path": str(path)}
 
 
+def _hire(args: dict[str, Any], cfg=None) -> dict[str, Any]:
+    """HR hires an employee (owner, 18.11.2026: "let hr hire more stuff").
+
+    The hire is a ``staff.hire`` record — the role's key, title and job instructions — so
+    the new employee exists from the next line on: an office in the chat list, tasks from
+    the director, shifts in the cycle. The job description is also a file,
+    ``<state>/corporation/staff/<role>.job.md`` (a file is a file; the embeddings are the
+    index). A new hire then goes through onboarding and writes their own personnel file:
+    the onboarding thread waits until this turn is over. Hiring the same key again
+    updates the job description and does not onboard twice.
+    """
+    actor = _actor()
+    if actor != "hr":
+        raise ValueError(
+            f"hiring is the HR employee's work, in the HR office; here the actor is {actor}"
+        )
+    name = str(args["role"]).strip().lower()
+    if not _ROLE_KEY.match(name):
+        raise ValueError(
+            "role must be a short latin key: a letter, then letters, digits or _ (for example tester)"
+        )
+    if name in ROLES:
+        raise ValueError(
+            f"{name} is already on the staff (a built-in role); hire a role the company does not have"
+        )
+    title = str(args["title"]).strip()
+    instructions = str(args["instructions"]).strip()
+    why = str(args.get("why") or "").strip()
+    rehired = name in journal.state().hired
+    path = journal.staff_dir() / f"{_safe_segment(name)}.job.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = (
+        f"# Должностная инструкция — {title} ({name})\n\n"
+        f"Нанят отделом кадров компании мобильных приложений.\n\n## Что делает\n\n{instructions}\n"
+    )
+    if why:
+        text += f"\n## Зачем нанят\n\n{why}\n"
+    path.write_text(text, encoding="utf-8")
+    entry = journal.ledger().append(
+        "staff.hire",
+        actor,
+        {
+            "role": name,
+            "title": title,
+            "instructions": instructions,
+            "why": why,
+            "path": str(path),
+        },
+    )
+    from corporation import office, staff
+
+    conversation = office.ensure_office(name)
+    onboarding = "не нужен: должностная инструкция обновлена, личное дело уже заведено"
+    if not rehired:
+        started = staff.onboard(name)
+        onboarding = (
+            "запущен: новый сотрудник сам напишет личное дело после этого хода"
+            if started["started"]
+            else f"не запущен ({started['reason']}); запустить: корпорация: онбординг {name}"
+        )
+    return {
+        "success": True,
+        "role": name,
+        "title": title,
+        "seq": entry["seq"],
+        "office": conversation,
+        "path": str(path),
+        "rehired": rehired,
+        "onboarding": onboarding,
+    }
+
+
 def _note(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     step = _step()
     entry = journal.ledger().append(
@@ -333,6 +410,16 @@ def _status(args: dict[str, Any], cfg=None) -> dict[str, Any]:
         "success": True,
         "summary": st.summary(),
         "brief": st.brief(),
+        # the staff of the moment: every employee's key and title, and who has a personnel file
+        "roster": [
+            {
+                "role": name,
+                "title": employee.title,
+                "hired": name in st.hired,
+                "personnel_file": name in st.staff,
+            }
+            for name, employee in all_roles().items()
+        ],
     }
     if step.get("project") in st.projects:
         project = st.projects[step["project"]]
@@ -399,18 +486,9 @@ CORPORATION_TOOLS = {
         schema={
             "properties": {
                 "project": _ID,
-                "role": {
-                    "type": "string",
-                    "enum": [
-                        "founder",
-                        "director",
-                        "research",
-                        "production",
-                        "critic",
-                        "marketing",
-                        "sales",
-                    ],
-                },
+                # not an enum: the staff grows when HR hires; the code checks the key
+                # against the staff of the moment and names the valid ones in the error
+                "role": _ID,
                 "text": _TEXT,
                 "product": _ID,
                 "offer": _ID,
@@ -419,7 +497,7 @@ CORPORATION_TOOLS = {
             "required": ["project", "role", "text"],
         },
         title="Поставить задачу",
-        description="Директор: задача роли в проекте; text — одно конкретное поручение с измеримым результатом.",
+        description="Директор: задача роли в проекте; role — ключ сотрудника из штата (founder, director, hr, research, production, critic, marketing, sales или нанятый — смотри roster в corporation status); text — одно конкретное поручение с измеримым результатом.",
     ),
     "finish_task": _tool(
         _finish_task,
@@ -478,6 +556,21 @@ CORPORATION_TOOLS = {
         },
         title="Оффер",
         description="Маркетинг: цена в рублях, канал (telegram, vk, email) и текст объявления для готового продукта.",
+    ),
+    "hire": _tool(
+        _hire,
+        read_only=False,
+        schema={
+            "properties": {
+                "role": _ID,
+                "title": _TEXT,
+                "instructions": _TEXT,
+                "why": _TEXT,
+            },
+            "required": ["role", "title", "instructions"],
+        },
+        title="Нанять сотрудника",
+        description="Кадры (HR), в своём кабинете: нанять сотрудника, которого в штате нет. role — короткий ключ латиницей (tester, designer); title — должность по-русски; instructions — должностная инструкция (что делает, какими инструментами, чем заканчивает поручение); why — зачем нужен. Новый сотрудник получает кабинет, задачи от директора и сам проходит онбординг.",
     ),
     "directive": _tool(
         _directive,

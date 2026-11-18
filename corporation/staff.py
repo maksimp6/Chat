@@ -1,4 +1,4 @@
-"""Onboarding: every employee writes their own personnel file; the Court checks the set.
+"""Staff: onboarding, personnel files, and the owner's hiring orders to HR.
 
 Owner, 09.11.2026: "do onboarding, collect cv and write workers личное дело, запиши его
 эмоциональное состояние и готовность к работе, свои результаты сверь у суда" — and, in
@@ -8,32 +8,40 @@ employee answers with a ``corporation personnel`` call (cv, mood, readiness): th
 is theirs — actor = the role — and it is embedded like every ledger record (``staff.file``).
 The file is also a file, ``<state>/corporation/staff/<role>.md`` (owner, 09.11.2026: the
 embeddings database "is not replace files manager"); the record carries its path.
-An employee who ends the turn without that call gets a ``note`` saying so, with their own
-words quoted; no file is invented for them.
+An employee who ends both turns without that call gets a ``note`` saying so, with their
+own words quoted; no file is invented for them.
 
 When every office has had its turn, the whole set goes before the Court (the Court dialog,
 ``logos-court``): what each file says, who has none. The Court's verdict is a ``note`` of
 actor ``court`` with ``check: onboarding``.
 
-The turns run in one thread, one office after another (the system is synchronous). The
-chat command ``корпорация: онбординг [роль]`` starts it; ``корпорация: дело <роль>`` reads
-a file; the board window reads ``POST /api/corporation {action: staff}``.
+Owner, 18.11.2026: "let hr hire more stuff". Hiring is HR's own work (the ``corporation
+hire`` tool, in the HR office); ``ask_hr`` only carries the owner's order into that office.
+An employee HR hired is onboarded the same way as a built-in one — the hire tool starts
+it, and the thread waits until the HR turn is over before it speaks.
+
+The turns run in one thread, one office after another, and never beside another turn (the
+system is synchronous). Chat commands: ``корпорация: онбординг [роль]``, ``корпорация: дело
+<роль>``, ``корпорация: найм <кого и зачем>``, ``корпорация: штат``; the board window reads
+``POST /api/corporation {action: staff}``.
 """
 
 from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Any
 
 from corporation import ledger as journal
-from corporation.roles import ROLES
+from corporation.roles import all_roles, get_role
 
 logger = logging.getLogger("logos.corporation.staff")
 
-__all__ = ["file_text", "onboard", "running"]
+__all__ = ["ask_hr", "file_text", "onboard", "running"]
 
 _thread: threading.Thread | None = None
+_hr_thread: threading.Thread | None = None
 _lock = threading.Lock()
 
 # A low round cap for the onboarding turn (owner, 09.11.2026: "fix"). The office turn
@@ -43,10 +51,25 @@ _lock = threading.Lock()
 # loop. The office route keeps a caller's max_rounds (chat.mcp_routes); the cycle is
 # untouched. This is not a business limit — it bounds one onboarding turn only.
 ONBOARD_ROUNDS = 4
+IDLE_WAIT_SECONDS = 5
 
 
 def running() -> bool:
     return bool(_thread is not None and _thread.is_alive())
+
+
+def _title(role: str) -> str:
+    employee = get_role(role)
+    return employee.title if employee is not None else role
+
+
+def _wait_idle() -> None:
+    """Wait until no chat turn is running: the owner's turn, a cycle step, or the HR turn
+    that has just hired the employee this thread is about to onboard."""
+    from corporation.cycle import _owner_busy
+
+    while _owner_busy():
+        time.sleep(IDLE_WAIT_SECONDS)
 
 
 def _brief(role: str) -> str:
@@ -54,7 +77,7 @@ def _brief(role: str) -> str:
 
     st = journal.state()
     return (
-        f"Онбординг. Ты — {ROLES[role].title} в компании мобильных приложений. "
+        f"Онбординг. Ты — {_title(role)} в компании мобильных приложений. "
         f"Цель компании: {st.goal or DEFAULT_GOAL}\n\n"
         "Сделай ровно одно действие: вызови инструмент corporation с tool=personnel и "
         "arguments с тремя полями — cv (кто ты и чем полезен компании мобильных приложений), "
@@ -66,7 +89,7 @@ def _brief(role: str) -> str:
 
 def _retry_brief(role: str) -> str:
     return (
-        f"Ты — {ROLES[role].title}. Личное дело ещё не записано. Сейчас вызови инструмент "
+        f"Ты — {_title(role)}. Личное дело ещё не записано. Сейчас вызови инструмент "
         'corporation ровно один раз: tool=personnel, arguments={"cv": "…", "mood": "…", '
         '"readiness": "…"} — заполни поля своими словами про себя как сотрудника компании '
         "мобильных приложений. Не вызывай status, git, filesystem и другие инструменты. "
@@ -107,13 +130,14 @@ def _onboard_one(role: str) -> dict[str, Any]:
         "note",
         "owner",
         {
-            "text": f"онбординг: {ROLES[role].title} ({role}) — ход в кабинете",
+            "text": f"онбординг: {_title(role)} ({role}) — ход в кабинете",
             "onboarding": role,
             "conversation": conversation,
         },
     )
     reply, error, recorded = "", True, False
     for brief in (_brief(role), _retry_brief(role)):
+        _wait_idle()
         before = journal.state().staff.get(role)
         try:
             reply = _turn(conversation, brief, source, ONBOARD_ROUNDS)
@@ -162,13 +186,14 @@ def _court_check(results: list[dict[str, Any]]) -> str:
         item = st.staff.get(role)
         if item:
             lines.append(
-                f"- {role} ({ROLES[role].title}): дело, запись {item['seq']}; cv: {item['cv'][:300]}; "
+                f"- {role} ({_title(role)}): дело, запись {item['seq']}; cv: {item['cv'][:300]}; "
                 f"mood: {item['mood'][:200]}; readiness: {item['readiness'][:200]}"
             )
         else:
             lines.append(
-                f"- {role} ({ROLES[role].title}): дела нет; ход закончился словами: {result['reply'][:300]}"
+                f"- {role} ({_title(role)}): дела нет; ход закончился словами: {result['reply'][:300]}"
             )
+    _wait_idle()
     try:
         verdict = _turn(
             COURT_CONVERSATION_ID,
@@ -224,13 +249,13 @@ def _run(roles: list[str]) -> None:
 
 
 def onboard(role: str | None = None) -> dict[str, Any]:
-    """Start the onboarding of one role or of every employee, in the offices' order."""
+    """Start the onboarding of one employee or of every employee, in the offices' order."""
     global _thread
-    if role is not None and role not in ROLES:
+    if role is not None and get_role(role) is None:
         raise ValueError(f"no such employee: {role}")
-    from corporation.office import OFFICES
+    from corporation.office import rows
 
-    roles = [role] if role else [r for r, _conversation, _title in OFFICES]
+    roles = [role] if role else [r for r, _conversation, _title_text in rows()]
     with _lock:
         if _thread is not None and _thread.is_alive():
             return {"started": False, "reason": "онбординг уже идёт", "roles": roles}
@@ -241,15 +266,67 @@ def onboard(role: str | None = None) -> dict[str, Any]:
     return {"started": True, "roles": roles}
 
 
+def _run_hr(text: str) -> None:
+    """The owner's hiring order, said in the HR office; HR does the hiring itself."""
+    from corporation import office
+
+    book = journal.ledger()
+    try:
+        conversation = office.ensure_office("hr")
+        _wait_idle()
+        reply = _turn(
+            conversation,
+            f"Поручение правления кадрам: {text}\n\nНайми, кого нужно, вызовом corporation hire "
+            "(role, title, instructions, why) и кратко отчитайся.",
+            "corporation:hr",
+        )
+        error = reply.startswith("⚠️")
+    except Exception as exc:
+        logger.exception("[CORP] the hiring order failed")
+        reply, error = f"{type(exc).__name__}: {exc}", True
+    try:
+        book.append(
+            "note",
+            "owner",
+            {
+                "text": f"найм: поручение кадрам «{text[:300]}» — ход {'не удался' if error else 'сделан'}",
+                "hiring": "hr",
+                "reply": reply[:2000],
+                "error": error,
+            },
+        )
+    except Exception:
+        logger.exception("[CORP] the hiring note was not written")
+
+
+def ask_hr(text: str) -> dict[str, Any]:
+    """Carry the owner's hiring order into the HR office (корпорация: найм …)."""
+    global _hr_thread
+    order = str(text or "").strip()
+    if not order:
+        raise ValueError("the hiring order is empty")
+    with _lock:
+        if _hr_thread is not None and _hr_thread.is_alive():
+            return {
+                "started": False,
+                "reason": "кадры ещё выполняют прошлое поручение о найме",
+            }
+        _hr_thread = threading.Thread(
+            target=_run_hr, args=(order,), name="logos-hiring", daemon=True
+        )
+        _hr_thread.start()
+    return {"started": True}
+
+
 def file_text(role: str) -> str:
     """An employee's personnel file as a chat reply."""
-    if role not in ROLES:
+    if get_role(role) is None:
         raise ValueError(f"no such employee: {role}")
     item = journal.state().staff.get(role)
     if not item:
-        return f"Личного дела {ROLES[role].title} ({role}) в журнале нет."
+        return f"Личного дела {_title(role)} ({role}) в журнале нет."
     text = (
-        f"Личное дело {ROLES[role].title} ({role}), запись {item['seq']} от {item['at']} "
+        f"Личное дело {_title(role)} ({role}), запись {item['seq']} от {item['at']} "
         f"(версия {item['versions']}):\nРезюме: {item['cv']}\nСостояние: {item['mood']}\n"
         f"Готовность: {item['readiness']}"
     )

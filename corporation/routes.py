@@ -26,6 +26,7 @@ _COMMAND_WORDS = {
     "channel": "канал",
     "backup": "снимок",
     "onboarding": "онбординг",
+    "hire": "найм",
 }
 
 
@@ -83,17 +84,18 @@ def corporation_action() -> Any:
             )
         if action == "staff":
             from corporation import staff
-            from corporation.roles import ROLES
+            from corporation.roles import all_roles
 
             st = journal.state()
             return jsonify(
                 {
                     "success": True,
                     "staff": st.staff,
+                    "hired": st.hired,
                     "onboarding_running": staff.running(),
                     "roles": {
                         name: {"title": role.title, "person": role.person}
-                        for name, role in ROLES.items()
+                        for name, role in all_roles().items()
                     },
                 }
             )

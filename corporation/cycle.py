@@ -35,7 +35,14 @@ import urllib.request
 from typing import Any
 
 from corporation import ledger as journal
-from corporation.roles import ROLE_ORDER, ROLES, WATCHDOG_ROUNDS, Role, policy_name
+from corporation.roles import (
+    ROLE_ORDER,
+    WATCHDOG_ROUNDS,
+    Role,
+    all_roles,
+    hired_roles,
+    policy_name,
+)
 
 logger = logging.getLogger("logos.corporation.cycle")
 
@@ -337,6 +344,11 @@ def _pick(st: journal.State) -> tuple[str, dict[str, Any] | None] | None:
         mine = [t for t in queued if t["role"] == role]
         if mine:
             return role, mine[0]
+    # the employees HR hired take their shifts after the pipeline's own roles
+    for role in hired_roles():
+        mine = [t for t in queued if t["role"] == role]
+        if mine:
+            return role, mine[0]
     if any(not d.get("project") for d in st.directives):
         return "director", None
     # Nothing queued and no directive waiting: the one who wants gets the shift (owner,
@@ -401,13 +413,8 @@ def _brief(st: journal.State, role: Role, task: dict[str, Any] | None) -> str:
             f"Поручение {task['id']} (проект {task['project']}, ход {task['turns'] + 1}{' из ' + str(role.turns) if role.turns else ''}):\n{task['text']}"
         )
         project = st.projects.get(task.get("project") or "")
-        if project and role.name in (
-            "research",
-            "production",
-            "critic",
-            "marketing",
-            "sales",
-        ):
+        # the line's route card for everyone who works on the product, hired employees too
+        if project and role.name not in ("founder", "director", "hr"):
             lines.append(recipe(project.get("line")))
         folder = journal.products_dir() / (task.get("project") or "x")
         if role.writes_products:
@@ -528,7 +535,7 @@ def step_once() -> dict[str, Any]:
     if picked is None:
         return {"idle": True}
     role_name, task = picked
-    role = ROLES[role_name]
+    role = all_roles()[role_name]
     if not _switch_model(role):
         return {"idle": True, "error": "model switch failed"}
     book = journal.ledger()

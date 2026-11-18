@@ -24,7 +24,25 @@ def get_policy(name: Any) -> Any | None:
         return None
     if not _POLICIES:
         _register_known()
-    return _POLICIES.get(name)
+    policy = _POLICIES.get(name)
+    if policy is None:
+        policy = _hired_policy(name)
+    return policy
+
+
+def _hired_policy(name: str) -> Any | None:
+    """The policy of an employee HR hired: the role is a ``staff.hire`` record in the
+    company's ledger (written by the ``corporation hire`` tool, trusted code), not a name
+    the model made up — a key the ledger does not hold is still an unknown policy."""
+    try:
+        from corporation.roles import hired_roles, policy_for, policy_name
+
+        for role in hired_roles():
+            if policy_name(role) == name:
+                return policy_for(role)
+    except Exception:  # the corporation is optional for the chat
+        pass
+    return None
 
 
 def policy_names() -> list[str]:

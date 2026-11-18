@@ -32,6 +32,8 @@ HELP = (
     "• корпорация: журнал [n] — последние записи\n"
     "• корпорация: онбординг [роль] — каждый сотрудник сам пишет личное дело в своём кабинете (резюме, состояние, готовность); набор сверяет Суд\n"
     "• корпорация: дело <роль> — личное дело сотрудника из журнала\n"
+    "• корпорация: найм <кого и зачем> — поручение кадрам; кадры нанимают сами, новый сотрудник сам проходит онбординг\n"
+    "• корпорация: штат — все сотрудники: встроенные и нанятые кадрами\n"
     "• корпорация: кабинеты — открыть кабинеты сотрудников (диалоги)\n"
     "• корпорация: <имя> (Вера, Глеб, Ника, Макар, Инга, Лев, Дана) — кабинет сотрудника; пиши туда и он сделает"
 )
@@ -202,30 +204,57 @@ def handle(message: str) -> str:
         except ValueError:
             count = 20
         return _journal_text(max(1, count))
+    if word in ("штат", "roster"):
+        from corporation.roles import all_roles
+
+        st = journal.state()
+        rows = []
+        for name, employee in all_roles().items():
+            marks = []
+            if name in st.hired:
+                marks.append(f"нанят кадрами, запись {st.hired[name]['seq']}")
+            marks.append("личное дело есть" if name in st.staff else "личного дела нет")
+            rows.append(f"• {employee.title} ({name}) — {'; '.join(marks)}")
+        return f"Штат компании, {len(rows)}:\n" + "\n".join(rows)
+    if word in ("найм", "hire"):
+        if not tail:
+            return "Формат: корпорация: найм <кого нанять и зачем>. Кадры наймут сами: должность, инструкция, кабинет, онбординг."
+        from corporation import staff
+
+        made = staff.ask_hr(tail)
+        if not made["started"]:
+            return str(made["reason"])
+        return (
+            "Поручение передано в кабинет кадров. Кадры нанимают сами (corporation hire): ключ роли, "
+            "должность, должностная инструкция файлом, кабинет в списке чатов; новый сотрудник затем сам "
+            "пишет личное дело. Смотреть: корпорация: штат."
+        )
     if word in ("онбординг", "onboarding"):
         from corporation import staff
-        from corporation.roles import ROLES
+        from corporation.roles import all_roles
 
+        staff_now = all_roles()
         role = tail.lower() or None
-        if role and role not in ROLES:
-            return f"Нет такой роли: {role}. Роли: {', '.join(ROLES)}."
+        if role and role not in staff_now:
+            return f"Нет такой роли: {role}. Роли: {', '.join(staff_now)}."
         made = staff.onboard(role)
         if not made["started"]:
             return str(made["reason"])
         return (
             "Онбординг запущен: "
-            + ", ".join(ROLES[r].title for r in made["roles"])
+            + ", ".join(staff_now[r].title for r in made["roles"])
             + ". Каждый пишет личное дело сам, в своём кабинете (corporation personnel: резюме, "
             "состояние, готовность); за него никто не пишет. Когда все прошли, набор уходит на "
             "сверку в Суд. Смотреть: корпорация: дело <роль>."
         )
     if word in ("дело", "file"):
         from corporation import staff
-        from corporation.roles import ROLES
+        from corporation.roles import all_roles
 
+        staff_now = all_roles()
         role = tail.lower()
-        if role not in ROLES:
-            return "Формат: корпорация: дело <роль>; роли: " + ", ".join(ROLES) + "."
+        if role not in staff_now:
+            return "Формат: корпорация: дело <роль>; роли: " + ", ".join(staff_now) + "."
         return staff.file_text(role)
     if word in ("кабинеты", "сотрудники", "offices"):
         from corporation import office
@@ -239,17 +268,18 @@ def handle(message: str) -> str:
             "с полным набором инструментов, и запишет результат в журнал:\n" + rows
         )
     # корпорация: <имя или роль> — open or point to one employee's office
-    from corporation.roles import ROLES
+    from corporation.roles import all_roles
 
-    by_name = {ROLES[r].person["name"].lower(): r for r in ROLES}
-    role = word if word in ROLES else by_name.get(word)
+    staff_now = all_roles()
+    by_name = {staff_now[r].person["name"].lower(): r for r in staff_now}
+    role = word if word in staff_now else by_name.get(word)
     if role is not None:
         from corporation import office
 
         conv = office.ensure_office(role)
-        person = ROLES[role].person
+        person = staff_now[role].person
         return (
-            f"Кабинет {person['name']} ({ROLES[role].title}) открыт: диалог «{office.title(role)}» в списке чатов. "
+            f"Кабинет {person['name']} ({staff_now[role].title}) открыт: диалог «{office.title(role)}» в списке чатов. "
             f"Пиши туда — {person['name']} делает по-твоему. conversation_id: {conv}"
         )
     return "Не понял команду.\n" + HELP

@@ -39,6 +39,17 @@ DEPARTMENTS: tuple[dict[str, Any], ...] = (
         ),
     },
     {
+        "id": "hr",
+        "name": "Кадры",
+        "sign": "🧑‍💼",
+        "roles": ("hr",),
+        "does": (
+            "Нанимает, кого не хватает",
+            "Онбординг и личные дела",
+            "Должностные инструкции файлами",
+        ),
+    },
+    {
         "id": "sales",
         "name": "Маркетинг и продажи",
         "sign": "📣",
@@ -178,7 +189,10 @@ def _departments(st: journal.State, current: dict[str, Any]) -> list[dict[str, A
     day = datetime.now(UTC).strftime("%Y-%m-%d")
     result = []
     for spec in DEPARTMENTS:
-        roles = spec["roles"]
+        # the employees HR hired sit in the HR department's card until they have their own
+        roles = (
+            spec["roles"] + tuple(st.hired) if spec["id"] == "hr" else spec["roles"]
+        )
         queued = sum(
             1
             for t in st.tasks.values()
@@ -207,10 +221,17 @@ def _departments(st: journal.State, current: dict[str, Any]) -> list[dict[str, A
             state = f"в очереди {queued + working}"
         else:
             state = "свободен" if st.cycle.get("running") else "ждёт гудка"
-        from corporation.roles import ROLES
+        from corporation.roles import all_roles
 
-        people = [ROLES[r].person for r in roles if r in ROLES]
+        staff_now = all_roles()
+        people = [staff_now[r].person for r in roles if r in staff_now]
         facts = _facts_today(st, roles) if roles else []
+        if spec["id"] == "hr":
+            facts = [
+                f"В штате: {len(staff_now)}",
+                f"Нанято кадрами: {len(st.hired)}",
+                f"Личных дел: {len(st.staff)}",
+            ]
         if spec["id"] == "finance":
             money = cash.summary(st)
             facts = [
@@ -276,6 +297,8 @@ _EVENT_WORDS = {
     "channel.stop": "Канал остановлен",
     "channel.start": "Канал включён",
     "model.switch": "Смена модели",
+    "staff.file": "Личное дело",
+    "staff.hire": "Нанят сотрудник",
     "backup": "Снимок",
     "cycle.error": "Сбой цикла",
     "note": "Заметка",
@@ -284,9 +307,9 @@ _QUIET = {"cycle.tick", "board.command", "channel.cursor", "task.turn"}
 
 
 def _who(actor: str | None) -> str:
-    from corporation.roles import ROLES
+    from corporation.roles import get_role
 
-    role = ROLES.get(actor or "")
+    role = get_role(actor)
     return (
         role.person["name"]
         if role
@@ -320,6 +343,10 @@ def _what(entry: dict[str, Any]) -> str:
         text = f"{data.get('id')} → {_who(data.get('role'))}: {str(data.get('text') or '')[:80]}"
     elif entry["kind"] == "model.switch":
         text = f"{data.get('from')} → {data.get('to')}"
+    elif entry["kind"] == "staff.hire":
+        text = f"{data.get('role')} — {data.get('title')}"
+    elif entry["kind"] == "staff.file":
+        text = f"готовность: {str(data.get('readiness') or '')[:80]}"
     ref = entry.get("task") or entry.get("product") or entry.get("project") or ""
     return (
         f"{ref} " if ref and entry["kind"] not in ("task.open", "offer.draft") else ""
@@ -551,7 +578,9 @@ def board(st: journal.State | None = None) -> dict[str, Any]:
         for t in tasks
         if t["status"] == "failed"
     ][-10:]
-    from corporation.roles import ROLES
+    from corporation.roles import all_roles
+
+    staff_now = all_roles()  # the staff of the moment: built-in and hired
 
     open_tasks = sorted(
         [t for t in tasks if t["status"] in ("working", "queued")],
@@ -560,7 +589,7 @@ def board(st: journal.State | None = None) -> dict[str, Any]:
     return {
         "company": {
             "running": bool(st.cycle.get("running")),
-            "agents": len(ROLES),
+            "agents": len(staff_now),
             "revenue_today": _today(st)["revenue"],
             "growth_month_pct": _month_growth(st),
             "goal": st.goal,
@@ -581,7 +610,7 @@ def board(st: journal.State | None = None) -> dict[str, Any]:
             "records": st.records,
             "running_since": st.cycle.get("since"),
         },
-        "people": {name: ROLES[name].person for name in ROLES},
+        "people": {name: staff_now[name].person for name in staff_now},
         "current_tasks": [
             {
                 "id": t["id"],

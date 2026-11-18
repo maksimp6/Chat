@@ -24,6 +24,9 @@ __all__ = [
     "WATCHDOG_ROUNDS",
     "Role",
     "RolePolicy",
+    "all_roles",
+    "get_role",
+    "hired_roles",
     "policy_for",
     "policy_name",
 ]
@@ -124,6 +127,22 @@ ROLES: dict[str, Role] = {
             "ты директор: раскладываешь цель на задачи с измеримым результатом и не плодишь лишних.",
         ),
     ),
+    "hr": Role(
+        name="hr",
+        title="Кадры",
+        instructions=(
+            "Ты кадры (HR): нанимаешь сотрудников, когда компании не хватает рук. Сначала corporation "
+            "status: штат (roster), очередь задач, провалы, личные дела. Реши, какой роли не хватает для "
+            "цели компании — мобильных приложений, — и найми её вызовом corporation hire: role — короткий "
+            "ключ латиницей (например tester или designer), title — должность по-русски, instructions — "
+            "должностная инструкция (что сотрудник делает, какими инструментами компании, и что поручение "
+            "он заканчивает вызовом corporation finish_task или fail_task), why — зачем он нужен. Нанимай по "
+            "делу: новая роль закрывает работу, которую сейчас никто не делает; роль, которая уже есть в "
+            "штате, не нанимай повторно. После найма новый сотрудник сам проходит онбординг и сам пишет "
+            "личное дело — ты за него ничего не пишешь. Что сделал — corporation note."
+        ),
+        persona=("", "🧑‍💼", ""),
+    ),
     "research": Role(
         name="research",
         title="Исследование",
@@ -208,7 +227,55 @@ ROLES: dict[str, Role] = {
 
 # The order shifts take when several roles have work: the pipeline's order, so a product
 # started today is reviewed, offered and sold before the next one begins.
-ROLE_ORDER = ("director", "sales", "marketing", "critic", "production", "research")
+ROLE_ORDER = (
+    "director",
+    "hr",
+    "sales",
+    "marketing",
+    "critic",
+    "production",
+    "research",
+)
+
+
+def hired_roles() -> dict[str, Role]:
+    """The employees HR hired (owner, 18.11.2026: "let hr hire more stuff").
+
+    A hired role is not code: its definition is a ``staff.hire`` record in the ledger
+    (key, title, job instructions), so the staff grows without a deploy and every hire is
+    in the journal and the embeddings like any other fact. A hired employee has no
+    personal name — the title is the name — and may write product files like production.
+    A ledger that cannot be read gives no hired roles; the built-in ones still work.
+    """
+    try:
+        from corporation import ledger as journal
+
+        hired = journal.state().hired
+    except Exception:
+        return {}
+    result: dict[str, Role] = {}
+    for name, item in hired.items():
+        if name in ROLES:
+            continue
+        result[name] = Role(
+            name=name,
+            title=str(item.get("title") or name),
+            instructions=str(item.get("instructions") or ""),
+            writes_products=True,
+            persona=("", str(item.get("avatar") or "🧑‍💼"), ""),
+        )
+    return result
+
+
+def all_roles() -> dict[str, Role]:
+    """Every employee: the built-in roles, then the hired ones."""
+    return {**ROLES, **hired_roles()}
+
+
+def get_role(name: Any) -> Role | None:
+    """A role by its key, built-in or hired; None when there is no such employee."""
+    key = str(name or "")
+    return ROLES.get(key) or hired_roles().get(key)
 
 # The company's standing goal when the ledger holds no board.goal (корпорация: цель …).
 # Owner, 09.11.2026: "build me a mobile app company".
