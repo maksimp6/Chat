@@ -26,6 +26,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from corporation import context
+
 logger = logging.getLogger("logos.corporation.ledger")
 
 __all__ = ["Ledger", "State", "ledger", "products_dir", "staff_dir", "state", "state_dir"]
@@ -194,6 +196,12 @@ class Ledger:
         """Write one record, fsync it, embed it. Returns the record."""
         if kind not in KINDS:
             raise ValueError(f"unknown ledger kind: {kind}")
+        record_data = dict(data or {})
+        # A shift done by a worker outside the box names its model in every record it
+        # writes: the journal never passes outside work off as the local runner's.
+        outside_brain = context.brain()
+        if outside_brain and "via" not in record_data:
+            record_data["via"] = outside_brain
         with self._lock:
             items = self.entries()
             prev = items[-1]["hash"] if items else _ZERO
@@ -202,7 +210,7 @@ class Ledger:
                 "at": _now(),
                 "kind": kind,
                 "actor": actor,
-                "data": data or {},
+                "data": record_data,
                 "prev": prev,
             }
             for key, value in (

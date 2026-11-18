@@ -1,8 +1,9 @@
 """POST /api/corporation: the board window reads here; actions are the owner's commands.
 
 One endpoint, ``action`` picks what to do (status, conveyor, ledger, projects, staff, start,
-stop, goal, directive, decision, sold, expense, channel, backup, onboarding), the same words as the chat
-commands, so the window and the chat are one steering wheel.
+stop, goal, directive, decision, sold, expense, channel, backup, onboarding, hire, shift), the same
+words as the chat commands, so the window and the chat are one steering wheel. ``shift`` is the
+door for a worker outside the box (``corporation/outside.py``).
 """
 
 from __future__ import annotations
@@ -99,6 +100,12 @@ def corporation_action() -> Any:
                     },
                 }
             )
+        if action == "shift":
+            # a shift done by a worker outside the box, in a role; every record it
+            # writes names its model (corporation/outside.py)
+            from corporation import outside
+
+            return jsonify({"success": True, **outside.run_shift(data)})
         if action in _COMMAND_WORDS:
             text = str(data.get("text") or "")
             reply = commands.handle(
