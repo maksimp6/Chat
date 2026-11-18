@@ -87,6 +87,43 @@ def _open_project(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     }
 
 
+def _link_directive(args: dict[str, Any], cfg=None) -> dict[str, Any]:
+    """A directive already served by an open project is linked to it.
+
+    The ledger is append-only: when the ``project.open`` record named the directive
+    wrongly, or named none, the repair is a new ``project.directive`` record."""
+    st = journal.state()
+    project = str(args["project"])
+    if project not in st.projects:
+        raise ValueError(
+            f"no such project: {project}; projects: {', '.join(st.projects) or 'none'}"
+        )
+    directive = args.get("directive")
+    seq = (
+        int(directive)
+        if (isinstance(directive, int) and not isinstance(directive, bool))
+        or (isinstance(directive, str) and directive.isdigit())
+        else None
+    )
+    found = next((d for d in st.directives if d["seq"] == seq), None)
+    if found is None:
+        raise ValueError(
+            f"no such directive: {directive}; directive is the record number of a directive, "
+            f"directives: {', '.join(str(d['seq']) for d in st.directives) or 'none'}"
+        )
+    if found.get("project"):
+        raise ValueError(
+            f"directive {seq} already has project {found['project']}; only a directive without a project is linked"
+        )
+    journal.ledger().append(
+        "project.directive",
+        _actor(),
+        {"id": project, "directive": seq, "why": str(args["why"])},
+        project=project,
+    )
+    return {"success": True, "project": project, "directive": seq}
+
+
 def _open_task(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     st = journal.state()
     project = str(args["project"])
@@ -480,6 +517,20 @@ CORPORATION_TOOLS = {
         title="Открыть проект",
         description="Директор: новый проект по директиве (directive — номер записи; без него первая открытая) на линии компании: android (исходный проект приложения для Android) или pwa (устанавливаемое мобильное веб-приложение); другая линия (bots, texts, docs, data, translation) — только если её называет директива. Создаёт каталог продуктов проекта.",
     ),
+    "link_directive": _tool(
+        _link_directive,
+        read_only=False,
+        schema={
+            "properties": {
+                "project": _ID,
+                "directive": {"type": "integer"},
+                "why": _TEXT,
+            },
+            "required": ["project", "directive", "why"],
+        },
+        title="Привязать директиву к проекту",
+        description="Директор: привязать директиву к уже открытому по ней проекту (когда запись об открытии проекта назвала директиву неверно или не назвала). directive — номер записи директивы.",
+    ),
     "open_task": _tool(
         _open_task,
         read_only=False,
@@ -555,7 +606,7 @@ CORPORATION_TOOLS = {
             "required": ["price", "text"],
         },
         title="Оффер",
-        description="Маркетинг: цена в рублях, канал (telegram, vk, email) и текст объявления для готового продукта.",
+        description="Маркетинг: цена в рублях, канал (site, vk, telegram, email) и текст объявления для готового продукта.",
     ),
     "hire": _tool(
         _hire,

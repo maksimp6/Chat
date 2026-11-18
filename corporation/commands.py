@@ -24,9 +24,9 @@ HELP = (
     "• корпорация: цель <текст> — постоянная цель; без записи действует цель компании: делать и продавать мобильные приложения\n"
     "• корпорация: директива <текст> — что делаем (без неё решает основатель)\n"
     "• корпорация: решение <проект|задача> <close|requeue|keep> <текст>\n"
-    "• корпорация: продано <продукт> <сумма> [покупатель] [примечание]\n"
+    "• корпорация: продано <продукт> <сумма> [покупатель] [примечание]; для заказа с сайта — продано <номер заказа>\n"
     "• корпорация: расход <сумма> <на что>\n"
-    "• корпорация: канал telegram|vk|email вкл|выкл\n"
+    "• корпорация: канал site|telegram|vk|email вкл|выкл\n"
     "• корпорация: статус — положение дел\n"
     "• корпорация: снимок — резервная копия сейчас\n"
     "• корпорация: журнал [n] — последние записи\n"
@@ -74,6 +74,15 @@ def _status_text() -> str:
         + ".",
         f"Записей в журнале: {st.records}; последний снимок: {(st.last_backup or {}).get('at') or '—'}.",
     ]
+    # Work done outside the box, so the books do not read "stopped, 0 steps" while the
+    # company works.
+    outside = [n for n in st.notes if n.get("shift") == "outside"]
+    if outside:
+        last = outside[-1]
+        lines.insert(
+            1,
+            f"Смены вне ящика: {len(outside)}, последняя {last['at']} ({last.get('actor') or '—'}, {last.get('via') or '—'}).",
+        )
     return "\n".join(lines)
 
 
@@ -154,19 +163,54 @@ def handle(message: str) -> str:
         return f"Решение записано ([{entry['seq']}]): {target} → {verdict}."
     if word in ("продано", "sold"):
         parts = tail.split(" ", 3)
+        st = journal.state()
+        # A site order's number alone is the whole command: the owner reads that
+        # number in the transfer's comment. One order is confirmed once.
+        number = parts[0].lower() if len(parts) == 1 else ""
+        if number.startswith("site-"):
+            order = st.orders.get(number)
+            if order is None:
+                return f"Заказа {number} в журнале нет. Проверьте номер из комментария к переводу."
+            if order["product"] in st.clients[number]["paid"]:
+                return f"Заказ {number} уже подтверждён: вторая запись о продаже не сделана."
+            try:
+                made = cash.confirm_sale(
+                    str(order["product"]),
+                    order["amount"],
+                    f"заказ с сайта {number}, оффер {order['offer']}",
+                    number,
+                )
+            except ValueError as exc:
+                return f"Не записано: {exc}"
+            return (
+                f"Оплата заказа {number} записана ([{made['seq']}]): {order['product']}, "
+                f"{_fmt_money(order['amount'])} ₽, заказ от {order['at']}. Сверьте сумму с поступлением. "
+                f"Покупателю открыто скачивание. Подтверждено всего: {_fmt_money(made['confirmed'])} ₽."
+            )
         if len(parts) < 2:
-            return "Формат: корпорация: продано <продукт> <сумма> [покупатель] [примечание]"
+            return (
+                "Формат: корпорация: продано <продукт> <сумма> [покупатель] [примечание]; "
+                "для заказа с сайта — продано <номер заказа>"
+            )
         try:
             amount = float(parts[1].replace(",", "."))
         except ValueError:
             return "Сумма должна быть числом."
         client = parts[2] if len(parts) > 2 else None
         note = parts[3] if len(parts) > 3 else ""
+        known = client is None or client in st.clients
         try:
             made = cash.confirm_sale(parts[0], amount, note, client)
         except ValueError as exc:
             return f"Не записано: {exc}"
-        return f"Продажа записана ([{made['seq']}]): {parts[0]} за {_fmt_money(amount)} ₽. Подтверждено всего: {_fmt_money(made['confirmed'])} ₽."
+        return (
+            f"Продажа записана ([{made['seq']}]): {parts[0]} за {_fmt_money(amount)} ₽. Подтверждено всего: {_fmt_money(made['confirmed'])} ₽."
+            + (
+                ""
+                if known
+                else f" Покупателя {client} нет среди написавших компании: оплата записана на покупателя, который компании не писал; выдача по ней не откроется — проверьте идентификатор."
+            )
+        )
     if word in ("расход", "expense"):
         parts = tail.split(" ", 1)
         try:
@@ -177,8 +221,13 @@ def handle(message: str) -> str:
         return f"Расход записан ([{made['seq']}]): {_fmt_money(amount)} ₽."
     if word in ("канал", "channel"):
         parts = tail.split()
-        if len(parts) < 2 or parts[0].lower() not in ("telegram", "vk", "email"):
-            return "Формат: корпорация: канал telegram|vk|email вкл|выкл"
+        if len(parts) < 2 or parts[0].lower() not in (
+            "site",
+            "telegram",
+            "vk",
+            "email",
+        ):
+            return "Формат: корпорация: канал site|telegram|vk|email вкл|выкл"
         name, switch = parts[0].lower(), parts[1].lower()
         if switch in ("вкл", "on"):
             from corporation import channels

@@ -6,7 +6,7 @@ before the step it describes counts as done; the hash of the previous record is 
 every record, so a lost or edited line is found by ``verify`` at start-up. Every
 record is also embedded into the vector database (collection ``corporation``), so
 the roles can search their own past by meaning; an embedding that failed is
-retried by ``reembed_missing``. Snapshots (``snapshot``) copy the journal and the
+made up by the ledger's worker (``catch_up``). Snapshots (``snapshot``) copy the journal and the
 products to the phone's /sdcard and to the state directory.
 
 The file is ``<state dir>/corporation/ledger.jsonl``; the state directory is the
@@ -19,8 +19,12 @@ import hashlib
 import json
 import logging
 import os
+import queue
 import shutil
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,7 +34,16 @@ from corporation import context
 
 logger = logging.getLogger("logos.corporation.ledger")
 
-__all__ = ["Ledger", "State", "ledger", "products_dir", "staff_dir", "state", "state_dir"]
+__all__ = [
+    "Ledger",
+    "State",
+    "embedding_deferred",
+    "ledger",
+    "products_dir",
+    "staff_dir",
+    "state",
+    "state_dir",
+]
 
 _ZERO = "0" * 64
 COLLECTION = "corporation"
@@ -44,6 +57,7 @@ KINDS = frozenset(
         "board.goal",
         "project.open",
         "project.close",
+        "project.directive",
         "task.open",
         "task.start",
         "task.turn",
@@ -76,6 +90,19 @@ KINDS = frozenset(
         "backup",
     }
 )
+
+_EMBED_LATER: ContextVar[bool] = ContextVar("corporation_embed_later", default=False)
+
+
+@contextmanager
+def embedding_deferred() -> Iterator[None]:
+    """Records appended inside are embedded by the ledger's own worker thread, not by
+    the caller: a visitor of the shop and a caller of the door do not wait for the runner."""
+    token = _EMBED_LATER.set(True)
+    try:
+        yield
+    finally:
+        _EMBED_LATER.reset(token)
 
 
 def state_dir() -> Path:
@@ -133,6 +160,8 @@ class Ledger:
         self.path = path
         self._lock = threading.RLock()
         self._entries: list[dict[str, Any]] | None = None
+        self._pending: queue.SimpleQueue[dict[str, Any] | None] = queue.SimpleQueue()
+        self._embedder: threading.Thread | None = None
 
     # ----- reading -------------------------------------------------------------
 
@@ -194,42 +223,72 @@ class Ledger:
         offer: str | None = None,
     ) -> dict[str, Any]:
         """Write one record, fsync it, embed it. Returns the record."""
-        if kind not in KINDS:
-            raise ValueError(f"unknown ledger kind: {kind}")
-        record_data = dict(data or {})
+        return self.append_all(
+            [
+                {
+                    "kind": kind,
+                    "actor": actor,
+                    "data": data,
+                    "project": project,
+                    "task": task,
+                    "product": product,
+                    "offer": offer,
+                }
+            ]
+        )[0]
+
+    def append_all(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Write several records as one group: consecutive numbers, one write, one
+        fsync; then embed each. Every item holds the arguments of ``append`` by name
+        (``kind``, ``actor``, ``data``, ``project``, ``task``, ``product``, ``offer``).
+        Returns the records."""
+        for record in records:
+            if record["kind"] not in KINDS:
+                raise ValueError(f"unknown ledger kind: {record['kind']}")
+        if not records:
+            return []
         # A shift done by a worker outside the box names its model in every record it
         # writes: the journal never passes outside work off as the local runner's.
         outside_brain = context.brain()
-        if outside_brain and "via" not in record_data:
-            record_data["via"] = outside_brain
+        written: list[dict[str, Any]] = []
         with self._lock:
             items = self.entries()
             prev = items[-1]["hash"] if items else _ZERO
-            payload: dict[str, Any] = {
-                "seq": len(items) + 1,
-                "at": _now(),
-                "kind": kind,
-                "actor": actor,
-                "data": record_data,
-                "prev": prev,
-            }
-            for key, value in (
-                ("project", project),
-                ("task", task),
-                ("product", product),
-                ("offer", offer),
-            ):
-                if value:
-                    payload[key] = value
-            entry = {**payload, "hash": _hash(prev, payload)}
+            for record in records:
+                record_data = dict(record.get("data") or {})
+                if outside_brain and "via" not in record_data:
+                    record_data["via"] = outside_brain
+                payload: dict[str, Any] = {
+                    "seq": len(items) + len(written) + 1,
+                    "at": _now(),
+                    "kind": record["kind"],
+                    "actor": record["actor"],
+                    "data": record_data,
+                    "prev": prev,
+                }
+                for key in ("project", "task", "product", "offer"):
+                    if record.get(key):
+                        payload[key] = record[key]
+                entry = {**payload, "hash": _hash(prev, payload)}
+                written.append(entry)
+                prev = entry["hash"]
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as stream:
-                stream.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                stream.write(
+                    "".join(
+                        json.dumps(entry, ensure_ascii=False) + "\n"
+                        for entry in written
+                    )
+                )
                 stream.flush()
                 os.fsync(stream.fileno())
-            self._entries = items + [entry]
-        self._embed(entry)
-        return entry
+            self._entries = items + written
+        for entry in written:
+            if _EMBED_LATER.get():
+                self._embed_later(entry)
+            else:
+                self._embed(entry)
+        return written
 
     # ----- the vector copy -------------------------------------------------------
 
@@ -261,6 +320,47 @@ class Ledger:
                 "[CORP] record %s not embedded yet: %s", entry.get("seq"), exc
             )
             return False
+
+    def _embed_later(self, entry: dict[str, Any] | None) -> None:
+        self._pending.put(entry)
+        with self._lock:
+            if self._embedder is None or not self._embedder.is_alive():
+                self._embedder = threading.Thread(
+                    target=self._embed_pending,
+                    name="logos-corporation-embed",
+                    daemon=True,
+                )
+                self._embedder.start()
+
+    def catch_up(self) -> None:
+        """Wake the ledger's worker to embed what the vector database does not hold yet."""
+        self._embed_later(None)
+
+    def _embed_pending(self) -> None:
+        behind = True  # a fresh process may have lost a queue: look once
+        while True:
+            entry = self._pending.get()
+            ok = self._embed(entry) if entry is not None else True
+            if not ok:
+                behind = True
+            elif behind:
+                behind = not self._catch_up()
+
+    def _catch_up(self) -> bool:
+        """Embed every record the vector database does not hold yet. False when a
+        look-up or an embedding failed: the next record or wake-up tries again."""
+        try:
+            from vector_db import store as vectors
+        except Exception:
+            return False
+        for entry in self.entries():
+            try:
+                present = vectors.has(COLLECTION, self._doc_id(entry))
+            except Exception:
+                return False
+            if not present and not self._embed(entry):
+                return False
+        return True
 
     def reembed_missing(self, limit: int = 200) -> int:
         """Embed the records the vector database does not hold yet (after a runner outage)."""
@@ -296,8 +396,9 @@ class Ledger:
         for target in targets:
             try:
                 target.mkdir(parents=True, exist_ok=True)
-                if self.path.exists():
-                    shutil.copy2(self.path, target / self.path.name)
+                with self._lock:  # no record is written while the journal is copied
+                    if self.path.exists():
+                        shutil.copy2(self.path, target / self.path.name)
                 if products_dir().is_dir():
                     shutil.copytree(
                         products_dir(), target / "products", dirs_exist_ok=True
@@ -372,6 +473,12 @@ class State:
     hired: dict[str, dict[str, Any]] = field(
         default_factory=dict
     )  # role key -> the definition of an employee HR hired (staff.hire)
+    invoices: list[dict[str, Any]] = field(
+        default_factory=list
+    )  # invoice records: what was billed to whom
+    orders: dict[str, dict[str, Any]] = field(
+        default_factory=dict
+    )  # site client id -> the order that created it
 
     def next_id(self, prefix: str, table: dict[str, Any]) -> str:
         width = {"p": 4, "t": 5, "pr": 4, "o": 4}.get(prefix, 4)
@@ -497,6 +604,13 @@ def build_state(entries: list[dict[str, Any]]) -> State:
             if data.get("id") in st.projects:
                 st.projects[data["id"]]["status"] = "closed"
                 st.projects[data["id"]]["result"] = data.get("result")
+        elif kind == "project.directive":
+            pid, seq = data.get("id"), data.get("directive")
+            if pid in st.projects:
+                st.projects[pid]["directive"] = seq
+                for d in st.directives:
+                    if d["seq"] == seq:
+                        d["project"] = pid
         elif kind == "task.open":
             tid = data["id"]
             st.tasks[tid] = {
@@ -616,7 +730,12 @@ def build_state(entries: list[dict[str, Any]]) -> State:
                 },
             )
             client["messages"].append(
-                {"at": e["at"], "text": data.get("text", ""), "from": "client"}
+                {
+                    "at": e["at"],
+                    "text": data.get("text", ""),
+                    "from": "client",
+                    "channel": data.get("channel"),
+                }
             )
         elif kind == "client.reply":
             cid = str(data.get("client"))
@@ -631,7 +750,12 @@ def build_state(entries: list[dict[str, Any]]) -> State:
                 },
             )
             client["messages"].append(
-                {"at": e["at"], "text": data.get("text", ""), "from": "sales"}
+                {
+                    "at": e["at"],
+                    "text": data.get("text", ""),
+                    "from": "sales",
+                    "channel": data.get("channel"),
+                }
             )
         elif kind == "revenue.confirmed":
             st.money["confirmed"] += _money(data.get("amount"))
@@ -714,6 +838,46 @@ def build_state(entries: list[dict[str, Any]]) -> State:
                 st.office_of[data["office"]] = str(data["conversation"])
         elif kind == "backup":
             st.last_backup = {"at": e["at"], **data}
+        elif kind == "invoice":
+            st.invoices.append(
+                {
+                    "seq": e["seq"],
+                    "at": e["at"],
+                    "client": str(data.get("client") or ""),
+                    "channel": data.get("channel"),
+                    "offer": e.get("offer"),
+                    "product": e.get("product"),
+                    "amount": _money(data.get("amount")),
+                    "currency": data.get("currency", "RUB"),
+                    "text": data.get("text", ""),
+                }
+            )
+        # A site order and its signals, read beside the client.message branch above
+        # (which stays as it is for every channel).
+        if (
+            kind == "client.message"
+            and data.get("channel") == "site"
+            and data.get("signal")
+        ):
+            cid = str(data.get("client"))
+            if data["signal"] == "order" and e.get("offer"):
+                st.orders.setdefault(
+                    cid,
+                    {
+                        "client": cid,
+                        "offer": e.get("offer"),
+                        "product": e.get("product"),
+                        "project": e.get("project"),
+                        "at": e["at"],
+                        "amount": _money(data.get("amount")),
+                        "currency": data.get("currency", "RUB"),
+                        "contact": str(data.get("contact") or ""),
+                        "key": str(data.get("key") or ""),
+                        "signals": {},  # signal -> when it was first sent
+                    },
+                )
+            elif cid in st.orders:
+                st.orders[cid]["signals"].setdefault(str(data["signal"]), e["at"])
     return st
 
 

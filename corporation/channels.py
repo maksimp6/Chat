@@ -1,4 +1,5 @@
-"""The company's own hands outside: Telegram and mail, behind the Court gate.
+"""The company's own hands outside: Telegram, VK, mail and the company's own shop on
+its site, behind the Court gate.
 
 Owner, 08.11.2026: "i don't want they coming to me". The sales role publishes offers,
 answers buyers, sends invoices and delivers products itself. Before anything leaves,
@@ -17,6 +18,9 @@ Keys are the owner's (core/.env on the phone), never in the ledger:
   LOGOS_CORP_VK_TOKEN            a VK community token (wall, messages, docs)
   LOGOS_CORP_VK_GROUP            the community id (a number); its wall is the shelf, its messages the counter
   LOGOS_CORP_MAIL_HOST / _USER / _PASSWORD / _IMAP_HOST   the company mailbox (optional)
+
+The channel ``site`` needs no keys: the shop (``corporation/shop.py``) reads offers,
+replies and invoices from the ledger, so for it the record is the whole act.
 """
 
 from __future__ import annotations
@@ -70,6 +74,7 @@ def configured() -> dict[str, bool]:
             os.environ.get("LOGOS_CORP_MAIL_HOST")
             and os.environ.get("LOGOS_CORP_MAIL_USER")
         ),
+        "site": True,  # the company's own shop: no keys
     }
 
 
@@ -364,6 +369,7 @@ def _publish(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     how = {
         "telegram": f"напишите боту: /buy {oid}",
         "vk": f"напишите сообществу: куплю {oid}",
+        "site": f"оформите заказ в магазине компании, карточка {oid}",
     }.get(channel, f"ответьте на это письмо: куплю {oid}")
     text = f"{offer['text']}\n\nЦена: {offer['price']:.0f} {offer['currency']}. Чтобы купить, {how}"
     gate(st, channel, "publish", text=text)
@@ -382,6 +388,9 @@ def _publish(args: dict[str, Any], cfg=None) -> dict[str, Any]:
     elif channel == "vk":
         posted = _vk("wall.post", owner_id=-_vk_group(), from_group=1, message=text)
         message_id = (posted or {}).get("post_id")
+    elif channel == "site":
+        # The shop lists the offer from the ledger: the record below is the publication.
+        message_id = f"site:{oid}"
     else:
         message_id = _mail_send(
             os.environ.get("LOGOS_CORP_MAIL_LIST")
@@ -445,6 +454,8 @@ def _reply(args: dict[str, Any], cfg=None) -> dict[str, Any]:
         _tg("sendMessage", chat_id=cid, text=text)
     elif channel == "vk":
         _vk_send(cid, text)
+    elif channel == "site":
+        pass  # the buyer reads it on the order page
     else:
         _mail_send(cid, "Ответ компании", text)
     return {"success": True, "client": cid, "channel": channel}
@@ -488,11 +499,16 @@ def _invoice(args: dict[str, Any], cfg=None) -> dict[str, Any]:
         )
         return {"success": True, "client": cid, "offer": oid, "invoice": "telegram"}
     # No payments provider: the price and the owner's payment instructions go as text.
-    how = (
-        os.environ.get("LOGOS_CORP_PAYMENT_TEXT")
-        or "Реквизиты для оплаты пришлёт компания отдельным сообщением."
-    )
-    text = f"Счёт за {oid}: {offer['price']:.0f} {offer['currency']}. {how}"
+    if channel == "site":
+        # The order page shows the owner's payment text as it is when the buyer opens
+        # the page, so a site invoice carries the amount only.
+        text = f"Счёт за {oid}: {offer['price']:.0f} {offer['currency']}."
+    else:
+        how = (
+            os.environ.get("LOGOS_CORP_PAYMENT_TEXT")
+            or "Реквизиты для оплаты пришлёт компания отдельным сообщением."
+        )
+        text = f"Счёт за {oid}: {offer['price']:.0f} {offer['currency']}. {how}"
     book.append(
         "invoice",
         _actor(),
@@ -510,6 +526,8 @@ def _invoice(args: dict[str, Any], cfg=None) -> dict[str, Any]:
         _tg("sendMessage", chat_id=cid, text=text)
     elif channel == "vk":
         _vk_send(cid, text)
+    elif channel == "site":
+        pass  # the buyer reads it on the order page
     else:
         _mail_send(cid, f"Счёт {oid}", text)
     return {
@@ -530,6 +548,16 @@ def _deliver(args: dict[str, Any], cfg=None) -> dict[str, Any]:
         raise ValueError(f"no such product: {prid}")
     channel = st.clients.get(cid, {}).get("channel") or "telegram"
     gate(st, channel, "deliver", client=cid, product=prid)
+    if channel == "site":
+        # The buyer takes the file from the order page; the shop records the delivery
+        # at the download.
+        return {
+            "success": True,
+            "client": cid,
+            "product": prid,
+            "delivered": None,
+            "note": "site: the buyer downloads the product from the order page; nothing is sent from here",
+        }
     path = Path(product["path"])
     if not path.is_file():
         raise ValueError(f"the product file is gone: {path}")
@@ -660,7 +688,7 @@ CHANNEL_TOOLS = {
         read_only=False,
         schema={"properties": {"offer": _ID}, "required": ["offer"]},
         title="Опубликовать оффер",
-        description="Продажи: оффер уходит в канал компании (Telegram или почта), с ценой и способом покупки.",
+        description="Продажи: оффер уходит в канал компании (сайт, ВК, Telegram или почта), с ценой и способом покупки.",
     ),
     "inbox": _tool(
         _inbox,
@@ -687,7 +715,7 @@ CHANNEL_TOOLS = {
             "required": ["client", "offer"],
         },
         title="Выставить счёт",
-        description="Продажи: счёт покупателю по офферу (Telegram Payments, если настроен провайдер; иначе текстом).",
+        description="Продажи: счёт покупателю по офферу (Telegram Payments, если настроен провайдер; иначе текстом; на сайте счёт выставляет сам магазин на странице заказа).",
     ),
     "deliver": _tool(
         _deliver,
@@ -697,6 +725,6 @@ CHANNEL_TOOLS = {
             "required": ["client", "product"],
         },
         title="Отдать продукт",
-        description="Продажи: файл продукта покупателю; только после подтверждённой оплаты.",
+        description="Продажи: файл продукта покупателю; только после подтверждённой оплаты (на сайте покупатель скачивает его сам со страницы заказа).",
     ),
 }

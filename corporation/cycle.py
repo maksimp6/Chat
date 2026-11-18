@@ -171,14 +171,16 @@ def _switch_model(role: Role) -> bool:
 
 def _handoffs(st: journal.State) -> None:
     """The pipeline's own tasks, opened by code, not by the director: a drafted product
-    goes to the critic, a reworked one back to production, a ready one to marketing, a
-    drafted offer to sales, a waiting buyer to sales."""
+    goes to the critic, a rejected one back to production and after the rework to the
+    critic again, a ready one to marketing, a drafted offer to sales, a waiting buyer
+    to sales."""
     book = journal.ledger()
     opened = {
         (t["role"], t.get("product"), t.get("offer"), t.get("client"))
         for t in st.tasks.values()
         if t["status"] in ("queued", "working")
     }
+    enabled = sorted(n for n, c in st.channels.items() if c.get("enabled"))
     for product in st.products.values():
         project = product["project"]
         if st.projects.get(project, {}).get("status") != "open":
@@ -209,32 +211,49 @@ def _handoffs(st: journal.State) -> None:
                 project=project,
                 task=tid,
             )
-        elif (
-            product["status"] == "rework"
-            and ("production", product["id"], None, None) not in opened
-        ):
-            tid = st.next_id("t", st.tasks)
-            st.tasks[tid] = {
-                "status": "queued",
-                "role": "production",
-                "product": product["id"],
-                "offer": None,
-                "client": None,
-            }
-            notes = reviews[-1].get("notes", "") if reviews else ""
-            book.append(
-                "task.open",
-                "cycle",
-                {
-                    "id": tid,
-                    "role": "production",
-                    "product": product["id"],
-                    "text": f"Доработай продукт {product['id']} «{product['title']}» в файле {product['path']} по замечаниям критика и "
-                    f"перезапиши файл; затем снова draft_product с тем же путём не нужен — только finish_task. Замечания: {notes}",
-                },
-                project=project,
-                task=tid,
+        elif product["status"] == "rework":
+            # After the rework the critic reads it again: a production task for this
+            # product closed after the last verdict means the rework is done.
+            verdict_at = reviews[-1]["at"] if reviews else ""
+            reworked = any(
+                t.get("role") == "production"
+                and t.get("product") == product["id"]
+                and t.get("status") == "done"
+                and (t.get("closed") or "") > verdict_at
+                for t in st.tasks.values()
             )
+            role = "critic" if reworked else "production"
+            if (role, product["id"], None, None) not in opened:
+                tid = st.next_id("t", st.tasks)
+                st.tasks[tid] = {
+                    "status": "queued",
+                    "role": role,
+                    "product": product["id"],
+                    "offer": None,
+                    "client": None,
+                }
+                notes = reviews[-1].get("notes", "") if reviews else ""
+                text = (
+                    f"Производство доработало продукт {product['id']} «{product['title']}» по твоим замечаниям. "
+                    f"Прочитай его заново в файле {product['path']} и вынеси вердикт review_product: ready или "
+                    f"rework с конкретными правками. Прошлые замечания: {notes}"
+                    if reworked
+                    else f"Доработай продукт {product['id']} «{product['title']}» в файле {product['path']} по "
+                    f"замечаниям критика и перезапиши файл; затем снова draft_product с тем же путём не нужен — "
+                    f"только finish_task. Замечания: {notes}"
+                )
+                book.append(
+                    "task.open",
+                    "cycle",
+                    {
+                        "id": tid,
+                        "role": role,
+                        "product": product["id"],
+                        "text": text,
+                    },
+                    project=project,
+                    task=tid,
+                )
         elif (
             product["status"] == "ready"
             and not any(o["product"] == product["id"] for o in st.offers.values())
@@ -256,7 +275,8 @@ def _handoffs(st: journal.State) -> None:
                     "role": "marketing",
                     "product": product["id"],
                     "text": f"Составь оффер (draft_offer) для готового продукта {product['id']} «{product['title']}», файл {product['path']}. "
-                    f"Описание: {product['summary']}",
+                    f"Описание: {product['summary']} "
+                    f"Включённые каналы: {', '.join(enabled) or 'нет'}; укажи канал явно (channel).",
                 },
                 project=project,
                 task=tid,
@@ -265,7 +285,7 @@ def _handoffs(st: journal.State) -> None:
         if (
             offer["status"] == "draft"
             and st.channels.get(offer["channel"], {}).get("enabled")
-            and ("sales", None, offer["id"], None) not in opened
+            and ("sales", offer["product"], offer["id"], None) not in opened
         ):
             tid = st.next_id("t", st.tasks)
             st.tasks[tid] = {
@@ -718,15 +738,15 @@ def stop(reason: str = "owner") -> dict[str, Any]:
 
 
 def ensure_started() -> None:
-    """At boot: the cycle resumes when the ledger says it was running (and re-embeds what the
-    vector database missed while the runner was away)."""
+    """At boot: the cycle resumes when the ledger says it was running (and the ledger's
+    worker is woken to embed what the vector database missed while the runner was away)."""
     try:
         st = journal.state()
     except Exception:
         logger.exception("[CORP] the ledger could not be read at boot")
         return
     try:
-        journal.ledger().reembed_missing()
+        journal.ledger().catch_up()
     except Exception:
         logger.exception("[CORP] re-embedding failed")
     if st.cycle.get("running"):

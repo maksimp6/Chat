@@ -13,7 +13,9 @@ make system synchronous step after step".
 - ``ledger``   the append-only, hash-chained journal and the state derived from it
 - ``roles``    the departments: instructions, tools, budgets, model
 - ``tools``    the ``corporation`` tool the roles call (projects, tasks, products, offers)
-- ``channels`` the company's own hands outside (Telegram, mail) behind the Court gate
+- ``channels`` the company's own hands outside (the site, VK, Telegram, mail) behind the Court gate
+- ``shop``     the company's own shop on its site: offers, demo, order page, download
+- ``outside``  the door for workers outside the box: a shift in a role, the next step, a project's files
 - ``cash``     revenue and expenses, counted from the ledger
 - ``cycle``    the synchronous loop: one step, one role, one runner; shifts by model
 - ``office``   an employee's own dialog (fixed id ``logos-corp-<role>``), where the owner talks to one
