@@ -25,6 +25,8 @@ One function; ``POST /api/corporation {action: "shift", …}`` is its only calle
 
 from __future__ import annotations
 
+import base64
+import binascii
 from pathlib import Path
 from typing import Any
 
@@ -38,11 +40,22 @@ __all__ = ["run_shift"]
 def _write_file(project: str, item: Any) -> str:
     """One product file of the shift, inside ``products/<project>/``; returns its path."""
     if not isinstance(item, dict):
-        raise ValueError("a file is {path, content}")
+        raise ValueError("a file is {path, content} or {path, content_base64}")
     relative = Path(str(item.get("path") or ""))
     content = item.get("content")
-    if not str(relative) or str(relative) == "." or not isinstance(content, str):
-        raise ValueError("a file needs a relative path and text content")
+    encoded = item.get("content_base64")
+    # text as it is; anything else (an icon, an archive) as base64
+    if isinstance(encoded, str) and content is None:
+        try:
+            payload = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError(f"content_base64 of {relative} is not base64") from exc
+    elif isinstance(content, str) and encoded is None:
+        payload = content.encode("utf-8")
+    else:
+        raise ValueError("a file needs either text content or content_base64")
+    if not str(relative) or str(relative) == ".":
+        raise ValueError("a file needs a relative path")
     if relative.is_absolute() or ".." in relative.parts:
         raise ValueError(f"a file path stays inside the project's folder: {relative}")
     from corporation.tools import _project_dir
@@ -56,7 +69,7 @@ def _write_file(project: str, item: Any) -> str:
             f"a file path stays inside the project's folder: {relative}"
         ) from exc
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(content, encoding="utf-8")
+    target.write_bytes(payload)
     return str(target)
 
 
@@ -90,7 +103,8 @@ def _call(call: Any) -> dict[str, Any]:
 def run_shift(data: dict[str, Any]) -> dict[str, Any]:
     """Do one outside shift: write the files, make the calls, leave the note.
 
-    ``data``: role, brain, optional project and task, files [{path, content}], calls
+    ``data``: role, brain, optional project and task, files [{path, content}] (text) or
+    [{path, content_base64}] (anything else: an icon, an archive), calls
     [{category, tool, arguments}], reply (what the worker says it did). The calls run in
     order and stop at the first one a tool refuses; the answer says how far it got.
     """
