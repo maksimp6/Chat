@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+{% if view == "order" or view == "message" %}<meta name="robots" content="noindex, nofollow">
+{% endif %}{% if view == "order" and refresh %}<meta http-equiv="refresh" content="600">
+{% endif %}<title>{% if view == "shelf" %}Магазин приложений{% else %}{{ title }} — Магазин приложений{% endif %}</title>
+<style>
+  :root { --bg: #f5f3ee; --card: #ffffff; --text: #1f2328; --muted: #6b6f76; --ok: #2f7d4f; --bad: #b3412e; --line: #d9d6cf; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16181c; --card: #1f2227; --text: #e8e6e1; --muted: #9a9ea5; --ok: #5fbf85; --bad: #e27a66; --line: #3a3d43; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px 48px; }
+  a { color: inherit; }
+  .top { display: inline-block; color: var(--muted); margin-bottom: 24px; }
+  h1 { font-size: 32px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+  h2 { font-size: 20px; margin: 28px 0 8px; }
+  p { margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border-radius: 14px; padding: 18px 20px; margin-bottom: 12px; }
+  .card h2 { margin-top: 0; }
+  .price { font-size: 24px; font-weight: 600; }
+  .links a { margin-right: 16px; }
+  .pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .muted { color: var(--muted); font-size: 14px; }
+  label { display: block; color: var(--muted); font-size: 14px; margin: 0 0 4px; }
+  input { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid var(--line);
+          border-radius: 10px; background: var(--bg); color: var(--text); }
+  button { margin: 12px 0; width: 100%; font: inherit; font-weight: 600; padding: 12px;
+           border: 0; border-radius: 10px; background: var(--text); color: var(--bg); cursor: pointer; }
+  button.second { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .message { border-top: 1px solid var(--line); padding: 12px 0; }
+  .message:first-of-type { border-top: 0; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 32px; }
+</style>
+</head>
+<body>
+<main>
+<a class="top" href="/shop/">Магазин приложений</a>
+{% if view == "shelf" %}
+<h1>Магазин приложений</h1>
+<p class="sub">Готовые приложения и исходные проекты. Каждое можно открыть и попробовать до покупки.</p>
+{% for card in cards %}
+<div class="card">
+  <h2>{{ card.title }}</h2>
+  <p class="pre">{{ card.lead }}</p>
+  <p class="price">{{ card.price }}</p>
+  <p class="links"><a href="{{ card.href }}">Подробнее и заказ</a>{% if card.demo_href %}<a href="{{ card.demo_href }}">Демонстрация</a>{% endif %}</p>
+</div>
+{% else %}
+<div class="card"><p>Витрина пока пуста. Загляните позже.</p></div>
+{% endfor %}
+{% elif view == "offer" %}
+<h1>{{ title }}</h1>
+<div class="card">
+  <p class="pre">{{ text }}</p>
+  <p class="price">Цена: {{ price }}</p>
+</div>
+{% if demo_href %}
+<h2>Демонстрация</h2>
+<p>{{ demo_note }}</p>
+<p><a href="{{ demo_href }}" target="_blank" rel="noopener noreferrer">Открыть демонстрацию в новой вкладке</a></p>
+{% endif %}
+<h2>Что вы получите</h2>
+<p>{{ receive }}</p>
+<h2>Как проходит покупка</h2>
+<p>1. Нажмите «Оформить заказ» — откроется страница заказа со счётом.<br>
+2. Оплатите счёт по реквизитам на странице заказа, в комментарии укажите номер заказа.<br>
+3. Нажмите на странице заказа «Я оплатил(а)».<br>
+4. После подтверждения оплаты там появится ссылка для скачивания.</p>
+<h2>Оформить заказ</h2>
+{% if error %}<p class="bad">{{ error }}</p>
+{% endif %}
+<form class="card" method="post" action="/shop/order">
+  <input type="hidden" name="offer" value="{{ offer }}">
+  <div class="hp" aria-hidden="true"><input type="text" name="website" value="" autocomplete="off" tabindex="-1" aria-hidden="true"></div>
+  <label for="contact">Контакт для связи (необязательно): e-mail, телефон или @имя в Telegram</label>
+  <input id="contact" name="contact" maxlength="{{ contact_max }}" autocomplete="off" value="{{ contact }}">
+  <button type="submit">Оформить заказ</button>
+  <p>После нажатия откроется страница заказа. Сохраните её адрес: это единственный ключ к заказу — по нему видны счёт, ответы продавца и файл.</p>
+  <p class="muted">Контакт нужен, чтобы продавец мог написать вам по этому заказу.</p>
+</form>
+{% elif view == "order" %}
+<h1>{{ title }}</h1>
+<p class="sub">{{ product_title }} · {{ price }}</p>
+<p>Сохраните адрес этой страницы — это единственный ключ к заказу.</p>
+<div class="card">
+  <p>{{ state }}</p>
+{% if download_href %}
+  <p><a href="{{ download_href }}">Скачать «{{ product_title }}»</a></p>
+{% endif %}
+{% if invoice %}
+  <p>Счёт: {{ price }} за «{{ product_title }}».</p>
+{% if payment_text %}
+  <p class="pre">Как оплатить: {{ payment_text }}</p>
+{% endif %}
+  <p>В комментарии к переводу укажите номер заказа: {{ cid }}.</p>
+{% endif %}
+</div>
+{% if can_pay %}
+<form method="post" action="/shop/order/signal">
+  <input type="hidden" name="token" value="{{ token }}">
+  <input type="hidden" name="signal" value="paid">
+  <div class="hp" aria-hidden="true"><input type="text" name="website" value="" autocomplete="off" tabindex="-1" aria-hidden="true"></div>
+  <button type="submit">Я оплатил(а)</button>
+</form>
+{% endif %}
+{% if can_help %}
+<form method="post" action="/shop/order/signal">
+  <input type="hidden" name="token" value="{{ token }}">
+  <input type="hidden" name="signal" value="help">
+  <div class="hp" aria-hidden="true"><input type="text" name="website" value="" autocomplete="off" tabindex="-1" aria-hidden="true"></div>
+  <button class="second" type="submit">Нужна помощь продавца</button>
+</form>
+{% endif %}
+{% if help_at %}
+<p class="muted">Вы просили продавца связаться {{ help_at }}.</p>
+{% endif %}
+{% if not open %}
+<p class="muted">Магазин временно не принимает сообщения. Попробуйте позже.</p>
+{% endif %}
+<p class="links"><a href="{{ self_href }}">Обновить страницу</a><a href="{{ mail_href }}">Отправить ссылку на заказ себе на почту</a></p>
+<h2>Переписка</h2>
+<div class="card">
+{% for message in messages %}
+  <div class="message">
+    <div class="muted">{{ message.who }} · {{ message.at }}</div>
+    <div class="pre">{{ message.text }}</div>
+  </div>
+{% endfor %}
+</div>
+{% else %}
+<h1>{{ title }}</h1>
+<p>{{ text }}</p>
+<p><a href="/shop/">На витрину</a></p>
+{% endif %}
+<footer>Оплата — переводом по реквизитам из счёта. Файлы выдаются на странице заказа после подтверждения оплаты.</footer>
+</main>
+</body>
+</html>

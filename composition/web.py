@@ -43,6 +43,7 @@ from organization.partner_relations import (
 )
 from corporation.cycle import ensure_started as ensure_corporation_cycle
 from corporation.routes import corporation_bp
+from corporation.shop import host_rule as shop_host_rule, shop_bp, shop_headers
 from plugin_system.routes import plugin_bp
 from provider_accounts.credentials_routes import provider_credentials_bp
 from provider_accounts.model_routes import install as install_model_routes
@@ -83,6 +84,7 @@ BLUEPRINTS = (
     rag_bp,
     vectors_bp,
     corporation_bp,
+    shop_bp,
 )
 
 # Turns opened before this process booted were killed with the previous one (#1710).
@@ -104,6 +106,14 @@ STORAGE_INITIALIZERS = (
 def install(app: Application) -> None:
     """Add every unit the web process serves to ``app``."""
     register_mcp_tools()
+    # The shop answers on its own name only, and that name sees only the shop: an
+    # application-level hook, ahead of every other one (a blueprint's runs for its
+    # own routes only).
+    app.before_request(shop_host_rule)
+    # The shop's headers go on every answer the shop name gets under the shop's paths,
+    # whether a rule matched or not. Response hooks run in reverse order, so this one,
+    # registered before the shell's, runs after them; no other answer is touched.
+    app.after_request(shop_headers)
     install_rdc_pairing(app)
     for blueprint in BLUEPRINTS:
         app.register_blueprint(blueprint)
