@@ -8,10 +8,14 @@ Port 80 opens without root because the boot hook ``10-unprivileged-ports`` sets
 ``net.ipv4.ip_unprivileged_port_start`` to 0. The page shows only the state below.
 
 ``chat.maxxxpavlov.ru`` is the Logos server (port 8080), proxied here only for
-addresses inside the home network: Logos has no login and its tools run on the
-phone, so from outside that name answers 404 (owner, 04.11.2026: LAN only).
+addresses inside the home network; from outside that name answers 404 (owner,
+04.11.2026: LAN only).
 Since 05.11.2026 it also answers every IPv4 address RIPE NCC lists for Russia
 (owner: "now open for all russian ips").
+
+``www.maxxxpavlov.ru/shop/`` is the company's shop: the same addresses reach the paths
+under ``/shop/`` of Logos; everything else on that name is answered as before (owner,
+18.11.2026: "so work until business is running").
 
 HTTPS: port 443 serves the same pages with the Let's Encrypt certificate that
 acme_cert.py keeps fresh (owner, 05.11.2026: "make ssl for chat domain"); port 80
@@ -45,6 +49,15 @@ CHALLENGE_PREFIX = "/.well-known/acme-challenge/"
 BOOT_HOOK = Path.home() / ".termux/boot/70-home-page"
 STARTED = time.time()
 CHAT_HOST = "chat." + ddns_regru.DOMAIN
+SHOP_HOST = "www." + ddns_regru.DOMAIN
+SHOP_PREFIX = "/shop/"
+# The largest body the shop reads (corporation/shop.py BODY_MAX); a larger declared one is not read.
+SHOP_BODY_MAX = 4000
+SHOP_PAGE = """<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>{title}</title></head>
+<body><h1>{title}</h1><p>{text}</p></body></html>
+"""
 LOGOS = ("127.0.0.1", 8080)
 # Connection-level headers belong to one hop; the proxy never forwards them.
 _HOP_HEADERS = {
@@ -206,6 +219,8 @@ def _local(address: str) -> bool:
 
 
 _home_ip = {"address": None, "at": 0.0}
+# Set once port 443 serves: only then is plain HTTP of the shop sent to HTTPS.
+_tls = {"on": False}
 
 
 def _home_public_ip() -> str | None:
@@ -227,9 +242,10 @@ OWNER_PROXY_ADDRESSES = frozenset({"157.228.161.121"})
 
 
 # Russia's IPv4 blocks from the RIPE NCC delegation file, refreshed daily and kept on
-# disk, so a restart opens for Russia at once (owner, 05.11.2026: all Russian IPs).
+# disk under ~/.config, which a deploy keeps, so a restart opens for Russia at once
+# (owner, 05.11.2026: all Russian IPs).
 RIPE_DELEGATED = "https://ftp.ripe.net/pub/stats/ripencc/delegated-ripencc-latest"
-RUSSIA_CACHE = Path.home() / ".cache/ripe-ru-ipv4.json"
+RUSSIA_CACHE = Path.home() / ".config/home-page/ripe-ru-ipv4.json"
 _russia: dict[str, tuple[list[int], list[int]]] = {"table": ([], [])}
 
 
@@ -240,12 +256,18 @@ def _load_russia(ranges: list[list[int]]) -> None:
 
 
 def _refresh_russia() -> None:
-    try:
-        cached = json.loads(RUSSIA_CACHE.read_text(encoding="utf-8"))
-        _load_russia(cached["ranges"])
-        age = time.time() - cached["at"]
-    except (OSError, ValueError, KeyError, TypeError):
-        age = float("inf")
+    age = float("inf")
+    # The list written before the move to ~/.config is read when the new file is not
+    # there yet, so the first restart on this code does not start with an empty list.
+    for path in (RUSSIA_CACHE, Path.home() / ".cache/ripe-ru-ipv4.json"):
+        try:
+            cached = json.loads(path.read_text(encoding="utf-8"))
+            at = float(cached["at"])
+            _load_russia(cached["ranges"])
+            age = time.time() - at
+            break
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
     while True:
         if age > 86400:
             try:
@@ -326,19 +348,108 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _for_chat(self) -> bool:
-        host = (
+    def _host(self) -> str:
+        return (
             (self.headers.get("Host") or "")
             .rsplit(":", 1)[0]
             .strip()
             .lower()
             .rstrip(".")
         )
-        return host == CHAT_HOST
 
-    def _proxy(self) -> None:
-        """Logos for the home network and Russian addresses; elsewhere the name does not exist."""
+    def _shop_target(self) -> bool:
+        """The raw request target is the shop's: "/shop", "/shop?..." or anything under "/shop/"."""
+        target = self.path
+        return target.partition("?")[0] == "/shop" or target.startswith(SHOP_PREFIX)
+
+    def _logos(self) -> bool:
+        """Answer a request for Logos (the chat name, or the shop's paths of the shop name); False otherwise."""
+        host = self._host()
+        if host == CHAT_HOST:
+            self._proxy(CHAT_HOST)
+        elif host == SHOP_HOST and self._shop_target():
+            try:
+                self._shop()
+            except Exception as exc:
+                # The visitor went away, or the answer of Logos broke off: the
+                # connection closes and the reason is in the log.
+                print(
+                    time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "shop request failed:",
+                    repr(exc),
+                    flush=True,
+                )
+        else:
+            return False
+        return True
+
+    def _redirect(self, code: int, location: str) -> None:
+        self.send_response(code)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _shop_page(self, code: int, title: str, text: str) -> None:
+        """A small page of the shop name in its own language, for what the proxy answers itself."""
+        body = SHOP_PAGE.format(
+            title=html.escape(title), text=html.escape(text)
+        ).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _shop(self) -> None:
+        """The shop's paths of the shop name reach the shop pages of Logos and nothing else."""
+        target = self.path
         if not _home(self.client_address[0]):
+            self._shop_page(
+                404,
+                "Магазин недоступен",
+                f"Магазин открыт для посетителей из России. Ваш адрес: {self.client_address[0]}.",
+            )
+            return
+        if not (target.isascii() and target.isprintable()):
+            self._shop_page(
+                404, "Страница не найдена", "Такой страницы в магазине нет."
+            )
+            return
+        if _tls["on"] and not isinstance(self.connection, ssl.SSLSocket):
+            self._redirect(308, f"https://{SHOP_HOST}{target}")
+            return
+        if self.command in ("GET", "HEAD") and target.partition("?")[0] == "/shop":
+            self._redirect(302, SHOP_PREFIX)
+            return
+        if self.command not in ("GET", "HEAD", "POST") or not target.startswith(
+            SHOP_PREFIX
+        ):
+            self._shop_page(
+                404, "Страница не найдена", "Такой страницы в магазине нет."
+            )
+            return
+        lengths = self.headers.get_all("Content-Length") or []
+        declared = (lengths[0] if lengths else "") or "0"
+        if len(lengths) > 1 or not (
+            declared.isascii()
+            and declared.isdigit()
+            and len(declared) <= 4
+            and int(declared) <= SHOP_BODY_MAX
+        ):
+            self._shop_page(
+                400,
+                "Запрос не принят",
+                "Форма отправлена неверно. Вернитесь назад и попробуйте ещё раз.",
+            )
+            return
+        self._proxy(SHOP_HOST)
+
+    def _proxy(self, host: str) -> None:
+        """Logos for the home network and Russian addresses; elsewhere the name does not exist."""
+        # The shop name's address was judged by _shop.
+        if host == CHAT_HOST and not _home(self.client_address[0]):
             # Says which address was refused, so a device that should be at home shows why.
             self.send_error(
                 404,
@@ -346,13 +457,40 @@ class Handler(BaseHTTPRequestHandler):
                 f"адрес дома: {_home_public_ip() or 'неизвестен'}.",
             )
             return
+        shop = host == SHOP_HOST
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length else None
-        headers = {
-            k: v for k, v in self.headers.items() if k.lower() not in _HOP_HEADERS
-        }
+        if shop and body is not None and len(body) != length:
+            # Fewer bytes than declared arrived: the request is not forwarded.
+            self._shop_page(
+                400,
+                "Запрос не принят",
+                "Форма отправлена неверно. Вернитесь назад и попробуйте ещё раз.",
+            )
+            return
+        # The proxy sets the forwarding headers of a request it passes on; for the shop
+        # name it sets Host and Content-Length too.
+        headers = {}
+        for k, v in self.headers.items():
+            name = k.lower()
+            if name in _HOP_HEADERS or (
+                shop
+                and (
+                    "_" in name
+                    or name in ("host", "content-length")
+                    or name.startswith("x-forwarded-")
+                )
+            ):
+                continue
+            headers[k] = v
+        if shop:
+            if body is not None:
+                # The length the proxy read.
+                headers["Content-Length"] = str(len(body))
+            # The name the request was routed on.
+            headers["Host"] = host
         headers["X-Forwarded-For"] = self.client_address[0]
-        headers["X-Forwarded-Host"] = CHAT_HOST
+        headers["X-Forwarded-Host"] = host
         headers["X-Forwarded-Proto"] = (
             "https" if isinstance(self.connection, ssl.SSLSocket) else "http"
         )
@@ -363,7 +501,12 @@ class Handler(BaseHTTPRequestHandler):
             response = upstream.getresponse()
         except OSError:
             upstream.close()
-            self.send_error(502, "Logos is not answering")
+            if host == SHOP_HOST:
+                self._shop_page(
+                    502, "Магазин обновляется", "Попробуйте через несколько минут."
+                )
+            else:
+                self.send_error(502, "Logos is not answering")
             return
         try:
             self.send_response(response.status, response.reason)
@@ -383,23 +526,27 @@ class Handler(BaseHTTPRequestHandler):
             upstream.close()
 
     def do_PUT(self) -> None:  # noqa: N802 (http.server API)
-        self._proxy() if self._for_chat() else self.send_error(404)
+        if not self._logos():
+            self.send_error(404)
 
     def do_PATCH(self) -> None:  # noqa: N802 (http.server API)
-        self._proxy() if self._for_chat() else self.send_error(404)
+        if not self._logos():
+            self.send_error(404)
 
     def do_DELETE(self) -> None:  # noqa: N802 (http.server API)
-        self._proxy() if self._for_chat() else self.send_error(404)
+        if not self._logos():
+            self.send_error(404)
 
     def do_OPTIONS(self) -> None:  # noqa: N802 (http.server API)
-        self._proxy() if self._for_chat() else self.send_error(404)
+        if not self._logos():
+            self.send_error(404)
 
     def do_HEAD(self) -> None:  # noqa: N802 (http.server API)
-        self._proxy() if self._for_chat() else self.send_error(404)
+        if not self._logos():
+            self.send_error(404)
 
     def do_POST(self) -> None:  # noqa: N802 (http.server API)
-        if self._for_chat():
-            self._proxy()
+        if self._logos():
             return
         if self.path != "/ddns" or not _local(self.client_address[0]):
             self.send_error(404)
@@ -436,8 +583,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.startswith(CHALLENGE_PREFIX):
             self._challenge()
             return
-        if self._for_chat():
-            self._proxy()
+        if self._logos():
             return
         state = _state()
         if self.path == "/ddns":
@@ -510,6 +656,7 @@ def _serve_tls() -> None:
         server.socket, server_side=True, do_handshake_on_connect=False
     )
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    _tls["on"] = True
 
 
 def _certificates(script: Path) -> None:
