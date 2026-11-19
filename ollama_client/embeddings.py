@@ -22,6 +22,9 @@ def embed(
             endpoint, json={"model": model, "input": list(texts)}, timeout=timeout
         )
     except requests.RequestException as exc:
+        if isinstance(exc, requests.ConnectionError):
+            # the next request probes the runner's addresses again
+            settings.forget()
         raise OllamaError(
             f"asmrun {endpoint} unreachable: {type(exc).__name__}: {exc}", reached=False
         ) from exc

@@ -237,6 +237,9 @@ def ask(
     try:
         resp = requests.post(endpoint, json=body, timeout=timeout, stream=True)
     except requests.RequestException as exc:
+        if isinstance(exc, requests.ConnectionError):
+            # the next request probes the runner's addresses again
+            settings.forget()
         raise OllamaError(
             f"asmrun {endpoint} unreachable: {type(exc).__name__}: {exc}", reached=False
         ) from exc
