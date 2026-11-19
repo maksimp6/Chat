@@ -356,6 +356,13 @@ def _pick(st: journal.State) -> tuple[str, dict[str, Any] | None] | None:
         if t["status"] == "queued"
         and st.projects.get(t["project"], {}).get("status", "open") == "open"
     ]
+    # Within a project the tasks are taken in the order they were opened (research
+    # before production, production before the critic's reading); the role order
+    # below decides between projects.
+    first: dict[Any, dict[str, Any]] = {}
+    for t in queued:
+        first.setdefault(t["project"], t)
+    queued = list(first.values())
     last = st.cycle.get("last_role")
     if last and last != "director":
         same = [t for t in queued if t["role"] == last]
