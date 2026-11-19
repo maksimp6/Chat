@@ -16,9 +16,11 @@ table for a directive that names one by word; they are not the company's lines.
 
 from __future__ import annotations
 
-__all__ = ["COMPANY_LINES", "DEFAULT_LINE", "LINES", "menu", "recipe"]
+from typing import Any
 
-LINES: dict[str, dict[str, str]] = {
+__all__ = ["COMPANY_LINES", "DEFAULT_LINE", "LINES", "for_sale", "menu", "recipe"]
+
+LINES: dict[str, dict[str, Any]] = {
     "android": {
         "name": "Приложения для Android",
         "makes": "Готовый исходный проект приложения: Kotlin + Gradle (структура app/, AndroidManifest.xml, "
@@ -67,6 +69,8 @@ LINES: dict[str, dict[str, str]] = {
         "заглушек «TODO». В develop модуль переносит отдельным шагом владелец или работник по слову "
         "владельца, прямым push; сам продукт в репозиторий не попадает.",
         "sells": "Не продаётся: модуль делается для самого Логоса. Владелец решает, берёт ли его в develop.",
+        # the cycle opens no marketing task for a ready product of this line
+        "for_sale": False,
     },
     "bots": {
         "name": "Боты и скрипты",
@@ -110,6 +114,11 @@ LINES: dict[str, dict[str, str]] = {
 COMPANY_LINES: tuple[str, ...] = ("android", "pwa")
 
 DEFAULT_LINE = "android"
+
+
+def for_sale(line: str | None) -> bool:
+    """Whether the products of a line are offered for sale (a line says False when not)."""
+    return bool(LINES.get(line or "", {}).get("for_sale", True))
 
 
 def recipe(line: str | None) -> str:

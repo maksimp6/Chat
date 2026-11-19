@@ -35,6 +35,7 @@ import urllib.request
 from typing import Any
 
 from corporation import ledger as journal
+from corporation.lines import for_sale
 from corporation.roles import (
     ROLE_ORDER,
     WATCHDOG_ROUNDS,
@@ -256,6 +257,7 @@ def _handoffs(st: journal.State) -> None:
                 )
         elif (
             product["status"] == "ready"
+            and for_sale(st.projects.get(project, {}).get("line"))
             and not any(o["product"] == product["id"] for o in st.offers.values())
             and ("marketing", product["id"], None, None) not in opened
         ):
