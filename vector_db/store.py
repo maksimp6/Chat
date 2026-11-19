@@ -327,16 +327,20 @@ def collections() -> dict[str, Any]:
     for record in get_store().items(prefix=PREFIX).values():
         if isinstance(record, dict):
             entry = counts.setdefault(
-                record.get("collection"), {"documents": set(), "chunks": 0}
+                record.get("collection"),
+                {"documents": set(), "chunks": 0, "searchable": 0},
             )
             entry["documents"].add(record.get("id"))
             entry["chunks"] += 1
+            if record.get("model") == DOC_MODEL:
+                entry["searchable"] += 1
     return {
         "collections": [
             {
                 "collection": name,
                 "documents": len(entry["documents"]),
                 "chunks": entry["chunks"],
+                "searchable": entry["searchable"],
             }
             for name, entry in sorted(counts.items(), key=lambda item: str(item[0]))
         ]

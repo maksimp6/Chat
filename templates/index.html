@@ -181,6 +181,7 @@
             <button id="system-status-btn" type="button" class="header-btn logos-btn" title="Состояние системы" aria-label="Состояние системы" data-action="modal.open" data-modal="logos-system-status">●</button>
             <button id="model-btn" type="button" class="header-btn logos-btn" title="Модели" aria-label="Модели" data-action="modal.open" data-modal="model-modal">🤖</button>
             <button id="memory-btn" type="button" class="header-btn logos-btn" title="Управление памятью" aria-label="Управление памятью" data-action="modal.open" data-modal="memoryModal">🧠</button>
+            <button id="vectors-btn" type="button" class="header-btn logos-btn" title="Векторная база" aria-label="Векторная база" data-action="header.vectors.open">🧬</button>
             <button id="file-manager-btn" type="button" class="header-btn logos-btn" title="Файловый менеджер" aria-label="Файловый менеджер" data-action="header.files.open">📁</button>
             <button id="project-tree-btn" type="button" class="header-btn logos-btn" title="Структура проекта" aria-label="Структура проекта" data-action="project-tree.open">🌳</button>
             <button id="group-chat-btn" type="button" class="header-btn logos-btn" title="Групповой чат" aria-label="Групповой чат" data-action="header.group.open">👥</button>
@@ -368,6 +369,7 @@
     <script src="{{ static_root }}/memory_panel.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/provider_credentials.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/logs.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/vectors.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/corporation.js?v={{ static_version }}" defer></script>
   </body>
 </html>

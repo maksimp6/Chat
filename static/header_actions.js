@@ -18,6 +18,7 @@
     actions.register("header.mcp.open", call("openMcpManagerModal"));
     actions.register("header.rdc.open", call("openRdcModal"));
     actions.register("header.logs.open", call("openLogsModal"));
+    actions.register("header.vectors.open", call("openVectorsModal"));
     actions.register("header.settings.open", call("openSettingsModal"));
     actions.register("header.files.open", call("openFileManagerModal"));
     actions.register("header.treasury.open", call("openTreasuryPanel"));

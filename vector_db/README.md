@@ -43,7 +43,7 @@ Owner, 05.11.2026: "we don't need full sentences from remember just do sense ext
 
 ## HTTP
 
-`POST /api/vectors/<action>` (`add`, `search`, `delete`, `drop`, `collections`) with the tool's fields as JSON.
+`POST /api/vectors/<action>` (`add`, `search`, `delete`, `drop`, `collections`) with the tool's fields as JSON. The window «Векторная база» (🧬 tile, `static/vectors.js`) reads `collections` (documents, chunks and the chunks the current model embedded, `searchable`) and `search`; it changes nothing.
 
 ## Ports
 
