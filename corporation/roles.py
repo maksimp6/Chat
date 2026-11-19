@@ -31,9 +31,10 @@ __all__ = [
     "policy_name",
 ]
 
-# The chat model the stick boots with today; a role that names another file makes the
-# cycle switch the runner's model at the shift boundary (POST /v1/model, a reboot).
-DEFAULT_GGUF = "qwen35-9b-opus-distill-q4.gguf"
+# The chat model the runner serves the company with (owner, 09.11.2026: the 4B on the PC);
+# a role that names another file makes the cycle switch the runner's model at the shift
+# boundary (POST /v1/model, a reboot).
+DEFAULT_GGUF = "qwen35-4b-stock.gguf"
 
 # The one operational limit kept after the owner removed the business caps (08.11.2026,
 # "no restrictions"): a ceiling on tool rounds in a single turn. Not a business limit — it
