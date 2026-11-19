@@ -25,6 +25,7 @@ Also `delete(collection, doc_id)`, `drop(collection)`, `collections()`.
 - `repository-git`, `repository-issues`, `repository-issue_comments`, `repository-review_comments`, `repository-runs`: every record `rag_sync` appends (the app's code and history, its GitHub data).
 - `dialogs`: what was said in chat (`chat.mcp_routes._embed_turn`, in a thread after the reply is stored; a failure is a Court case `dialog_embedding_failed`): the reply of every finished turn with its question, the partial text and reasoning of a failed turn, a voice reply and the reply after an approved action. An image prompt is a document of its own, `<conversation>-image-<request>` (`chat.image_routes._embed_prompt`).
 - `memory_facts`: every fact of the Kristall journal. After each save `agent_memory.extractor` embeds the facts the collection lacks, so a fact is embedded once and a fact older than the collection joins at the next save. The SHA-256 of the fact is the document id; the metadata holds its category when it was embedded.
+- `court`: every Court sitting (`court/hearing/<id>`, document id = sitting id) and every censor record (`censor-<dialog>-<message>`), written by `court.embed`: verdicts, rules, reasons, decisions and conclusions, without quotes.
 
 ## Tool
 

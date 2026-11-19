@@ -23,7 +23,7 @@ Verdicts, lightest first: ПРАВО, БЕСПОЛЕЗНОЕ, СКОЛЬЗКО, 
 
 **The Court in the group chat** (`court.hearings.speak`, `POST /api/court/speak`). The Court is a participant of the group chat (👥 → «Суд Логоса», `static/group_chat.js`): after the chosen models have answered, the server judges the replies since the Court's last word, by their original words, and writes the verdicts into the chat as a message with `source: court` (never judged itself); when the user's last message asks about the rules, the Court lists them. The models see the Court's word in the history. The first word opens the sitting over the dialog, every later word updates it.
 
-**The hall of hearings** (`court.hearings`, the ⚖️ button of the page, `static/court.js`). A hearing is one sitting over one dialog: the protocol, the case drafts the flares opened, and the owner's decisions in the states of the Court procedure (`ALLEGED` until the owner decides, then `INVESTIGATING`, `CONFIRMED`, `REFUTED`, `UNKNOWN`, `FIXED`, `VERIFIED`, `ACCEPTED`), each with a reason and a history. A sitting can be judged again (decisions on the cases that are still there are kept), closed and reopened with a reason. Filing a case to GitHub is the owner's action, never automatic: the issue carries verdicts, rules and message numbers, the quotes go to the encrypted evidence. Hearings are kept in the Kristall store under `court/hearing/<id>`.
+**The hall of hearings** (`court.hearings`, the ⚖️ button of the page, `static/court.js`). A hearing is one sitting over one dialog: the protocol, the case drafts the flares opened, and the owner's decisions in the states of the Court procedure (`ALLEGED` until the owner decides, then `INVESTIGATING`, `CONFIRMED`, `REFUTED`, `UNKNOWN`, `FIXED`, `VERIFIED`, `ACCEPTED`), each with a reason and a history. A sitting can be judged again (decisions on the cases that are still there are kept), closed and reopened with a reason. Filing a case to GitHub is the owner's action, never automatic: the issue carries verdicts, rules and message numbers, the quotes go to the encrypted evidence. Hearings are kept in the Kristall store under `court/hearing/<id>`. Every sitting and every censor record is also embedded into the vector database, collection `court` (`court.embed`, in a thread after the record is saved; the document id is the sitting's id, so a new revision replaces it; at boot the records the collection lacks are embedded). The text holds verdicts, rules, reasons, message numbers, the owner's decisions with their history and the conclusion, never quotes or a struck reply's original words; a failure is a Court case `court_embedding_failed`.
 
 ## Public API
 
@@ -95,6 +95,8 @@ Everything `court` uses from other units is a field of `Host` in [`court/host.py
 | `get_messages` | `storage.records.get_messages` |
 | `get_store` | `storage.records.get_store` |
 | `list_owned_conversations` | `conversations.ownership.list_owned_conversations` |
+| `vector_add` | `vector_db.store.add` |
+| `vector_has` | `vector_db.store.has` |
 
 ## Configuration
 
@@ -112,4 +114,5 @@ The device needs `git`, `git-lfs`, `age` and `age-keygen` on `PATH`; without the
 - `composition/wiring.py` registers the `court` host factory (`register_all()`, or `register_units("court")` for this unit alone); the host is built on first use.
 - `composition/wiring.py` passes `court.filing.file_case` to the `invocation` host as `file_court_case`; `invocation.manager.fail_invocation` calls it for every failed invocation.
 - `composition/web.py` registers the blueprint `court_bp` (`court.hearings`).
+- `composition/web.py` runs `court.embed.start_missing` at boot (`STORAGE_INITIALIZERS`): the Court records the collection `court` lacks are embedded in a thread.
 - `composition/tool_sources.py` adds the `court` tool category from `court.tools`.

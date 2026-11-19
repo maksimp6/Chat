@@ -33,6 +33,8 @@ class Host:
     list_message_traces: Any  # invocation.api.list_message_traces
     list_owned_conversations: Any  # conversations.ownership.list_owned_conversations
     list_yandex_operations: Any  # yandex_client_modules.operations.list_operations
+    vector_add: Any  # vector_db.store.add
+    vector_has: Any  # vector_db.store.has
 
 
 _binding: Binding[Host] = Binding("court")
@@ -62,6 +64,8 @@ __all__ = [
     "list_owned_conversations",
     "list_yandex_operations",
     "provide",
+    "vector_add",
+    "vector_has",
 ]
 
 
@@ -119,3 +123,11 @@ def list_owned_conversations(*args: Any, **kwargs: Any) -> Any:
 
 def list_yandex_operations(*args: Any, **kwargs: Any) -> Any:
     return current().list_yandex_operations(*args, **kwargs)
+
+
+def vector_add(*args: Any, **kwargs: Any) -> Any:
+    return current().vector_add(*args, **kwargs)
+
+
+def vector_has(*args: Any, **kwargs: Any) -> Any:
+    return current().vector_has(*args, **kwargs)

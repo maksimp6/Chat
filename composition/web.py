@@ -25,6 +25,7 @@ from invocation.manager import fail_interrupted_invocations
 from chat.voice_routes import voice_bp
 from cloud.cloudru.iam_routes import cloudru_iam_bp
 from conversations.routes import install as install_conversation_routes
+from court.embed import start_missing as embed_court_records
 from court.hearings import court_bp
 from rag_sync.routes import rag_bp
 from vector_db.routes import vectors_bp
@@ -100,6 +101,7 @@ STORAGE_INITIALIZERS = (
     ensure_rdc_server,
     partial(fail_interrupted_invocations, before=_BOOTED_AT),
     ensure_corporation_cycle,  # the company's cycle resumes when its ledger says it was running
+    embed_court_records,  # Court records the vector database lacks are embedded in a thread
 )
 
 

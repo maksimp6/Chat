@@ -390,6 +390,8 @@ def _court():
     from yandex_client_modules.operations import (
         list_operations as list_yandex_operations,
     )
+    from vector_db.store import add as vector_add
+    from vector_db.store import has as vector_has
 
     return host.Host(
         ContractViolation=ContractViolation,
@@ -410,6 +412,8 @@ def _court():
         list_message_traces=list_message_traces,
         list_owned_conversations=list_owned_conversations,
         list_yandex_operations=list_yandex_operations,
+        vector_add=vector_add,
+        vector_has=vector_has,
     )
 
 

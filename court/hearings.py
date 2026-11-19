@@ -25,7 +25,7 @@ import urllib.request
 from typing import Any
 from uuid import uuid4
 
-from court import filing
+from court import embed, filing
 from court.host import (
     add_message,
     bound,
@@ -128,6 +128,7 @@ def _save(hearing: dict[str, Any]) -> dict[str, Any]:
             key,
             {**hearing, "revision": read_revision + 1, "updated_at": int(time.time())},
         )
+    embed.start_hearing(hearing["id"])
     return get_store().get(key)
 
 
@@ -182,6 +183,7 @@ def open_hearing(
     }
     with get_store().transaction() as tx:
         tx.set(_key(hearing["id"]), hearing)
+    embed.start_hearing(hearing["id"])
     return hearing
 
 
@@ -463,6 +465,7 @@ def speak(conversation_id: str, *, crisis: bool | None = None) -> dict[str, Any]
         }
         with get_store().transaction() as tx:
             tx.set(_key(hearing["id"]), hearing)
+        embed.start_hearing(hearing["id"])
     else:
         hearing.update(
             {
@@ -533,6 +536,7 @@ def record_reply(
                     "at": int(time.time()),
                 },
             )
+        embed.start_censor(CENSOR_PREFIX + conversation_id + "/" + str(message_id))
     messages = _with_originals(
         conversation_id, _dialog_messages(conversation_id, owner)
     )
@@ -585,6 +589,7 @@ def _sit(
             if tx.get(key) is not None:
                 raise ValueError("заседание открыто одновременно; повторите")
             tx.set(key, hearing)
+        embed.start_hearing(hearing["id"])
         return hearing
     hearing.update(
         {
