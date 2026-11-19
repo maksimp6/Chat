@@ -286,6 +286,7 @@ def _handoffs(st: journal.State) -> None:
     for offer in st.offers.values():
         if (
             offer["status"] == "draft"
+            and for_sale(st.projects.get(offer.get("project"), {}).get("line"))
             and st.channels.get(offer["channel"], {}).get("enabled")
             and ("sales", offer["product"], offer["id"], None) not in opened
         ):

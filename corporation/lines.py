@@ -69,7 +69,8 @@ LINES: dict[str, dict[str, Any]] = {
         "заглушек «TODO». В develop модуль переносит отдельным шагом владелец или работник по слову "
         "владельца, прямым push; сам продукт в репозиторий не попадает.",
         "sells": "Не продаётся: модуль делается для самого Логоса. Владелец решает, берёт ли его в develop.",
-        # the cycle opens no marketing task for a ready product of this line
+        # the cycle opens no marketing task for a ready product of this line, and no
+        # sales task for an offer drafted for one
         "for_sale": False,
     },
     "bots": {
